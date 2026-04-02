@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Professional user of the system",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "registrationNumber": { "type": "string" }
+      },
+      "required": ["name", "role"]
+    },
+    "Elderly": {
+      "title": "Elderly",
+      "description": "Resident of the institution",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "entryDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] },
+        "photoUrl": { "type": "string" }
+      },
+      "required": ["name", "birthDate", "entryDate", "status"]
+    },
+    "PIA": {
+      "title": "PIA",
+      "description": "Individualized Care Plan",
+      "type": "object",
+      "properties": {
+        "elderlyId": { "type": "string" },
+        "date": { "type": "string" },
+        "responsible": { "type": "string" },
+        "status": { "type": "string", "enum": ["EM_ANDAMENTO", "CONCLUIDO", "REVISAR"] },
+        "hasBPC": { "type": "boolean" },
+        "hasPension": { "type": "boolean" },
+        "hasLoans": { "type": "boolean" },
+        "monthlyIncome": { "type": "number" },
+        "familyInvolvement": { "type": "string" },
+        "healthStatus": { "type": "string" },
+        "medications": { "type": "string" },
+        "mobilityStatus": { "type": "string" },
+        "objectives": { "type": "string" },
+        "actions": { "type": "string" },
+        "observations": { "type": "string" }
+      },
+      "required": ["elderlyId", "date", "status"]
+    },
+    "EvolutionRecord": {
+      "title": "EvolutionRecord",
+      "description": "Professional evolution record for an elderly",
+      "type": "object",
+      "properties": {
+        "elderlyId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "professionalRole": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["INDIVIDUAL", "GRUPO", "VISITA_DOMICILIAR"] }
+      },
+      "required": ["elderlyId", "professionalId", "date", "content"]
+    },
+    "Donor": {
+      "title": "Donor",
+      "description": "Donor or monthly member",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "type": { "type": "string", "enum": ["DOADOR", "SOCIO_MENSAL"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] },
+        "startDate": { "type": "string" }
+      },
+      "required": ["name", "type", "status", "startDate"]
+    },
+    "DiaperDonation": {
+      "title": "DiaperDonation",
+      "description": "Record of diaper donation to community",
+      "type": "object",
+      "properties": {
+        "beneficiaryName": { "type": "string" },
+        "date": { "type": "string" },
+        "quantity": { "type": "number" },
+        "size": { "type": "string", "enum": ["TAMANHO_UNICO"] },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["beneficiaryName", "date", "quantity"]
+    },
+    "DiaperStock": {
+      "title": "DiaperStock",
+      "description": "Current diaper stock level",
+      "type": "object",
+      "properties": {
+        "quantity": { "type": "number" },
+        "lastUpdate": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["quantity", "lastUpdate"]
+    },
+    "DiaperProductionLog": {
+      "title": "DiaperProductionLog",
+      "description": "Record of diaper production or stock out",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "quantity": { "type": "number" },
+        "type": { "type": "string", "enum": ["PRODUCTION", "STOCK_OUT"] },
+        "registeredBy": { "type": "string" },
+        "observations": { "type": "string" }
+      },
+      "required": ["date", "quantity", "type", "registeredBy"]
+    }
+  },
+  "firestore": {
+    "users": { "schema": "User", "description": "System users" },
+    "elderly": { "schema": "Elderly", "description": "Institutionalized elderly" },
+    "pias": { "schema": "PIA", "description": "Care plans" },
+    "evolutions": { "schema": "EvolutionRecord", "description": "Professional evolutions" },
+    "donors": { "schema": "Donor", "description": "Donors and members" },
+    "diaperDonations": { "schema": "DiaperDonation", "description": "Community diaper donations" },
+    "diaperStock": { "schema": "DiaperStock", "description": "Factory stock control" },
+    "diaperProductionLogs": { "schema": "DiaperProductionLog", "description": "Factory production logs" }
+  }
+}

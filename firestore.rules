@@ -1,0 +1,206 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - name: string (required)
+    //   - role: string (required)
+    //   - photoUrl: string (optional)
+    //   - registrationNumber: string (optional)
+    //
+    // Collection: elderly
+    // Document ID: {elderlyId}
+    // Fields:
+    //   - name: string (required)
+    //   - birthDate: string (required)
+    //   - entryDate: string (required)
+    //   - status: string (required, enum: ATIVO, INATIVO)
+    //   - photoUrl: string (optional)
+    //
+    // Collection: pias
+    // Document ID: {piaId}
+    // Fields:
+    //   - elderlyId: string (required)
+    //   - date: string (required)
+    //   - responsible: string (required)
+    //   - status: string (required, enum: EM_ANDAMENTO, CONCLUIDO, REVISAR)
+    //   - [Other fields for health, social, family, objectives]
+    //
+    // Collection: evolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - elderlyId: string (required)
+    //   - professionalId: string (required)
+    //   - professionalRole: string (required)
+    //   - date: string (required)
+    //   - content: string (required)
+    //   - type: string (required, enum: INDIVIDUAL, GRUPO, VISITA_DOMICILIAR)
+    //
+    // Collection: donors
+    // Document ID: {donorId}
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - phone: string (required)
+    //   - type: string (required, enum: DOADOR, SOCIO_MENSAL)
+    //   - amount: number (optional)
+    //   - status: string (required, enum: ATIVO, INATIVO)
+    //   - startDate: string (required)
+    //
+    // Collection: diaperDonations
+    // Document ID: {donationId}
+    // Fields:
+    //   - beneficiaryName: string (required)
+    //   - date: string (required)
+    //   - quantity: number (required)
+    //   - size: string (required, enum: TAMANHO_UNICO)
+    //   - registeredBy: string (required)
+    //
+    // Collection: diaperStock
+    // Document ID: {stockId}
+    // Fields:
+    //   - quantity: number (required)
+    //   - lastUpdate: string (required)
+    //   - updatedBy: string (required)
+    //
+    // Collection: calendarEvents
+    // Document ID: {eventId}
+    // Fields:
+    //   - title: string (required)
+    //   - type: string (required, enum: COMPROMISSO, FERIADO, REUNIAO, OFICINA, ROTINA)
+    //   - description: string (optional)
+    //   - time: string (optional)
+    //   - location: string (optional)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - createdBy: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PRESIDENTE' ||
+          (request.auth.token.email == "franciaraeabreucoelho@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isCoordinator() {
+      return isAuthenticated() && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'COORDENADORA' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PROJETISTA');
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'];
+    }
+
+    function isValidElderly(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.status in ['ATIVO', 'INATIVO'];
+    }
+
+    function isValidCalendarEvent(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.type in ['COMPROMISSO', 'FERIADO', 'REUNIAO', 'OFICINA', 'ROTINA'] &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.createdBy is string &&
+             data.createdAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+    }
+
+    match /elderly/{elderlyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidElderly(request.resource.data) && hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'ENFERMEIRA', 'PROJETISTA']);
+    }
+
+    match /pias/{piaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasAnyRole(['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'PROJETISTA']);
+    }
+
+    match /evolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && hasAnyRole(['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA']);
+      allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.professionalId || isAdmin() || isCoordinator());
+    }
+
+    match /donors/{donorId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /diaperDonations/{donationId} {
+      allow read: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA']);
+      allow create: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA']);
+    }
+
+    match /diaperStock/{stockId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /diaperProductionLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /calendarEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidCalendarEvent(request.resource.data);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
