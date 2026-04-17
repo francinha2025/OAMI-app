@@ -80,6 +80,314 @@ service cloud.firestore {
     //   - createdBy: string (required)
     //   - createdAt: string (required)
     //
+    // Collection: volunteers
+    // Document ID: {volunteerId}
+    // Fields:
+    //   - name: string (required)
+    //   - type: string (required, enum: VOLUNTARIO, ESTAGIARIO)
+    //   - startDate: string (required)
+    //   - activities: string (required)
+    //   - status: string (required, enum: ATIVO, INATIVO)
+    //   - createdAt: string (required)
+    //
+    // Collection: financial
+    // Document ID: {recordId}
+    // Fields:
+    //   - date: string (required)
+    //   - description: string (required)
+    //   - amount: number (required)
+    //   - type: string (required, enum: RECEITA, DESPESA)
+    //   - category: string (required)
+    //
+    // Collection: physioPatients
+    // Document ID: {patientId}
+    // Fields:
+    //   - name: string (required)
+    //   - age: string (required)
+    //   - diagnosis: string (required)
+    //   - phone: string (required)
+    //   - category: string (required, enum: ortopedia, neurologico, idosos, outros)
+    //
+    // Collection: physioAssessments
+    // Document ID: {assessmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - complaint: string (required)
+    //
+    // Collection: physioEvolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - procedures: string (required)
+    //
+    // Collection: physioExercises
+    // Document ID: {exerciseId}
+    // Fields:
+    //   - title: string (required)
+    //   - category: string (required)
+    //
+    // Collection: physioAppointments
+    // Document ID: {appointmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - time: string (required)
+    //
+    // Collection: nursingPatients
+    // Document ID: {patientId}
+    // Fields:
+    //   - name: string (required)
+    //   - age: number (required)
+    //   - diagnosis: string (required)
+    //
+    // Collection: medications
+    // Document ID: {medicationId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - name: string (required)
+    //
+    // Collection: medicationAdministrations
+    // Document ID: {adminId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - medicationId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: vitalSigns
+    // Document ID: {vitalId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: dressingRecords
+    // Document ID: {dressingId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: nursingEvolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: incidentRecords
+    // Document ID: {incidentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: shiftSchedules
+    // Document ID: {shiftId}
+    // Fields:
+    //   - date: string (required)
+    //   - shift: string (required)
+    //
+    // Collection: avdRecords
+    // Document ID: {avdId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: diaperChangeRecords
+    // Document ID: {changeId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychPatients
+    // Document ID: {patientId}
+    // Fields:
+    //   - name: string (required)
+    //   - age: number (required)
+    //   - entryDate: string (required)
+    //
+    // Collection: psychInitialAssessments
+    // Document ID: {assessmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychEvolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychAppointments
+    // Document ID: {appointmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychEmotionalMonitorings
+    // Document ID: {monitoringId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychFamilyBonds
+    // Document ID: {bondId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychActivities
+    // Document ID: {activityId}
+    // Fields:
+    //   - date: string (required)
+    //   - title: string (required)
+    //
+    // Collection: psychCognitionAssessments
+    // Document ID: {assessmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: psychInterventionPlans
+    // Document ID: {planId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogyPatients
+    // Document ID: {patientId}
+    // Fields:
+    //   - name: string (required)
+    //   - age: number (required)
+    //
+    // Collection: pedagogyInitialAssessments
+    // Document ID: {assessmentId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogyEvolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogyActivities
+    // Document ID: {activityId}
+    // Fields:
+    //   - date: string (required)
+    //   - title: string (required)
+    //
+    // Collection: pedagogyStimulationTrackings
+    // Document ID: {trackingId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogySocialParticipations
+    // Document ID: {participationId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogyIndividualPlans
+    // Document ID: {planId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //
+    // Collection: pedagogyLifeHistories
+    // Document ID: {historyId}
+    // Fields:
+    //   - patientId: string (required)
+    //
+    // Collection: socialPatients
+    // Document ID: {patientId}
+    // Fields:
+    //   - name: string (required)
+    //   - birthDate: string (required)
+    //   - maritalStatus: string (required, enum: SOLTEIRO, CASADO, DIVORCIADO, VIUVO, OUTRO)
+    //   - benefitStatus: string (required, enum: ATIVO, SUSPENSO, NAO_POSSUI)
+    //   - createdAt: string (required)
+    //
+    // Collection: socialFamilyTies
+    // Document ID: {tieId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - hasFamily: boolean (required)
+    //   - registeredBy: string (required)
+    //   - updatedAt: string (required)
+    //
+    // Collection: socialDocumentations
+    // Document ID: {docId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - rg: string (required, enum: COMPLETO, PENDENTE, INEXISTENTE)
+    //   - cpf: string (required, enum: COMPLETO, PENDENTE, INEXISTENTE)
+    //   - sus: string (required, enum: COMPLETO, PENDENTE, INEXISTENTE)
+    //   - birthCertificate: string (required, enum: COMPLETO, PENDENTE, INEXISTENTE)
+    //   - addressProof: string (required, enum: COMPLETO, PENDENTE, INEXISTENTE)
+    //   - updatedAt: string (required)
+    //
+    // Collection: socialLegalSituations
+    // Document ID: {situationId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - hasCurator: boolean (required)
+    //   - isInterdicted: boolean (required)
+    //   - situationStatus: string (required, enum: REGULAR, EM_ANDAMENTO, PENDENTE)
+    //   - updatedAt: string (required)
+    //
+    // Collection: socialStudies
+    // Document ID: {studyId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - lifeHistory: string (required)
+    //   - socialConditions: string (required)
+    //   - institutionalizationReason: string (required)
+    //   - technicalOpinion: string (required)
+    //   - registeredBy: string (required)
+    //
+    // Collection: socialEvolutions
+    // Document ID: {evolutionId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - serviceType: string (required)
+    //   - observation: string (required)
+    //   - conduct: string (required)
+    //   - registeredBy: string (required)
+    //
+    // Collection: socialReferrals
+    // Document ID: {referralId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - destination: string (required, enum: CRAS, CREAS, INSS, DEFENSORIA, SAUDE, OUTRO)
+    //   - description: string (required)
+    //   - status: string (required, enum: CONCLUIDO, EM_ANDAMENTO, NAO_REALIZADO)
+    //   - registeredBy: string (required)
+    //
+    // Collection: socialFamilyVisits
+    // Document ID: {visitId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - visitorName: string (required)
+    //   - kinship: string (required)
+    //   - observations: string (required)
+    //   - registeredBy: string (required)
+    //
+    // Collection: socialRiskSituations
+    // Document ID: {riskId}
+    // Fields:
+    //   - patientId: string (required)
+    //   - date: string (required)
+    //   - type: string (required, enum: ABANDONO, NEGLIGENCIA, VIOLACAO_DIREITOS, OUTRO)
+    //   - description: string (required)
+    //   - severity: string (required, enum: BAIXA, MEDIA, ALTA)
+    //   - status: string (required, enum: IDENTIFICADO, EM_ACOMPANHAMENTO, RESOLVIDO)
+    //   - registeredBy: string (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -96,12 +404,44 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PRESIDENTE' ||
-          (request.auth.token.email == "franciaraeabreucoelho@gmail.com" && request.auth.token.email_verified == true));
+        ((request.auth.token.email == "franciaraeabreucoelho@gmail.com" && request.auth.token.email_verified == true) ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PRESIDENTE'));
     }
 
     function isCoordinator() {
-      return isAuthenticated() && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'COORDENADORA' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PROJETISTA');
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'COORDENADORA' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PROJETISTA');
+    }
+
+    function isPhysio() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'FISIOTERAPEUTA';
+    }
+
+    function isNurse() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ENFERMEIRA';
+    }
+
+    function isPsychologist() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PSICOLOGA';
+    }
+
+    function isPedagogue() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PEDAGOGA';
+    }
+
+    function isSocialWorker() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ASSISTENTE_SOCIAL';
     }
 
     function hasRole(role) {
@@ -109,7 +449,9 @@ service cloud.firestore {
     }
 
     function hasAnyRole(roles) {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
     }
 
     function hasRequiredFields(fields) {
@@ -146,6 +488,92 @@ service cloud.firestore {
              data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
              data.createdBy is string &&
              data.createdAt is string;
+    }
+
+    function isValidGalleryPhoto(data) {
+      return data.url is string && data.url.size() > 0 &&
+             data.date is string &&
+             data.professionalId is string &&
+             data.professionalName is string &&
+             data.professionalRole is string &&
+             data.professionalRole in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'] &&
+             data.activityType is string &&
+             data.category in ['MULTIDISCIPLINAR', 'OFICINA', 'REUNIAO', 'OUTROS'] &&
+             (!('patientId' in data) || data.patientId is string) &&
+             (!('patientName' in data) || data.patientName is string) &&
+             (!('description' in data) || (data.description is string && data.description.size() < 5000));
+    }
+
+    function isValidVolunteer(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.cpf is string && data.cpf.size() >= 11 && data.cpf.size() <= 20 &&
+             data.address is string && data.address.size() > 0 && data.address.size() < 500 &&
+             data.type is string && data.type in ['VOLUNTARIO', 'ESTAGIARIO'] &&
+             data.startDate is string && data.startDate.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.activities is string && data.activities.size() > 0 && data.activities.size() < 2000 &&
+             data.status is string && data.status in ['ATIVO', 'INATIVO'] &&
+             data.createdAt is string;
+    }
+
+    function isValidFinancialRecord(data) {
+      return data.date is string && data.date.size() > 0 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 500 &&
+             data.amount is number &&
+             data.type in ['RECEITA', 'DESPESA'] &&
+             data.category is string && data.category.size() > 0;
+    }
+
+    function isValidCommunityElderly(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.age is int && data.age >= 0 && data.age < 150 &&
+             data.birthDate is string && data.birthDate.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.address is string && data.address.size() > 0 && data.address.size() < 500 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 30 &&
+             data.registeredAt is string;
+    }
+
+    function isValidWorkshop(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.type in ['PROFISSIONAL', 'IDOSOS'];
+    }
+
+    function isValidCaregiver(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 30 &&
+             data.address is string && data.address.size() > 0 && data.address.size() < 500 &&
+             data.registeredAt is string;
+    }
+
+    function isValidProfessional(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'] &&
+             data.registrationNumber is string &&
+             data.phone is string &&
+             data.admissionDate is string &&
+             data.status in ['ATIVO', 'INATIVO'] &&
+             data.createdAt is string;
+    }
+
+    function isValidPhysioPatient(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.category in ['ortopedia', 'neurologico', 'idosos', 'outros'];
+    }
+
+    function isValidPhysioAssessment(data) {
+      return data.patientId is string && data.date is string;
+    }
+
+    function isValidPhysioEvolution(data) {
+      return data.patientId is string && data.date is string;
+    }
+
+    function isValidPhysioExercise(data) {
+      return data.title is string && data.title.size() > 0;
+    }
+
+    function isValidPhysioAppointment(data) {
+      return data.patientId is string && data.date is string;
     }
 
     // ===============================================================
@@ -195,12 +623,269 @@ service cloud.firestore {
 
     match /calendarEvents/{eventId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isValidCalendarEvent(request.resource.data);
+      allow create, update: if isAuthenticated() && isValidCalendarEvent(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /gallery/{photoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidGalleryPhoto(request.resource.data) && request.resource.data.professionalId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidGalleryPhoto(request.resource.data) && (resource.data.professionalId == request.auth.uid || isAdmin() || isCoordinator());
+      allow delete: if isAuthenticated() && (resource.data.professionalId == request.auth.uid || isAdmin() || isCoordinator());
+    }
+
+    match /volunteers/{volunteerId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isCoordinator()) && isValidVolunteer(request.resource.data);
+      allow update: if (isAdmin() || isCoordinator()) && isValidVolunteer(request.resource.data) && 
+                    (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if isAdmin() || isCoordinator();
+    }
+
+    match /financial/{recordId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /communityElderly/{elderlyId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidCommunityElderly(request.resource.data);
+      allow delete: if hasAnyRole(['PRESIDENTE', 'COORDENADORA']) || isAdmin();
+    }
+
+    match /workshops/{workshopId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidWorkshop(request.resource.data);
+      allow delete: if hasAnyRole(['PRESIDENTE', 'COORDENADORA']) || isAdmin();
+    }
+
+    match /caregivers/{caregiverId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidCaregiver(request.resource.data);
+      allow delete: if hasAnyRole(['PRESIDENTE', 'COORDENADORA']) || isAdmin();
+    }
+
+    match /professionals/{professionalId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /physioPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isPhysio() || isCoordinator() || isAdmin();
+    }
+
+    match /physioAssessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPhysio() || isCoordinator() || isAdmin();
+    }
+
+    match /physioEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isPhysio() || isCoordinator() || isAdmin();
+    }
+
+    match /physioExercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow write: if isPhysio() || isCoordinator() || isAdmin();
+    }
+
+    match /physioAppointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPhysio() || isCoordinator() || isAdmin();
+    }
+
+    match /nursingPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /medications/{medicationId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /medicationAdministrations/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /vitalSigns/{vitalId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /dressingRecords/{dressingId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /nursingEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /incidentRecords/{incidentId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /shiftSchedules/{shiftId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /avdRecords/{avdId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /diaperChangeRecords/{changeId} {
+      allow read: if isAuthenticated();
+      allow write: if isNurse() || isCoordinator() || isAdmin();
+    }
+
+    match /psychPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychInitialAssessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychAppointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychEmotionalMonitorings/{monitoringId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychFamilyBonds/{bondId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychActivities/{activityId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychCognitionAssessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /psychInterventionPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isPsychologist() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyInitialAssessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyActivities/{activityId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyStimulationTrackings/{trackingId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogySocialParticipations/{participationId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyIndividualPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /pedagogyLifeHistories/{historyId} {
+      allow read: if isAuthenticated();
+      allow write: if isPedagogue() || isCoordinator() || isAdmin();
+    }
+
+    match /socialPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialFamilyTies/{tieId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialDocumentations/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialLegalSituations/{situationId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialStudies/{studyId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialReferrals/{referralId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialFamilyVisits/{visitId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /socialRiskSituations/{riskId} {
+      allow read: if isAuthenticated();
+      allow write: if isSocialWorker() || isCoordinator() || isAdmin();
     }
 
     // Default deny
     match /{document=**} {
       allow read, write: if false;
+    }
+    match /familyEngagements/{engagementId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && hasAnyRole(['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'COORDENADORA', 'PRESIDENTE', 'PROJETISTA']);
+    }
+
+    match /settings/institutional {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
     }
   }
 }

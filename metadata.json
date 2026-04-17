@@ -1,5 +1,5 @@
 {
   "name": "OAMI - Gestão ILPI",
   "description": "Sistema de gestão para a Instituição de Longa Permanência para Idosos OAMI em Vitória do Mearim-MA.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["camera", "microphone"]
 }

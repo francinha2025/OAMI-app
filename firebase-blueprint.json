@@ -18,6 +18,10 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "fullName": { "type": "string" },
+        "cpf": { "type": "string" },
+        "birthCertificate": { "type": "string" },
+        "lastProfession": { "type": "string" },
         "birthDate": { "type": "string" },
         "entryDate": { "type": "string" },
         "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] },
@@ -113,6 +117,528 @@
         "observations": { "type": "string" }
       },
       "required": ["date", "quantity", "type", "registeredBy"]
+    },
+    "GalleryPhoto": {
+      "title": "GalleryPhoto",
+      "description": "Photo stored in the institutional gallery",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "date": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "professionalName": { "type": "string" },
+        "professionalRole": { "type": "string" },
+        "activityType": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["MULTIDISCIPLINAR", "OFICINA", "REUNIAO", "OUTROS"] }
+      },
+      "required": ["url", "date", "professionalId", "professionalName", "professionalRole", "activityType", "category"]
+    },
+    "Volunteer": {
+      "title": "Volunteer",
+      "description": "Volunteer or intern of the institution",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["VOLUNTARIO", "ESTAGIARIO"] },
+        "startDate": { "type": "string" },
+        "activities": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] }
+      },
+      "required": ["name", "type", "startDate", "status"]
+    },
+    "FinancialRecord": {
+      "title": "FinancialRecord",
+      "description": "Income or expense record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["RECEITA", "DESPESA"] },
+        "category": { "type": "string" }
+      },
+      "required": ["date", "description", "amount", "type", "category"]
+    },
+    "CommunityElderly": {
+      "title": "CommunityElderly",
+      "description": "Elderly person from the community registered for workshops",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "birthDate": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "healthConditions": { "type": "string" },
+        "medications": { "type": "string" },
+        "interests": { "type": "array", "items": { "type": "string" } },
+        "livingSituation": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "registeredAt": { "type": "string" }
+      },
+      "required": ["name", "age", "birthDate", "address", "phone", "registeredAt"]
+    },
+    "Workshop": {
+      "title": "Workshop",
+      "description": "Institutional workshop or training",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["PROFISSIONAL", "IDOSOS"] },
+        "participants": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["title", "date", "type"]
+    },
+    "Caregiver": {
+      "title": "Caregiver",
+      "description": "Caregiver participating in training sessions",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "experience": { "type": "string" },
+        "trainingInterests": { "type": "array", "items": { "type": "string" } },
+        "registeredAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "address", "registeredAt"]
+    },
+    "Professional": {
+      "title": "Professional",
+      "description": "Detailed information about staff professionals",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "admissionDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] },
+        "observations": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "role", "registrationNumber", "phone", "admissionDate", "status", "createdAt"]
+    },
+    "PsychPatient": {
+      "title": "PsychPatient",
+      "description": "Elderly patient for psychology tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "entryDate": { "type": "string" },
+        "familyContact": { "type": "string" },
+        "lifeHistory": { "type": "string" },
+        "hasVisits": { "type": "boolean" },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "age", "entryDate", "createdAt"]
+    },
+    "PsychInitialAssessment": {
+      "title": "PsychInitialAssessment",
+      "description": "Initial psychological assessment of an elderly",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "emotionalState": { "type": "string" },
+        "cognition": { "type": "string", "enum": ["ORIENTADO", "DESORIENTADO"] },
+        "mood": { "type": "string" },
+        "adaptationLevel": { "type": "string" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "emotionalState", "cognition", "mood", "adaptationLevel", "registeredBy"]
+    },
+    "PsychEvolution": {
+      "title": "PsychEvolution",
+      "description": "Psychological evolution record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "observation": { "type": "string" },
+        "intervention": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "time", "observation", "intervention", "registeredBy"]
+    },
+    "PsychAppointment": {
+      "title": "PsychAppointment",
+      "description": "Psychological appointment record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "type": { "type": "string", "enum": ["INDIVIDUAL", "GRUPO", "RODA_CONVERSA"] },
+        "status": { "type": "string", "enum": ["REALIZADO", "FALTOU", "PENDENTE"] },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "time", "type", "status", "registeredBy"]
+    },
+    "PsychEmotionalMonitoring": {
+      "title": "PsychEmotionalMonitoring",
+      "description": "Daily emotional monitoring record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "sadness": { "type": "string", "enum": ["LEVE", "MODERADO", "INTENSO", "NENHUM"] },
+        "anxiety": { "type": "string", "enum": ["LEVE", "MODERADO", "INTENSO", "NENHUM"] },
+        "loneliness": { "type": "string", "enum": ["LEVE", "MODERADO", "INTENSO", "NENHUM"] },
+        "irritability": { "type": "string", "enum": ["LEVE", "MODERADO", "INTENSO", "NENHUM"] },
+        "wellBeing": { "type": "string", "enum": ["FELIZ", "NEUTRO", "TRISTE"] },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "sadness", "anxiety", "loneliness", "irritability", "wellBeing", "registeredBy"]
+    },
+    "PsychFamilyBond": {
+      "title": "PsychFamilyBond",
+      "description": "Family bond and visit record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "receivesVisits": { "type": "boolean" },
+        "frequency": { "type": "string" },
+        "familyRelationship": { "type": "string" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "receivesVisits", "frequency", "familyRelationship", "registeredBy"]
+    },
+    "PsychActivity": {
+      "title": "PsychActivity",
+      "description": "Psychosocial activity record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["OFICINA", "DINAMICA", "GRUPO"] },
+        "description": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["date", "title", "type", "description", "participants", "registeredBy"]
+    },
+    "PsychCognitionAssessment": {
+      "title": "PsychCognitionAssessment",
+      "description": "Cognitive assessment record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "memory": { "type": "string", "enum": ["PRESERVADO", "COMPROMETIDO"] },
+        "attention": { "type": "string", "enum": ["PRESERVADO", "COMPROMETIDO"] },
+        "orientation": { "type": "string", "enum": ["PRESERVADO", "COMPROMETIDO"] },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "memory", "attention", "orientation", "registeredBy"]
+    },
+    "PsychInterventionPlan": {
+      "title": "PsychInterventionPlan",
+      "description": "Psychological intervention plan",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "objectives": { "type": "string" },
+        "strategies": { "type": "string" },
+        "followUp": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "objectives", "strategies", "followUp", "registeredBy"]
+    },
+    "PedagogyPatient": {
+      "title": "PedagogyPatient",
+      "description": "Elderly patient for pedagogy tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "schooling": { "type": "string" },
+        "previousProfession": { "type": "string" },
+        "interests": { "type": "array", "items": { "type": "string" } },
+        "cognitiveLimitations": { "type": "string" },
+        "literacyLevel": { "type": "string", "enum": ["ALFABETIZADO", "ANALFABETO", "ALFABETIZADO_FUNCIONAL"] },
+        "cognitiveLevel": { "type": "string", "enum": ["ALTO", "MEDIO", "BAIXO"] },
+        "favoriteActivities": { "type": "array", "items": { "type": "string" } },
+        "routinePreference": { "type": "string", "enum": ["GRUPO", "SOZINHO", "MISTO"] },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "age", "schooling", "literacyLevel", "cognitiveLevel", "createdAt"]
+    },
+    "PedagogyInitialAssessment": {
+      "title": "PedagogyInitialAssessment",
+      "description": "Initial pedagogical assessment",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "memory": { "type": "string", "enum": ["PRESERVADO", "LEVE_COMPROMETIMENTO", "COMPROMETIDO"] },
+        "attention": { "type": "string", "enum": ["PRESERVADO", "LEVE_COMPROMETIMENTO", "COMPROMETIDO"] },
+        "language": { "type": "string", "enum": ["PRESERVADO", "LEVE_COMPROMETIMENTO", "COMPROMETIDO"] },
+        "comprehension": { "type": "string", "enum": ["PRESERVADO", "LEVE_COMPROMETIMENTO", "COMPROMETIDO"] },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "memory", "attention", "language", "comprehension", "registeredBy"]
+    },
+    "PedagogyEvolution": {
+      "title": "PedagogyEvolution",
+      "description": "Pedagogical evolution record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "activityTitle": { "type": "string" },
+        "participation": { "type": "string", "enum": ["ATIVO", "PASSIVO", "RECUSOU"] },
+        "response": { "type": "string" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "activityTitle", "participation", "response", "registeredBy"]
+    },
+    "PedagogyActivity": {
+      "title": "PedagogyActivity",
+      "description": "Pedagogical activity record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["MEMORIA", "PINTURA", "MUSICA", "JOGOS", "LEITURA", "OUTRO"] },
+        "description": { "type": "string" },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["date", "time", "title", "type", "description", "participants", "registeredBy"]
+    },
+    "PedagogyStimulationTracking": {
+      "title": "PedagogyStimulationTracking",
+      "description": "Cognitive stimulation tracking",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "memoryScore": { "type": "integer" },
+        "attentionScore": { "type": "integer" },
+        "reasoningScore": { "type": "integer" },
+        "languageScore": { "type": "integer" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "memoryScore", "attentionScore", "reasoningScore", "languageScore", "registeredBy"]
+    },
+    "PedagogySocialParticipation": {
+      "title": "PedagogySocialParticipation",
+      "description": "Social participation record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "interactionLevel": { "type": "string", "enum": ["ALTO", "MEDIO", "BAIXO"] },
+        "isIsolated": { "type": "boolean" },
+        "isCommunicative": { "type": "boolean" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "interactionLevel", "isIsolated", "isCommunicative", "registeredBy"]
+    },
+    "PedagogyIndividualPlan": {
+      "title": "PedagogyIndividualPlan",
+      "description": "Individual pedagogical plan",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "objectives": { "type": "string" },
+        "indicatedActivities": { "type": "array", "items": { "type": "string" } },
+        "strategies": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "objectives", "indicatedActivities", "strategies", "registeredBy"]
+    },
+    "PedagogyLifeHistory": {
+      "title": "PedagogyLifeHistory",
+      "description": "Life history and memories",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "memories": { "type": "string" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "stories": { "type": "string" },
+        "timelineEvents": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "date": { "type": "string" },
+              "event": { "type": "string" }
+            }
+          } 
+        },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "memories", "stories", "registeredBy"]
+    },
+    "SocialPatient": {
+      "title": "SocialPatient",
+      "description": "Elderly patient for social work tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "naturalness": { "type": "string" },
+        "maritalStatus": { "type": "string", "enum": ["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO", "OUTRO"] },
+        "schooling": { "type": "string" },
+        "previousProfession": { "type": "string" },
+        "income": { "type": "number" },
+        "benefits": { "type": "array", "items": { "type": "string" } },
+        "benefitStatus": { "type": "string", "enum": ["ATIVO", "SUSPENSO", "NAO_POSSUI"] },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "birthDate", "maritalStatus", "benefitStatus", "createdAt"]
+    },
+    "SocialFamilyTie": {
+      "title": "SocialFamilyTie",
+      "description": "Family ties and relationships",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "hasFamily": { "type": "boolean" },
+        "members": { "type": "array", "items": { "type": "object" } },
+        "observations": { "type": "string" },
+        "abandonmentRisk": { "type": "boolean" },
+        "registeredBy": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["patientId", "hasFamily", "registeredBy", "updatedAt"]
+    },
+    "SocialDocumentation": {
+      "title": "SocialDocumentation",
+      "description": "Documentation status for an elderly",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "rg": { "type": "string", "enum": ["COMPLETO", "PENDENTE", "INEXISTENTE"] },
+        "cpf": { "type": "string", "enum": ["COMPLETO", "PENDENTE", "INEXISTENTE"] },
+        "sus": { "type": "string", "enum": ["COMPLETO", "PENDENTE", "INEXISTENTE"] },
+        "birthCertificate": { "type": "string", "enum": ["COMPLETO", "PENDENTE", "INEXISTENTE"] },
+        "addressProof": { "type": "string", "enum": ["COMPLETO", "PENDENTE", "INEXISTENTE"] },
+        "observations": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["patientId", "rg", "cpf", "sus", "birthCertificate", "addressProof", "updatedAt"]
+    },
+    "SocialLegalSituation": {
+      "title": "SocialLegalSituation",
+      "description": "Legal status and curatorship",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "hasCurator": { "type": "boolean" },
+        "curatorName": { "type": "string" },
+        "isInterdicted": { "type": "boolean" },
+        "processNumber": { "type": "string" },
+        "comarca": { "type": "string" },
+        "situationStatus": { "type": "string", "enum": ["REGULAR", "EM_ANDAMENTO", "PENDENTE"] },
+        "observations": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["patientId", "hasCurator", "isInterdicted", "situationStatus", "updatedAt"]
+    },
+    "SocialStudy": {
+      "title": "SocialStudy",
+      "description": "Social study and technical opinion",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "lifeHistory": { "type": "string" },
+        "socialConditions": { "type": "string" },
+        "institutionalizationReason": { "type": "string" },
+        "supportNetwork": { "type": "string" },
+        "technicalOpinion": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "lifeHistory", "socialConditions", "institutionalizationReason", "technicalOpinion", "registeredBy"]
+    },
+    "SocialEvolution": {
+      "title": "SocialEvolution",
+      "description": "Social work evolution record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "serviceType": { "type": "string" },
+        "observation": { "type": "string" },
+        "conduct": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "serviceType", "observation", "conduct", "registeredBy"]
+    },
+    "SocialReferral": {
+      "title": "SocialReferral",
+      "description": "Social work referral record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "destination": { "type": "string", "enum": ["CRAS", "CREAS", "INSS", "DEFENSORIA", "SAUDE", "OUTRO"] },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["CONCLUIDO", "EM_ANDAMENTO", "NAO_REALIZADO"] },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "destination", "description", "status", "registeredBy"]
+    },
+    "SocialFamilyVisit": {
+      "title": "SocialFamilyVisit",
+      "description": "Family visit record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "visitorName": { "type": "string" },
+        "kinship": { "type": "string" },
+        "observations": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "visitorName", "kinship", "observations", "registeredBy"]
+    },
+    "SocialRiskSituation": {
+      "title": "SocialRiskSituation",
+      "description": "Social risk situation record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["ABANDONO", "NEGLIGENCIA", "VIOLACAO_DIREITOS", "OUTRO"] },
+        "description": { "type": "string" },
+        "severity": { "type": "string", "enum": ["BAIXA", "MEDIA", "ALTA"] },
+        "status": { "type": "string", "enum": ["IDENTIFICADO", "EM_ACOMPANHAMENTO", "RESOLVIDO"] },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "type", "description", "severity", "status", "registeredBy"]
     }
   },
   "firestore": {
@@ -123,6 +649,39 @@
     "donors": { "schema": "Donor", "description": "Donors and members" },
     "diaperDonations": { "schema": "DiaperDonation", "description": "Community diaper donations" },
     "diaperStock": { "schema": "DiaperStock", "description": "Factory stock control" },
-    "diaperProductionLogs": { "schema": "DiaperProductionLog", "description": "Factory production logs" }
+    "diaperProductionLogs": { "schema": "DiaperProductionLog", "description": "Factory production logs" },
+    "gallery": { "schema": "GalleryPhoto", "description": "Institutional photo gallery" },
+    "volunteers": { "schema": "Volunteer", "description": "Volunteers and interns" },
+    "financial": { "schema": "FinancialRecord", "description": "Financial records" },
+    "communityElderly": { "schema": "CommunityElderly", "description": "Community elderly registration" },
+    "workshops": { "schema": "Workshop", "description": "Workshops and trainings" },
+    "caregivers": { "schema": "Caregiver", "description": "Caregivers registration" },
+    "professionals": { "schema": "Professional", "description": "Detailed staff records" },
+    "psychPatients": { "schema": "PsychPatient", "description": "Psychology patients" },
+    "psychInitialAssessments": { "schema": "PsychInitialAssessment", "description": "Psychology initial assessments" },
+    "psychEvolutions": { "schema": "PsychEvolution", "description": "Psychology evolutions" },
+    "psychAppointments": { "schema": "PsychAppointment", "description": "Psychology appointments" },
+    "psychEmotionalMonitorings": { "schema": "PsychEmotionalMonitoring", "description": "Psychology emotional monitorings" },
+    "psychFamilyBonds": { "schema": "PsychFamilyBond", "description": "Psychology family bonds" },
+    "psychActivities": { "schema": "PsychActivity", "description": "Psychology activities" },
+    "psychCognitionAssessments": { "schema": "PsychCognitionAssessment", "description": "Psychology cognition assessments" },
+    "psychInterventionPlans": { "schema": "PsychInterventionPlan", "description": "Psychology intervention plans" },
+    "pedagogyPatients": { "schema": "PedagogyPatient", "description": "Pedagogy patients" },
+    "pedagogyInitialAssessments": { "schema": "PedagogyInitialAssessment", "description": "Pedagogy initial assessments" },
+    "pedagogyEvolutions": { "schema": "PedagogyEvolution", "description": "Pedagogy evolutions" },
+    "pedagogyActivities": { "schema": "PedagogyActivity", "description": "Pedagogy activities" },
+    "pedagogyStimulationTrackings": { "schema": "PedagogyStimulationTracking", "description": "Pedagogy stimulation trackings" },
+    "pedagogySocialParticipations": { "schema": "PedagogySocialParticipation", "description": "Pedagogy social participations" },
+    "pedagogyIndividualPlans": { "schema": "PedagogyIndividualPlan", "description": "Pedagogy individual plans" },
+    "pedagogyLifeHistories": { "schema": "PedagogyLifeHistory", "description": "Pedagogy life histories" },
+    "socialPatients": { "schema": "SocialPatient", "description": "Social work patients" },
+    "socialFamilyTies": { "schema": "SocialFamilyTie", "description": "Social work family ties" },
+    "socialDocumentations": { "schema": "SocialDocumentation", "description": "Social work documentations" },
+    "socialLegalSituations": { "schema": "SocialLegalSituation", "description": "Social work legal situations" },
+    "socialStudies": { "schema": "SocialStudy", "description": "Social work studies" },
+    "socialEvolutions": { "schema": "SocialEvolution", "description": "Social work evolutions" },
+    "socialReferrals": { "schema": "SocialReferral", "description": "Social work referrals" },
+    "socialFamilyVisits": { "schema": "SocialFamilyVisit", "description": "Social work family visits" },
+    "socialRiskSituations": { "schema": "SocialRiskSituation", "description": "Social work risk situations" }
   }
 }
