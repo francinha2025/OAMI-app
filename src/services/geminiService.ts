@@ -96,3 +96,61 @@ export async function processSmartIA(text: string, userProfile?: string): Promis
     return null;
   }
 }
+
+export async function extractFormData(text: string, formSchema: string): Promise<any> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `Analise o seguinte texto extraído de um documento via OCR e tente preencher os campos do formulário baseando-se no esquema fornecido abaixo.
+    Retorne APENAS um objeto JSON plano onde as chaves são os nomes dos campos do formulário.
+    Se um campo não for encontrado, omita-o do JSON.
+    Normalize datas para YYYY-MM-DD se possível.
+
+    ESQUEMA DO FORMULÁRIO:
+    ${formSchema}
+
+    TEXTO OCR:
+    ${text}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
+
+    if (!response.text) return {};
+    return JSON.parse(response.text);
+  } catch (error) {
+    console.error("Error extracting form data:", error);
+    return {};
+  }
+}
+
+export async function fixGrammar(text: string): Promise<string> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return text;
+
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `Você é um editor especializado em prontuários de saúde. Sua tarefa é corrigir e melhorar o texto fornecido, mantendo o sentido original, mas tornando-o mais profissional, gramaticalmente correto e claro.
+    Use terminologia técnica apropriada para enfermagem/saúde se fizer sentido, mas não mude os fatos relatados.
+    Retorne APENAS o texto corrigido, sem comentários adicionais.
+
+    TEXTO ORIGINAL:
+    ${text}`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: prompt }] }],
+    });
+
+    return response.text || text;
+  } catch (error) {
+    console.error("Error fixing grammar:", error);
+    return text;
+  }
+}

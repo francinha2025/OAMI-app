@@ -7,7 +7,7 @@ import {
   Clock, Phone, User as UserIcon, Trash2, Edit2, 
   Download, Printer, X, Info, ArrowLeft,
   TrendingUp, UserCircle, LogOut, Moon, Sun,
-  Smile, Meh, Frown, History, Lightbulb,
+  Smile, Meh, Frown, History, Lightbulb, Loader2, Zap,
   Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -20,6 +20,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   PsychPatient, PsychInitialAssessment, PsychEvolution, 
   PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, 
@@ -43,14 +44,16 @@ interface PsychologySectionProps {
   interventionPlans: PsychInterventionPlan[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onSavePatient: (data: Omit<PsychPatient, 'id'>, id?: string) => Promise<void>;
-  onSaveInitialAssessment: (data: Omit<PsychInitialAssessment, 'id'>) => Promise<void>;
-  onSaveEvolution: (data: Omit<PsychEvolution, 'id'>) => Promise<void>;
-  onSaveAppointment: (data: Omit<PsychAppointment, 'id'>) => Promise<void>;
-  onSaveEmotionalMonitoring: (data: Omit<PsychEmotionalMonitoring, 'id'>) => Promise<void>;
-  onSaveFamilyBond: (data: Omit<PsychFamilyBond, 'id'>) => Promise<void>;
-  onSaveActivity: (data: Omit<PsychActivity, 'id'>) => Promise<void>;
-  onSaveCognitionAssessment: (data: Omit<PsychCognitionAssessment, 'id'>) => Promise<void>;
-  onSaveInterventionPlan: (data: Omit<PsychInterventionPlan, 'id'>) => Promise<void>;
+  onSaveInitialAssessment: (data: Omit<PsychInitialAssessment, 'id'>, id?: string) => Promise<void>;
+  onSaveEvolution: (data: Omit<PsychEvolution, 'id'>, id?: string) => Promise<void>;
+  onSaveAppointment: (data: Omit<PsychAppointment, 'id'>, id?: string) => Promise<void>;
+  onSaveEmotionalMonitoring: (data: Omit<PsychEmotionalMonitoring, 'id'>, id?: string) => Promise<void>;
+  onSaveFamilyBond: (data: Omit<PsychFamilyBond, 'id'>, id?: string) => Promise<void>;
+  onSaveActivity: (data: Omit<PsychActivity, 'id'>, id?: string) => Promise<void>;
+  onSaveCognitionAssessment: (data: Omit<PsychCognitionAssessment, 'id'>, id?: string) => Promise<void>;
+  onSaveInterventionPlan: (data: Omit<PsychInterventionPlan, 'id'>, id?: string) => Promise<void>;
+  onDeleteRecord: (collectionName: string, id: string) => Promise<void>;
+  onDeletePatient: (id: string) => Promise<void>;
   onSavePhotos: (photos: string[], patientId: string, patientName: string, activityType: string, description?: string) => Promise<void>;
   onUpdateProfile: (data: Partial<UserType>) => Promise<void>;
   theme: 'light' | 'dark';
@@ -68,8 +71,12 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   const [activeTab, setActiveTab] = useState<PsychTab>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<any>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [modalType, setModalType] = useState<'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' | null>(null);
+  const [editingData, setEditingData] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
 
   const filteredPatients = useMemo(() => {
     return (props.patients || []).filter(p => 
@@ -337,6 +344,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 setSearchQuery={setSearchQuery}
                 onSelect={setSelectedPatientId}
                 onAdd={() => { setModalType('patient'); setIsModalOpen(true); }}
+                onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
               />
             )}
             {activeTab === 'initial' && (
@@ -344,6 +352,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 assessments={props.initialAssessments}
                 onAdd={() => { setModalType('initial'); setIsModalOpen(true); }}
+                onEdit={(a: any) => { setEditingData(a); setModalType('initial'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'initial' })}
               />
             )}
             {activeTab === 'evolution' && (
@@ -351,6 +361,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 evolutions={props.evolutions}
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
+                onEdit={(e: any) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
               />
             )}
             {activeTab === 'appointments' && (
@@ -358,6 +370,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 appointments={props.appointments}
                 onAdd={() => { setModalType('appointment'); setIsModalOpen(true); }}
+                onEdit={(a: any) => { setEditingData(a); setModalType('appointment'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'appointment' })}
               />
             )}
             {activeTab === 'emotions' && (
@@ -365,6 +379,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 monitorings={props.emotionalMonitorings}
                 onAdd={() => { setModalType('emotion'); setIsModalOpen(true); }}
+                onEdit={(e: any) => { setEditingData(e); setModalType('emotion'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'emotion' })}
               />
             )}
             {activeTab === 'family' && (
@@ -372,6 +388,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 bonds={props.familyBonds}
                 onAdd={() => { setModalType('family'); setIsModalOpen(true); }}
+                onEdit={(f: any) => { setEditingData(f); setModalType('family'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'family' })}
               />
             )}
             {activeTab === 'activities' && (
@@ -379,6 +397,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 activities={props.activities}
                 onAdd={() => { setModalType('activity'); setIsModalOpen(true); }}
+                onEdit={(a: any) => { setEditingData(a); setModalType('activity'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'activity' })}
               />
             )}
             {activeTab === 'cognition' && (
@@ -386,6 +406,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={props.patients}
                 assessments={props.cognitionAssessments}
                 onAdd={() => { setModalType('cognition'); setIsModalOpen(true); }}
+                onEdit={(c: any) => { setEditingData(c); setModalType('cognition'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'cognition' })}
               />
             )}
             {activeTab === 'alerts' && (
@@ -413,25 +435,67 @@ export const PsychologySection = (props: PsychologySectionProps) => {
         </AnimatePresence>
       </div>
 
-      <PsychologyModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        type={modalType}
-        patients={props.patients}
-        onSave={async (data) => {
-          const payload = { ...data, registeredBy: props.user.name };
-          if (modalType === 'patient') await props.onSavePatient(data as any);
-          if (modalType === 'initial') await props.onSaveInitialAssessment(payload as any);
-          if (modalType === 'evolution') await props.onSaveEvolution(payload as any);
-          if (modalType === 'appointment') await props.onSaveAppointment(payload as any);
-          if (modalType === 'emotion') await props.onSaveEmotionalMonitoring(payload as any);
-          if (modalType === 'family') await props.onSaveFamilyBond(payload as any);
-          if (modalType === 'activity') await props.onSaveActivity(payload as any);
-          if (modalType === 'cognition') await props.onSaveCognitionAssessment(payload as any);
-          if (modalType === 'plan') await props.onSaveInterventionPlan(payload as any);
-          setIsModalOpen(false);
+      <AnimatePresence>
+        {isModalOpen && (
+          <PsychologyModal 
+            isOpen={isModalOpen}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingData(null);
+              setModalType(null);
+            }}
+            type={modalType}
+            patients={props.patients}
+            showToast={props.showToast}
+            onSavePhotos={props.onSavePhotos}
+            editingData={editingData}
+            onSave={async (data: any) => {
+              const payload = { ...data, registeredBy: props.user.name };
+              const id = editingData?.id;
+              if (modalType === 'patient') await props.onSavePatient(data as any, id);
+              if (modalType === 'initial') await props.onSaveInitialAssessment(payload as any, id);
+              if (modalType === 'evolution') await props.onSaveEvolution(payload as any, id);
+              if (modalType === 'appointment') await props.onSaveAppointment(payload as any, id);
+              if (modalType === 'emotion') await props.onSaveEmotionalMonitoring(payload as any, id);
+              if (modalType === 'family') await props.onSaveFamilyBond(payload as any, id);
+              if (modalType === 'activity') await props.onSaveActivity(payload as any, id);
+              if (modalType === 'cognition') await props.onSaveCognitionAssessment(payload as any, id);
+              if (modalType === 'plan') await props.onSaveInterventionPlan(payload as any, id);
+              setIsModalOpen(false);
+              setEditingData(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <ConfirmationModal 
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={async () => {
+          if (!deleteConfirm) return;
+          try {
+            if (deleteConfirm.type === 'patient') {
+              await props.onDeletePatient(deleteConfirm.id);
+              setSelectedPatientId(null);
+            } else {
+              const mapping: Record<string, string> = {
+                initial: 'psychInitialAssessments',
+                evolution: 'psychEvolutions',
+                appointment: 'psychAppointments',
+                emotion: 'psychEmotionalMonitorings',
+                family: 'psychFamilyBonds',
+                activity: 'psychActivities',
+                cognition: 'psychCognitionAssessments',
+                plan: 'psychInterventionPlans'
+              };
+              await props.onDeleteRecord(mapping[deleteConfirm.type], deleteConfirm.id);
+            }
+          } finally {
+            setDeleteConfirm(null);
+          }
         }}
-        onSavePhotos={props.onSavePhotos}
+        title={`Excluir ${deleteConfirm?.type === 'patient' ? 'Paciente' : 'Registro'}`}
+        message={`Tem certeza que deseja excluir este ${deleteConfirm?.type === 'patient' ? 'paciente' : 'registro'}? Esta ação não pode ser desfeita.`}
       />
     </div>
   );
@@ -470,7 +534,7 @@ const StatCard = ({ icon, label, value, color, alert }: { icon: React.ReactNode,
   </div>
 );
 
-const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd }: any) => (
+const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, onEdit }: any) => (
   <div className="space-y-6">
     <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
       <div className="relative w-full md:w-96">
@@ -505,9 +569,11 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd }
                 <p className="text-xs text-gray-500">{patient.age} anos • {patient.entryDate}</p>
               </div>
             </div>
-            <button className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors">
-              <MoreVertical size={18} />
-            </button>
+            <div className="flex gap-1">
+              <button onClick={() => onEdit(patient)} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">
+                <Edit2 size={16} />
+              </button>
+            </div>
           </div>
           
           <div className="space-y-3 mb-6">
@@ -525,9 +591,6 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd }
             <button onClick={() => onSelect(patient.id)} className="flex-1 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all">
               Ver Perfil
             </button>
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
-              Evoluir
-            </button>
           </div>
         </div>
       ))}
@@ -535,7 +598,7 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd }
   </div>
 );
 
-const InitialAssessmentView = ({ patients, assessments, onAdd }: any) => (
+const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold">Avaliações Iniciais</h3>
@@ -550,7 +613,13 @@ const InitialAssessmentView = ({ patients, assessments, onAdd }: any) => (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-2">
               <h4 className="font-bold text-blue-600">{patient?.name}</h4>
-              <span className="text-xs text-gray-400">{a.date}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">{a.date}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => onEdit(a)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => onDelete(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-3">
               <div>
@@ -578,7 +647,7 @@ const InitialAssessmentView = ({ patients, assessments, onAdd }: any) => (
   </div>
 );
 
-const EvolutionView = ({ patients, evolutions, onAdd }: any) => (
+const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold">Evoluções Psicológicas</h3>
@@ -597,6 +666,10 @@ const EvolutionView = ({ patients, evolutions, onAdd }: any) => (
                 <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
                 <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
               </div>
+              <div className="flex gap-2">
+                <button onClick={() => onEdit(e)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                <button onClick={() => onDelete(e.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+              </div>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-gray-600 dark:text-gray-400"><span className="font-bold text-blue-600">Obs:</span> {e.observation}</p>
@@ -609,7 +682,7 @@ const EvolutionView = ({ patients, evolutions, onAdd }: any) => (
   </div>
 );
 
-const AppointmentsView = ({ patients, appointments, onAdd }: any) => (
+const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold">Atendimentos</h3>
@@ -650,7 +723,10 @@ const AppointmentsView = ({ patients, appointments, onAdd }: any) => (
                   </span>
                 </td>
                 <td className="py-4">
-                  <button className="text-blue-600 hover:underline font-bold text-xs">Detalhes</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => onEdit(app)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(app.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                  </div>
                 </td>
               </tr>
             );
@@ -661,7 +737,7 @@ const AppointmentsView = ({ patients, appointments, onAdd }: any) => (
   </div>
 );
 
-const EmotionsView = ({ patients, monitorings, onAdd }: any) => (
+const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <h3 className="text-lg font-bold">Monitoramento Emocional</h3>
@@ -687,6 +763,10 @@ const EmotionsView = ({ patients, monitorings, onAdd }: any) => (
                   <h4 className="font-bold">{patient?.name}</h4>
                   <p className="text-xs text-gray-500">{m.date}</p>
                 </div>
+              </div>
+              <div className="flex gap-1">
+                <button onClick={() => onEdit(m)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                <button onClick={() => onDelete(m.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -722,7 +802,7 @@ const EmotionIndicator = ({ label, level }: { label: string, level: string }) =>
   </div>
 );
 
-const FamilyView = ({ patients, bonds, onAdd }: any) => (
+const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold">Vínculo Familiar</h3>
@@ -744,7 +824,13 @@ const FamilyView = ({ patients, bonds, onAdd }: any) => (
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start mb-1">
                 <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
-                <span className="text-xs text-gray-400">{b.date}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">{b.date}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => onEdit(b)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(b.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                </div>
               </div>
               <div className="flex gap-4 text-xs mb-2">
                 <p><span className="text-gray-400 font-bold">VISITAS:</span> {b.receivesVisits ? 'Sim' : 'Não'}</p>
@@ -759,7 +845,7 @@ const FamilyView = ({ patients, bonds, onAdd }: any) => (
   </div>
 );
 
-const ActivitiesView = ({ patients, activities, onAdd }: any) => (
+const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <h3 className="text-lg font-bold">Atividades Psicossociais</h3>
@@ -774,7 +860,13 @@ const ActivitiesView = ({ patients, activities, onAdd }: any) => (
             <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold uppercase">
               {act.type}
             </span>
-            <span className="text-xs text-gray-400">{act.date}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{act.date}</span>
+              <div className="flex gap-1">
+                <button onClick={() => onEdit(act)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                <button onClick={() => onDelete(act.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+              </div>
+            </div>
           </div>
           <h4 className="text-lg font-bold mb-2">{act.title}</h4>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{act.description}</p>
@@ -794,7 +886,7 @@ const ActivitiesView = ({ patients, activities, onAdd }: any) => (
   </div>
 );
 
-const CognitionView = ({ patients, assessments, onAdd }: any) => (
+const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <h3 className="text-lg font-bold">Avaliação Cognitiva</h3>
@@ -811,6 +903,7 @@ const CognitionView = ({ patients, assessments, onAdd }: any) => (
             <th className="pb-4">Memória</th>
             <th className="pb-4">Atenção</th>
             <th className="pb-4">Orientação</th>
+            <th className="pb-4">Ações</th>
           </tr>
         </thead>
         <tbody className="text-sm">
@@ -828,6 +921,12 @@ const CognitionView = ({ patients, assessments, onAdd }: any) => (
                 </td>
                 <td className="py-4">
                   <CognitionBadge status={a.orientation} />
+                </td>
+                <td className="py-4">
+                  <div className="flex gap-2">
+                    <button onClick={() => onEdit(a)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(a.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                  </div>
                 </td>
               </tr>
             );
@@ -1004,16 +1103,44 @@ const SettingsView = ({ user, theme, setTheme, onLogout }: any) => (
   </div>
 );
 
-const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos }: any) => {
-  const [formData, setFormData] = useState<any>({
+const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos, editingData, showToast }: any) => {
+  const [formData, setFormData] = useState<any>(editingData || {
+    date: format(new Date(), 'yyyy-MM-dd'),
+    time: format(new Date(), 'HH:mm'),
     photos: []
   });
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleDigitize = (text: string) => {
-    if (type === 'evolution') {
-      setFormData((prev: any) => ({ ...prev, evolution: (prev.evolution || '') + '\n' + text }));
-    } else if (type === 'activity') {
-      setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
+  const handleDigitize = async (text: string) => {
+    if (!text) return;
+    setIsExtracting(true);
+    try {
+      const schemas: Record<string, string> = {
+        patient: "name, age (number), birthDate, familyContact, lifeHistory",
+        initial: "complaint, clinicalHistory, familyHistory, generalObservations",
+        evolution: "evolution, observation",
+        appointment: "description, thoughts, feelings",
+        emotion: "wellBeing (FELIZ, TRANQUILO, NEUTRO, ANSIOSO, TRISTE), notes",
+        family: "familyMemberName, relationship, observation",
+        activity: "title, description, objectives",
+        cognition: "memoryRating (1-5), attentionRating (1-5), orientationRating (1-5), notes",
+        plan: "objectives, interventions, followUp"
+      };
+      
+      const extractedData = await extractFormData(text, schemas[type] || "description, observations");
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData((prev: any) => ({ ...prev, ...extractedData }));
+      } else {
+        if (type === 'evolution') {
+          setFormData((prev: any) => ({ ...prev, evolution: (prev.evolution || '') + '\n' + text }));
+        } else if (type === 'activity') {
+          setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -1048,7 +1175,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
       >
         <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <div>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white">
+            <h3 className="text-2xl font-black text-gray-800 dark:text-white flex items-center gap-3">
               {type === 'patient' ? 'Novo Idoso' : 
                type === 'initial' ? 'Avaliação Inicial' :
                type === 'evolution' ? 'Nova Evolução' :
@@ -1057,6 +1184,12 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
                type === 'family' ? 'Vínculo Familiar' :
                type === 'activity' ? 'Nova Atividade' :
                type === 'cognition' ? 'Avaliação Cognitiva' : 'Novo Registro'}
+              {isExtracting && (
+                <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Extraindo Dados...
+                </span>
+              )}
             </h3>
             <p className="text-sm text-gray-400 font-medium">Preencha as informações abaixo</p>
           </div>
@@ -1203,16 +1336,96 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
             </div>
           )}
 
+          {type === 'patient' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
+              <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} />
+              <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} />
+              <Input label="Escolaridade" value={formData.schooling} onChange={(v) => setFormData({ ...formData, schooling: v })} />
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase">Histórico de Vida</label>
+                <textarea 
+                  rows={4}
+                  value={formData.lifeHistory || ''}
+                  onChange={(e) => setFormData({ ...formData, lifeHistory: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                />
+              </div>
+            </div>
+          )}
+
+          {type === 'initial' && (
+            <div className="space-y-6">
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase">Queixa Principal</label>
+                <textarea 
+                  rows={3}
+                  value={formData.complaint || ''}
+                  onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                />
+              </div>
+            </div>
+          )}
+
+          {type === 'evolution' && (
+            <div className="space-y-6">
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <div className="grid grid-cols-2 gap-6">
+                <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Evolução</label>
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      disabled={isExtracting || !formData.evolution}
+                      onClick={async () => {
+                        if (!formData.evolution) return;
+                        setIsExtracting(true);
+                        try {
+                          const fixed = await fixGrammar(formData.evolution);
+                          setFormData({ ...formData, evolution: fixed });
+                          showToast('Texto corrigido com sucesso', 'success');
+                        } catch (err) {
+                          console.error(err);
+                          showToast('Erro ao corrigir texto', 'error');
+                        } finally {
+                          setIsExtracting(false);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                    >
+                      {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+                      Corrigir
+                    </button>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, evolution: (formData.evolution || '') + ' ' + t })} />
+                  </div>
+                </div>
+                <textarea 
+                  rows={4}
+                  value={formData.evolution || ''}
+                  onChange={(e) => setFormData({ ...formData, evolution: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none font-bold" 
+                />
+              </div>
+            </div>
+          )}
+
           {type === 'appointment' && (
             <div className="space-y-6">
-              <Select label="Idoso" options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
               <div className="grid grid-cols-2 gap-6">
-                <Input label="Data" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-                <Input label="Hora" type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
+                <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
               </div>
               <div className="grid grid-cols-2 gap-6">
-                <Select label="Tipo de Atendimento" options={[{value: 'INDIVIDUAL', label: 'Individual'}, {value: 'GRUPO', label: 'Grupo'}, {value: 'RODA_CONVERSA', label: 'Roda de Conversa'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
-                <Select label="Status" options={[{value: 'PENDENTE', label: 'Pendente'}, {value: 'REALIZADO', label: 'Realizado'}, {value: 'FALTOU', label: 'Faltou'}]} onChange={(v) => setFormData({ ...formData, status: v })} />
+                <Select label="Tipo de Atendimento" value={formData.type} options={[{value: 'INDIVIDUAL', label: 'Individual'}, {value: 'GRUPO', label: 'Grupo'}, {value: 'RODA_CONVERSA', label: 'Roda de Conversa'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
+                <Select label="Status" value={formData.status} options={[{value: 'PENDENTE', label: 'Pendente'}, {value: 'REALIZADO', label: 'Realizado'}, {value: 'FALTOU', label: 'Faltou'}]} onChange={(v) => setFormData({ ...formData, status: v })} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -1231,15 +1444,15 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
           {type === 'family' && (
             <div className="space-y-6">
-              <Select label="Idoso" options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data do Registro" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <Input label="Data do Registro" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
               <div className="flex items-center gap-3">
-                <input type="checkbox" onChange={(e) => setFormData({ ...formData, receivesVisits: e.target.checked })} className="w-5 h-5 rounded-lg text-blue-600" />
+                <input type="checkbox" checked={formData.receivesVisits} onChange={(e) => setFormData({ ...formData, receivesVisits: e.target.checked })} className="w-5 h-5 rounded-lg text-blue-600" />
                 <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Recebe visitas familiares?</label>
               </div>
               <div className="grid grid-cols-2 gap-6">
-                <Input label="Frequência das Visitas" onChange={(v) => setFormData({ ...formData, frequency: v })} />
-                <Input label="Qualidade da Relação" onChange={(v) => setFormData({ ...formData, familyRelationship: v })} />
+                <Input label="Frequência das Visitas" value={formData.frequency} onChange={(v) => setFormData({ ...formData, frequency: v })} />
+                <Input label="Qualidade da Relação" value={formData.familyRelationship} onChange={(v) => setFormData({ ...formData, familyRelationship: v })} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -1258,12 +1471,12 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
           {type === 'cognition' && (
             <div className="space-y-6">
-              <Select label="Idoso" options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data da Avaliação" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
               <div className="grid grid-cols-3 gap-6">
-                <Select label="Memória" options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
-                <Select label="Atenção" options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, attention: v })} />
-                <Select label="Orientação" options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, orientation: v })} />
+                <Select label="Memória" value={formData.memory} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
+                <Select label="Atenção" value={formData.attention} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, attention: v })} />
+                <Select label="Orientação" value={formData.orientation} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, orientation: v })} />
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -1282,8 +1495,8 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
           
           {type === 'plan' && (
             <div className="space-y-6">
-              <Select label="Idoso" options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data do Plano" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+              <Input label="Data do Plano" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-gray-400 uppercase">Objetivos Terapêuticos</label>
@@ -1346,32 +1559,35 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
   );
 };
 
-const Input = ({ label, type = "text", onChange }: { label: string, type?: string, onChange: (v: string) => void }) => (
+const Input = ({ label, type = "text", value, onChange }: { label: string, type?: string, value?: string, onChange: (v: string) => void }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <input 
       type={type} 
+      value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all" 
     />
   </div>
 );
 
-const TextArea = ({ label, onChange }: { label: string, onChange: (v: string) => void }) => (
+const TextArea = ({ label, value, onChange }: { label: string, value?: string, onChange: (v: string) => void }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <textarea 
       rows={3}
+      value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
     />
   </div>
 );
 
-const Select = ({ label, options, onChange }: { label: string, options: { value: string, label: string }[], onChange: (v: string) => void }) => (
+const Select = ({ label, options, value, onChange }: { label: string, options: { value: string, label: string }[], value?: string, onChange: (v: string) => void }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <select 
+      value={value || ''}
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all"
     >
@@ -1380,3 +1596,27 @@ const Select = ({ label, options, onChange }: { label: string, options: { value:
     </select>
   </div>
 );
+
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }: any) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+      >
+        <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">{title}</h3>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 font-bold">{message}</p>
+        <div className="flex gap-4">
+          <button onClick={onClose} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-200 transition-all">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition-all">
+            Confirmar
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};

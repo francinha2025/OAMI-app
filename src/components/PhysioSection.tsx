@@ -10,7 +10,7 @@ import {
   Heart, Shield, Info, ArrowLeft,
   Star, MessageSquare, Bell,
   Stethoscope, Activity, TrendingUp,
-  UserCircle, LogOut, Moon, Sun
+  UserCircle, LogOut, Moon, Sun, Loader2, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -22,6 +22,7 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, 
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { extractFormData, fixGrammar } from '../services/geminiService';
 import { PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
@@ -41,6 +42,7 @@ interface PhysioSectionProps {
   onSaveEvolution: (data: Omit<PhysioEvolution, 'id'>, id?: string) => Promise<void>;
   onSaveExercise: (data: Omit<PhysioExercise, 'id'>, id?: string) => Promise<void>;
   onSaveAppointment: (data: Omit<PhysioAppointment, 'id'>, id?: string) => Promise<void>;
+  onDeleteRecord: (collectionName: string, id: string) => Promise<void>;
   onSavePhotos: (photos: string[], patientId: string, patientName: string, activityType: string, description?: string) => Promise<void>;
   onUpdateProfile?: (data: Partial<UserType>) => Promise<void>;
   theme: 'light' | 'dark';
@@ -76,12 +78,14 @@ export const PhysioSection = ({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PhysioPatient | null>(null);
+  const [editingData, setEditingData] = useState<any>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'assessment' | 'evolution' | 'exercise' | 'appointment' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [reportPatientId, setReportPatientId] = useState('');
   const [reportMonth, setReportMonth] = useState(format(new Date(), 'yyyy-MM'));
 
   const filteredPatients = useMemo(() => {
-    return patients.filter(p => 
+    return (patients || []).filter(p => 
       p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.diagnosis?.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -482,9 +486,17 @@ export const PhysioSection = ({
                             </span>
                           </td>
                           <td className="p-6 text-right">
-                            <button className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                              <FileText size={16} />
-                            </button>
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => { setEditingData(a); setIsAssessmentModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+                                <Edit2 size={16} />
+                              </button>
+                              <button onClick={() => setDeleteConfirm({ id: a.id, type: 'assessment' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                                <Trash2 size={16} />
+                              </button>
+                              <button className="p-2 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/20 rounded-lg transition-colors">
+                                <FileText size={16} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -531,6 +543,14 @@ export const PhysioSection = ({
                             <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name || 'N/A'}</h4>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(e.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                           </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => setDeleteConfirm({ id: e.id, type: 'evolution' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                         {e.painLevel !== undefined && (
                           <div className="text-right">
@@ -587,6 +607,14 @@ export const PhysioSection = ({
                       ) : (
                         <Dumbbell size={48} className="text-gray-300 dark:text-gray-700" />
                       )}
+                      <div className="absolute top-4 left-4 flex gap-2">
+                        <button onClick={() => { setEditingData(ex); setIsExerciseModalOpen(true); }} className="p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full text-blue-600 shadow-sm transition-all hover:scale-110">
+                          <Edit2 size={14} />
+                        </button>
+                        <button onClick={() => setDeleteConfirm({ id: ex.id, type: 'exercise' })} className="p-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full text-red-600 shadow-sm transition-all hover:scale-110">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                       <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full text-[10px] font-bold text-green-600 uppercase">
                         {ex.category}
                       </div>
@@ -923,6 +951,7 @@ export const PhysioSection = ({
               <div className="overflow-y-auto p-8">
                 <EvolutionForm 
                   patients={patients}
+                  showToast={showToast}
                   onSave={async (data) => {
                     await onSaveEvolution(data);
                     setIsEvolutionModalOpen(false);
@@ -1032,9 +1061,23 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
     category: initialData?.category || 'ORTOPEDIA',
     createdAt: initialData?.createdAt || new Date().toISOString()
   });
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleDigitize = (text: string) => {
-    setFormData(prev => ({ ...prev, diagnosis: (prev.diagnosis || '') + '\n' + text }));
+  const handleDigitize = async (text: string) => {
+    if (!text) return;
+    setIsExtracting(true);
+    try {
+      const extractedData = await extractFormData(text, "name, age (number), diagnosis, phone, category (ORTOPEDIA, NEUROLOGIA, RESPIRATORIA, GERIATRIA), observations");
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData(prev => ({ ...prev, ...extractedData }));
+      } else {
+        setFormData(prev => ({ ...prev, diagnosis: (prev.diagnosis || '') + '\n' + text }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1144,29 +1187,46 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
   );
 };
 
-const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAssessment, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any }) => {
+const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAssessment, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any, initialData?: PhysioAssessment | null }) => {
   const [formData, setFormData] = useState<Omit<PhysioAssessment, 'id'> & { photos: string[] }>({
-    patientId: '',
-    date: new Date().toISOString(),
-    complaint: '',
-    history: '',
-    painScale: 0,
-    motionLimitation: '',
-    physicalTests: '',
-    fallRisk: 'BAIXO',
-    mobilityLevel: '',
-    independenceADLs: '',
-    medicalHistory: '',
-    photos: []
+    patientId: initialData?.patientId || '',
+    date: initialData?.date || new Date().toISOString(),
+    complaint: initialData?.complaint || '',
+    history: initialData?.history || '',
+    painScale: initialData?.painScale || 0,
+    motionLimitation: initialData?.motionLimitation || '',
+    physicalTests: initialData?.physicalTests || '',
+    fallRisk: initialData?.fallRisk || 'BAIXO',
+    mobilityLevel: initialData?.mobilityLevel || '',
+    independenceADLs: initialData?.independenceADLs || '',
+    medicalHistory: initialData?.medicalHistory || '',
+    photos: initialData?.photos || []
   });
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleDigitize = (text: string) => {
-    // Simple heuristic to fill fields based on OCR text
-    if (text.toLowerCase().includes('dor')) {
-      const match = text.match(/dor\s*(\d+)/i);
-      if (match) setFormData(prev => ({ ...prev, painScale: parseInt(match[1]) }));
+  const handleDigitize = async (text: string) => {
+    if (!text) return;
+    setIsExtracting(true);
+    try {
+      const schemas: Record<string, string> = {
+        assessment: "complaint, history, painScale (number 0-10), motionLimitation, physicalTests, fallRisk (ALTO, MEDIO, BAIXO), mobilityLevel, independenceADLs, medicalHistory"
+      };
+      
+      const extractedData = await extractFormData(text, schemas.assessment);
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData(prev => ({ ...prev, ...extractedData }));
+      } else {
+        if (text.toLowerCase().includes('dor')) {
+          const match = text.match(/dor\s*(\d+)/i);
+          if (match) setFormData(prev => ({ ...prev, painScale: parseInt(match[1]) }));
+        }
+        setFormData(prev => ({ ...prev, complaint: prev.complaint + '\n' + text }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtracting(false);
     }
-    setFormData(prev => ({ ...prev, complaint: prev.complaint + '\n' + text }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1285,25 +1345,44 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients
 
       <div className="flex gap-4 pt-4">
         <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">Cancelar</button>
-        <button type="submit" className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all">Salvar Avaliação</button>
+        <button 
+          type="submit"
+          className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all"
+        >
+          {initialData ? 'Atualizar Avaliação' : 'Salvar Avaliação'}
+        </button>
       </div>
     </form>
   );
 };
 
-const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioEvolution, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any }) => {
+const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, showToast }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioEvolution, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any, initialData?: PhysioEvolution | null, showToast: (msg: string, type?: 'success' | 'error') => void }) => {
   const [formData, setFormData] = useState<Omit<PhysioEvolution, 'id'> & { photos: string[] }>({
-    patientId: '',
-    date: new Date().toISOString(),
-    procedures: '',
-    evolution: '',
-    observations: '',
-    painLevel: 0,
-    photos: []
+    patientId: initialData?.patientId || '',
+    date: initialData?.date || new Date().toISOString(),
+    procedures: initialData?.procedures || '',
+    evolution: initialData?.evolution || '',
+    observations: initialData?.observations || '',
+    painLevel: initialData?.painLevel || 0,
+    photos: initialData?.photos || []
   });
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleDigitize = (text: string) => {
-    setFormData(prev => ({ ...prev, evolution: prev.evolution + '\n' + text }));
+  const handleDigitize = async (text: string) => {
+    if (!text) return;
+    setIsExtracting(true);
+    try {
+      const extractedData = await extractFormData(text, "procedures, evolution, observations, painLevel (number 0-10)");
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData(prev => ({ ...prev, ...extractedData }));
+      } else {
+        setFormData(prev => ({ ...prev, evolution: (prev.evolution || '') + '\n' + text }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1355,7 +1434,31 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients:
       <div className="space-y-2">
         <div className="flex justify-between items-center ml-1">
           <label className="text-xs font-bold text-gray-400 uppercase">Procedimentos Realizados</label>
-          <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, procedures: (prev.procedures || '') + ' ' + t }))} />
+          <div className="flex gap-2">
+            <button 
+              type="button"
+              disabled={isExtracting || !formData.procedures}
+              onClick={async () => {
+                if (!formData.procedures) return;
+                setIsExtracting(true);
+                try {
+                  const fixed = await fixGrammar(formData.procedures);
+                  setFormData(prev => ({ ...prev, procedures: fixed }));
+                  showToast('Texto corrigido com sucesso', 'success');
+                } catch (err) {
+                  console.error(err);
+                  showToast('Erro ao corrigir texto', 'error');
+                } finally {
+                  setIsExtracting(false);
+                }
+              }}
+              className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+            >
+              {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+              Corrigir
+            </button>
+            <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, procedures: (prev.procedures || '') + ' ' + t }))} />
+          </div>
         </div>
         <textarea 
           required
@@ -1368,7 +1471,31 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients:
       <div className="space-y-2">
         <div className="flex justify-between items-center ml-1">
           <label className="text-xs font-bold text-gray-400 uppercase">Evolução / Resposta</label>
-          <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, evolution: (prev.evolution || '') + ' ' + t }))} />
+          <div className="flex gap-2">
+            <button 
+              type="button"
+              disabled={isExtracting || !formData.evolution}
+              onClick={async () => {
+                if (!formData.evolution) return;
+                setIsExtracting(true);
+                try {
+                  const fixed = await fixGrammar(formData.evolution);
+                  setFormData(prev => ({ ...prev, evolution: fixed }));
+                  showToast('Texto corrigido com sucesso', 'success');
+                } catch (err) {
+                  console.error(err);
+                  showToast('Erro ao corrigir texto', 'error');
+                } finally {
+                  setIsExtracting(false);
+                }
+              }}
+              className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+            >
+              {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+              Corrigir
+            </button>
+            <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, evolution: (prev.evolution || '') + ' ' + t }))} />
+          </div>
         </div>
         <textarea 
           required
@@ -1388,20 +1515,22 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos }: { patients:
 
       <div className="flex gap-4 pt-4">
         <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">Cancelar</button>
-        <button type="submit" className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all">Salvar Evolução</button>
+        <button type="submit" className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all">
+          {initialData ? 'Atualizar Evolução' : 'Salvar Evolução'}
+        </button>
       </div>
     </form>
   );
 };
 
-const ExerciseForm = ({ onSave, onCancel }: { onSave: (data: Omit<PhysioExercise, 'id'>) => Promise<void>, onCancel: () => void }) => {
+const ExerciseForm = ({ onSave, onCancel, initialData }: { onSave: (data: Omit<PhysioExercise, 'id'>) => Promise<void>, onCancel: () => void, initialData?: PhysioExercise | null }) => {
   const [formData, setFormData] = useState<Omit<PhysioExercise, 'id'> & { photos: string[] }>({
-    title: '',
-    description: '',
-    category: 'ALONGAMENTO',
-    videoUrl: '',
-    imageUrl: '',
-    photos: []
+    title: initialData?.title || '',
+    description: initialData?.description || '',
+    category: initialData?.category || 'ALONGAMENTO',
+    videoUrl: initialData?.videoUrl || '',
+    imageUrl: initialData?.imageUrl || '',
+    photos: initialData?.photos || []
   });
 
   const handleDigitize = (text: string) => {
@@ -1471,20 +1600,22 @@ const ExerciseForm = ({ onSave, onCancel }: { onSave: (data: Omit<PhysioExercise
 
       <div className="flex gap-4 pt-4">
         <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">Cancelar</button>
-        <button type="submit" className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all">Salvar Exercício</button>
+        <button type="submit" className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all">
+          {initialData ? 'Atualizar Exercício' : 'Salvar Exercício'}
+        </button>
       </div>
     </form>
   );
 };
 
-const AppointmentForm = ({ patients, onSave, onCancel }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAppointment, 'id'>) => Promise<void>, onCancel: () => void }) => {
+const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAppointment, 'id'>) => Promise<void>, onCancel: () => void, initialData?: PhysioAppointment | null }) => {
   const [formData, setFormData] = useState<Omit<PhysioAppointment, 'id'> & { photos: string[] }>({
-    patientId: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    time: '08:00',
-    status: 'PENDENTE',
-    observations: '',
-    photos: []
+    patientId: initialData?.patientId || '',
+    date: initialData?.date || format(new Date(), 'yyyy-MM-dd'),
+    time: initialData?.time || '08:00',
+    status: initialData?.status || 'PENDENTE',
+    observations: initialData?.observations || '',
+    photos: initialData?.photos || []
   });
 
   const handleDigitize = (text: string) => {

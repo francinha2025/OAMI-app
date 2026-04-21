@@ -6,7 +6,7 @@ import {
   MoreVertical, ChevronRight, AlertCircle, CheckCircle2, 
   Clock, Phone, User as UserIcon, Trash2, Edit2, 
   Download, Printer, X, Heart, Info, ArrowLeft,
-  TrendingUp, UserCircle, LogOut, Moon, Sun,
+  TrendingUp, UserCircle, LogOut, Moon, Sun, Loader2,
   Droplets, Thermometer, Wind, Zap,
   Coffee, Bath, Move, Bed
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   NursingPatient, Medication, MedicationAdministration, 
   VitalSigns, DressingRecord, NursingEvolution, 
@@ -90,14 +91,14 @@ export const NursingSection = (props: NursingSectionProps) => {
   };
 
   const filteredPatients = useMemo(() => {
-    return props.patients.filter(p => 
+    return (props.patients || []).filter(p => 
       p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.diagnosis?.toLowerCase().includes(searchQuery.toLowerCase())
+      (p as any).diagnosis?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [props.patients, searchQuery]);
 
   const selectedPatient = useMemo(() => 
-    props.patients.find(p => p.id === selectedPatientId), 
+    (props.patients || []).find(p => p.id === selectedPatientId), 
     [props.patients, selectedPatientId]
   );
 
@@ -273,6 +274,35 @@ export const NursingSection = (props: NursingSectionProps) => {
               )}
             </div>
           </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <ClipboardList className="text-blue-600" size={20} />
+              Últimas Evoluções
+            </h3>
+            <div className="space-y-4">
+              {props.evolutions.slice(0, 3).map(evo => {
+                const patient = props.patients.find(p => p.id === evo.patientId);
+                return (
+                  <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl group relative">
+                    <div className="flex justify-between items-start mb-2">
+                       <span className="text-[10px] font-bold text-blue-600 uppercase italic">{patient?.name || 'Paciente não encontrado'}</span>
+                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <button onClick={() => { setEditingData(evo); setModalType('evolution'); setIsModalOpen(true); }} className="text-gray-400 hover:text-green-600"><Edit2 size={14} /></button>
+                         <button onClick={() => setDeleteConfirm({ id: evo.id, type: 'evolution' })} className="text-gray-400 hover:text-red-600"><Trash2 size={14} /></button>
+                       </div>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 italic">"{evo.content}"</p>
+                    <div className="flex justify-between items-center mt-2">
+                       <p className="text-[10px] text-gray-400 uppercase font-bold">{evo.date} às {evo.time}</p>
+                       <p className="text-[10px] text-gray-400 font-medium">Por: {evo.registeredBy}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              {(props.evolutions || []).length === 0 && <p className="text-center text-gray-400 py-4 text-xs italic">Sem evoluções registradas.</p>}
+            </div>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -358,6 +388,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 patient={selectedPatient} 
                 medications={props.medications.filter(m => m.patientId === selectedPatientId)}
                 vitals={props.vitalSigns.filter(v => v.patientId === selectedPatientId)}
+                evolutions={props.evolutions.filter(e => e.patientId === selectedPatientId)}
                 onBack={() => setSelectedPatientId(null)}
                 onAddMedication={() => { setModalType('medication'); setIsModalOpen(true); }}
                 onAddVital={() => { setModalType('vital'); setIsModalOpen(true); }}
@@ -370,6 +401,8 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onDeleteMedication={(id) => setDeleteConfirm({ id, type: 'medication' })}
                 onEditVital={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); }}
                 onDeleteVital={(id) => setDeleteConfirm({ id, type: 'vital' })}
+                onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
+                onDeleteEvolution={(id) => setDeleteConfirm({ id, type: 'evolution' })}
               />
             )}
             {activeTab === 'medication' && (
@@ -451,17 +484,19 @@ export const NursingSection = (props: NursingSectionProps) => {
       </div>
 
       <AnimatePresence>
-        {isModalOpen && (
-          <NursingModal 
-            type={modalType} 
-            patients={props.patients}
-            medications={props.medications}
-            editingData={editingData}
-            onClose={() => { 
-              setIsModalOpen(false); 
-              setModalType(null); 
-              setEditingData(null);
-            }}
+          {isModalOpen && (
+            <NursingModal 
+              type={modalType} 
+              patients={props.patients}
+              medications={props.medications}
+              editingData={editingData}
+              initialPatientId={selectedPatientId || undefined}
+              showToast={props.showToast}
+              onClose={() => { 
+                setIsModalOpen(false); 
+                setModalType(null); 
+                setEditingData(null);
+              }}
             onSavePatient={props.onSavePatient}
             onSaveMedication={props.onSaveMedication}
             onSaveAdministration={props.onSaveAdministration}
@@ -768,7 +803,7 @@ const ReportCard = ({ title, description, icon, onClick }: { title: string, desc
   </button>
 );
 
-const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData }: {
+const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast }: {
   type: string | null,
   patients: NursingPatient[],
   medications: Medication[],
@@ -784,22 +819,50 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
   onSaveAVD: any,
   onSaveDiaperChange: any,
   onSavePhotos: any,
-  editingData?: any
+  editingData?: any,
+  initialPatientId?: string,
+  showToast: (msg: string, type?: 'success' | 'error') => void
 }) => {
   const [formData, setFormData] = useState<any>(editingData || {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: format(new Date(), 'HH:mm'),
     status: 'PENDENTE',
-    photos: []
+    photos: [],
+    patientId: initialPatientId || ''
   });
+  const [isExtracting, setIsExtracting] = useState(false);
 
-  const handleDigitize = (text: string) => {
-    if (type === 'evolution') {
-      setFormData((prev: any) => ({ ...prev, evolution: (prev.evolution || '') + '\n' + text }));
-    } else if (type === 'incident') {
-      setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
-    } else if (type === 'dressing') {
-      setFormData((prev: any) => ({ ...prev, appearance: (prev.appearance || '') + '\n' + text }));
+  const handleDigitize = async (text: string) => {
+    if (!text) return;
+    setIsExtracting(true);
+    try {
+      const schemas: Record<string, string> = {
+        patient: "name, fullName, age (number), diagnosis, comorbidities, allergies, fallRisk (BAIXO, MEDIO, ALTO), familyContact",
+        medication: "name, dosage, frequency, route, description, type (CONTINUA, CONTROLADA, SOS)",
+        vital: "systolicBP (number), diastolicBP (number), heartRate (number), temperature (number), saturation (number), bloodGlucose (number)",
+        dressing: "location, woundType, aspect, observations, nextChangeDate",
+        evolution: "content",
+        incident: "type, description, conduct, notes",
+        avd: "feedingStatus, hygieneStatus, mobilityStatus, description",
+        diaper: "type (TROCA_TOTAL, REVISAO, HIGIENE), observation"
+      };
+      
+      const extractedData = await extractFormData(text, schemas[type] || "description, observations");
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData((prev: any) => ({ ...prev, ...extractedData }));
+      } else {
+        if (type === 'evolution') {
+          setFormData((prev: any) => ({ ...prev, content: (prev.content || '') + '\n' + text }));
+        } else if (type === 'incident') {
+          setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
+        } else if (type === 'dressing') {
+          setFormData((prev: any) => ({ ...prev, appearance: (prev.appearance || '') + '\n' + text }));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -844,7 +907,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
         className="bg-white dark:bg-gray-900 rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
       >
         <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-tight">
+          <h3 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
             {type === 'patient' ? `${editingData ? 'Editar' : 'Novo'} Paciente` : 
              type === 'medication' ? `${editingData ? 'Editar' : 'Nova'} Medicação` :
              type === 'vital' ? `${editingData ? 'Editar' : 'Registrar'} Sinais Vitais` :
@@ -854,6 +917,12 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
              type === 'shift' ? `${editingData ? 'Editar' : 'Novo'} Plantão` :
              type === 'avd' ? `${editingData ? 'Editar' : 'Registrar'} AVD` : 
              `${editingData ? 'Editar' : 'Registrar'} Troca de Fralda`}
+            {isExtracting && (
+              <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Extraindo Dados...
+              </span>
+            )}
           </h3>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
@@ -865,7 +934,8 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
               <label className="text-xs font-bold text-gray-400 uppercase">Paciente</label>
               <select 
                 required
-                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
+                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold"
+                value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o paciente</option>
@@ -1045,16 +1115,42 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
 
           {type === 'evolution' && (
             <div className="space-y-4">
+              <Input label="Data da Evolução" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-gray-400 uppercase">Evolução</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, content: (formData.content || '') + ' ' + t })} />
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      disabled={isExtracting || !formData.content}
+                      onClick={async () => {
+                        if (!formData.content) return;
+                        setIsExtracting(true);
+                        try {
+                          const fixed = await fixGrammar(formData.content);
+                          setFormData({ ...formData, content: fixed });
+                          showToast('Texto corrigido com sucesso', 'success');
+                        } catch (err) {
+                          console.error(err);
+                          showToast('Erro ao corrigir texto', 'error');
+                        } finally {
+                          setIsExtracting(false);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                    >
+                      {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+                      Corrigir Texto
+                    </button>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, content: (formData.content || '') + ' ' + t })} />
+                  </div>
                 </div>
                 <textarea 
                   required
                   value={formData.content || ''}
                   className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm min-h-[150px]"
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  placeholder="Descreva a evolução do paciente..."
                 />
               </div>
             </div>
@@ -1377,6 +1473,7 @@ const PatientDetailView = ({
   patient, 
   medications, 
   vitals, 
+  evolutions,
   onBack, 
   onAddMedication, 
   onAddVital, 
@@ -1388,11 +1485,14 @@ const PatientDetailView = ({
   onEditMedication,
   onDeleteMedication,
   onEditVital,
-  onDeleteVital
+  onDeleteVital,
+  onEditEvolution,
+  onDeleteEvolution
 }: { 
   patient: NursingPatient, 
   medications: Medication[], 
   vitals: VitalSigns[],
+  evolutions: NursingEvolution[],
   onBack: () => void,
   onAddMedication: () => void,
   onAddVital: () => void,
@@ -1404,7 +1504,9 @@ const PatientDetailView = ({
   onEditMedication: (med: Medication) => void,
   onDeleteMedication: (id: string) => void,
   onEditVital: (vital: VitalSigns) => void,
-  onDeleteVital: (id: string) => void
+  onDeleteVital: (id: string) => void,
+  onEditEvolution: (evo: NursingEvolution) => void,
+  onDeleteEvolution: (id: string) => void
 }) => (
   <div className="space-y-6 animate-in slide-in-from-right duration-500">
     <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-green-600 transition-colors font-bold text-sm mb-4">
@@ -1567,6 +1669,46 @@ const PatientDetailView = ({
             </table>
             {(vitals || []).length === 0 && (
               <p className="text-center text-gray-400 py-8 text-sm italic">Nenhum sinal vital registrado.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <ClipboardList className="text-blue-600" size={20} />
+              Histórico de Evolução
+            </h3>
+            <button onClick={onAddEvolution} className="text-xs font-bold text-green-600 hover:underline flex items-center gap-1">
+              <Plus size={14} /> Registrar
+            </button>
+          </div>
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+            {evolutions.map(evo => (
+              <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl space-y-2 group">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">{evo.date} às {evo.time}</span>
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => onEditEvolution(evo)}
+                      className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDeleteEvolution(evo.id)}
+                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">{evo.content}</p>
+                <div className="text-[8px] font-bold text-gray-400 uppercase">Por: {evo.registeredBy}</div>
+              </div>
+            ))}
+            {(evolutions || []).length === 0 && (
+              <p className="text-center text-gray-400 py-8 text-sm italic">Nenhuma evolução registrada para este paciente.</p>
             )}
           </div>
         </div>

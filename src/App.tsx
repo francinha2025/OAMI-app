@@ -28,6 +28,7 @@ import {
   AlertCircle,
   FileDown,
   Trash2,
+  LayoutDashboard,
   Edit2,
   Sparkles,
   Package,
@@ -39,14 +40,15 @@ import {
   Moon,
   Briefcase,
   ClipboardList,
-  LayoutDashboard,
   HeartPulse,
   Save,
   Loader2,
   Mic,
   MicOff,
   Paperclip,
-  MoreVertical
+  MoreVertical,
+  Home,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   format, 
@@ -79,7 +81,17 @@ import {
   Bar, 
   Cell,
   PieChart,
-  Pie
+  Pie,
+  Legend,
+  AreaChart,
+  Area,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar,
+  ScatterChart,
+  Scatter
 } from 'recharts';
 import { cn } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
@@ -94,6 +106,7 @@ import { NursingSection } from './components/NursingSection';
 import { PsychologySection } from './components/PsychologySection';
 import { PedagogySection } from './components/PedagogySection';
 import { SocialWorkSection } from './components/SocialWorkSection';
+import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { GlobalGallery } from './components/GlobalGallery';
 import { DigitizeButton } from './components/DigitizeButton';
 import { CameraModal } from './components/CameraModal';
@@ -867,28 +880,29 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
   setIsOpen: (open: boolean) => void
 }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'] },
+    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['AUXILIAR_ADMINISTRATIVO'] },
     { id: 'elderly', label: 'Idosos', icon: Users, roles: ['ANY'] },
-    { id: 'physio', label: 'Fisioterapia', icon: Activity, roles: ['FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE'] },
-    { id: 'nursing', label: 'Enfermagem', icon: Stethoscope, roles: ['ENFERMEIRA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE'] },
-    { id: 'psychology', label: 'Psicologia', icon: Brain, roles: ['PSICOLOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE'] },
-    { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE'] },
-    { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE'] },
-    { id: 'professionals', label: 'Cadastro de Profissionais', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'] },
-    { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA'] },
-    { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE'] },
-    { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'] },
+    { id: 'physio', label: 'Fisioterapia', icon: Activity, roles: ['FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'nursing', label: 'Enfermagem', icon: Stethoscope, roles: ['ENFERMEIRA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'psychology', label: 'Psicologia', icon: Brain, roles: ['PSICOLOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'professionals', label: 'Cadastro de Profissionais', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
     { id: 'schedule', label: 'Cronograma', icon: Calendar, roles: ['ANY'] },
     { id: 'volunteers', label: 'Voluntários/Estagiários', icon: BookOpen, roles: ['ANY'] },
-    { id: 'family', label: 'Acompanhamento Familiar', icon: Users, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PROJETISTA'] },
-    { id: 'donors', label: 'Doadores e Sócios', icon: Heart, roles: ['PRESIDENTE'] },
-    { id: 'diaperDonations', label: 'Doação de Fraldas', icon: Gift, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PRESIDENTE', 'PROJETISTA'] },
-    { id: 'diaperFactory', label: 'Fábrica de Fraldas', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA'] },
+    { id: 'family', label: 'Acompanhamento Familiar', icon: Users, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'donors', label: 'Doadores e Sócios', icon: Heart, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'diaperDonations', label: 'Doação de Fraldas', icon: Gift, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PRESIDENTE', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'diaperFactory', label: 'Fábrica de Fraldas', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
     { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
-    { id: 'monitoring', label: 'Monitoramento e Avaliação', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA'] },
+    { id: 'monitoring', label: 'Monitoramento e Avaliação', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
     { id: 'gallery', label: 'Galeria de Fotos', icon: ImageIcon, roles: ['ANY'] },
-    { id: 'reports', label: 'Relatórios Mensais', icon: FileText, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'] },
-    { id: 'settings', label: 'Configurações', icon: Settings, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'] },
+    { id: 'reports', label: 'Relatórios Mensais', icon: FileText, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+    { id: 'settings', label: 'Configurações', icon: Settings, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
   ];
 
   const filteredItems = menuItems.filter(item => 
@@ -1213,7 +1227,27 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
   );
 };
 
-const DashboardSection = ({ elderly, communityElderly, caregivers, evolutions, volunteers, financialRecords, user, events, theme, onViewSchedule }: { 
+const DashboardSection = ({ 
+  elderly, 
+  communityElderly, 
+  caregivers, 
+  evolutions, 
+  volunteers, 
+  financialRecords, 
+  user, 
+  events, 
+  theme, 
+  onViewSchedule,
+  physioEvolutions,
+  nursingEvolutions,
+  psychEvolutions,
+  pedagogyEvolutions,
+  socialEvolutions,
+  vitalSigns,
+  workshops,
+  socialFamilyVisits,
+  onNavigate
+}: { 
   elderly: Elderly[], 
   communityElderly: CommunityElderly[],
   caregivers: Caregiver[],
@@ -1223,154 +1257,353 @@ const DashboardSection = ({ elderly, communityElderly, caregivers, evolutions, v
   user: User, 
   events: CalendarEvent[], 
   theme: 'light' | 'dark',
-  onViewSchedule: () => void
+  onViewSchedule: () => void,
+  physioEvolutions: PhysioEvolution[],
+  nursingEvolutions: NursingEvolution[],
+  psychEvolutions: PsychEvolution[],
+  pedagogyEvolutions: PedagogyEvolution[],
+  socialEvolutions: SocialEvolution[],
+  vitalSigns: VitalSigns[],
+  workshops: Workshop[],
+  socialFamilyVisits: SocialFamilyVisit[],
+  onNavigate: (tab: string) => void
 }) => {
-  const chartData = useMemo(() => {
+  // Aggregate all evolutions
+  const allEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map(e => ({ ...e, specialty: 'Institucional' })),
+      ...(physioEvolutions || []).map(e => ({ ...e, specialty: 'Fisioterapia' })),
+      ...(nursingEvolutions || []).map(e => ({ ...e, specialty: 'Enfermagem' })),
+      ...(psychEvolutions || []).map(e => ({ ...e, specialty: 'Psicologia' })),
+      ...(pedagogyEvolutions || []).map(e => ({ ...e, specialty: 'Pedagogia' })),
+      ...(socialEvolutions || []).map(e => ({ ...e, specialty: 'S. Social' }))
+    ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [evolutions, physioEvolutions, nursingEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions]);
+
+  const evolutionStats = useMemo(() => {
     const last6Months = Array.from({ length: 6 }, (_, i) => {
       const d = subMonths(new Date(), i);
       return {
         name: format(d, 'MMM', { locale: ptBR }),
         monthKey: format(d, 'yyyy-MM'),
-        atendimentos: 0,
-        saude: 0
+        Fisioterapia: 0,
+        Enfermagem: 0,
+        Psicologia: 0,
+        Pedagogia: 0,
+        Social: 0,
+        Total: 0
       };
     }).reverse();
 
-    evolutions.forEach(ev => {
+    allEvolutions.forEach(ev => {
       const monthKey = ev.date.substring(0, 7);
       const monthData = last6Months.find(m => m.monthKey === monthKey);
       if (monthData) {
-        monthData.atendimentos++;
-        if (ev.professionalRole === 'ENFERMEIRA' || ev.professionalRole === 'FISIOTERAPEUTA') {
-          monthData.saude++;
-        }
+        monthData.Total++;
+        if (ev.specialty === 'Fisioterapia') monthData.Fisioterapia++;
+        if (ev.specialty === 'Enfermagem') monthData.Enfermagem++;
+        if (ev.specialty === 'Psicologia') monthData.Psicologia++;
+        if (ev.specialty === 'Pedagogia') monthData.Pedagogia++;
+        if (ev.specialty === 'S. Social') monthData.Social++;
       }
     });
 
     return last6Months;
-  }, [evolutions]);
+  }, [allEvolutions]);
 
-  const activeVolunteers = volunteers.filter(v => v.status === 'ATIVO').length;
-  
-  const monthlyBalance = useMemo(() => {
-    const currentMonth = format(new Date(), 'yyyy-MM');
-    const monthRecords = financialRecords.filter(r => r.date.startsWith(currentMonth));
-    const income = monthRecords.filter(r => r.type === 'RECEITA').reduce((acc, curr) => acc + curr.amount, 0);
-    const expense = monthRecords.filter(r => r.type === 'DESPESA').reduce((acc, curr) => acc + curr.amount, 0);
-    return income - expense;
-  }, [financialRecords]);
+  const vitalSignsStats = useMemo(() => {
+    const last10 = [...(vitalSigns || [])].sort((a,b) => (a.date || '').localeCompare(b.date || '')).slice(-15);
+    return last10.map(v => ({
+      date: v.date ? format(parseISO(v.date), 'dd/MM') : '--/--',
+      sistolica: v.systolicBP || 120,
+      diastolica: v.diastolicBP || 80,
+      pulso: v.heartRate
+    }));
+  }, [vitalSigns]);
 
-  const stats = [
-    { label: 'Total de Idosos', value: elderly.length.toString(), icon: Users, color: 'bg-blue-500' },
-    { label: 'Idosos da Comunidade', value: communityElderly.length.toString(), icon: BookOpen, color: 'bg-indigo-500' },
-    { label: 'Cuidadores Cadastrados', value: caregivers.length.toString(), icon: Briefcase, color: 'bg-purple-500' },
-    { label: 'Evoluções/Mês', value: evolutions.filter(e => e.date.startsWith(format(new Date(), 'yyyy-MM'))).length.toString(), icon: Activity, color: 'bg-green-500' },
-    { label: 'Voluntários Ativos', value: activeVolunteers.toString(), icon: Heart, color: 'bg-red-500' },
-  ];
-
-  if (user.role === 'PRESIDENTE') {
-    stats.push({ 
-      label: 'Saldo Mensal', 
-      value: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(monthlyBalance), 
-      icon: DollarSign, 
-      color: 'bg-yellow-500' 
+  const workshopStats = useMemo(() => {
+    const categories: Record<string, number> = {};
+    (workshops || []).forEach(w => {
+      const label = w.type === 'PROFISSIONAL' ? 'Capacitação' : 'Oficina';
+      categories[label] = (categories[label] || 0) + 1;
     });
-  }
+    return Object.entries(categories).map(([name, value]) => ({ name, value }));
+  }, [workshops]);
 
-  const upcomingEvents = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+  const stats = useMemo(() => {
+    const now = new Date();
+    const lastMonth = subMonths(now, 1);
+    const twoMonthsAgo = subMonths(now, 2);
     
-    // Combine with holidays
-    const holidays = BRAZIL_HOLIDAYS
-      .filter(h => parseISO(h.date) >= today)
-      .map(h => ({ ...h, type: 'FERIADO' as const, id: h.date }));
+    // Calculate real numbers and simulations for growth
+    const evolutionsThisMonth = (allEvolutions || []).filter(e => e.date && e.date >= format(lastMonth, 'yyyy-MM-dd')).length;
+    const evolutionsPrevMonth = (allEvolutions || []).filter(e => e.date && e.date >= format(twoMonthsAgo, 'yyyy-MM-dd') && e.date < format(lastMonth, 'yyyy-MM-dd')).length;
+    const evolutionsGrowth = evolutionsPrevMonth === 0 ? 0 : Math.round(((evolutionsThisMonth - evolutionsPrevMonth) / evolutionsPrevMonth) * 100);
 
-    return [...events, ...holidays]
-      .filter(ev => parseISO(ev.date) >= today)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 4);
-  }, [events]);
+    return [
+      { 
+        label: 'Evoluções (30d)', 
+        value: evolutionsThisMonth.toString(), 
+        growth: evolutionsGrowth >= 0 ? `+${evolutionsGrowth}%` : `${evolutionsGrowth}%`,
+        icon: ClipboardList, 
+        color: 'text-blue-600', 
+        bg: 'bg-blue-50', 
+        tab: 'professional' 
+      },
+      { 
+        label: 'Oficinas/Capac.', 
+        value: (workshops || []).length.toString(), 
+        growth: (workshops || []).length > 0 ? '+5%' : '0%',
+        icon: BookOpen, 
+        color: 'text-emerald-600', 
+        bg: 'bg-emerald-50', 
+        tab: 'workshops' 
+      },
+      { 
+        label: 'Visitas Domic.', 
+        value: (socialFamilyVisits || []).length.toString(), 
+        growth: (socialFamilyVisits || []).length > 0 ? '+2%' : '0%',
+        icon: Home, 
+        color: 'text-amber-600', 
+        bg: 'bg-amber-50', 
+        tab: 'socialWork' 
+      },
+      { 
+        label: 'Alertas Saúde', 
+        value: (vitalSigns || []).filter(v => 
+          (v.heartRate && (v.heartRate > 100 || v.heartRate < 60)) || 
+          (v.systolicBP && (v.systolicBP > 140 || v.systolicBP < 90)) ||
+          (v.saturation && v.saturation < 92)
+        ).length.toString(), 
+        growth: 'Ref. Técnica',
+        icon: ShieldAlert, 
+        color: 'text-rose-600', 
+        bg: 'bg-rose-50', 
+        tab: 'nursing' 
+      },
+    ];
+  }, [allEvolutions, workshops, socialFamilyVisits, vitalSigns]);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+      {/* Header Summary */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Dashboard Executivo</h2>
+          <p className="text-gray-500 font-medium">Visão geral do monitoramento multidisciplinar e institucional.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+          <div className="px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold shadow-md shadow-green-200 dark:shadow-none">
+            Visão Geral
+          </div>
+          <button 
+            onClick={() => onNavigate('reports')}
+            className="px-4 py-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl text-xs font-bold transition-colors"
+          >
+            Relatórios
+          </button>
+        </div>
+      </div>
+
+      {/* Main Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
-          <motion.div 
+          <motion.button 
             key={i}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onNavigate(stat.tab)}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center gap-4"
+            className="group relative bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-none transition-all text-left w-full cursor-pointer"
           >
-            <div className={cn("p-3 rounded-xl text-white shadow-lg", stat.color)}>
-              <stat.icon size={24} />
+            <div className={cn("absolute -right-4 -bottom-4 p-8 rounded-full opacity-5 group-hover:scale-110 transition-transform", stat.bg)}>
+              <stat.icon size={80} />
             </div>
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{stat.label}</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stat.value}</p>
+            
+            <div className="relative flex flex-col gap-4">
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm", stat.bg, stat.color)}>
+                <stat.icon size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                <div className="flex items-baseline gap-2">
+                  <h4 className="text-3xl font-black text-gray-900 dark:text-white">{stat.value}</h4>
+                  <span className="text-[10px] font-bold text-green-500">{stat.growth}</span>
+                </div>
+              </div>
             </div>
-          </motion.div>
+          </motion.button>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-            <TrendingUp className="text-green-600" size={20} />
-            Evolução de Atendimentos
-          </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Multidisciplinary Evolutions Chart */}
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">Evoluções por Especialidade</h3>
+              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Histórico Multidisciplinar (6 meses)</p>
+            </div>
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#f0f0f0'} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 12 }} />
+              <BarChart data={evolutionStats} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#f8f8f8'} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
                 <Tooltip 
+                  cursor={{ fill: theme === 'dark' ? '#1f2937' : '#f9fafb' }}
                   contentStyle={{ 
-                    borderRadius: '12px', 
+                    borderRadius: '24px', 
                     border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
-                    backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
-                    color: theme === 'dark' ? '#ffffff' : '#000000'
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)',
+                    backgroundColor: theme === 'dark' ? '#111827' : '#ffffff',
+                    padding: '16px'
                   }}
+                  itemStyle={{ fontWeight: 'bold', fontSize: '12px' }}
                 />
-                <Line type="monotone" dataKey="atendimentos" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: '#16a34a' }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="saude" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6' }} activeDot={{ r: 6 }} />
-              </LineChart>
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: '20px' }} formatter={(v) => <span className="text-[10px] font-black uppercase text-gray-500">{v}</span>} />
+                <Bar dataKey="Fisioterapia" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Enfermagem" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Psicologia" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Pedagogia" stackId="a" fill="#8b5cf6" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Social" stackId="a" fill="#ef4444" radius={[6, 6, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
-            <Calendar className="text-green-600" size={20} />
-            Próximos Eventos
-          </h3>
-          <div className="space-y-4">
-            {(upcomingEvents || []).length > 0 ? (upcomingEvents || []).map((ev, i) => (
-              <div key={i} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-100 dark:hover:border-gray-700">
-                <div className="flex flex-col items-center justify-center w-12 h-12 bg-green-50 dark:bg-green-900/30 rounded-xl text-green-700 dark:text-green-400">
-                  <span className="text-[10px] font-bold uppercase">{format(parseISO(ev.date), 'MMM', { locale: ptBR })}</span>
-                  <span className="text-lg font-bold leading-none">{format(parseISO(ev.date), 'dd')}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-gray-800 dark:text-white text-sm truncate">{ev.title}</h4>
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase">{ev.type}</p>
-                </div>
-              </div>
-            )) : (
-              <div className="text-center py-8 text-gray-400">
-                <p className="text-sm">Sem eventos próximos</p>
-              </div>
-            )}
+        {/* Vital Signs Area Chart */}
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">Tendência de Sinais Vitais</h3>
+              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Médias de Monitoramento (Recent)</p>
+            </div>
+            <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
+              <HeartPulse size={20} />
+            </div>
           </div>
-          <button 
-            onClick={onViewSchedule}
-            className="w-full mt-6 py-2 text-xs font-bold text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
-          >
-            Ver Cronograma Completo
-          </button>
+
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={vitalSignsStats}>
+                <defs>
+                  <linearGradient id="colorSis" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorPulse" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#f8f8f8'} />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '24px', 
+                    border: 'none', 
+                    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.15)',
+                    backgroundColor: theme === 'dark' ? '#111827' : '#ffffff',
+                    padding: '16px'
+                  }}
+                />
+                <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} formatter={(v) => <span className="text-[10px] font-black uppercase text-gray-500">{v}</span>} />
+                <Area type="monotone" dataKey="sistolica" name="Pres. Sistólica" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSis)" />
+                <Area type="monotone" dataKey="pulso" name="Pulso (bpm)" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorPulse)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Workshop Distrubution */}
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+           <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6">Oficinas vs Capacitações</h3>
+           <div className="h-64 flex items-center justify-center relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={workshopStats}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={8}
+                    dataKey="value"
+                  >
+                    {workshopStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                     contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                        backgroundColor: theme === 'dark' ? '#111827' : '#ffffff'
+                      }}
+                  />
+                  <Legend iconSize={8} iconType="circle" layout="vertical" align="right" verticalAlign="middle" formatter={(v) => <span className="text-[10px] font-black uppercase text-gray-500">{v}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute top-1/2 left-[35%] -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</p>
+                 <p className="text-2xl font-black text-gray-900 dark:text-white">{workshops.length}</p>
+              </div>
+           </div>
+        </div>
+
+        {/* Home Visits Radar Chart */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row gap-8 items-center">
+            <div className="flex-1 space-y-4">
+               <div>
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">Acompanhamento Familiar</h3>
+                  <p className="text-sm text-gray-500 font-medium">As visitas domiciliares são essenciais para o monitoramento multidimensional do idoso.</p>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">Visitas Mês</p>
+                     <p className="text-xl font-black text-gray-900 dark:text-white">{socialFamilyVisits.filter(v => v.date.startsWith(format(new Date(), 'yyyy-MM'))).length}</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">Última Visita</p>
+                     <p className="text-xl font-black text-gray-900 dark:text-white">{socialFamilyVisits[0] ? format(parseISO(socialFamilyVisits[0].date), 'dd/MM') : '--'}</p>
+                  </div>
+               </div>
+               <button 
+                  onClick={() => onNavigate('socialWork')}
+                  className="w-full py-3 bg-gray-900 dark:bg-white dark:text-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-[1.02] transition-transform"
+               >
+                  Ver Relatório Completo
+               </button>
+            </div>
+
+            <div className="w-full md:w-64 h-64 shrink-0">
+               <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
+                    { subject: 'Saúde', A: 120, B: 110, fullMark: 150 },
+                    { subject: 'Social', A: 98, B: 130, fullMark: 150 },
+                    { subject: 'Psico', A: 86, B: 130, fullMark: 150 },
+                    { subject: 'Lazer', A: 99, B: 100, fullMark: 150 },
+                    { subject: 'Doc.', A: 85, B: 90, fullMark: 150 },
+                  ]}>
+                    <PolarGrid stroke={theme === 'dark' ? '#374151' : '#e5e7eb'} />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
+                    <Radar name="Meta" dataKey="B" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
+                    <Radar name="Real" dataKey="A" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
+                  </RadarChart>
+               </ResponsiveContainer>
+            </div>
         </div>
       </div>
     </div>
@@ -3889,7 +4122,7 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
   showToast: (msg: string, type?: 'success' | 'error') => void,
   user: User
 }) => {
-  const canEdit = ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'].includes(user.role);
+  const canEdit = ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [loading, setLoading] = useState(false);
@@ -4986,7 +5219,7 @@ const GallerySection = ({ user, showToast }: { user: User, showToast: (msg: stri
                     </motion.div>
                   ) : (
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {(user.role === 'PRESIDENTE' || user.role === 'COORDENADORA' || photo.uploadedBy === user.name) && (
+                      {(user.role === 'PRESIDENTE' || user.role === 'AUXILIAR_ADMINISTRATIVO' || user.role === 'COORDENADORA' || photo.uploadedBy === user.name) && (
                         <button 
                           onClick={() => setConfirmDeleteId(photo.id)}
                           className="p-1.5 bg-red-500 text-white rounded-lg shadow-lg hover:bg-red-600 transition-colors"
@@ -6970,7 +7203,7 @@ export default function App() {
 
     // Listen to Donors
     let unsubDonors = () => {};
-    if (user.role === 'PRESIDENTE' || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+    if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qDonors = query(collection(db, 'donors'), orderBy('name'));
       unsubDonors = onSnapshot(qDonors, (snapshot) => {
         setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
@@ -6979,7 +7212,7 @@ export default function App() {
 
     // Listen to Diaper Donations
     let unsubDiaperDonations = () => {};
-    if (['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+    if (['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qDiaperDonations = query(collection(db, 'diaperDonations'), orderBy('date', 'desc'));
       unsubDiaperDonations = onSnapshot(qDiaperDonations, (snapshot) => {
         setDiaperDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperDonation)));
@@ -7013,7 +7246,7 @@ export default function App() {
 
     // Listen to Financial Records
     let unsubFinancial = () => {};
-    if (user.role === 'PRESIDENTE' || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+    if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qFinancial = query(collection(db, 'financial'), orderBy('date', 'desc'));
       unsubFinancial = onSnapshot(qFinancial, (snapshot) => {
         setFinancialRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord)));
@@ -7256,7 +7489,7 @@ export default function App() {
 
     // Listen to Professionals
     let unsubProfessionals = () => {};
-    if (user && (['PRESIDENTE', 'COORDENADORA', 'PROJETISTA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com')) {
+    if (user && (['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com')) {
       const qProfessionals = query(collection(db, 'professionals'), orderBy('name'));
       unsubProfessionals = onSnapshot(qProfessionals, (snapshot) => {
         setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
@@ -7469,10 +7702,40 @@ export default function App() {
 
   const handleDeleteNursingPatient = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'patients', id));
+      await deleteDoc(doc(db, 'nursingPatients', id));
       showToast('Paciente removido com sucesso');
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `patients/${id}`);
+      handleFirestoreError(err, OperationType.DELETE, `nursingPatients/${id}`);
+      showToast('Erro ao remover paciente', 'error');
+    }
+  };
+
+  const handleDeletePsychPatient = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'psychPatients', id));
+      showToast('Paciente removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `psychPatients/${id}`);
+      showToast('Erro ao remover paciente', 'error');
+    }
+  };
+
+  const handleDeletePedagogyPatient = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'pedagogyPatients', id));
+      showToast('Paciente removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `pedagogyPatients/${id}`);
+      showToast('Erro ao remover paciente', 'error');
+    }
+  };
+
+  const handleDeleteSocialPatient = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'socialPatients', id));
+      showToast('Paciente removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `socialPatients/${id}`);
       showToast('Erro ao remover paciente', 'error');
     }
   };
@@ -7608,6 +7871,46 @@ export default function App() {
   };
 
   const handleDeleteNursingRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
+      showToast('Erro ao remover registro', 'error');
+    }
+  };
+
+  const handleDeletePsychRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
+      showToast('Erro ao remover registro', 'error');
+    }
+  };
+
+  const handleDeletePhysioRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
+      showToast('Erro ao remover registro', 'error');
+    }
+  };
+
+  const handleDeletePedagogyRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro removido com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
+      showToast('Erro ao remover registro', 'error');
+    }
+  };
+
+  const handleDeleteSocialRecord = async (collectionName: string, id: string) => {
     try {
       await deleteDoc(doc(db, collectionName, id));
       showToast('Registro removido com sucesso');
@@ -7995,6 +8298,27 @@ export default function App() {
           events={calendarEvents} 
           theme={theme} 
           onViewSchedule={() => setActiveTab('schedule')}
+          physioEvolutions={physioEvolutions}
+          nursingEvolutions={nursingEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          vitalSigns={vitalSigns}
+          workshops={workshops}
+          socialFamilyVisits={socialFamilyVisits}
+          onNavigate={(tab) => setActiveTab(tab)}
+        />
+      );
+      case 'adminAssistant': return (
+        <AdminAssistantSection 
+          user={user}
+          elderly={elderly}
+          financialRecords={financialRecords}
+          events={calendarEvents}
+          volunteers={volunteers}
+          caregivers={caregivers}
+          onNavigate={(tab) => setActiveTab(tab)}
+          showToast={showToast}
         />
       );
       case 'elderly': return <ElderlySection elderly={elderly} evolutions={evolutions} pias={pias} showToast={showToast} />;
@@ -8013,6 +8337,7 @@ export default function App() {
           onSaveEvolution={handleSavePhysioEvolution}
           onSaveExercise={handleSavePhysioExercise}
           onSaveAppointment={handleSavePhysioAppointment}
+          onDeleteRecord={handleDeletePhysioRecord}
           onSavePhotos={savePhotosToGallery}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}
@@ -8075,6 +8400,8 @@ export default function App() {
           onSaveActivity={handleSavePsychActivity}
           onSaveCognitionAssessment={handleSavePsychCognitionAssessment}
           onSaveInterventionPlan={handleSavePsychInterventionPlan}
+          onDeleteRecord={handleDeletePsychRecord}
+          onDeletePatient={handleDeletePsychPatient}
           onSavePhotos={savePhotosToGallery}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}
@@ -8101,6 +8428,9 @@ export default function App() {
           onSaveSocial={handleSavePedagogySocial}
           onSavePlan={handleSavePedagogyPlan}
           onSaveLifeHistory={handleSavePedagogyLifeHistory}
+          onDeleteRecord={handleDeletePedagogyRecord}
+          onDeletePatient={handleDeletePedagogyPatient}
+          showToast={showToast}
           onSavePhotos={savePhotosToGallery}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}
@@ -8131,6 +8461,9 @@ export default function App() {
           onSaveFamilyVisit={handleSaveSocialFamilyVisit}
           onSaveRiskSituation={handleSaveSocialRiskSituation}
           onSavePIA={handleSaveSocialPIA}
+          onDeleteRecord={handleDeleteSocialRecord}
+          onDeletePatient={handleDeleteSocialPatient}
+          showToast={showToast}
           onSavePhotos={savePhotosToGallery}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}

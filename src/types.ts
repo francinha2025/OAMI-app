@@ -7,7 +7,8 @@ export type Role =
   | 'ENFERMEIRA' 
   | 'FISIOTERAPEUTA'
   | 'FABRICANTE_FRALDAS'
-  | 'PROJETISTA';
+  | 'PROJETISTA'
+  | 'AUXILIAR_ADMINISTRATIVO';
 
 export interface GalleryItem {
   id: string;
@@ -274,6 +275,7 @@ export interface PhysioExercise {
   category: 'ALONGAMENTO' | 'FORTALECIMENTO' | 'REABILITACAO' | 'OUTRO';
   videoUrl?: string;
   imageUrl?: string;
+  photos?: string[];
 }
 
 export interface PhysioAppointment {
@@ -283,6 +285,7 @@ export interface PhysioAppointment {
   time: string;
   status: 'ATENDIDO' | 'FALTOU' | 'PENDENTE';
   observations?: string;
+  photos?: string[];
 }
 
 export interface NursingPatient {

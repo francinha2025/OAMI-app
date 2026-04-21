@@ -8,7 +8,7 @@ import {
   Trash2, Edit2, Download, Printer, X, Info,
   ArrowLeft, TrendingUp, UserCircle, LogOut,
   Moon, Sun, Smile, Meh, Frown, History,
-  Lightbulb, Target, Star, ShieldAlert,
+  Lightbulb, Target, Star, ShieldAlert, Loader2, Zap,
   Home, MapPin, Briefcase, DollarSign,
   FileCheck, FileWarning, FileX, Landmark
 } from 'lucide-react';
@@ -22,6 +22,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay, subMonths } from 'd
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   User as UserType,
   SocialPatient, SocialFamilyTie, SocialDocumentation,
@@ -56,6 +57,7 @@ interface SocialWorkSectionProps {
   onSaveRiskSituation: (data: Partial<SocialRiskSituation>) => Promise<void>;
   onSavePIA: (data: Partial<PIA>) => Promise<void>;
   onSavePhotos: (photos: string[], patientId: string, patientName: string, activityType: string, description?: string) => Promise<void>;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
@@ -104,6 +106,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   onSaveRiskSituation,
   onSavePIA,
   onSavePhotos,
+  showToast,
   theme,
   setTheme,
   onLogout
@@ -115,6 +118,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [editingData, setEditingData] = useState<any>(null);
   const [selectedPatient, setSelectedPatient] = useState<SocialPatient | null>(null);
   const [formData, setFormData] = useState<any>({});
+  const [isExtracting, setIsExtracting] = useState(false);
 
   // Dashboard Stats
   const stats = useMemo(() => {
@@ -141,7 +145,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     };
   }, [patients, familyTies, documentations, referrals, familyVisits]);
 
-  const filteredPatients = patients.filter(p => 
+  const filteredPatients = (patients || []).filter(p => 
     p.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -151,14 +155,38 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleDigitize = (text: string) => {
+  const handleDigitize = async (text: string) => {
     const type = modalType || activeTab;
-    if (type === 'evolution') {
-      setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
-    } else if (type === 'docs' || type === 'documentation') {
-      setFormData((prev: any) => ({ ...prev, observations: (prev.observations || '') + '\n' + text }));
-    } else if (type === 'study') {
-      setFormData((prev: any) => ({ ...prev, socialStudy: (prev.socialStudy || '') + '\n' + text }));
+    if (!text) return;
+
+    setIsExtracting(true);
+    try {
+      const schemas: Record<string, string> = {
+        patient: "name, age (number), birthDate, gender, currentAddress, city, previousProfession",
+        study: "lifeHistory, socialConditions, institutionalizationReason, technicalOpinion",
+        evolution: "description, observation, conduct",
+        visit: "visitorName, relationship, date, description",
+        risk: "description, complexity (ALTA, MEDIA, BAIXA)",
+        documentation: "rg, cpf, sus, voterID, birthCertificate (all status: POSSUI, PENDENTE, INEXISTENTE), observations"
+      };
+
+      const extractedData = await extractFormData(text, schemas[type] || "description, observations");
+      
+      if (extractedData && Object.keys(extractedData).length > 0) {
+        setFormData((prev: any) => ({ ...prev, ...extractedData }));
+      } else {
+        if (type === 'evolution') {
+          setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
+        } else if (type === 'docs' || type === 'documentation') {
+          setFormData((prev: any) => ({ ...prev, observations: (prev.observations || '') + '\n' + text }));
+        } else if (type === 'study') {
+          setFormData((prev: any) => ({ ...prev, socialStudy: (prev.socialStudy || '') + '\n' + text }));
+        }
+      }
+    } catch (err) {
+      console.error("Extraction error:", err);
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -303,12 +331,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
+            className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                <p className="text-2xl font-bold mt-1">{stat.value}</p>
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400">{stat.label}</p>
+                <p className="text-2xl font-black mt-1 text-gray-900 dark:text-white">{stat.value}</p>
               </div>
               <div className={cn("p-3 rounded-xl", stat.bg)}>
                 <stat.icon className={cn("w-6 h-6", stat.color)} />
@@ -319,8 +347,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
             <TrendingUp className="w-5 h-5 text-blue-600" />
             Evolução de Atendimentos
           </h3>
@@ -343,8 +371,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
             <ShieldAlert className="w-5 h-5 text-red-600" />
             Situações de Risco por Tipo
           </h3>
@@ -378,21 +406,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2 uppercase tracking-tight">
             <Clock className="w-5 h-5 text-blue-600" />
             Encaminhamentos Recentes
           </h3>
           <div className="space-y-4">
             {referrals.slice(-5).map((referral, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+              <div key={i} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
+                  <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                     <Share2 className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{referral.destination}</p>
-                    <p className="text-sm text-gray-500">{referral.description}</p>
+                    <p className="font-black text-gray-900 dark:text-white">{referral.destination}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{referral.description}</p>
                   </div>
                 </div>
                 <span className={cn(
@@ -408,27 +436,27 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2 uppercase tracking-tight">
             <FileWarning className="w-5 h-5 text-orange-600" />
             Alertas Críticos
           </h3>
           <div className="space-y-3">
             {stats.noFamily > 0 && (
-              <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-red-900">{stats.noFamily} idosos sem vínculo familiar</p>
-                  <p className="text-xs text-red-700">Risco de abandono identificado.</p>
+                  <p className="text-sm font-black text-red-900 dark:text-red-300">{stats.noFamily} idosos sem vínculo familiar</p>
+                  <p className="text-xs text-red-700 dark:text-red-400 font-bold">Risco de abandono identificado.</p>
                 </div>
               </div>
             )}
             {stats.pendingDocs > 0 && (
-              <div className="p-3 bg-orange-50 border border-orange-100 rounded-xl flex items-start gap-3">
-                <FileX className="w-5 h-5 text-orange-600 mt-0.5" />
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 rounded-xl flex items-start gap-3">
+                <FileX className="w-5 h-5 text-orange-600 dark:text-orange-400 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-orange-900">{stats.pendingDocs} pendências documentais</p>
-                  <p className="text-xs text-orange-700">Regularização necessária para benefícios.</p>
+                  <p className="text-sm font-black text-orange-900 dark:text-orange-300">{stats.pendingDocs} pendências documentais</p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400 font-bold">Regularização necessária para benefícios.</p>
                 </div>
               </div>
             )}
@@ -447,40 +475,40 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nome Completo</label>
                 <input
                   required
                   type="text"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Data de Nascimento</label>
                 <input
                   required
                   type="date"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
                   value={formData.birthDate || ''}
                   onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Naturalidade</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Naturalidade</label>
                 <input
                   required
                   type="text"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
                   value={formData.naturalness || ''}
                   onChange={(e) => setFormData({ ...formData, naturalness: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado Civil</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Estado Civil</label>
                 <select
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
                   value={formData.maritalStatus || ''}
                   onChange={(e) => setFormData({ ...formData, maritalStatus: e.target.value })}
                 >
@@ -493,40 +521,40 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Escolaridade</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Escolaridade</label>
                 <input
                   required
                   type="text"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
                   value={formData.schooling || ''}
                   onChange={(e) => setFormData({ ...formData, schooling: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Profissão Anterior</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Profissão Anterior</label>
                 <input
                   required
                   type="text"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
                   value={formData.previousProfession || ''}
                   onChange={(e) => setFormData({ ...formData, previousProfession: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Renda (R$)</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Renda (R$)</label>
                 <input
                   required
                   type="number"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
                   value={formData.income || ''}
                   onChange={(e) => setFormData({ ...formData, income: parseFloat(e.target.value) })}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status do Benefício</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Status do Benefício</label>
                 <select
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
                   value={formData.benefitStatus || ''}
                   onChange={(e) => setFormData({ ...formData, benefitStatus: e.target.value })}
                 >
@@ -567,6 +595,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data do Atendimento</label>
+              <input
+                required
+                type="date"
+                className="w-full p-2 border border-gray-200 rounded-lg"
+                value={formData.date || format(new Date(), 'yyyy-MM-dd')}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Atendimento</label>
               <input
                 required
@@ -580,11 +618,35 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium text-gray-700">Situação Observada</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observation: (formData.observation || '') + ' ' + t })} />
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    disabled={isExtracting || !formData.observation}
+                    onClick={async () => {
+                      if (!formData.observation) return;
+                      setIsExtracting(true);
+                      try {
+                        const fixed = await fixGrammar(formData.observation);
+                        setFormData({ ...formData, observation: fixed });
+                        showToast('Texto corrigido com sucesso', 'success');
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Erro ao corrigir texto', 'error');
+                      } finally {
+                        setIsExtracting(false);
+                      }
+                    }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                  >
+                    {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+                    Corrigir
+                  </button>
+                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observation: (formData.observation || '') + ' ' + t })} />
+                </div>
               </div>
               <textarea
                 required
-                className="w-full p-2 border border-gray-200 rounded-lg h-24"
+                className="w-full p-2 border border-gray-200 rounded-lg h-24 font-bold"
                 value={formData.observation || ''}
                 onChange={(e) => setFormData({ ...formData, observation: e.target.value })}
               />
@@ -592,11 +654,35 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium text-gray-700">Conduta / Encaminhamentos</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, conduct: (formData.conduct || '') + ' ' + t })} />
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    disabled={isExtracting || !formData.conduct}
+                    onClick={async () => {
+                      if (!formData.conduct) return;
+                      setIsExtracting(true);
+                      try {
+                        const fixed = await fixGrammar(formData.conduct);
+                        setFormData({ ...formData, conduct: fixed });
+                        showToast('Texto corrigido com sucesso', 'success');
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Erro ao corrigir texto', 'error');
+                      } finally {
+                        setIsExtracting(false);
+                      }
+                    }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                  >
+                    {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+                    Corrigir
+                  </button>
+                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, conduct: (formData.conduct || '') + ' ' + t })} />
+                </div>
               </div>
               <textarea
                 required
-                className="w-full p-2 border border-gray-200 rounded-lg h-24"
+                className="w-full p-2 border border-gray-200 rounded-lg h-24 font-bold"
                 value={formData.conduct || ''}
                 onChange={(e) => setFormData({ ...formData, conduct: e.target.value })}
               />
@@ -823,10 +909,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idoso</label>
                 <select
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   value={formData.elderlyId || ''}
                   onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
                 >
@@ -835,10 +921,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                 <select
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   value={formData.status || 'EM_ANDAMENTO'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
@@ -851,40 +937,43 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 <input
                   type="checkbox"
                   checked={formData.hasBPC || false}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded"
                   onChange={(e) => setFormData({ ...formData, hasBPC: e.target.checked })}
                 />
-                <label className="text-sm font-medium text-gray-700">Possui BPC</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Possui BPC</label>
               </div>
               <div className="flex items-center gap-2 mt-6">
                 <input
                   type="checkbox"
                   checked={formData.hasPension || false}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded"
                   onChange={(e) => setFormData({ ...formData, hasPension: e.target.checked })}
                 />
-                <label className="text-sm font-medium text-gray-700">Possui Aposentadoria</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Possui Aposentadoria</label>
               </div>
               <div className="flex items-center gap-2 mt-6">
                 <input
                   type="checkbox"
                   checked={formData.hasLoans || false}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded"
                   onChange={(e) => setFormData({ ...formData, hasLoans: e.target.checked })}
                 />
-                <label className="text-sm font-medium text-gray-700">Possui Empréstimos</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Possui Empréstimos</label>
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Renda Mensal (R$)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Renda Mensal (R$)</label>
                 <input
                   type="number"
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   value={formData.monthlyIncome || ''}
                   onChange={(e) => setFormData({ ...formData, monthlyIncome: parseFloat(e.target.value) })}
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Envolvimento Familiar</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Envolvimento Familiar</label>
                 <select
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   value={formData.familyInvolvement || 'MEDIO'}
                   onChange={(e) => setFormData({ ...formData, familyInvolvement: e.target.value })}
                 >
@@ -896,24 +985,24 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               <div className="col-span-2">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Objetivos do Plano</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Objetivos do Plano</label>
                   <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
                 </div>
                 <textarea
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg h-24"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
                   value={formData.objectives || ''}
                   onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
                 />
               </div>
               <div className="col-span-2">
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Ações Propostas</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ações Propostas</label>
                   <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, actions: (formData.actions || '') + ' ' + t })} />
                 </div>
                 <textarea
                   required
-                  className="w-full p-2 border border-gray-200 rounded-lg h-24"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
                   value={formData.actions || ''}
                   onChange={(e) => setFormData({ ...formData, actions: e.target.value })}
                 />
@@ -1304,35 +1393,35 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
         <table className="w-full text-left">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
             <tr>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">Idoso</th>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">RG</th>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">CPF</th>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">SUS</th>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">Certidão</th>
-              <th className="px-6 py-4 text-sm font-bold text-gray-500 uppercase">Residência</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Idoso</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">RG</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">CPF</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">SUS</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Certidão</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Residência</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {documentations.map((doc) => {
               const patient = patients.find(p => p.id === doc.patientId);
               const getStatusBadge = (status: string) => (
                 <span className={cn(
-                  "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
-                  status === 'COMPLETO' ? "bg-green-100 text-green-700" :
-                  status === 'PENDENTE' ? "bg-orange-100 text-orange-700" :
-                  "bg-red-100 text-red-700"
+                  "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
+                  status === 'COMPLETO' ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800" :
+                  status === 'PENDENTE' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-800" :
+                  "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800"
                 )}>
                   {status}
                 </span>
               );
 
               return (
-                <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-900">{patient?.name}</td>
+                <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white">{patient?.name}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.rg)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.cpf)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.sus)}</td>
@@ -1350,7 +1439,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderFamilyTies = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900">Vínculo Familiar</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white">Vínculo Familiar</h3>
         <button
           onClick={() => openModal('family')}
           className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors"
@@ -1364,19 +1453,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         {familyTies.map((tie) => {
           const patient = patients.find(p => p.id === tie.patientId);
           return (
-            <div key={tie.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
                     <Heart className="w-6 h-6 text-pink-500" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
+                    <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
                   </div>
                 </div>
                 {tie.abandonmentRisk && (
-                  <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold uppercase flex items-center gap-1">
+                  <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full text-xs font-black uppercase flex items-center gap-1 border border-red-200 dark:border-red-800">
                     <AlertTriangle className="w-3 h-3" />
                     Risco Abandono
                   </span>
@@ -1385,14 +1474,14 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
               <div className="space-y-4">
                 {(tie.members || []).map((member) => (
-                  <div key={member.id} className="p-3 bg-gray-50 rounded-xl flex items-center justify-between">
+                  <div key={member.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{member.name} ({member.kinship})</p>
-                      <p className="text-xs text-gray-500">{member.phone}</p>
+                      <p className="text-sm font-black text-gray-900 dark:text-white">{member.name} ({member.kinship})</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold">{member.phone}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Visitas</p>
-                      <p className="text-xs font-bold text-gray-700">{member.visitFrequency}</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Visitas</p>
+                      <p className="text-xs font-black text-gray-700 dark:text-gray-300">{member.visitFrequency}</p>
                     </div>
                   </div>
                 ))}
@@ -1615,25 +1704,25 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar idoso..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black dark:text-white font-medium"
-            />
-          </div>
-          <button
-            onClick={() => openModal('patient')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Novo Cadastro Social
-          </button>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar idoso..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white font-black"
+          />
         </div>
+        <button
+          onClick={() => openModal('patient')}
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 dark:shadow-none active:scale-95"
+        >
+          <Plus className="w-5 h-5" />
+          <span className="font-bold">Novo Cadastro Social</span>
+        </button>
+      </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPatients.map((patient) => (
@@ -1767,8 +1856,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-        <div className="divide-y divide-gray-100">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {evolutions.map((evolution) => {
             const patient = patients.find(p => p.id === evolution.patientId);
             return (
@@ -2224,12 +2313,30 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border dark:border-gray-800"
             >
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-                <h3 className="text-lg font-bold text-gray-900 uppercase tracking-wider">
-                  {modalType || activeTab}
-                </h3>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
+              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                {modalType === 'patient' || modalType === 'profile' ? 'Novo Cadastro de Idoso' : 
+                 modalType === 'evolution' ? 'Nova Evolução Social' :
+                 modalType === 'referral' ? 'Novo Encaminhamento' :
+                 modalType === 'visit' ? 'Novo Registro de Visita' :
+                 modalType === 'risk' ? 'Nova Situação de Risco' :
+                 modalType === 'study' ? 'Novo Estudo Social' :
+                 modalType === 'legal' ? 'Nova Situação Legal' :
+                 modalType === 'family' ? 'Novo Vínculo Familiar' :
+                 modalType === 'docs' ? 'Atualização de Documentos' :
+                 modalType || activeTab}
+                {isExtracting && (
+                  <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Extraindo Dados...
+                  </span>
+                )}
+              </h3>
+              <button 
+                onClick={() => setIsModalOpen(false)} 
+                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
               </div>
               {renderModalContent()}
             </motion.div>
