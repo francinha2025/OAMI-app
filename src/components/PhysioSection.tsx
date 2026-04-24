@@ -6,7 +6,7 @@ import {
   ChevronRight, AlertCircle, CheckCircle2, 
   Clock, MapPin, Phone, Mail, 
   User as UserIcon, Camera, Trash2, Edit2, 
-  Download, Printer, Share2, X,
+  Download, Printer, Share2, X, Target,
   Heart, Shield, Info, ArrowLeft,
   Star, MessageSquare, Bell,
   Stethoscope, Activity, TrendingUp,
@@ -22,6 +22,7 @@ import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, 
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType } from '../types';
 import { PhotoUpload } from './PhotoUpload';
@@ -115,18 +116,43 @@ export const PhysioSection = ({
     const patientAssessments = assessments.filter(a => a.patientId === reportPatientId);
     const patientEvolutions = evolutions.filter(e => e.patientId === reportPatientId);
 
-    const data = [
+    const data: any[] = [
       ['Nome', patient.name],
       ['Idade', patient.age],
-      ['Diagnóstico', patient.diagnosis],
+      ['Diagnóstico Principal', patient.diagnosis],
       ['Categoria', patient.category],
+      ['Telefone', patient.phone],
       ['', ''],
-      ['AVALIAÇÕES', ''],
-      ...patientAssessments.map(a => [format(parseISO(a.date), 'dd/MM/yyyy'), a.complaint]),
-      ['', ''],
-      ['EVOLUÇÕES', ''],
-      ...patientEvolutions.map(e => [format(parseISO(e.date), 'dd/MM/yyyy'), e.evolution])
+      ['AVALIAÇÕES FISIOTERAPÊUTICAS', ''],
     ];
+
+    patientAssessments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(a => {
+      data.push([{ content: `Avaliação em ${format(parseISO(a.date), 'dd/MM/yyyy')}`, colSpan: 2, styles: { fillColor: [200, 200, 200], fontStyle: 'bold' } }]);
+      if (a.complaint) data.push(['Queixa Principal', a.complaint]);
+      if (a.medicalDiagnosis) data.push(['Diagnóstico Médico', a.medicalDiagnosis]);
+      if (a.hda) data.push(['HDA', a.hda]);
+      if (a.hpp) data.push(['HPP', a.hpp]);
+      if (a.currentMedications) data.push(['Medicações', a.currentMedications]);
+      if (a.complementaryExams) data.push(['Exames', a.complementaryExams]);
+      if (a.vitals) {
+        const v = a.vitals;
+        data.push(['Sinais Vitais', `FC: ${v.heartRate || '---'} bpm, FR: ${v.respRate || '---'} irpm, PA: ${v.bloodPressure || '---'}`]);
+      }
+      if (a.inspectionPalpation) data.push(['Inspeção/Palpação', a.inspectionPalpation]);
+      if (a.motionLimitation) data.push(['Limitação Adm', a.motionLimitation]);
+      if (a.specificTests) data.push(['Testes Específicos', a.specificTests]);
+      if (a.functionalDiagnosis) data.push(['Diagnóstico Funcional', a.functionalDiagnosis]);
+      if (a.treatmentObjectives) data.push(['Objetivos', a.treatmentObjectives]);
+      if (a.treatmentPlan) data.push(['Plano', a.treatmentPlan]);
+      data.push(['Escala de Dor', `${a.painScale}/10`]);
+      data.push(['Risco de Queda', a.fallRisk || 'N/A']);
+      data.push(['', '']);
+    });
+
+    data.push(['EVOLUÇÕES DIÁRIAS', '']);
+    patientEvolutions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(e => {
+      data.push([format(parseISO(e.date), 'dd/MM/yyyy'), `Evolução: ${e.evolution}\nProcedimentos: ${e.procedures}`]);
+    });
 
     generateModernPDF({
       title: `Prontuário de Fisioterapia - ${patient.name}`,
@@ -163,21 +189,94 @@ export const PhysioSection = ({
     });
   };
 
-  const stats = useMemo(() => {
+  const handleGeneratePatientWord = async () => {
+    if (!reportPatientId) {
+      showToast('Selecione um paciente para gerar o prontuário', 'error');
+      return;
+    }
+    const patient = patients.find(p => p.id === reportPatientId);
+    if (!patient) return;
+
+    const patientAssessments = assessments.filter(a => a.patientId === reportPatientId);
+    const patientEvolutions = evolutions.filter(e => e.patientId === reportPatientId);
+
+    const data: any[][] = [
+      ['Nome', patient.name],
+      ['Idade', String(patient.age)],
+      ['Diagnóstico Principal', patient.diagnosis],
+      ['Categoria', patient.category],
+      ['Telefone', patient.phone],
+      ['', ''],
+      ['AVALIAÇÕES FISIOTERAPÊUTICAS', ''],
+    ];
+
+    patientAssessments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(a => {
+      data.push([`Avaliação em ${format(parseISO(a.date), 'dd/MM/yyyy')}`, '']);
+      if (a.complaint) data.push(['Queixa Principal', a.complaint]);
+      if (a.medicalDiagnosis) data.push(['Diagnóstico Médico', a.medicalDiagnosis]);
+      if (a.hda) data.push(['HDA', a.hda]);
+      if (a.currentMedications) data.push(['Medicações', a.currentMedications]);
+      if (a.functionalDiagnosis) data.push(['Diagnóstico Funcional', a.functionalDiagnosis]);
+      if (a.treatmentPlan) data.push(['Plano', a.treatmentPlan]);
+      data.push(['Escala de Dor', `${a.painScale}/10`]);
+      data.push(['', '']);
+    });
+
+    data.push(['EVOLUÇÕES DIÁRIAS', '']);
+    patientEvolutions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).forEach(e => {
+      data.push([format(parseISO(e.date), 'dd/MM/yyyy'), `Evolução: ${e.evolution}\nProcedimentos: ${e.procedures}`]);
+    });
+
+    await generateModernWord({
+      title: `Prontuário de Fisioterapia - ${patient.name}`,
+      subtitle: `Documento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+      columns: ['Campo/Data', 'Descrição/Informação'],
+      data,
+      fileName: `prontuario_${patient.name.toLowerCase().replace(/\s/g, '_')}`
+    });
+  };
+
+  const handleGenerateActivityWord = async () => {
+    const [year, month] = reportMonth.split('-');
+    const monthEvolutions = evolutions.filter(e => {
+      const date = parseISO(e.date);
+      return date.getFullYear() === parseInt(year) && date.getMonth() === parseInt(month) - 1;
+    });
+
+    const data = monthEvolutions.map(e => {
+      const patient = patients.find(p => p.id === e.patientId);
+      return [
+        format(parseISO(e.date), 'dd/MM/yyyy'),
+        patient?.name || 'N/A',
+        e.procedures,
+        e.evolution
+      ];
+    });
+
+    await generateModernWord({
+      title: `Relatório de Atividades - ${format(parseISO(`${reportMonth}-01`), 'MMMM/yyyy', { locale: ptBR })}`,
+      subtitle: `Resumo mensal de atendimentos de fisioterapia`,
+      columns: ['Data', 'Paciente', 'Procedimentos', 'Evolução'],
+      data,
+      fileName: `relatorio_atividades_${reportMonth}`
+    });
+  };
+
+    const stats = useMemo(() => {
     const patientsList = patients || [];
     const appointmentsList = appointments || [];
     const evolutionsList = evolutions || [];
     const assessmentsList = assessments || [];
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    const todayAppointments = appointmentsList.filter(a => a.date === today);
-    const pendingEvolutions = todayAppointments.filter(a => a.status === 'ATENDIDO' && !evolutionsList.some(e => e.patientId === a.patientId && e.date === today)).length;
+    const todayAppointments = (appointmentsList || []).filter(a => a.date === today);
+    const pendingEvolutions = (todayAppointments || []).filter(a => a.status === 'ATENDIDO' && !(evolutionsList || []).some(e => e.patientId === a.patientId && e.date === today)).length;
     
     return {
       totalPatients: patientsList.length,
       todayAppointments: todayAppointments.length,
       pendingEvolutions,
-      highPainAlerts: assessmentsList.filter(a => a.painScale >= 7).length
+      highPainAlerts: (assessmentsList || []).filter(a => a.painScale >= 7).length
     };
   }, [patients, appointments, evolutions, assessments]);
 
@@ -195,7 +294,7 @@ export const PhysioSection = ({
       dayDate.setDate(startOfWeek.getDate() + index);
       const dateStr = dayDate.toISOString().split('T')[0];
       
-      const count = evolutions.filter(e => e.date.startsWith(dateStr)).length;
+      const count = (evolutions || []).filter(e => e.date.startsWith(dateStr)).length;
       return { name: day, total: count };
     });
   }, [evolutions]);
@@ -212,25 +311,27 @@ export const PhysioSection = ({
   ];
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 min-h-[80vh]">
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 min-h-[80vh]">
       {/* Internal Navigation */}
-      <div className="lg:w-64 flex-shrink-0 space-y-2">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveSubTab(item.id)}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all",
+              "flex-shrink-0 lg:w-full flex items-center gap-3 px-6 lg:px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap snap-start group",
               activeSubTab === item.id 
-                ? "bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none" 
+                ? "bg-green-600 text-white shadow-xl shadow-green-100 dark:shadow-none translate-x-0 lg:translate-x-1" 
                 : "text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-gray-800"
             )}
           >
-            <item.icon size={20} />
+            <div className={cn("transition-transform group-hover:scale-110", activeSubTab === item.id ? "text-white" : "text-gray-400 group-hover:text-green-600")}>
+              <item.icon size={18} />
+            </div>
             {item.label}
           </button>
         ))}
-      </div>
+      </aside>
 
       {/* Content Area */}
       <div className="flex-1">
@@ -463,8 +564,8 @@ export const PhysioSection = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {assessments.map((a) => {
-                      const patient = patients.find(p => p.id === a.patientId);
+                    {(assessments || []).map((a) => {
+                      const patient = (patients || []).find(p => p.id === a.patientId);
                       return (
                         <tr key={a.id} className="text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                           <td className="p-6 font-bold text-gray-800 dark:text-white">{patient?.name || 'N/A'}</td>
@@ -738,13 +839,22 @@ export const PhysioSection = ({
                       <option value="">Selecionar Paciente...</option>
                       {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <button 
-                      onClick={handleGeneratePatientPDF}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all"
-                    >
-                      <Download size={20} />
-                      Gerar PDF
-                    </button>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={handleGeneratePatientPDF}
+                        className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all"
+                      >
+                        <Download size={20} />
+                        PDF
+                      </button>
+                      <button 
+                        onClick={handleGeneratePatientWord}
+                        className="flex-1 flex items-center justify-center gap-2 bg-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-600 transition-all"
+                      >
+                        <FileText size={20} />
+                        Word
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -764,13 +874,22 @@ export const PhysioSection = ({
                         value={reportMonth}
                         onChange={(e) => setReportMonth(e.target.value)}
                       />
-                      <button 
-                        onClick={handleGenerateActivityPDF}
-                        className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-green-700 transition-all"
-                      >
-                        <Printer size={20} />
-                        Gerar PDF
-                      </button>
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={handleGenerateActivityPDF}
+                          className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-green-700 transition-all"
+                        >
+                          <Download size={20} />
+                          PDF
+                        </button>
+                        <button 
+                          onClick={handleGenerateActivityWord}
+                          className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-green-600 transition-all"
+                        >
+                          <FileText size={20} />
+                          Word
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -875,7 +994,7 @@ export const PhysioSection = ({
       {/* Patient Modal */}
       <AnimatePresence>
         {isPatientModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsPatientModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setIsPatientModalOpen(false)}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -904,7 +1023,7 @@ export const PhysioSection = ({
         )}
 
         {isAssessmentModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsAssessmentModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -913,19 +1032,21 @@ export const PhysioSection = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">Nova Avaliação</h3>
-                <button onClick={() => setIsAssessmentModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <h3 className="text-xl font-bold">{editingData ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
+                <button onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
               <div className="overflow-y-auto p-8">
                 <AssessmentForm 
                   patients={patients}
+                  initialData={editingData}
                   onSave={async (data) => {
-                    await onSaveAssessment(data);
+                    await onSaveAssessment(data, editingData?.id);
                     setIsAssessmentModalOpen(false);
+                    setEditingData(null);
                   }}
-                  onCancel={() => setIsAssessmentModalOpen(false)}
+                  onCancel={() => { setIsAssessmentModalOpen(false); setEditingData(null); }}
                   onSavePhotos={onSavePhotos}
                 />
               </div>
@@ -934,7 +1055,7 @@ export const PhysioSection = ({
         )}
 
         {isEvolutionModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsEvolutionModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -943,8 +1064,8 @@ export const PhysioSection = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">Nova Evolução</h3>
-                <button onClick={() => setIsEvolutionModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <h3 className="text-xl font-bold">{editingData ? 'Editar Evolução' : 'Nova Evolução'}</h3>
+                <button onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -952,11 +1073,13 @@ export const PhysioSection = ({
                 <EvolutionForm 
                   patients={patients}
                   showToast={showToast}
+                  initialData={editingData}
                   onSave={async (data) => {
-                    await onSaveEvolution(data);
+                    await onSaveEvolution(data, editingData?.id);
                     setIsEvolutionModalOpen(false);
+                    setEditingData(null);
                   }}
-                  onCancel={() => setIsEvolutionModalOpen(false)}
+                  onCancel={() => { setIsEvolutionModalOpen(false); setEditingData(null); }}
                   onSavePhotos={onSavePhotos}
                 />
               </div>
@@ -965,7 +1088,7 @@ export const PhysioSection = ({
         )}
 
         {isExerciseModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsExerciseModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -974,18 +1097,20 @@ export const PhysioSection = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">Novo Exercício</h3>
-                <button onClick={() => setIsExerciseModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <h3 className="text-xl font-bold">{editingData ? 'Editar Exercício' : 'Novo Exercício'}</h3>
+                <button onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
               <div className="overflow-y-auto p-8">
                 <ExerciseForm 
+                  initialData={editingData}
                   onSave={async (data) => {
-                    await onSaveExercise(data);
+                    await onSaveExercise(data, editingData?.id);
                     setIsExerciseModalOpen(false);
+                    setEditingData(null);
                   }}
-                  onCancel={() => setIsExerciseModalOpen(false)}
+                  onCancel={() => { setIsExerciseModalOpen(false); setEditingData(null); }}
                 />
               </div>
             </motion.div>
@@ -993,7 +1118,7 @@ export const PhysioSection = ({
         )}
 
         {isAppointmentModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsAppointmentModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1002,19 +1127,51 @@ export const PhysioSection = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">Agendar Sessão</h3>
-                <button onClick={() => setIsAppointmentModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                <h3 className="text-xl font-bold">{editingData ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
+                <button onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                   <X size={20} />
                 </button>
               </div>
               <div className="overflow-y-auto p-8">
                 <AppointmentForm 
                   patients={patients}
+                  initialData={editingData}
                   onSave={async (data) => {
-                    await onSaveAppointment(data);
+                    await onSaveAppointment(data, editingData?.id);
                     setIsAppointmentModalOpen(false);
+                    setEditingData(null);
                   }}
-                  onCancel={() => setIsAppointmentModalOpen(false)}
+                  onCancel={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {isAppointmentModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
+                <h3 className="text-xl font-bold">{editingData ? 'Editar Agendamento' : 'Agendar Sessão'}</h3>
+                <button onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-8">
+                <AppointmentForm 
+                  patients={patients}
+                  initialData={editingData}
+                  onSave={async (data) => {
+                    await onSaveAppointment(data, editingData?.id);
+                    setIsAppointmentModalOpen(false);
+                    setEditingData(null);
+                  }}
+                  onCancel={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}
                 />
               </div>
             </motion.div>
@@ -1091,7 +1248,6 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome Completo</label>
         <input 
           type="text" 
-          required
           value={formData.name}
           onChange={e => setFormData({ ...formData, name: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1103,7 +1259,6 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Idade</label>
           <input 
             type="number" 
-            required
             value={formData.age || ''}
             onChange={e => setFormData({ ...formData, age: parseInt(e.target.value) })}
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1113,7 +1268,6 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Telefone</label>
           <input 
             type="text" 
-            required
             value={formData.phone}
             onChange={e => setFormData({ ...formData, phone: e.target.value })}
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1140,7 +1294,6 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
           <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, diagnosis: (prev.diagnosis || '') + ' ' + t }))} />
         </div>
         <textarea 
-          required
           value={formData.diagnosis}
           onChange={e => setFormData({ ...formData, diagnosis: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none"
@@ -1192,7 +1345,21 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
     patientId: initialData?.patientId || '',
     date: initialData?.date || new Date().toISOString(),
     complaint: initialData?.complaint || '',
-    history: initialData?.history || '',
+    hda: initialData?.hda || (initialData as any)?.history || '',
+    hpp: initialData?.hpp || initialData?.medicalHistory || '',
+    complementaryExams: initialData?.complementaryExams || '',
+    currentMedications: initialData?.currentMedications || '',
+    vitals: initialData?.vitals || {
+      heartRate: undefined,
+      respRate: undefined,
+      bloodPressure: ''
+    },
+    inspectionPalpation: initialData?.inspectionPalpation || '',
+    specificTests: initialData?.specificTests || (initialData as any)?.physicalTests || '',
+    medicalDiagnosis: initialData?.medicalDiagnosis || '',
+    functionalDiagnosis: initialData?.functionalDiagnosis || '',
+    treatmentObjectives: initialData?.treatmentObjectives || '',
+    treatmentPlan: initialData?.treatmentPlan || '',
     painScale: initialData?.painScale || 0,
     motionLimitation: initialData?.motionLimitation || '',
     physicalTests: initialData?.physicalTests || '',
@@ -1209,7 +1376,7 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
     setIsExtracting(true);
     try {
       const schemas: Record<string, string> = {
-        assessment: "complaint, history, painScale (number 0-10), motionLimitation, physicalTests, fallRisk (ALTO, MEDIO, BAIXO), mobilityLevel, independenceADLs, medicalHistory"
+        assessment: "complaint, hda, hpp, complementaryExams, currentMedications, vitals { heartRate (number), respRate (number), bloodPressure (string) }, inspectionPalpation, specificTests, medicalDiagnosis, functionalDiagnosis, treatmentObjectives, treatmentPlan, painScale (number 0-10), motionLimitation, physicalTests, fallRisk (ALTO, MEDIO, BAIXO), mobilityLevel, independenceADLs, medicalHistory"
       };
       
       const extractedData = await extractFormData(text, schemas.assessment);
@@ -1240,102 +1407,305 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
-          <select 
-            required
-            value={formData.patientId}
-            onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
-          >
-            <option value="">Selecionar Paciente...</option>
-            {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data da Avaliação</label>
-          <input 
-            type="date" 
-            required
-            value={formData.date.split('T')[0]}
-            onChange={e => setFormData({ ...formData, date: new Date(e.target.value).toISOString() })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex justify-between items-center ml-1">
-          <label className="text-xs font-bold text-gray-400 uppercase">Queixa Principal</label>
-          <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, complaint: (prev.complaint || '') + ' ' + t }))} />
-        </div>
-        <textarea 
-          required
-          value={formData.complaint}
-          onChange={e => setFormData({ ...formData, complaint: e.target.value })}
-          className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escala de Dor (0-10)</label>
-          <input 
-            type="range" 
-            min="0" 
-            max="10"
-            value={formData.painScale}
-            onChange={e => setFormData({ ...formData, painScale: parseInt(e.target.value) })}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-          />
-          <div className="flex justify-between text-[10px] font-bold text-gray-400">
-            <span>Sem Dor</span>
-            <span className="text-green-600 text-sm">{formData.painScale}</span>
-            <span>Dor Máxima</span>
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* 1. Identificação */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-green-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <UserIcon size={14} />
+          Identificação & Data
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
+            <select 
+              value={formData.patientId}
+              onChange={e => setFormData({ ...formData, patientId: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+            >
+              <option value="">Selecionar Paciente...</option>
+              {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data da Avaliação</label>
+            <input 
+              type="date" 
+              value={formData.date.split('T')[0]}
+              onChange={e => setFormData({ ...formData, date: new Date(e.target.value).toISOString() })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+            />
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase ml-1">Risco de Queda</label>
-          <select 
-            value={formData.fallRisk}
-            onChange={e => setFormData({ ...formData, fallRisk: e.target.value as any })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
-          >
-            <option value="BAIXO">Baixo</option>
-            <option value="MEDIO">Médio</option>
-            <option value="ALTO">Alto</option>
-          </select>
+      </div>
+
+      {/* 2. Anamnese */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <ClipboardList size={14} />
+          Anamnese
+        </h4>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Queixa Principal</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, complaint: (prev.complaint || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.complaint}
+              onChange={e => setFormData({ ...formData, complaint: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none"
+              placeholder="Descreva a queixa principal do paciente..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">HDA (História da Doença Atual)</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hda: (prev.hda || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.hda}
+                onChange={e => setFormData({ ...formData, hda: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Relato sobre o quadro atual..."
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">HPP (História Patológica Pregressa)</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hpp: (prev.hpp || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.hpp}
+                onChange={e => setFormData({ ...formData, hpp: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Comorbidades, cirurgias anteriores..."
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Exames Complementares</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, complementaryExams: (prev.complementaryExams || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.complementaryExams}
+                onChange={e => setFormData({ ...formData, complementaryExams: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Resultados de ECG, Raio-X, exames de sangue..."
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Medicações em Uso</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, currentMedications: (prev.currentMedications || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.currentMedications}
+                onChange={e => setFormData({ ...formData, currentMedications: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Nome e dosagem das medicações..."
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <div className="flex justify-between items-center ml-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Limitação de Movimento</label>
-            <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, motionLimitation: (prev.motionLimitation || '') + ' ' + t }))} />
+      {/* 3. Sinais Vitais */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Activity size={14} />
+          Sinais Vitais
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">FC (bpm)</label>
+            <input 
+              type="number"
+              value={formData.vitals?.heartRate || ''}
+              onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, heartRate: parseInt(e.target.value) } })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              placeholder="Ex: 75"
+            />
           </div>
-          <textarea 
-            value={formData.motionLimitation}
-            onChange={e => setFormData({ ...formData, motionLimitation: e.target.value })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none"
-          />
-        </div>
-        <div className="space-y-2">
-          <div className="flex justify-between items-center ml-1">
-            <label className="text-xs font-bold text-gray-400 uppercase">Testes Físicos</label>
-            <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, physicalTests: (prev.physicalTests || '') + ' ' + t }))} />
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">FR (irpm)</label>
+            <input 
+              type="number"
+              value={formData.vitals?.respRate || ''}
+              onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, respRate: parseInt(e.target.value) } })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              placeholder="Ex: 14"
+            />
           </div>
-          <textarea 
-            value={formData.physicalTests}
-            onChange={e => setFormData({ ...formData, physicalTests: e.target.value })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none"
-          />
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase ml-1">PA (mmHg)</label>
+            <input 
+              type="text"
+              value={formData.vitals?.bloodPressure || ''}
+              onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, bloodPressure: e.target.value } })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              placeholder="Ex: 120x80"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
+      {/* 4. Exame Físico */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Stethoscope size={14} />
+          Exame Físico & Testes
+        </h4>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Inspeção e Palpação</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, inspectionPalpation: (prev.inspectionPalpation || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.inspectionPalpation}
+              onChange={e => setFormData({ ...formData, inspectionPalpation: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              placeholder="Postura, trofismo, edemas, tônus, crepitações..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Escala de Dor (0-10)</label>
+              <div className="p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl space-y-2">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="10"
+                  value={formData.painScale}
+                  onChange={e => setFormData({ ...formData, painScale: parseInt(e.target.value) })}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                />
+                <div className="flex justify-between text-[10px] font-bold text-gray-400">
+                  <span>Sem Dor</span>
+                  <span className="text-green-600 text-sm">{formData.painScale}</span>
+                  <span>Dor Máxima</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Risco de Queda</label>
+              <select 
+                value={formData.fallRisk}
+                onChange={e => setFormData({ ...formData, fallRisk: e.target.value as any })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              >
+                <option value="BAIXO">Baixo</option>
+                <option value="MEDIO">Médio</option>
+                <option value="ALTO">Alto</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Testes Físicos / Específicos</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, specificTests: (prev.specificTests || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.specificTests}
+                onChange={e => setFormData({ ...formData, specificTests: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Testes de equilíbrio, força, marcha..."
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Limitação de Movimento</label>
+                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, motionLimitation: (prev.motionLimitation || '') + ' ' + t }))} />
+              </div>
+              <textarea 
+                value={formData.motionLimitation}
+                onChange={e => setFormData({ ...formData, motionLimitation: e.target.value })}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                placeholder="Restrições articulares identificadas..."
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Diagnóstico */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <AlertCircle size={14} />
+          Diagnóstico
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Diagnóstico Médico</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, medicalDiagnosis: (prev.medicalDiagnosis || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.medicalDiagnosis}
+              onChange={e => setFormData({ ...formData, medicalDiagnosis: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              placeholder="Ex: AVE não especificado..."
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Diagnóstico Cinético Funcional</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, functionalDiagnosis: (prev.functionalDiagnosis || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.functionalDiagnosis}
+              onChange={e => setFormData({ ...formData, functionalDiagnosis: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              placeholder="Limitações funcionais, déficits de equilíbrio..."
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Conduta & Planejamento */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
+        <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Target size={14} />
+          Conduta & Planejamento
+        </h4>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Objetivos do Tratamento</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentObjectives: (prev.treatmentObjectives || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.treatmentObjectives}
+              onChange={e => setFormData({ ...formData, treatmentObjectives: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              placeholder="Ganho de força, resistência, capacidade funcional..."
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-bold text-gray-400 uppercase">Plano de Tratamento</label>
+              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentPlan: (prev.treatmentPlan || '') + ' ' + t }))} />
+            </div>
+            <textarea 
+              value={formData.treatmentPlan}
+              onChange={e => setFormData({ ...formData, treatmentPlan: e.target.value })}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+              placeholder="Cinesioterapia, treino de equilíbrio, treino de marcha..."
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Midia */}
+      <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
         <div className="flex justify-between items-center">
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
           <DigitizeButton onDigitize={handleDigitize} />
@@ -1347,7 +1717,7 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
         <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">Cancelar</button>
         <button 
           type="submit"
-          className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all"
+          className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all transform hover:-translate-y-1"
         >
           {initialData ? 'Atualizar Avaliação' : 'Salvar Avaliação'}
         </button>
@@ -1395,12 +1765,26 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
     }
   };
 
+  const handleFixGrammar = async (field: 'procedures' | 'evolution' | 'observations') => {
+    if (!formData[field]) return;
+    setIsExtracting(true);
+    try {
+      const fixed = await fixGrammar(formData[field]);
+      setFormData({ ...formData, [field]: fixed });
+      showToast('Texto corrigido com sucesso', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao corrigir texto', 'error');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
         <select 
-          required
           value={formData.patientId}
           onChange={e => setFormData({ ...formData, patientId: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1414,7 +1798,6 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data</label>
           <input 
             type="date" 
-            required
             value={formData.date.split('T')[0]}
             onChange={e => setFormData({ ...formData, date: new Date(e.target.value).toISOString() })}
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1461,7 +1844,6 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
           </div>
         </div>
         <textarea 
-          required
           value={formData.procedures}
           onChange={e => setFormData({ ...formData, procedures: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none"
@@ -1498,7 +1880,6 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
           </div>
         </div>
         <textarea 
-          required
           value={formData.evolution}
           onChange={e => setFormData({ ...formData, evolution: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none"
@@ -1549,7 +1930,6 @@ const ExerciseForm = ({ onSave, onCancel, initialData }: { onSave: (data: Omit<P
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Título do Exercício</label>
         <input 
           type="text" 
-          required
           value={formData.title}
           onChange={e => setFormData({ ...formData, title: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1572,7 +1952,6 @@ const ExerciseForm = ({ onSave, onCancel, initialData }: { onSave: (data: Omit<P
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Descrição / Instruções</label>
         <textarea 
-          required
           value={formData.description}
           onChange={e => setFormData({ ...formData, description: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none"
@@ -1633,7 +2012,6 @@ const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients
       <div className="space-y-2">
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
         <select 
-          required
           value={formData.patientId}
           onChange={e => setFormData({ ...formData, patientId: e.target.value })}
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1647,7 +2025,6 @@ const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data</label>
           <input 
             type="date" 
-            required
             value={formData.date}
             onChange={e => setFormData({ ...formData, date: e.target.value })}
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
@@ -1657,7 +2034,6 @@ const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Horário</label>
           <input 
             type="time" 
-            required
             value={formData.time}
             onChange={e => setFormData({ ...formData, time: e.target.value })}
             className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"

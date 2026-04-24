@@ -16,10 +16,11 @@ import {
   Tooltip, ResponsiveContainer, LineChart as ReLineChart, Line,
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
+import { format, isToday, parseISO, startOfToday, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   NursingPatient, Medication, MedicationAdministration, 
@@ -69,6 +70,11 @@ type NursingTab =
   | 'incidents' | 'shift' | 'reports' | 'settings';
 
 export const NursingSection = (props: NursingSectionProps) => {
+  const { 
+    patients, medications, administrations, vitalSigns, 
+    dressings, evolutions, incidents, shifts, 
+    avds, diaperChanges 
+  } = props;
   const [activeTab, setActiveTab] = useState<NursingTab>('dashboard');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -119,8 +125,8 @@ export const NursingSection = (props: NursingSectionProps) => {
     return {
       totalPatients: patientsList.length,
       pendingMeds: pendingMedications,
-      pendingDressings: dressingsList.filter(d => d.nextChangeDate === today).length,
-      alerts: alteredVitals + incidentRecords.filter(i => i.date === today).length
+      pendingDressings: (dressingsList || []).filter(d => d.nextChangeDate === today).length,
+      alerts: alteredVitals + (incidentRecords || []).filter(i => i.date === today).length
     };
   }, [props.patients, props.administrations, props.dressings, props.incidents, props.vitalSigns]);
 
@@ -221,7 +227,7 @@ export const NursingSection = (props: NursingSectionProps) => {
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={props.vitalSigns.slice(0, 7).reverse()}>
+                <AreaChart data={(props.vitalSigns || []).slice(0, 7).reverse()}>
                   <defs>
                     <linearGradient id="colorBP" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
@@ -246,12 +252,12 @@ export const NursingSection = (props: NursingSectionProps) => {
               Próximas Medicações
             </h3>
             <div className="space-y-3">
-              {props.administrations
+              {(props.administrations || [])
                 .filter(a => a.status === 'PENDENTE')
                 .slice(0, 5)
                 .map(admin => {
-                  const patient = props.patients.find(p => p.id === admin.patientId);
-                  const med = props.medications.find(m => m.id === admin.medicationId);
+                  const patient = (props.patients || []).find(p => p.id === admin.patientId);
+                  const med = (props.medications || []).find(m => m.id === admin.medicationId);
                   return (
                     <div key={admin.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
                       <div className="flex items-center gap-3">
@@ -281,8 +287,8 @@ export const NursingSection = (props: NursingSectionProps) => {
               Últimas Evoluções
             </h3>
             <div className="space-y-4">
-              {props.evolutions.slice(0, 3).map(evo => {
-                const patient = props.patients.find(p => p.id === evo.patientId);
+              {(props.evolutions || []).slice(0, 3).map(evo => {
+                const patient = (props.patients || []).find(p => p.id === evo.patientId);
                 return (
                   <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl group relative">
                     <div className="flex justify-between items-start mb-2">
@@ -312,7 +318,7 @@ export const NursingSection = (props: NursingSectionProps) => {
               Alertas Recentes
             </h3>
             <div className="space-y-4">
-              {props.incidents.slice(0, 4).map(incident => (
+              {(props.incidents || []).slice(0, 4).map(incident => (
                 <div key={incident.id} className="flex gap-3">
                   <div className="mt-1">
                     <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
@@ -355,20 +361,18 @@ export const NursingSection = (props: NursingSectionProps) => {
   );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8">
-      <aside className="w-full lg:w-64 space-y-2">
-        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard size={20} />} label="Dashboard" />
-        <NavButton active={activeTab === 'patients'} onClick={() => setActiveTab('patients')} icon={<Users size={20} />} label="Pacientes" />
-        <NavButton active={activeTab === 'medication'} onClick={() => setActiveTab('medication')} icon={<Pill size={20} />} label="Medicação" />
-        <NavButton active={activeTab === 'vitals'} onClick={() => setActiveTab('vitals')} icon={<Activity size={20} />} label="Sinais Vitais" />
-        <NavButton active={activeTab === 'dressings'} onClick={() => setActiveTab('dressings')} icon={<Bandage size={20} />} label="Curativos" />
-        <NavButton active={activeTab === 'evolutions'} onClick={() => setActiveTab('evolutions')} icon={<ClipboardList size={20} />} label="Evolução" />
-        <NavButton active={activeTab === 'incidents'} onClick={() => setActiveTab('incidents')} icon={<AlertTriangle size={20} />} label="Alertas" />
-        <NavButton active={activeTab === 'shift'} onClick={() => setActiveTab('shift')} icon={<Calendar size={20} />} label="Plantão" />
-        <NavButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<FileText size={20} />} label="Relatórios" />
-        <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
-          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20} />} label="Configurações" />
-        </div>
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
+        <NavButton active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setEditingData(null); }} icon={<LayoutDashboard size={18} />} label="Dashboard" />
+        <NavButton active={activeTab === 'patients'} onClick={() => { setActiveTab('patients'); setEditingData(null); }} icon={<Users size={18} />} label="Pacientes" />
+        <NavButton active={activeTab === 'medication'} onClick={() => { setActiveTab('medication'); setEditingData(null); }} icon={<Pill size={18} />} label="Medicação" />
+        <NavButton active={activeTab === 'vitals'} onClick={() => { setActiveTab('vitals'); setEditingData(null); }} icon={<Activity size={18} />} label="Sinais Vitais" />
+        <NavButton active={activeTab === 'dressings'} onClick={() => { setActiveTab('dressings'); setEditingData(null); }} icon={<Bandage size={18} />} label="Curativos" />
+        <NavButton active={activeTab === 'evolutions'} onClick={() => { setActiveTab('evolutions'); setEditingData(null); }} icon={<ClipboardList size={18} />} label="Evolução" />
+        <NavButton active={activeTab === 'incidents'} onClick={() => { setActiveTab('incidents'); setEditingData(null); }} icon={<AlertTriangle size={18} />} label="Alertas" />
+        <NavButton active={activeTab === 'shift'} onClick={() => { setActiveTab('shift'); setEditingData(null); }} icon={<Calendar size={18} />} label="Plantão" />
+        <NavButton active={activeTab === 'reports'} onClick={() => { setActiveTab('reports'); setEditingData(null); }} icon={<FileText size={18} />} label="Relatórios" />
+        <NavButton active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setEditingData(null); }} icon={<Settings size={18} />} label="Ajustes" />
       </aside>
 
       <div className="flex-1 min-w-0">
@@ -386,22 +390,24 @@ export const NursingSection = (props: NursingSectionProps) => {
             {activeTab === 'patients' && selectedPatientId && selectedPatient && (
               <PatientDetailView 
                 patient={selectedPatient} 
-                medications={props.medications.filter(m => m.patientId === selectedPatientId)}
-                vitals={props.vitalSigns.filter(v => v.patientId === selectedPatientId)}
-                evolutions={props.evolutions.filter(e => e.patientId === selectedPatientId)}
+                medications={(props.medications || []).filter(m => m.patientId === selectedPatientId)}
+                vitals={(props.vitalSigns || []).filter(v => v.patientId === selectedPatientId)}
+                evolutions={(props.evolutions || []).filter(e => e.patientId === selectedPatientId)}
+                avds={(props.avds || []).filter(a => a.patientId === selectedPatientId)}
                 onBack={() => setSelectedPatientId(null)}
                 onAddMedication={() => { setModalType('medication'); setIsModalOpen(true); }}
                 onAddVital={() => { setModalType('vital'); setIsModalOpen(true); }}
                 onAddEvolution={() => { setModalType('evolution'); setIsModalOpen(true); }}
                 onAddAVD={() => { setModalType('avd'); setIsModalOpen(true); }}
                 onAddDiaper={() => { setModalType('diaper'); setIsModalOpen(true); }}
-                onEditPatient={(p) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
+                onAddDressing={() => { setModalType('dressing'); setIsModalOpen(true); }}
+                onEditPatient={(p) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); setSelectedPatientId(null); }}
                 onDeletePatient={(id) => setDeleteConfirm({ id, type: 'patient' })}
-                onEditMedication={(m) => { setEditingData(m); setModalType('medication'); setIsModalOpen(true); }}
+                onEditMedication={(m) => { setEditingData(m); setModalType('medication'); setIsModalOpen(true); setSelectedPatientId(null); }}
                 onDeleteMedication={(id) => setDeleteConfirm({ id, type: 'medication' })}
-                onEditVital={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); }}
+                onEditVital={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); setSelectedPatientId(null); }}
                 onDeleteVital={(id) => setDeleteConfirm({ id, type: 'vital' })}
-                onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
+                onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); setSelectedPatientId(null); }}
                 onDeleteEvolution={(id) => setDeleteConfirm({ id, type: 'evolution' })}
               />
             )}
@@ -565,7 +571,7 @@ const ShiftView = ({ shifts, onAdd, onEdit, onDelete }: {
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {shifts.map(s => (
+      {(shifts || []).map(s => (
         <div key={s.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 group relative">
           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button 
@@ -593,8 +599,8 @@ const ShiftView = ({ shifts, onAdd, onEdit, onDelete }: {
           <div className="space-y-2">
             <p className="text-xs text-gray-500 mb-2">{s.activities}</p>
             <div className="flex flex-wrap gap-2">
-              {s.professionals.map((p, idx) => (
-                <span key={idx} className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold">
+              {s.professionals.map((p) => (
+                <span key={p} className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold">
                   {p}
                 </span>
               ))}
@@ -614,39 +620,29 @@ const ReportsView = ({ patients, evolutions, administrations, vitalSigns, incide
   incidents: IncidentRecord[],
   medications: Medication[]
 }) => {
-  const downloadPDF = (title: string, data: any[]) => {
+  const downloadReport = async (title: string, data: any[], formatType: 'pdf' | 'word') => {
     if (!data || data.length === 0) return;
     
     const columns = Object.keys(data[0]);
     const body = data.map(item => Object.values(item));
     
-    generateModernPDF({
-      title,
-      subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
-      columns,
-      data: body,
-      fileName: title.toLowerCase().replace(/\s/g, '_')
-    });
-  };
-
-  const downloadDOC = (title: string, data: any[]) => {
-    let content = `<h1>${title}</h1><table border="1"><tr>`;
-    const keys = Object.keys(data[0] || {});
-    keys.forEach(key => content += `<th>${key}</th>`);
-    content += '</tr>';
-    data.forEach(item => {
-      content += '<tr>';
-      keys.forEach(key => content += `<td>${item[key]}</td>`);
-      content += '</tr>';
-    });
-    content += '</table>';
-
-    const blob = new Blob([content], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${title.toLowerCase().replace(/\s/g, '_')}.doc`;
-    link.click();
+    if (formatType === 'pdf') {
+      generateModernPDF({
+        title,
+        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+        columns,
+        data: body,
+        fileName: title.toLowerCase().replace(/\s/g, '_')
+      });
+    } else {
+      await generateModernWord({
+        title,
+        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+        columns,
+        data: body,
+        fileName: title.toLowerCase().replace(/\s/g, '_')
+      });
+    }
   };
 
   return (
@@ -657,77 +653,104 @@ const ReportsView = ({ patients, evolutions, administrations, vitalSigns, incide
           title="Evolução Mensal" 
           description="Resumo de todas as evoluções registradas no mês atual."
           icon={<ClipboardList className="text-blue-600" />}
-          onClick={() => {
-            const data = evolutions.map(e => ({
+          onDownloadPDF={() => {
+            const data = (evolutions || []).map(e => ({
               Data: e.date,
-              Paciente: patients.find(p => p.id === e.patientId)?.name || 'N/A',
+              Paciente: (patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
               Conteúdo: e.content,
               Responsável: e.registeredBy
             }));
-            downloadPDF("Relatório de Evoluções", data);
+            downloadReport("Relatório de Evoluções", data, 'pdf');
+          }}
+          onDownloadWord={() => {
+            const data = (evolutions || []).map(e => ({
+              Data: e.date,
+              Paciente: (patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
+              Conteúdo: e.content,
+              Responsável: e.registeredBy
+            }));
+            downloadReport("Relatório de Evoluções", data, 'word');
           }}
         />
         <ReportCard 
           title="Histórico de Medicação" 
           description="Relatório detalhado de administrações e intercorrências."
           icon={<Pill className="text-amber-600" />}
-          onClick={() => {
-            const data = administrations.map(a => ({
+          onDownloadPDF={() => {
+            const data = (administrations || []).map(a => ({
               Data: a.date,
               Hora: a.scheduledTime,
-              Paciente: patients.find(p => p.id === a.patientId)?.name || 'N/A',
-              Medicamento: medications.find(m => m.id === a.medicationId)?.name || 'N/A',
+              Paciente: (patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
+              Medicamento: (medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
               Status: a.status
             }));
-            downloadPDF("Histórico de Medicação", data);
+            downloadReport("Histórico de Medicação", data, 'pdf');
+          }}
+          onDownloadWord={() => {
+            const data = (administrations || []).map(a => ({
+              Data: a.date,
+              Hora: a.scheduledTime,
+              Paciente: (patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
+              Medicamento: (medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
+              Status: a.status
+            }));
+            downloadReport("Histórico de Medicação", data, 'word');
           }}
         />
         <ReportCard 
           title="Sinais Vitais" 
           description="Relatório de monitoramento de sinais vitais."
           icon={<Activity className="text-green-600" />}
-          onClick={() => {
-            const data = vitalSigns.map(v => ({
+          onDownloadPDF={() => {
+            const data = (vitalSigns || []).map(v => ({
               Data: v.date,
               Hora: v.time,
-              Paciente: patients.find(p => p.id === v.patientId)?.name || 'N/A',
+              Paciente: (patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
               PA: `${v.systolicBP}/${v.diastolicBP}`,
               FC: v.heartRate,
               Temp: v.temperature,
               Sat: v.saturation
             }));
-            downloadPDF("Relatório de Sinais Vitais", data);
+            downloadReport("Relatório de Sinais Vitais", data, 'pdf');
+          }}
+          onDownloadWord={() => {
+            const data = (vitalSigns || []).map(v => ({
+              Data: v.date,
+              Hora: v.time,
+              Paciente: (patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
+              PA: `${v.systolicBP}/${v.diastolicBP}`,
+              FC: v.heartRate,
+              Temp: v.temperature,
+              Sat: v.saturation
+            }));
+            downloadReport("Relatório de Sinais Vitais", data, 'word');
           }}
         />
         <ReportCard 
           title="Intercorrências" 
           description="Resumo de intercorrências registradas."
           icon={<AlertTriangle className="text-red-600" />}
-          onClick={() => {
-            const data = incidents.map(i => ({
+          onDownloadPDF={() => {
+            const data = (incidents || []).map(i => ({
               Data: i.date,
               Hora: i.time,
-              Paciente: patients.find(p => p.id === i.patientId)?.name || 'N/A',
+              Paciente: (patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
               Tipo: i.type,
               Descrição: i.description,
               Conduta: i.conduct
             }));
-            downloadPDF("Relatório de Intercorrências", data);
+            downloadReport("Relatório de Intercorrências", data, 'pdf');
           }}
-        />
-        <ReportCard 
-          title="Download em DOC (Medicações)" 
-          description="Baixar histórico de medicações em formato Word."
-          icon={<FileText className="text-amber-600" />}
-          onClick={() => {
-            const data = administrations.map(a => ({
-              Data: a.date,
-              Hora: a.scheduledTime,
-              Paciente: patients.find(p => p.id === a.patientId)?.name || 'N/A',
-              Medicamento: medications.find(m => m.id === a.medicationId)?.name || 'N/A',
-              Status: a.status
+          onDownloadWord={() => {
+            const data = (incidents || []).map(i => ({
+              Data: i.date,
+              Hora: i.time,
+              Paciente: (patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
+              Tipo: i.type,
+              Descrição: i.description,
+              Conduta: i.conduct
             }));
-            downloadDOC("Histórico de Medicação", data);
+            downloadReport("Relatório de Intercorrências", data, 'word');
           }}
         />
       </div>
@@ -791,16 +814,32 @@ const SettingsView = ({ user, theme, setTheme, onLogout, onPhotoClick, fileInput
   </div>
 );
 
-const ReportCard = ({ title, description, icon, onClick }: { title: string, description: string, icon: React.ReactNode, onClick: () => void }) => (
-  <button onClick={onClick} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-start gap-4 hover:border-green-200 transition-all text-left group">
+const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }: { title: string, description: string, icon: React.ReactNode, onDownloadPDF: () => void, onDownloadWord: () => void }) => (
+  <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-start gap-4 hover:border-green-200 transition-all text-left group">
     <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl group-hover:bg-green-50 transition-colors">
       {icon}
     </div>
-    <div>
+    <div className="flex-1">
       <h4 className="font-bold text-gray-800 dark:text-white mb-1">{title}</h4>
-      <p className="text-xs text-gray-500 leading-relaxed">{description}</p>
+      <p className="text-xs text-gray-500 leading-relaxed mb-4">{description}</p>
+      <div className="flex gap-2">
+        <button 
+          onClick={onDownloadPDF}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-bold hover:bg-blue-100 transition-colors"
+        >
+          <Download size={14} />
+          PDF
+        </button>
+        <button 
+          onClick={onDownloadWord}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-50 text-green-600 rounded-xl text-[10px] font-bold hover:bg-green-100 transition-colors"
+        >
+          <FileText size={14} />
+          WORD
+        </button>
+      </div>
     </div>
-  </button>
+  </div>
 );
 
 const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast }: {
@@ -828,7 +867,12 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
     time: format(new Date(), 'HH:mm'),
     status: 'PENDENTE',
     photos: [],
-    patientId: initialPatientId || ''
+    patientId: initialPatientId || '',
+    woundType: '',
+    location: '',
+    aspect: '',
+    conduct: '',
+    nextChangeDate: format(addDays(new Date(), 1), 'yyyy-MM-dd')
   });
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -885,13 +929,13 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
       }
 
       if (photos && photos.length > 0 && formData.patientId) {
-        const patient = patients.find(p => p.id === formData.patientId);
+        const patient = (patients || []).find(p => p.id === formData.patientId);
         const activityType = 
           type === 'evolution' ? 'Evolução de Enfermagem' :
           type === 'dressing' ? 'Curativo' :
           type === 'incident' ? 'Intercorrência' : 'Atividade de Enfermagem';
         
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description || formData.appearance);
+        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description || formData.aspect || formData.content);
       }
       onClose();
     } catch (err) {
@@ -900,46 +944,73 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
       <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white dark:bg-gray-900 rounded-3xl max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 rounded-[2.5rem] max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[95vh] overflow-hidden"
       >
-        <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-tight flex items-center gap-2">
-            {type === 'patient' ? `${editingData ? 'Editar' : 'Novo'} Paciente` : 
-             type === 'medication' ? `${editingData ? 'Editar' : 'Nova'} Medicação` :
-             type === 'vital' ? `${editingData ? 'Editar' : 'Registrar'} Sinais Vitais` :
-             type === 'dressing' ? `${editingData ? 'Editar' : 'Registrar'} Curativo` :
-             type === 'evolution' ? `${editingData ? 'Editar' : 'Nova'} Evolução` :
-             type === 'incident' ? `${editingData ? 'Editar' : 'Registrar'} Intercorrência` :
-             type === 'shift' ? `${editingData ? 'Editar' : 'Novo'} Plantão` :
-             type === 'avd' ? `${editingData ? 'Editar' : 'Registrar'} AVD` : 
-             `${editingData ? 'Editar' : 'Registrar'} Troca de Fralda`}
-            {isExtracting && (
-              <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Extraindo Dados...
-              </span>
-            )}
-          </h3>
-          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={24} />
+        <div className="p-4 sm:p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "p-3 rounded-2xl hidden sm:flex",
+              type === 'vital' ? "bg-red-50 text-red-600 dark:bg-red-900/30" :
+              type === 'dressing' ? "bg-amber-50 text-amber-600 dark:bg-amber-900/30" :
+              type === 'evolution' ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30" :
+              "bg-green-50 text-green-600 dark:bg-green-900/30"
+            )}>
+              {type === 'vital' ? <Activity size={24} /> :
+               type === 'dressing' ? <Bandage size={24} /> :
+               type === 'evolution' ? <ClipboardList size={24} /> :
+               <Plus size={24} />}
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-0.5 leading-none">
+                {type === 'patient' ? 'Cadastro' : 
+                 type === 'medication' ? 'Medicação' :
+                 type === 'vital' ? 'Sinais Vitais' :
+                 type === 'dressing' ? 'Curativo' :
+                 type === 'evolution' ? 'Evolução' :
+                 type === 'incident' ? 'Intercorrência' :
+                 type === 'shift' ? 'Escala de Plantão' :
+                 type === 'avd' ? 'Status AVD' : 'Troca de Fralda'}
+              </p>
+              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
+                {editingData ? 'Editar Registro' : 'Novo Registro'}
+              </h3>
+              {formData.patientId && type !== 'patient' && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                  <p className="text-[11px] font-black text-green-600 dark:text-green-500 uppercase tracking-tight">
+                    {(patients || []).find(p => p.id === formData.patientId)?.name || 'Paciente'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="group flex flex-col items-center gap-1 p-2 focus:outline-none"
+          >
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 text-gray-400 group-hover:text-red-500 group-hover:bg-red-50 dark:group-hover:bg-red-900/20 rounded-2xl transition-all shadow-sm border border-gray-100 dark:border-gray-700">
+              <X size={20} className="transition-transform group-hover:rotate-90" />
+            </div>
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter transition-colors group-hover:text-red-500">Fechar</span>
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          {type !== 'patient' && type !== 'shift' && (
+        
+        <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar">
+          <form id="nursing-form" onSubmit={handleSubmit} className="space-y-6 pb-20">
+            {type !== 'patient' && type !== 'shift' && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-400 uppercase">Paciente</label>
               <select 
-                required
                 className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o paciente</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
           )}
@@ -977,7 +1048,6 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Tipo de Medicação</label>
                 <select 
-                  required
                   value={formData.type || 'CONTINUA'}
                   className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
@@ -990,7 +1060,6 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase">Via de Administração</label>
                 <select 
-                  required
                   value={formData.route || 'ORAL'}
                   className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
                   onChange={(e) => setFormData({ ...formData, route: e.target.value })}
@@ -1146,7 +1215,6 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                   </div>
                 </div>
                 <textarea 
-                  required
                   value={formData.content || ''}
                   className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm min-h-[150px]"
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
@@ -1173,6 +1241,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
             </button>
           </div>
         </form>
+      </div>
       </motion.div>
     </div>
   );
@@ -1185,7 +1254,6 @@ const Input = ({ label, type = "text", value, onChange, step }: { label: string,
       type={type}
       step={step}
       value={value || ''}
-      required
       onChange={(e) => onChange(e.target.value)}
       className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
     />
@@ -1196,15 +1264,14 @@ const AVDSelect = ({ label, value, onChange }: { label: string, value?: string, 
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <select 
-      required
       value={value || ''}
       className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm"
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">Selecione...</option>
-      <option value="INDEPENDENTE">Independente</option>
-      <option value="DEPENDENTE PARCIAL">Dependente Parcial</option>
-      <option value="DEPENDENTE TOTAL">Dependente Total</option>
+      <option value="INDEPENDENTE">Independente (Realiza sozinho)</option>
+      <option value="ASSISTIDA">Assistida (Precisa de ajuda)</option>
+      <option value="DEPENDENTE">Dependente (Não realiza sozinho)</option>
     </select>
   </div>
 );
@@ -1241,8 +1308,8 @@ const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete }: {
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-gray-50 dark:divide-gray-800">
-            {vitals.map(v => {
-              const patient = patients.find(p => p.id === v.patientId);
+            {(vitals || []).map(v => {
+              const patient = (patients || []).find(p => p.id === v.patientId);
               const isAltered = v.systolicBP > 140 || v.systolicBP < 90 || v.temperature > 37.5 || v.saturation < 92;
               return (
                 <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
@@ -1302,8 +1369,8 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete }: {
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {dressings.map(d => {
-        const patient = patients.find(p => p.id === d.patientId);
+      {(dressings || []).map(d => {
+        const patient = (patients || []).find(p => p.id === d.patientId);
         return (
           <div key={d.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4 group">
             <div className="flex justify-between items-start">
@@ -1368,8 +1435,8 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete }: {
       </button>
     </div>
     <div className="space-y-4">
-      {evolutions.map(e => {
-        const patient = patients.find(p => p.id === e.patientId);
+      {(evolutions || []).map(e => {
+        const patient = (patients || []).find(p => p.id === e.patientId);
         return (
           <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-4">
@@ -1424,8 +1491,8 @@ const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete }: {
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {incidents.map(i => {
-        const patient = patients.find(p => p.id === i.patientId);
+      {(incidents || []).map(i => {
+        const patient = (patients || []).find(p => p.id === i.patientId);
         return (
           <div key={i.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-red-100 dark:border-red-900/30 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-1 h-full bg-red-500" />
@@ -1474,12 +1541,14 @@ const PatientDetailView = ({
   medications, 
   vitals, 
   evolutions,
+  avds,
   onBack, 
   onAddMedication, 
   onAddVital, 
   onAddEvolution, 
   onAddAVD, 
   onAddDiaper, 
+  onAddDressing,
   onEditPatient, 
   onDeletePatient,
   onEditMedication,
@@ -1493,12 +1562,14 @@ const PatientDetailView = ({
   medications: Medication[], 
   vitals: VitalSigns[],
   evolutions: NursingEvolution[],
+  avds: AVDRecord[],
   onBack: () => void,
   onAddMedication: () => void,
   onAddVital: () => void,
   onAddEvolution: () => void,
   onAddAVD: () => void,
   onAddDiaper: () => void,
+  onAddDressing: () => void,
   onEditPatient: (patient: NursingPatient) => void,
   onDeletePatient: (id: string) => void,
   onEditMedication: (med: Medication) => void,
@@ -1507,12 +1578,47 @@ const PatientDetailView = ({
   onDeleteVital: (id: string) => void,
   onEditEvolution: (evo: NursingEvolution) => void,
   onDeleteEvolution: (id: string) => void
-}) => (
+}) => {
+  const latestAVD = (avds || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'INDEPENDENTE': return 'green';
+      case 'ASSISTIDA': return 'amber';
+      case 'DEPENDENTE': return 'red';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'INDEPENDENTE': return 'Independente (Sem ajuda)';
+      case 'ASSISTIDA': return 'Assistida (Ajuda parcial)';
+      case 'DEPENDENTE': return 'Dependente (Ajuda total)';
+      default: return 'SEM REGISTRO';
+    }
+  };
+
+  return (
   <div className="space-y-6 animate-in slide-in-from-right duration-500">
-    <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-green-600 transition-colors font-bold text-sm mb-4">
-      <ArrowLeft size={18} />
-      Voltar para Lista
-    </button>
+    <div className="flex justify-between items-center mb-6">
+      <button 
+        onClick={onBack} 
+        className="flex items-center gap-3 px-5 py-2.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-500 hover:text-green-600 rounded-2xl shadow-sm transition-all group"
+      >
+        <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-1" />
+        <span className="font-bold text-sm">Voltar para Lista</span>
+      </button>
+      
+      <button 
+        onClick={onBack} 
+        className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl hover:bg-red-100 dark:hover:bg-red-900/40 transition-all shadow-sm flex items-center gap-2 group"
+        title="Fechar Detalhes"
+      >
+        <X size={20} className="transition-transform group-hover:rotate-90" />
+        <span className="text-xs font-black uppercase tracking-tight hidden sm:inline">Fechar</span>
+      </button>
+    </div>
 
     <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-gray-800">
       <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -1567,7 +1673,7 @@ const PatientDetailView = ({
             </button>
           </div>
           <div className="space-y-3">
-            {medications.map(med => (
+            {(medications || []).map(med => (
               <div key={med.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center text-amber-600">
@@ -1590,8 +1696,8 @@ const PatientDetailView = ({
                 </div>
                   <div className="flex items-center gap-3">
                     <div className="flex gap-1">
-                      {med.times.map(time => (
-                        <span key={time} className="px-2 py-1 bg-white dark:bg-gray-700 rounded-lg text-[10px] font-bold text-gray-400">{time}</span>
+                      {(med.times || []).map((time, i) => (
+                        <span key={`${time}-${i}`} className="px-2 py-1 bg-white dark:bg-gray-700 rounded-lg text-[10px] font-bold text-gray-400">{time}</span>
                       ))}
                     </div>
                     <div className="flex gap-1 ml-2 border-l border-gray-200 dark:border-gray-700 pl-2">
@@ -1640,7 +1746,7 @@ const PatientDetailView = ({
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {vitals.slice(0, 5).map(v => (
+                {(vitals || []).slice(0, 5).map(v => (
                   <tr key={v.id} className="border-t border-gray-50 dark:border-gray-800 group">
                     <td className="py-3 font-medium">{v.date} {v.time}</td>
                     <td className="py-3 font-bold text-gray-800 dark:text-white">{v.systolicBP}/{v.diastolicBP}</td>
@@ -1684,7 +1790,7 @@ const PatientDetailView = ({
             </button>
           </div>
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {evolutions.map(evo => (
+            {(evolutions || []).map(evo => (
               <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl space-y-2 group">
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">{evo.date} às {evo.time}</span>
@@ -1721,22 +1827,72 @@ const PatientDetailView = ({
             <ActionButton icon={<ClipboardList size={18} />} label="Evolução" onClick={onAddEvolution} color="blue" />
             <ActionButton icon={<Coffee size={18} />} label="AVDs" onClick={onAddAVD} color="green" />
             <ActionButton icon={<Bed size={18} />} label="Fralda" onClick={onAddDiaper} color="purple" />
-            <ActionButton icon={<Bandage size={18} />} label="Curativo" onClick={() => {}} color="amber" />
+            <ActionButton icon={<Bandage size={18} />} label="Curativo" onClick={onAddDressing} color="amber" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="text-lg font-bold mb-4">Status AVDs</h3>
-          <div className="space-y-4">
-            <AVDIndicator icon={<Coffee size={16} />} label="Alimentação" status="Independente" color="green" />
-            <AVDIndicator icon={<Bath size={16} />} label="Higiene" status="Assistida" color="amber" />
-            <AVDIndicator icon={<Move size={16} />} label="Mobilidade" status="Dependente" color="red" />
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <Activity className="text-green-600" size={20} />
+              Status Funcional (AVDs)
+            </h3>
+            <div className="flex gap-2">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span className="text-[8px] font-bold text-gray-400">IND.</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                <span className="text-[8px] font-bold text-gray-400">ASSIST.</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                <span className="text-[8px] font-bold text-gray-400">DEP.</span>
+              </div>
+            </div>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <AVDIndicator 
+              icon={<Coffee size={16} />} 
+              label="Alimentação" 
+              status={getStatusLabel(latestAVD?.feeding)} 
+              color={getStatusColor(latestAVD?.feeding)} 
+              value={latestAVD?.feeding}
+            />
+            <AVDIndicator 
+              icon={<Bath size={16} />} 
+              label="Higiene" 
+              status={getStatusLabel(latestAVD?.hygiene)} 
+              color={getStatusColor(latestAVD?.hygiene)} 
+              value={latestAVD?.hygiene}
+            />
+            <AVDIndicator 
+              icon={<Bandage size={16} />} 
+              label="Vestuário" 
+              status={getStatusLabel(latestAVD?.dressing)} 
+              color={getStatusColor(latestAVD?.dressing)} 
+              value={latestAVD?.dressing}
+            />
+            <AVDIndicator 
+              icon={<Move size={16} />} 
+              label="Mobilidade" 
+              status={getStatusLabel(latestAVD?.mobility)} 
+              color={getStatusColor(latestAVD?.mobility)} 
+              value={latestAVD?.mobility}
+            />
+          </div>
+          {latestAVD?.date && (
+            <p className="mt-6 text-[10px] text-gray-400 font-bold uppercase text-center bg-gray-50 dark:bg-gray-800/50 py-2 rounded-xl">
+              Último registro em: {format(parseISO(latestAVD.date), "dd/MM/yyyy")}
+            </p>
+          )}
         </div>
       </div>
     </div>
   </div>
 );
+}
 
 const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration }: { 
   patients: NursingPatient[], 
@@ -1747,7 +1903,7 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
 }) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
-  const dailyAdmins = administrations.filter(a => a.date === selectedDate);
+  const dailyAdmins = (administrations || []).filter(a => a.date === selectedDate);
   const stats = {
     total: dailyAdmins.length,
     done: dailyAdmins.filter(a => a.status === 'ADMINISTRADO').length,
@@ -1773,8 +1929,8 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
         <div className="lg:col-span-3 space-y-4">
           {dailyAdmins.length > 0 ? (
             dailyAdmins.map(admin => {
-              const patient = patients.find(p => p.id === admin.patientId);
-              const med = medications.find(m => m.id === admin.medicationId);
+              const patient = (patients || []).find(p => p.id === admin.patientId);
+              const med = (medications || []).find(m => m.id === admin.medicationId);
               return (
                 <div key={admin.id} className="bg-white dark:bg-gray-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between group">
                   <div className="flex items-center gap-4">
@@ -1859,20 +2015,43 @@ const ActionButton = ({ icon, label, onClick, color }: { icon: React.ReactNode, 
   </button>
 );
 
-const AVDIndicator = ({ icon, label, status, color }: { icon: React.ReactNode, label: string, status: string, color: string }) => (
-  <div className="flex items-center justify-between">
-    <div className="flex items-center gap-2">
-      <div className={cn("p-2 rounded-lg bg-opacity-10", `bg-${color}-600 text-${color}-600`)}>
+const AVDIndicator = ({ icon, label, status, color, value }: { icon: React.ReactNode, label: string, status: string, color: string, value?: string }) => (
+  <div className={cn(
+    "p-4 rounded-3xl border transition-all flex flex-col gap-3 h-full",
+    color === 'green' ? "bg-green-50/50 border-green-100 dark:bg-green-900/10 dark:border-green-800" :
+    color === 'amber' ? "bg-amber-50/50 border-amber-100 dark:bg-amber-900/10 dark:border-amber-800" :
+    color === 'red' ? "bg-red-50/50 border-red-100 dark:bg-red-900/10 dark:border-red-800" :
+    "bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800"
+  )}>
+    <div className="flex items-center justify-between">
+      <div className={cn("p-2.5 rounded-2xl shadow-sm", 
+        color === 'green' ? "bg-green-100 text-green-600 dark:bg-green-900/30" : 
+        color === 'amber' ? "bg-amber-100 text-amber-600 dark:bg-amber-900/30" : 
+        color === 'red' ? "bg-red-100 text-red-600 dark:bg-red-900/30" : "bg-gray-100 text-gray-400"
+      )}>
         {icon}
       </div>
-      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</span>
+      <div className="flex gap-1">
+        <div className={cn("w-2 h-4 rounded-full", (value === 'INDEPENDENTE' || value === 'ASSISTIDA' || value === 'DEPENDENTE') ? (color === 'green' ? 'bg-green-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500') : 'bg-gray-200 dark:bg-gray-700')}></div>
+        <div className={cn("w-2 h-4 rounded-full", (value === 'ASSISTIDA' || value === 'DEPENDENTE') ? (color === 'amber' ? 'bg-amber-500' : 'bg-red-500') : 'bg-gray-200 dark:bg-gray-700')}></div>
+        <div className={cn("w-2 h-4 rounded-full", value === 'DEPENDENTE' ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-700')}></div>
+      </div>
     </div>
-    <span className={cn("text-[10px] font-bold px-2 py-1 rounded-md", 
-      color === 'green' ? "bg-green-100 text-green-600" : 
-      color === 'amber' ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"
-    )}>
-      {status}
-    </span>
+    <div className="space-y-1">
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
+      <p className={cn("text-xs font-bold leading-tight", 
+        color === 'green' ? "text-green-700 dark:text-green-400" : 
+        color === 'amber' ? "text-amber-700 dark:text-amber-400" : 
+        color === 'red' ? "text-red-700 dark:text-red-400" : "text-gray-400"
+      )}>
+        {status}
+      </p>
+      <p className="text-[9px] text-gray-400 font-medium italic opacity-70">
+        {value === 'INDEPENDENTE' ? 'Total autonomia' : 
+         value === 'ASSISTIDA' ? 'Necessita ajuda parcial' : 
+         value === 'DEPENDENTE' ? 'Total dependência' : 'Não avaliado'}
+      </p>
+    </div>
   </div>
 );
 
@@ -1953,13 +2132,15 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   <button
     onClick={onClick}
     className={cn(
-      "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all",
+      "flex-shrink-0 lg:w-full flex items-center gap-3 px-6 lg:px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap snap-start group",
       active 
-        ? "bg-green-600 text-white shadow-lg shadow-green-100 dark:shadow-none" 
+        ? "bg-green-600 text-white shadow-xl shadow-green-100 dark:shadow-none" 
         : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400"
     )}
   >
-    {icon}
+    <div className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-gray-400 group-hover:text-green-600")}>
+      {icon}
+    </div>
     {label}
   </button>
 );
@@ -1974,7 +2155,7 @@ const PatientsView = ({ patients, onAdd, onSelect }: { patients: NursingPatient[
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {patients.map(patient => (
+      {(patients || []).map(patient => (
         <div key={patient.id} onClick={() => onSelect(patient.id)} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all cursor-pointer group">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 font-bold text-xl overflow-hidden">

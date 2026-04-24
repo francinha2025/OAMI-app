@@ -20,6 +20,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   PsychPatient, PsychInitialAssessment, PsychEvolution, 
@@ -96,9 +97,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     const familyBondsList = props.familyBonds || [];
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    const todayAppointments = appointmentsList.filter(a => a.date === today);
-    const sadPatients = emotionalMonitoringsList.filter(m => m.date === today && m.wellBeing === 'TRISTE').length;
-    const isolatedPatients = familyBondsList.filter(f => !f.receivesVisits).length;
+    const todayAppointments = (appointmentsList || []).filter(a => a.date === today);
+    const sadPatients = (emotionalMonitoringsList || []).filter(m => m.date === today && m.wellBeing === 'TRISTE').length;
+    const isolatedPatients = (familyBondsList || []).filter(f => !f.receivesVisits).length;
 
     return {
       totalPatients: patientsList.length,
@@ -197,7 +198,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             </h3>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={props.emotionalMonitorings.slice(-7).map(m => ({
+                <AreaChart data={(props.emotionalMonitorings || []).slice(-7).map(m => ({
                   date: m.date,
                   score: m.wellBeing === 'FELIZ' ? 3 : m.wellBeing === 'NEUTRO' ? 2 : 1
                 }))}>
@@ -225,11 +226,11 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               Próximos Atendimentos
             </h3>
             <div className="space-y-3">
-              {props.appointments
+              {(props.appointments || [])
                 .filter(a => a.status === 'PENDENTE')
                 .slice(0, 5)
                 .map(app => {
-                  const patient = props.patients.find(p => p.id === app.patientId);
+                  const patient = (props.patients || []).find(p => p.id === app.patientId);
                   return (
                     <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
                       <div className="flex items-center gap-3">
@@ -300,8 +301,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8">
-      <aside className="w-full lg:w-64 space-y-2 max-h-[calc(100vh-100px)] overflow-y-auto no-scrollbar scroll-smooth">
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent custom-scrollbar">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'patients', label: 'Idosos', icon: Users },
@@ -319,7 +320,10 @@ export const PsychologySection = (props: PsychologySectionProps) => {
           <NavButton
             key={tab.id}
             active={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id as PsychTab)}
+            onClick={() => {
+              setActiveTab(tab.id as PsychTab);
+              setEditingData(null);
+            }}
             icon={tab.icon}
             label={tab.label}
           />
@@ -505,13 +509,15 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
   <button
     onClick={onClick}
     className={cn(
-      "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all",
+      "flex-shrink-0 lg:w-full flex items-center gap-3 px-6 lg:px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap snap-start group",
       active 
-        ? "bg-green-600 text-white shadow-lg shadow-green-100 dark:shadow-none" 
+        ? "bg-green-600 text-white shadow-xl shadow-green-100 dark:shadow-none lg:translate-x-1" 
         : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400"
     )}
   >
-    <Icon className="w-5 h-5" />
+    <div className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-gray-400 group-hover:text-green-600")}>
+      <Icon size={18} />
+    </div>
     {label}
   </button>
 );
@@ -657,7 +663,7 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete }: any) =
     </div>
     <div className="space-y-6">
       {(evolutions || []).map((e: PsychEvolution) => {
-        const patient = patients.find((p: any) => p.id === e.patientId);
+        const patient = (patients || []).find((p: any) => p.id === e.patientId);
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
             <div className="absolute left-[-4px] top-0 w-2 h-2 rounded-full bg-blue-600" />
@@ -1003,7 +1009,7 @@ const AlertsView = ({ patients, monitorings, bonds }: any) => {
 };
 
 const ReportsView = ({ patients, evolutions }: any) => {
-  const handleGeneratePDF = (title: string) => {
+  const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
     if ((patients || []).length === 0) return;
 
     const data = patients.map((p: any) => {
@@ -1016,13 +1022,23 @@ const ReportsView = ({ patients, evolutions }: any) => {
       ];
     });
 
-    generateModernPDF({
-      title,
-      subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
-      columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
-      data,
-      fileName: title.toLowerCase().replace(/\s/g, '_')
-    });
+    if (formatType === 'pdf') {
+      generateModernPDF({
+        title,
+        subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
+        columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
+        data,
+        fileName: title.toLowerCase().replace(/\s/g, '_')
+      });
+    } else {
+      await generateModernWord({
+        title,
+        subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
+        columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
+        data,
+        fileName: title.toLowerCase().replace(/\s/g, '_')
+      });
+    }
   };
 
   return (
@@ -1031,37 +1047,48 @@ const ReportsView = ({ patients, evolutions }: any) => {
         title="Relatório Psicológico" 
         description="Gere um relatório detalhado do estado emocional do idoso." 
         icon={<FileText className="text-blue-600" />} 
-        onClick={() => handleGeneratePDF('Relatório Psicológico Geral')}
+        onDownloadPDF={() => downloadReport('Relatório Psicológico Geral', 'pdf')}
+        onDownloadWord={() => downloadReport('Relatório Psicológico Geral', 'word')}
       />
       <ReportCard 
         title="Evolução Semestral" 
         description="Resumo das evoluções e intervenções dos últimos 6 meses." 
         icon={<TrendingUp className="text-green-600" />} 
-        onClick={() => handleGeneratePDF('Evolução Semestral')}
+        onDownloadPDF={() => downloadReport('Evolução Semestral', 'pdf')}
+        onDownloadWord={() => downloadReport('Evolução Semestral', 'word')}
       />
       <ReportCard 
         title="Parecer Técnico" 
         description="Documento oficial para fins jurídicos ou familiares." 
         icon={<ClipboardList className="text-purple-600" />} 
-        onClick={() => handleGeneratePDF('Parecer Técnico')}
+        onDownloadPDF={() => downloadReport('Parecer Técnico', 'pdf')}
+        onDownloadWord={() => downloadReport('Parecer Técnico', 'word')}
       />
     </div>
   );
 };
 
-const ReportCard = ({ title, description, icon, onClick }: { title: string, description: string, icon: React.ReactNode, onClick: () => void }) => (
+const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }: { title: string, description: string, icon: React.ReactNode, onDownloadPDF: () => void, onDownloadWord: () => void }) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all">
     <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl w-fit mb-4">
       {icon}
     </div>
     <h4 className="font-bold mb-2">{title}</h4>
     <p className="text-sm text-gray-500 mb-6">{description}</p>
-    <button 
-      onClick={onClick}
-      className="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-    >
-      <Download size={16} /> Gerar PDF
-    </button>
+    <div className="flex gap-2">
+      <button 
+        onClick={onDownloadPDF}
+        className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+      >
+        <Download size={16} /> PDF
+      </button>
+      <button 
+        onClick={onDownloadWord}
+        className="flex-1 py-2 bg-green-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+      >
+        <FileText size={16} /> WORD
+      </button>
+    </div>
   </div>
 );
 
@@ -1111,28 +1138,39 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
   });
   const [isExtracting, setIsExtracting] = useState(false);
 
+  // Sync formData when editingData changes or when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData(editingData || {
+        date: format(new Date(), 'yyyy-MM-dd'),
+        time: format(new Date(), 'HH:mm'),
+        photos: []
+      });
+    }
+  }, [isOpen, editingData]);
+
   const handleDigitize = async (text: string) => {
     if (!text) return;
     setIsExtracting(true);
     try {
       const schemas: Record<string, string> = {
         patient: "name, age (number), birthDate, familyContact, lifeHistory",
-        initial: "complaint, clinicalHistory, familyHistory, generalObservations",
-        evolution: "evolution, observation",
-        appointment: "description, thoughts, feelings",
-        emotion: "wellBeing (FELIZ, TRANQUILO, NEUTRO, ANSIOSO, TRISTE), notes",
-        family: "familyMemberName, relationship, observation",
-        activity: "title, description, objectives",
-        cognition: "memoryRating (1-5), attentionRating (1-5), orientationRating (1-5), notes",
-        plan: "objectives, interventions, followUp"
+        initial: "emotionalState, mood, adaptationLevel, observations",
+        evolution: "observation, intervention",
+        appointment: "type (INDIVIDUAL, GRUPO, RODA_CONVERSA), status (REALIZADO, FALTOU, PENDENTE), observations",
+        emotion: "sadness (LEVE, MODERADO, INTENSO, NENHUM), anxiety (...), loneliness (...), irritability (...), wellBeing (FELIZ, NEUTRO, TRISTE), observations",
+        family: "receivesVisits (boolean), frequency, familyRelationship, observations",
+        activity: "title, type (OFICINA, DINAMICA, GRUPO), description",
+        cognition: "memory (PRESERVADO, COMPROMETIDO), attention (...), orientation (...), observations",
+        plan: "objectives, strategies, followUp"
       };
       
-      const extractedData = await extractFormData(text, schemas[type] || "description, observations");
+      const extractedData = await extractFormData(text, schemas[type] || "observations");
       if (extractedData && Object.keys(extractedData).length > 0) {
         setFormData((prev: any) => ({ ...prev, ...extractedData }));
       } else {
         if (type === 'evolution') {
-          setFormData((prev: any) => ({ ...prev, evolution: (prev.evolution || '') + '\n' + text }));
+          setFormData((prev: any) => ({ ...prev, observation: (prev.observation || '') + '\n' + text }));
         } else if (type === 'activity') {
           setFormData((prev: any) => ({ ...prev, description: (prev.description || '') + '\n' + text }));
         }
@@ -1148,7 +1186,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
     e.preventDefault();
     try {
       const { photos, ...data } = formData;
-      await onSave(data);
+      await onSave(data, editingData?.id);
 
       if (photos && photos.length > 0 && formData.patientId) {
         const patient = patients.find((p: any) => p.id === formData.patientId);
@@ -1156,7 +1194,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
           type === 'evolution' ? 'Evolução Psicológica' :
           type === 'activity' ? 'Atividade Psicológica' : 'Atendimento Psicológico';
         
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description);
+        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.observation || formData.description);
       }
       onClose();
     } catch (err) {
@@ -1176,14 +1214,16 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
         <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
           <div>
             <h3 className="text-2xl font-black text-gray-800 dark:text-white flex items-center gap-3">
-              {type === 'patient' ? 'Novo Idoso' : 
-               type === 'initial' ? 'Avaliação Inicial' :
-               type === 'evolution' ? 'Nova Evolução' :
-               type === 'appointment' ? 'Novo Atendimento' :
-               type === 'emotion' ? 'Monitoramento Emocional' :
-               type === 'family' ? 'Vínculo Familiar' :
-               type === 'activity' ? 'Nova Atividade' :
-               type === 'cognition' ? 'Avaliação Cognitiva' : 'Novo Registro'}
+              {editingData ? 'Editar' : 'Novo'} {
+                type === 'patient' ? 'Idoso' : 
+                type === 'initial' ? 'Avaliação Inicial' :
+                type === 'evolution' ? 'Evolução' :
+                type === 'appointment' ? 'Atendimento' :
+                type === 'emotion' ? 'Monitoramento Emocional' :
+                type === 'family' ? 'Vínculo Familiar' :
+                type === 'activity' ? 'Atividade' :
+                type === 'cognition' ? 'Avaliação Cognitiva' : 'Registro'
+              }
               {isExtracting && (
                 <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -1201,348 +1241,325 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-8 overflow-y-auto flex-1 space-y-8">
             {type === 'patient' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Nome Completo" onChange={(v) => setFormData({ ...formData, name: v })} />
-              <Input label="Idade" type="number" onChange={(v) => setFormData({ ...formData, age: parseInt(v) })} />
-              <Input label="Data de Entrada" type="date" onChange={(v) => setFormData({ ...formData, entryDate: v })} />
-              <Input label="Contato Familiar" onChange={(v) => setFormData({ ...formData, familyContact: v })} />
-              <div className="md:col-span-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs font-bold text-gray-400 uppercase">História de Vida</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, lifeHistory: (formData.lifeHistory || '') + ' ' + t })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
+                <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} />
+                <Input label="Idade" type="number" value={formData.age?.toString()} onChange={(v) => setFormData({ ...formData, age: v ? parseInt(v) : undefined })} />
+                <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} />
+                <Input label="Data de Entrada" type="date" value={formData.entryDate} onChange={(v) => setFormData({ ...formData, entryDate: v })} />
+                <Input label="Escolaridade" value={formData.schooling} onChange={(v) => setFormData({ ...formData, schooling: v })} />
+                <Input label="Contato Familiar" value={formData.familyContact} onChange={(v) => setFormData({ ...formData, familyContact: v })} />
+                <div className="md:col-span-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">História de Vida</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, lifeHistory: (formData.lifeHistory || '') + ' ' + t })} />
+                  </div>
+                  <TextArea label="" value={formData.lifeHistory} onChange={(v) => setFormData({ ...formData, lifeHistory: v })} />
                 </div>
-                <TextArea label="" onChange={(v) => setFormData({ ...formData, lifeHistory: v })} />
-              </div>
-              <div className="flex items-center gap-3">
-                <input type="checkbox" onChange={(e) => setFormData({ ...formData, hasVisits: e.target.checked })} className="w-5 h-5 rounded-lg text-blue-600" />
-                <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Recebe visitas?</label>
-              </div>
-            </div>
-          )}
-
-          {type === 'evolution' && (
-            <div className="space-y-6">
-              <Select label="Idoso" options={patients.map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Data" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-                <Input label="Hora" type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Observação</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observation: (formData.observation || '') + ' ' + t })} />
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.hasVisits} 
+                    onChange={(e) => setFormData({ ...formData, hasVisits: e.target.checked })} 
+                    className="w-5 h-5 rounded-lg text-blue-600" 
+                  />
+                  <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Recebe visitas?</label>
                 </div>
-                <textarea 
-                  rows={3}
-                  onChange={(e) => setFormData({ ...formData, observation: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Intervenção</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, intervention: (formData.intervention || '') + ' ' + t })} />
+            )}
+
+            {type === 'initial' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Estado Emocional" value={formData.emotionalState} onChange={(v) => setFormData({ ...formData, emotionalState: v })} />
+                  <Select label="Cognição" value={formData.cognition} options={[{value: 'ORIENTADO', label: 'Orientado'}, {value: 'DESORIENTADO', label: 'Desorientado'}]} onChange={(v) => setFormData({ ...formData, cognition: v })} />
                 </div>
-                <textarea 
-                  rows={3}
-                  onChange={(e) => setFormData({ ...formData, intervention: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Humor Predominante" value={formData.mood} onChange={(v) => setFormData({ ...formData, mood: v })} />
+                  <Input label="Nível de Adaptação" value={formData.adaptationLevel} onChange={(v) => setFormData({ ...formData, adaptationLevel: v })} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Observações Gerais</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={6}
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {type === 'emotion' && (
-            <div className="space-y-6">
-              <Select label="Idoso" options={patients.map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <Select label="Tristeza" options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, sadness: v })} />
-                <Select label="Ansiedade" options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, anxiety: v })} />
-                <Select label="Solidão" options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, loneliness: v })} />
-                <Select label="Irritabilidade" options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, irritability: v })} />
-              </div>
-              <Select label="Bem-estar Geral" options={[{value: 'FELIZ', label: 'Feliz 😊'}, {value: 'NEUTRO', label: 'Neutro 😐'}, {value: 'TRISTE', label: 'Triste 😔'}]} onChange={(v) => setFormData({ ...formData, wellBeing: v })} />
-            </div>
-          )}
-
-          {type === 'activity' && (
-            <div className="space-y-6">
-              <Input label="Título da Atividade" onChange={(v) => setFormData({ ...formData, title: v })} />
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Data" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-                <Select label="Tipo" options={[{value: 'OFICINA', label: 'Oficina'}, {value: 'DINAMICA', label: 'Dinâmica'}, {value: 'GRUPO', label: 'Grupo'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Participantes</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl max-h-48 overflow-y-auto">
-                  {(patients || []).map((p: any) => (
-                    <label key={p.id} className="flex items-center gap-2 text-sm p-2 hover:bg-white dark:hover:bg-gray-700 rounded-xl cursor-pointer transition-colors">
-                      <input 
-                        type="checkbox" 
-                        value={p.id}
-                        checked={(formData.participants || []).includes(p.id)}
-                        onChange={(e) => {
-                          const current = formData.participants || [];
-                          if (e.target.checked) setFormData({ ...formData, participants: [...current, p.id] });
-                          else setFormData({ ...formData, participants: current.filter((id: string) => id !== p.id) });
+            {type === 'evolution' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                  <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Evolução / Observação</label>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        disabled={isExtracting || !formData.observation}
+                        onClick={async () => {
+                          if (!formData.observation) return;
+                          setIsExtracting(true);
+                          try {
+                            const fixed = await fixGrammar(formData.observation);
+                            setFormData({ ...formData, observation: fixed });
+                            showToast('Texto corrigido com sucesso', 'success');
+                          } catch (err) {
+                            console.error(err);
+                            showToast('Erro ao corrigir texto', 'error');
+                          } finally {
+                            setIsExtracting(false);
+                          }
                         }}
-                        className="w-4 h-4 rounded text-blue-600"
-                      />
-                      <span className="truncate">{p.name}</span>
-                    </label>
-                  ))}
+                        className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                      >
+                        {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
+                        Corrigir
+                      </button>
+                      <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observation: (formData.observation || '') + ' ' + t })} />
+                    </div>
+                  </div>
+                  <textarea 
+                    rows={6}
+                    value={formData.observation || ''}
+                    onChange={(e) => setFormData({ ...formData, observation: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none font-bold" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Intervenção</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, intervention: (formData.intervention || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={4}
+                    value={formData.intervention || ''}
+                    onChange={(e) => setFormData({ ...formData, intervention: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none font-medium" 
+                  />
                 </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Descrição da Atividade</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, description: (formData.description || '') + ' ' + t })} />
+            )}
+
+            {type === 'appointment' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                  <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
                 </div>
-                <textarea 
-                  rows={3}
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-            </div>
-          )}
-
-          {type === 'initial' && (
-            <div className="space-y-6">
-              <Select label="Idoso" options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data da Avaliação" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Estado Emocional" onChange={(v) => setFormData({ ...formData, emotionalState: v })} />
-                <Select label="Cognição" options={[{value: 'ORIENTADO', label: 'Orientado'}, {value: 'DESORIENTADO', label: 'Desorientado'}]} onChange={(v) => setFormData({ ...formData, cognition: v })} />
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Humor Predominante" onChange={(v) => setFormData({ ...formData, mood: v })} />
-                <Input label="Nível de Adaptação" onChange={(v) => setFormData({ ...formData, adaptationLevel: v })} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Observações Gerais</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                <div className="grid grid-cols-2 gap-6">
+                  <Select label="Tipo de Atendimento" value={formData.type} options={[{value: 'INDIVIDUAL', label: 'Individual'}, {value: 'GRUPO', label: 'Grupo'}, {value: 'RODA_CONVERSA', label: 'Roda de Conversa'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
+                  <Select label="Status" value={formData.status} options={[{value: 'PENDENTE', label: 'Pendente'}, {value: 'REALIZADO', label: 'Realizado'}, {value: 'FALTOU', label: 'Faltou'}]} onChange={(v) => setFormData({ ...formData, status: v })} />
                 </div>
-                <textarea 
-                  rows={3}
-                  value={formData.observations || ''}
-                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Observações do Atendimento</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={6}
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {type === 'patient' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
-              <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} />
-              <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} />
-              <Input label="Escolaridade" value={formData.schooling} onChange={(v) => setFormData({ ...formData, schooling: v })} />
-              <div className="md:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Histórico de Vida</label>
-                <textarea 
-                  rows={4}
-                  value={formData.lifeHistory || ''}
-                  onChange={(e) => setFormData({ ...formData, lifeHistory: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-            </div>
-          )}
-
-          {type === 'initial' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Queixa Principal</label>
-                <textarea 
-                  rows={3}
-                  value={formData.complaint || ''}
-                  onChange={(e) => setFormData({ ...formData, complaint: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-            </div>
-          )}
-
-          {type === 'evolution' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <div className="grid grid-cols-2 gap-6">
+            {type === 'emotion' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={patients.map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
                 <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-                <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <Select label="Tristeza" value={formData.sadness} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, sadness: v })} />
+                  <Select label="Ansiedade" value={formData.anxiety} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, anxiety: v })} />
+                  <Select label="Solidão" value={formData.loneliness} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, loneliness: v })} />
+                  <Select label="Irritabilidade" value={formData.irritability} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, irritability: v })} />
+                </div>
+                <Select label="Bem-estar Geral" value={formData.wellBeing} options={[{value: 'FELIZ', label: 'Feliz 😊'}, {value: 'NEUTRO', label: 'Neutro 😐'}, {value: 'TRISTE', label: 'Triste 😔'}]} onChange={(v) => setFormData({ ...formData, wellBeing: v })} />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Observações Adicionais</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Evolução</label>
-                  <div className="flex gap-2">
-                    <button 
-                      type="button"
-                      disabled={isExtracting || !formData.evolution}
-                      onClick={async () => {
-                        if (!formData.evolution) return;
-                        setIsExtracting(true);
-                        try {
-                          const fixed = await fixGrammar(formData.evolution);
-                          setFormData({ ...formData, evolution: fixed });
-                          showToast('Texto corrigido com sucesso', 'success');
-                        } catch (err) {
-                          console.error(err);
-                          showToast('Erro ao corrigir texto', 'error');
-                        } finally {
-                          setIsExtracting(false);
-                        }
-                      }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
-                    >
-                      {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
-                      Corrigir
-                    </button>
-                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, evolution: (formData.evolution || '') + ' ' + t })} />
+            )}
+
+            {type === 'family' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Input label="Data do Registro" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.receivesVisits} 
+                    onChange={(e) => setFormData({ ...formData, receivesVisits: e.target.checked })} 
+                    className="w-5 h-5 rounded-lg text-blue-600" 
+                  />
+                  <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Recebe visitas familiares?</label>
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Frequência das Visitas" value={formData.frequency} onChange={(v) => setFormData({ ...formData, frequency: v })} />
+                  <Input label="Qualidade da Relação" value={formData.familyRelationship} onChange={(v) => setFormData({ ...formData, familyRelationship: v })} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Observações</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
+              </div>
+            )}
+
+            {type === 'activity' && (
+              <div className="space-y-6">
+                <Input label="Título da Atividade" value={formData.title} onChange={(v) => setFormData({ ...formData, title: v })} />
+                <div className="grid grid-cols-2 gap-6">
+                  <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                  <Select label="Tipo" value={formData.type} options={[{value: 'OFICINA', label: 'Oficina'}, {value: 'DINAMICA', label: 'Dinâmica'}, {value: 'GRUPO', label: 'Grupo'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Participantes</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl max-h-48 overflow-y-auto">
+                    {(patients || []).map((p: any) => (
+                      <label key={p.id} className="flex items-center gap-2 text-sm p-2 hover:bg-white dark:hover:bg-gray-700 rounded-xl cursor-pointer transition-colors">
+                        <input 
+                          type="checkbox" 
+                          value={p.id}
+                          checked={(formData.participants || []).includes(p.id)}
+                          onChange={(e) => {
+                            const current = formData.participants || [];
+                            if (e.target.checked) setFormData({ ...formData, participants: [...current, p.id] });
+                            else setFormData({ ...formData, participants: current.filter((id: string) => id !== p.id) });
+                          }}
+                          className="w-4 h-4 rounded text-blue-600"
+                        />
+                        <span className="truncate">{p.name}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <textarea 
-                  rows={4}
-                  value={formData.evolution || ''}
-                  onChange={(e) => setFormData({ ...formData, evolution: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none font-bold" 
-                />
-              </div>
-            </div>
-          )}
-
-          {type === 'appointment' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-                <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <Select label="Tipo de Atendimento" value={formData.type} options={[{value: 'INDIVIDUAL', label: 'Individual'}, {value: 'GRUPO', label: 'Grupo'}, {value: 'RODA_CONVERSA', label: 'Roda de Conversa'}]} onChange={(v) => setFormData({ ...formData, type: v })} />
-                <Select label="Status" value={formData.status} options={[{value: 'PENDENTE', label: 'Pendente'}, {value: 'REALIZADO', label: 'Realizado'}, {value: 'FALTOU', label: 'Faltou'}]} onChange={(v) => setFormData({ ...formData, status: v })} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Observações</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Descrição da Atividade</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, description: (formData.description || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
                 </div>
-                <textarea 
-                  rows={3}
-                  value={formData.observations || ''}
-                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
               </div>
-            </div>
-          )}
+            )}
 
-          {type === 'family' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data do Registro" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="flex items-center gap-3">
-                <input type="checkbox" checked={formData.receivesVisits} onChange={(e) => setFormData({ ...formData, receivesVisits: e.target.checked })} className="w-5 h-5 rounded-lg text-blue-600" />
-                <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Recebe visitas familiares?</label>
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <Input label="Frequência das Visitas" value={formData.frequency} onChange={(v) => setFormData({ ...formData, frequency: v })} />
-                <Input label="Qualidade da Relação" value={formData.familyRelationship} onChange={(v) => setFormData({ ...formData, familyRelationship: v })} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Observações</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+            {type === 'cognition' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <div className="grid grid-cols-3 gap-6">
+                  <Select label="Memória" value={formData.memory} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
+                  <Select label="Atenção" value={formData.attention} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, attention: v })} />
+                  <Select label="Orientação" value={formData.orientation} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, orientation: v })} />
                 </div>
-                <textarea 
-                  rows={3}
-                  value={formData.observations || ''}
-                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Observações Adicionais</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            
+            {type === 'plan' && (
+              <div className="space-y-6">
+                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Input label="Data do Plano" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Objetivos Terapêuticos</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.objectives || ''}
+                    onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Estratégias de Intervenção</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, strategies: (formData.strategies || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={3}
+                    value={formData.strategies || ''}
+                    onChange={(e) => setFormData({ ...formData, strategies: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-gray-400 uppercase">Acompanhamento</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, followUp: (formData.followUp || '') + ' ' + t })} />
+                  </div>
+                  <textarea 
+                    rows={2}
+                    value={formData.followUp || ''}
+                    onChange={(e) => setFormData({ ...formData, followUp: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
+                  />
+                </div>
+              </div>
+            )}
 
-          {type === 'cognition' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="grid grid-cols-3 gap-6">
-                <Select label="Memória" value={formData.memory} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
-                <Select label="Atenção" value={formData.attention} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, attention: v })} />
-                <Select label="Orientação" value={formData.orientation} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, orientation: v })} />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Observações Adicionais</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
-                </div>
-                <textarea 
-                  rows={3}
-                  value={formData.observations || ''}
-                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-            </div>
-          )}
+
+
+
+
           
-          {type === 'plan' && (
-            <div className="space-y-6">
-              <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
-              <Input label="Data do Plano" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Objetivos Terapêuticos</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
-                </div>
-                <textarea 
-                  rows={3}
-                  value={formData.objectives || ''}
-                  onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Estratégias de Intervenção</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, strategies: (formData.strategies || '') + ' ' + t })} />
-                </div>
-                <textarea 
-                  rows={3}
-                  value={formData.strategies || ''}
-                  onChange={(e) => setFormData({ ...formData, strategies: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Acompanhamento</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, followUp: (formData.followUp || '') + ' ' + t })} />
-                </div>
-                <textarea 
-                  rows={2}
-                  value={formData.followUp || ''}
-                  onChange={(e) => setFormData({ ...formData, followUp: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
-                />
-              </div>
-            </div>
-          )}
           
-          <div className="space-y-4 mt-8">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
-              <DigitizeButton onDigitize={handleDigitize} />
+            <div className="space-y-4 mt-8">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
+                <DigitizeButton onDigitize={handleDigitize} />
+              </div>
+              <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
-            <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} />
-          </div>
           </div>
 
           <div className="p-8 border-t border-gray-100 dark:border-gray-800 flex gap-4">
@@ -1550,7 +1567,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
               Cancelar
             </button>
             <button type="submit" className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
-              Salvar Registro
+              {editingData ? 'Salvar Edição' : 'Salvar Registro'}
             </button>
           </div>
         </form>

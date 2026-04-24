@@ -621,6 +621,26 @@ service cloud.firestore {
       allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
     }
 
+    match /diaperRawProductions/{rawId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /diaperWIPProcessings/{wipId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /diaperFinalPackings/{finalId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
+    match /diaperProductionGoals/{goalId} {
+      allow read: if isAuthenticated();
+      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+    }
+
     match /calendarEvents/{eventId} {
       allow read: if isAuthenticated();
       allow create, update: if isAuthenticated() && isValidCalendarEvent(request.resource.data);

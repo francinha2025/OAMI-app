@@ -20,6 +20,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, 
@@ -64,13 +65,15 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
   <button
     onClick={onClick}
     className={cn(
-      "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-black transition-all",
+      "flex-shrink-0 lg:w-full flex items-center gap-3 px-6 lg:px-4 py-3 rounded-2xl text-xs font-bold transition-all whitespace-nowrap snap-start group",
       active 
-        ? "bg-green-600 text-white shadow-lg shadow-green-100 dark:shadow-none" 
+        ? "bg-green-600 text-white shadow-xl shadow-green-100 dark:shadow-none lg:translate-x-1" 
         : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-400"
     )}
   >
-    <Icon className="w-5 h-5" />
+    <div className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-gray-400 group-hover:text-green-600")}>
+      <Icon size={18} />
+    </div>
     {label}
   </button>
 );
@@ -145,6 +148,21 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
     }
   };
 
+  const handleFixGrammar = async (field: string) => {
+    if (!formData[field]) return;
+    setIsExtracting(true);
+    try {
+      const fixed = await fixGrammar(formData[field]);
+      setFormData((prev: any) => ({ ...prev, [field]: fixed }));
+      showToast('Texto corrigido com sucesso', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao corrigir texto', 'error');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -206,6 +224,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
     setFormData(initialData || {});
     setEditingData(initialData);
     setIsModalOpen(true);
+    setSelectedPatient(null);
   };
 
   const renderModalContent = () => {
@@ -219,7 +238,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div className="col-span-2">
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nome Completo</label>
                 <input
-                  required
                   type="text"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.name || ''}
@@ -230,7 +248,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">URL da Foto</label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-bold"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold"
                   placeholder="https://exemplo.com/foto.jpg"
                   value={formData.photoUrl || ''}
                   onChange={(e) => setFormData({ ...formData, photoUrl: e.target.value })}
@@ -239,7 +257,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Idade</label>
                 <input
-                  required
                   type="number"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.age || ''}
@@ -249,8 +266,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Escolaridade</label>
                 <select
-                  required
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.schooling || ''}
                   onChange={(e) => setFormData({ ...formData, schooling: e.target.value })}
                 >
@@ -263,10 +279,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Profissão Anterior</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Profissão Anterior</label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.previousProfession || ''}
                   onChange={(e) => setFormData({ ...formData, previousProfession: e.target.value })}
                 />
@@ -274,7 +290,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Nível de Alfabetização</label>
                 <select
-                  required
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                   value={formData.literacyLevel || ''}
                   onChange={(e) => setFormData({ ...formData, literacyLevel: e.target.value })}
@@ -288,7 +303,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Nível Cognitivo</label>
                 <select
-                  required
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                   value={formData.cognitiveLevel || ''}
                   onChange={(e) => setFormData({ ...formData, cognitiveLevel: e.target.value })}
@@ -303,7 +317,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Interesses (separados por vírgula)</label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-bold"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold"
                   value={formData.interestsStr || ''}
                   onChange={(e) => setFormData({ ...formData, interestsStr: e.target.value, interests: e.target.value.split(',').map(s => s.trim()) })}
                 />
@@ -314,7 +328,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, cognitiveLimitations: (formData.cognitiveLimitations || '') + ' ' + t })} />
                 </div>
                 <textarea
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-bold h-20"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold h-20"
                   value={formData.cognitiveLimitations || ''}
                   onChange={(e) => setFormData({ ...formData, cognitiveLimitations: e.target.value })}
                 />
@@ -340,13 +354,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <div>
               <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Idoso</label>
               <select
-                required
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -356,7 +369,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     {field === 'praxis' ? 'Praxia' : field === 'gnosis' ? 'Gnosia' : field === 'comprehension' ? 'Compreensão' : field === 'orientation' ? 'Orientação' : field === 'memory' ? 'Memória' : field === 'attention' ? 'Atenção' : 'Linguagem'}
                   </label>
                   <select
-                    required
                     className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                     value={formData[field] || ''}
                     onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
@@ -396,23 +408,21 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         );
       case 'evolution':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Idoso</label>
               <select
-                required
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Título da Atividade</label>
               <input
-                required
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                 value={formData.activityTitle || ''}
@@ -422,7 +432,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Data do Registro</label>
               <input
-                required
                 type="date"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                 value={formData.date || format(new Date(), 'yyyy-MM-dd')}
@@ -433,7 +442,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Participação</label>
                 <select
-                  required
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                   value={formData.participation || ''}
                   onChange={(e) => setFormData({ ...formData, participation: e.target.value })}
@@ -447,7 +455,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Humor</label>
                 <select
-                  required
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                   value={formData.mood || ''}
                   onChange={(e) => setFormData({ ...formData, mood: e.target.value })}
@@ -490,8 +497,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </div>
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.response || ''}
                 onChange={(e) => setFormData({ ...formData, response: e.target.value })}
               />
@@ -513,14 +519,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'activity':
       case 'activities':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Título da Atividade</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Título da Atividade</label>
                 <input
-                  required
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 />
@@ -528,9 +533,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Data</label>
                 <input
-                  required
                   type="date"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.date || ''}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 />
@@ -538,9 +542,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Horário</label>
                 <input
-                  required
                   type="time"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.time || ''}
                   onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                 />
@@ -548,8 +551,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div>
                 <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Tipo</label>
                 <select
-                  required
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.type || ''}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 >
@@ -579,7 +581,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       }}
                       className="w-4 h-4 rounded text-pink-600 border-gray-300 focus:ring-pink-500"
                     />
-                    <span className="truncate text-black dark:text-gray-200 font-black">{p.name}</span>
+                    <span className="truncate text-gray-900 dark:text-gray-200 font-black">{p.name}</span>
                   </label>
                 ))}
               </div>
@@ -591,8 +593,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, description: (formData.description || '') + ' ' + t })} />
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
@@ -613,34 +614,30 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         );
       case 'stimulation':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
             <div>
-              <label className="block text-sm font-black text-black mb-1">Idoso</label>
+              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
               <select
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { field: 'memoryScore', label: 'Memória' },
-                { field: 'attentionScore', label: 'Atenção' },
-                { field: 'reasoningScore', label: 'Raciocínio' },
                 { field: 'languageScore', label: 'Linguagem' }
               ].map((item) => (
                 <div key={item.field}>
-                  <label className="block text-sm font-black text-black mb-1">{item.label}</label>
+                  <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">{item.label}</label>
                   <input
-                    required
                     type="number"
                     min="0"
                     max="10"
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                     value={formData[item.field] || ''}
                     onChange={(e) => setFormData({ ...formData, [item.field]: parseInt(e.target.value) })}
                   />
@@ -649,11 +646,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Observações</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Observações</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
               </div>
               <textarea
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.observations || ''}
                 onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
               />
@@ -674,25 +671,23 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         );
       case 'social':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
             <div>
-              <label className="block text-sm font-black text-black mb-1">Idoso</label>
+              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
               <select
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-black text-black mb-1">Nível de Interação</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nível de Interação</label>
                 <select
-                  required
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                   value={formData.interactionLevel || ''}
                   onChange={(e) => setFormData({ ...formData, interactionLevel: e.target.value })}
                 >
@@ -711,7 +706,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     checked={formData.isIsolated || false}
                     onChange={(e) => setFormData({ ...formData, isIsolated: e.target.checked })}
                   />
-                  <label htmlFor="isIsolated" className="text-sm font-black text-black leading-none">Está Isolado?</label>
+                  <label htmlFor="isIsolated" className="text-sm font-black text-gray-700 dark:text-gray-300 leading-none">Está Isolado?</label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -721,17 +716,17 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     checked={formData.isCommunicative || false}
                     onChange={(e) => setFormData({ ...formData, isCommunicative: e.target.checked })}
                   />
-                  <label htmlFor="isCommunicative" className="text-sm font-black text-black leading-none">É Comunicativo?</label>
+                  <label htmlFor="isCommunicative" className="text-sm font-black text-gray-700 dark:text-gray-300 leading-none">É Comunicativo?</label>
                 </div>
               </div>
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Observações Sociais</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Observações Sociais</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
               </div>
               <textarea
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.observations || ''}
                 onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
               />
@@ -752,49 +747,45 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         );
       case 'plan':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
             <div>
-              <label className="block text-sm font-black text-black mb-1">Idoso</label>
+              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
               <select
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Objetivos Pedagógicos</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Objetivos Pedagógicos</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.objectives || ''}
                 onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
               />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Estratégias de Intervenção</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Estratégias de Intervenção</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, strategies: (formData.strategies || '') + ' ' + t })} />
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.strategies || ''}
                 onChange={(e) => setFormData({ ...formData, strategies: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-black text-black mb-1">Atividades Indicadas (separadas por vírgula)</label>
+              <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Atividades Indicadas (separadas por vírgula)</label>
               <input
-                required
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.indicatedActivitiesStr || ''}
                 onChange={(e) => setFormData({ ...formData, indicatedActivitiesStr: e.target.value, indicatedActivities: e.target.value.split(',').map(s => s.trim()) })}
               />
@@ -815,48 +806,45 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         );
       case 'history':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-black dark:text-gray-100">
+          <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-gray-900 dark:text-gray-100">
             <div>
-              <label className="block text-sm font-black text-black mb-1">Idoso</label>
+              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
               <select
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
                 <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Principais Lembranças</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Principais Lembranças</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, memories: (formData.memories || '') + ' ' + t })} />
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.memories || ''}
                 onChange={(e) => setFormData({ ...formData, memories: e.target.value })}
               />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-black text-black">Histórias Marcantes</label>
+                <label className="block text-sm font-black text-gray-700 dark:text-gray-300">Histórias Marcantes</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, stories: (formData.stories || '') + ' ' + t })} />
               </div>
               <textarea
-                required
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black h-24"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black h-24"
                 value={formData.stories || ''}
                 onChange={(e) => setFormData({ ...formData, stories: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-black text-black mb-1">URLs das Fotos (separadas por vírgula)</label>
+              <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">URLs das Fotos (separadas por vírgula)</label>
               <input
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                 placeholder="https://exemplo.com/foto1.jpg, ..."
                 value={formData.photosStr || ''}
                 onChange={(e) => setFormData({ ...formData, photosStr: e.target.value, photos: e.target.value.split(',').map(s => s.trim()) })}
@@ -864,7 +852,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-black text-black">Linha do Tempo</h4>
+                <h4 className="text-sm font-black text-gray-900 dark:text-white">Linha do Tempo</h4>
                 <button
                   type="button"
                   onClick={() => {
@@ -882,10 +870,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               {(formData.timelineEvents || []).map((event: any, index: number) => (
                 <div key={index} className="grid grid-cols-3 gap-2 items-end bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
                   <div className="col-span-1">
-                    <label className="block text-[10px] font-black text-black uppercase mb-1">Data/Ano</label>
+                    <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Data/Ano</label>
                     <input
                       type="text"
-                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                       placeholder="Ex: 1950"
                       value={event.date}
                       onChange={(e) => {
@@ -896,10 +884,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="block text-[10px] font-black text-black uppercase mb-1">Evento</label>
+                    <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase mb-1">Evento</label>
                     <input
                       type="text"
-                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-black dark:text-white font-black"
+                      className="w-full p-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
                       placeholder="Ex: Casamento"
                       value={event.event}
                       onChange={(e) => {
@@ -1041,8 +1029,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-black text-black">{stat.label}</p>
-                <p className="text-2xl font-black mt-1 text-black dark:text-white">{stat.value}</p>
+                <p className="text-sm font-black text-gray-900 dark:text-gray-400">{stat.label}</p>
+                <p className="text-2xl font-black mt-1 text-gray-900 dark:text-white">{stat.value}</p>
               </div>
               <div className={cn("p-3 rounded-xl", stat.bg)}>
                 <stat.icon className={cn("w-6 h-6", stat.color)} />
@@ -1055,13 +1043,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Participation Chart */}
         <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="text-lg font-black text-black dark:text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
             <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Evolução de Participação
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={socialParticipations.slice(-7)}>
+              <AreaChart data={(socialParticipations || []).slice(-7)}>
                 <defs>
                   <linearGradient id="colorParticipation" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
@@ -1080,7 +1068,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
         {/* Cognitive Levels Chart */}
         <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="text-lg font-black text-black dark:text-white mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
             <Brain className="w-5 h-5 text-purple-600" />
             Nível Cognitivo Geral
           </h3>
@@ -1113,7 +1101,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       {/* Today's Activities */}
       <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-        <h3 className="text-lg font-black text-black dark:text-white mb-4 flex items-center gap-2">
+        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-blue-600" />
           Atividades do Dia
         </h3>
@@ -1130,8 +1118,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     {activity.type === 'LEITURA' && <BookOpen className="w-5 h-5 text-orange-600" />}
                   </div>
                   <div>
-                    <p className="font-black text-black dark:text-white">{activity.title}</p>
-                    <p className="text-sm text-black dark:text-gray-400 font-black">
+                    <p className="font-black text-gray-900 dark:text-white">{activity.title}</p>
+                    <p className="text-sm text-gray-900 dark:text-gray-400 font-black">
                       {activity.time} • {(activity.participants || []).length} participantes
                     </p>
                   </div>
@@ -1161,7 +1149,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <div className="flex items-center justify-between">
             <button 
               onClick={() => setSelectedPatient(null)}
-              className="flex items-center gap-2 text-gray-900 hover:text-black font-bold"
+              className="flex items-center gap-2 text-gray-900 hover:text-black dark:hover:text-white font-bold"
             >
               <ArrowLeft className="w-5 h-5 font-bold" />
               Voltar para Lista
@@ -1214,7 +1202,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   "flex items-center gap-2 px-6 py-4 text-sm font-black transition-all border-b-2 whitespace-nowrap",
                   residentSubTab === sub.id 
                     ? "border-blue-600 text-blue-900 dark:text-blue-400 bg-white dark:bg-gray-900" 
-                    : "border-transparent text-gray-950 dark:text-gray-400 hover:text-black dark:hover:text-gray-200"
+                    : "border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 )}
               >
                   <sub.icon className="w-4 h-4" />
@@ -1228,34 +1216,34 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div>
-                      <h4 className="text-sm font-black text-black dark:text-white uppercase tracking-wider mb-3">Profissão Anterior</h4>
-                      <p className="text-black dark:text-gray-100 font-bold">{selectedPatient.previousProfession || 'Não informada'}</p>
+                      <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Profissão Anterior</h4>
+                      <p className="text-gray-900 dark:text-gray-100 font-bold">{selectedPatient.previousProfession || 'Não informada'}</p>
                     </div>
                     <div>
-                      <h4 className="text-sm font-black text-black dark:text-white uppercase tracking-wider mb-3">Interesses</h4>
+                      <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Interesses</h4>
                       <div className="flex flex-wrap gap-2">
                         {(selectedPatient.interests || []).map((interest, i) => (
-                          <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/40 text-black dark:text-blue-300 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
+                          <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/40 text-gray-900 dark:text-blue-300 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
                             {interest}
                           </span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-sm font-black text-black dark:text-white uppercase tracking-wider mb-3">Preferência de Rotina</h4>
-                      <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/40 text-black dark:text-purple-300 rounded-full text-xs font-bold uppercase border border-purple-100 dark:border-purple-800">
+                      <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Preferência de Rotina</h4>
+                      <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/40 text-gray-900 dark:text-purple-300 rounded-full text-xs font-bold uppercase border border-purple-100 dark:border-purple-800">
                         {selectedPatient.routinePreference}
                       </span>
                     </div>
                   </div>
                   <div>
-                    <h4 className="text-sm font-black text-black uppercase tracking-wider mb-3">Limitações Cognitivas</h4>
+                    <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Limitações Cognitivas</h4>
                     <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                      <p className="text-black dark:text-gray-200 font-bold leading-relaxed">{selectedPatient.cognitiveLimitations || 'Nenhuma limitação registrada.'}</p>
+                      <p className="text-gray-900 dark:text-gray-200 font-bold leading-relaxed">{selectedPatient.cognitiveLimitations || 'Nenhuma limitação registrada.'}</p>
                     </div>
                     <button 
-                      onClick={() => openModal('patient', selectedPatient)}
-                      className="mt-6 flex items-center gap-2 text-black hover:text-blue-700 font-black text-sm"
+                      onClick={() => { openModal('patient', selectedPatient); setSelectedPatient(null); }}
+                      className="mt-6 flex items-center gap-2 text-gray-900 dark:text-white hover:text-blue-700 font-black text-sm"
                     >
                       <Edit2 className="w-4 h-4" />
                       Editar Perfil Educacional
@@ -1269,18 +1257,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div className="space-y-8">
                       <div>
-                        <h5 className="text-sm font-black text-black uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <h5 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                           <Lightbulb className="w-4 h-4" />
                           Principais Lembranças
                         </h5>
-                        <p className="text-black leading-relaxed italic font-bold">"{history.memories}"</p>
+                        <p className="text-gray-900 dark:text-white leading-relaxed italic font-bold">"{history.memories}"</p>
                       </div>
                       <div>
-                        <h5 className="text-sm font-black text-black uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <h5 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                           <FileText className="w-4 h-4" />
                           Histórias Marcantes
                         </h5>
-                        <p className="text-black leading-relaxed font-bold">{history.stories}</p>
+                        <p className="text-gray-900 dark:text-white leading-relaxed font-bold">{history.stories}</p>
                       </div>
                       <button 
                         onClick={() => openModal('history', history)}
@@ -1292,13 +1280,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     </div>
 
                     <div className="relative pl-8 border-l-2 border-black">
-                      <h5 className="text-sm font-black text-black uppercase tracking-wider mb-6">Linha do Tempo</h5>
+                      <h5 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-6">Linha do Tempo</h5>
                       <div className="space-y-8">
-                        {history.timelineEvents.map((event, i) => (
+                        {(history.timelineEvents || []).map((event, i) => (
                           <div key={i} className="relative">
                             <div className="absolute -left-[33px] top-1 w-4 h-4 rounded-full bg-black border-4 border-white shadow-sm" />
-                            <p className="text-xs font-black text-black mb-1">{event.date}</p>
-                            <p className="text-sm text-black font-bold">{event.event}</p>
+                            <p className="text-xs font-black text-gray-900 dark:text-white mb-1">{event.date}</p>
+                            <p className="text-sm text-gray-900 dark:text-white font-bold">{event.event}</p>
                           </div>
                         ))}
                       </div>
@@ -1307,7 +1295,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 ) : (
                   <div className="text-center py-12">
                     <History className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                    <p className="text-black font-bold">Nenhuma história de vida registrada para este idoso.</p>
+                    <p className="text-gray-900 dark:text-white font-bold">Nenhuma história de vida registrada para este idoso.</p>
                     <button 
                       onClick={() => openModal('history', { patientId: selectedPatient.id })}
                       className="mt-4 px-6 py-2 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700"
@@ -1342,7 +1330,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 ) : (
                   <div className="text-center py-12">
                     <Brain className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                    <p className="text-black font-bold">Nenhuma avaliação cognitiva inicial realizada.</p>
+                    <p className="text-gray-900 dark:text-white font-bold">Nenhuma avaliação cognitiva inicial realizada.</p>
                     <button 
                       onClick={() => openModal('assessment', { patientId: selectedPatient.id })}
                       className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
@@ -1387,7 +1375,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 ) : (
                   <div className="text-center py-12">
                     <Target className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                    <p className="text-black font-bold">Nenhum plano pedagógico individual (PPI) definido.</p>
+                    <p className="text-gray-900 dark:text-white font-bold">Nenhum plano pedagógico individual (PPI) definido.</p>
                     <button 
                       onClick={() => openModal('plan', { patientId: selectedPatient.id })}
                       className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
@@ -1413,7 +1401,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               placeholder="Buscar idoso..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-black dark:text-white"
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
             />
           </div>
           <button
@@ -1446,8 +1434,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       )}
                     </div>
                     <div>
-                      <h4 className="font-black text-black dark:text-white">{patient.name}</h4>
-                      <p className="text-sm text-black dark:text-gray-300 font-black">{patient.age} anos • {patient.schooling}</p>
+                      <h4 className="font-black text-gray-900 dark:text-white">{patient.name}</h4>
+                      <p className="text-sm text-gray-900 dark:text-gray-300 font-black">{patient.age} anos • {patient.schooling}</p>
                     </div>
                   </div>
                   <div className={cn(
@@ -1461,11 +1449,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </div>
 
                 <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-black dark:text-gray-200 font-black">
+                  <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
                     <BookOpen className="w-4 h-4 text-blue-500" />
                     <span>{patient.literacyLevel.replace('_', ' ')}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-black dark:text-gray-200 font-black">
+                  <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
                     <Star className="w-4 h-4 text-yellow-500" />
                     <span className="truncate">{(patient.interests || []).join(', ')}</span>
                   </div>
@@ -1502,7 +1490,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderActivitiesTab = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-black dark:text-white">Oficinas & Atividades</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white">Oficinas & Atividades</h3>
         <button
           onClick={() => openModal('activity')}
           className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors"
@@ -1514,7 +1502,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">
-          <h4 className="text-sm font-black text-black uppercase tracking-wider">Próximas Oficinas</h4>
+          <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">Próximas Oficinas</h4>
           <div className="grid grid-cols-1 gap-4">
             {(activities || []).map((activity) => (
               <div key={activity.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
@@ -1524,8 +1512,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       <Calendar className="w-6 h-6 text-pink-500" />
                     </div>
                     <div>
-                      <h5 className="font-black text-black dark:text-white">{activity.title}</h5>
-                      <p className="text-sm text-black dark:text-gray-400 font-black">
+                      <h5 className="font-black text-gray-900 dark:text-white">{activity.title}</h5>
+                      <p className="text-sm text-gray-900 dark:text-gray-400 font-black">
                         {format(parseISO(activity.date), 'dd/MM/yyyy')} às {activity.time}
                       </p>
                     </div>
@@ -1534,7 +1522,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     {activity.type}
                   </span>
                 </div>
-                <p className="text-sm text-black dark:text-gray-300 mb-4 font-black leading-relaxed">{activity.description}</p>
+                <p className="text-sm text-gray-900 dark:text-gray-300 mb-4 font-black leading-relaxed">{activity.description}</p>
                 <div className="flex gap-2">
                   <button 
                     onClick={() => openModal('evolution', { activityTitle: activity.title })}
@@ -1572,8 +1560,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
                   </div>
                   <div>
-                    <p className="text-sm font-black text-black dark:text-white">{patient?.name}</p>
-                    <p className="text-[11px] text-black dark:text-gray-400 font-black">{evolution.activityTitle}</p>
+                    <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                    <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">{evolution.activityTitle}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1583,7 +1571,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   )}>
                     {evolution.participation}
                   </span>
-                  <p className="text-[10px] text-black dark:text-gray-400 mt-1 font-black">{format(parseISO(evolution.date), 'dd/MM HH:mm')}</p>
+                  <p className="text-[10px] text-gray-900 dark:text-gray-400 mt-1 font-black">{format(parseISO(evolution.date), 'dd/MM HH:mm')}</p>
                 </div>
                 <div className="flex gap-1 ml-4">
                   <button 
@@ -1611,7 +1599,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderMonitoring = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-black dark:text-white">Acompanhamento de Progresso</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white">Acompanhamento de Progresso</h3>
         <div className="flex gap-2">
           <button
             onClick={() => openModal('stimulation')}
@@ -1632,7 +1620,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-          <h4 className="text-lg font-black text-black mb-6 flex items-center gap-2">
+          <h4 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
             <Brain className="w-5 h-5 text-blue-500" />
             Estimulação Cognitiva (Média)
           </h4>
@@ -1655,7 +1643,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         </div>
 
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-          <h4 className="text-lg font-black text-black mb-6 flex items-center gap-2">
+          <h4 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
             <Users2 className="w-5 h-5 text-green-500" />
             Interação Social
           </h4>
@@ -1701,8 +1689,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8">
-      <aside className="w-full lg:w-64 space-y-2">
+    <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'residents', label: 'Residentes', icon: Users },
@@ -1714,7 +1702,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <NavButton
             key={tab.id}
             active={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id as TabType)}
+            onClick={() => {
+              setActiveTab(tab.id as TabType);
+              setEditingData(null);
+            }}
             icon={tab.icon}
             label={tab.label}
           />
@@ -1742,25 +1733,48 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <p className="text-gray-500 max-w-md mx-auto">
                   Gere relatórios pedagógicos completos, acompanhamento de evolução cognitiva e participação social em PDF.
                 </p>
-                <button 
-                  onClick={() => {
-                    if ((patients || []).length === 0) return;
-                    const data = patients.map(p => {
-                      const patientEvolutions = evolutions.filter(e => e.patientId === p.id);
-                      return [p.name, p.age, patientEvolutions.length, p.status];
-                    });
-                    generateModernPDF({
-                      title: 'Relatório Pedagógico Geral',
-                      subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
-                      columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
-                      data,
-                      fileName: 'relatorio_pedagogico_geral'
-                    });
-                  }}
-                  className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-                >
-                  Gerar Relatório Geral
-                </button>
+                <div className="flex gap-4 mt-6">
+                  <button 
+                    onClick={() => {
+                      if ((patients || []).length === 0) return;
+                      const data = (patients || []).map(p => {
+                        const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
+                        return [p.name, p.age, patientEvolutions.length, p.status];
+                      });
+                      generateModernPDF({
+                        title: 'Relatório Pedagógico Geral',
+                        subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
+                        columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
+                        data,
+                        fileName: 'relatorio_pedagogico_geral'
+                      });
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100"
+                  >
+                    <Download className="w-5 h-5" />
+                    GERAR PDF
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      if ((patients || []).length === 0) return;
+                      const data = (patients || []).map(p => {
+                        const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
+                        return [p.name, p.age, patientEvolutions.length, p.status];
+                      });
+                      await generateModernWord({
+                        title: 'Relatório Pedagógico Geral',
+                        subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
+                        columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
+                        data,
+                        fileName: 'relatorio_pedagogico_geral'
+                      });
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-100"
+                  >
+                    <FileText className="w-5 h-5" />
+                    GERAR WORD
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
@@ -1769,7 +1783,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-transparent dark:border-gray-800 transition-all">
             <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

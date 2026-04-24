@@ -118,6 +118,58 @@
       },
       "required": ["date", "quantity", "type", "registeredBy"]
     },
+    "DiaperRawProduction": {
+      "title": "DiaperRawProduction",
+      "description": "Daily raw production (sewing)",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "quantity": { "type": "number" },
+        "operator": { "type": "string" },
+        "registeredBy": { "type": "string" },
+        "observations": { "type": "string" }
+      },
+      "required": ["date", "quantity", "operator", "registeredBy"]
+    },
+    "DiaperWIPProcessing": {
+      "title": "DiaperWIPProcessing",
+      "description": "Work in progress processing (cutting/adjusting)",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "inputQuantity": { "type": "number" },
+        "outputQuantity": { "type": "number" },
+        "lossQuantity": { "type": "number" },
+        "lossReason": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["date", "inputQuantity", "outputQuantity", "lossQuantity", "registeredBy"]
+    },
+    "DiaperFinalPacking": {
+      "title": "DiaperFinalPacking",
+      "description": "Finalization and quality control packing",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "inputQuantity": { "type": "number" },
+        "outputQuantity": { "type": "number" },
+        "lossQuantity": { "type": "number" },
+        "lossReason": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["date", "inputQuantity", "outputQuantity", "lossQuantity", "registeredBy"]
+    },
+    "DiaperProductionGoal": {
+      "title": "DiaperProductionGoal",
+      "description": "Weekly production targets",
+      "type": "object",
+      "properties": {
+        "weekStartDate": { "type": "string" },
+        "targetQuantity": { "type": "number" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["weekStartDate", "targetQuantity", "registeredBy"]
+    },
     "GalleryPhoto": {
       "title": "GalleryPhoto",
       "description": "Photo stored in the institutional gallery",
@@ -650,6 +702,10 @@
     "diaperDonations": { "schema": "DiaperDonation", "description": "Community diaper donations" },
     "diaperStock": { "schema": "DiaperStock", "description": "Factory stock control" },
     "diaperProductionLogs": { "schema": "DiaperProductionLog", "description": "Factory production logs" },
+    "diaperRawProductions": { "schema": "DiaperRawProduction", "description": "Raw production (sewing)" },
+    "diaperWIPProcessings": { "schema": "DiaperWIPProcessing", "description": "Work in progress processing" },
+    "diaperFinalPackings": { "schema": "DiaperFinalPacking", "description": "Final packaging and QC" },
+    "diaperProductionGoals": { "schema": "DiaperProductionGoal", "description": "Production targets" },
     "gallery": { "schema": "GalleryPhoto", "description": "Institutional photo gallery" },
     "volunteers": { "schema": "Volunteer", "description": "Volunteers and interns" },
     "financial": { "schema": "FinancialRecord", "description": "Financial records" },

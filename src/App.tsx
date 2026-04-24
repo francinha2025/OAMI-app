@@ -95,9 +95,12 @@ import {
 } from 'recharts';
 import { cn } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
+import { generateModernWord } from './lib/wordUtils';
+import { generateModernExcel } from './lib/excelUtils';
+import { Table as TableIcon } from 'lucide-react';
 import { processSmartIA, AISmartCommandResult } from './services/geminiService';
 import { GoogleGenAI } from "@google/genai";
 import { db, auth } from './firebase';
@@ -106,6 +109,7 @@ import { NursingSection } from './components/NursingSection';
 import { PsychologySection } from './components/PsychologySection';
 import { PedagogySection } from './components/PedagogySection';
 import { SocialWorkSection } from './components/SocialWorkSection';
+import { DiaperProductionSection } from './components/DiaperProductionSection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { GlobalGallery } from './components/GlobalGallery';
 import { DigitizeButton } from './components/DigitizeButton';
@@ -113,6 +117,9 @@ import { CameraModal } from './components/CameraModal';
 import { PhotoUpload } from './components/PhotoUpload';
 import { 
   collection, 
+  where, 
+  Timestamp,
+  limit,
   onSnapshot, 
   addDoc, 
   updateDoc, 
@@ -349,7 +356,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="fixed bottom-24 right-6 w-96 h-[600px] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-green-100 dark:border-green-900/30 flex flex-col z-50 overflow-hidden"
+              className="fixed bottom-24 right-6 w-96 h-[600px] bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-green-100 dark:border-green-900/30 flex flex-col z-[60] overflow-hidden"
             >
             <div className="p-4 bg-green-600 text-white flex justify-between items-center shadow-lg">
               <div className="flex items-center gap-2">
@@ -879,35 +886,56 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
   isOpen: boolean,
   setIsOpen: (open: boolean) => void
 }) => {
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'elderly', label: 'Idosos', icon: Users, roles: ['ANY'] },
-    { id: 'physio', label: 'Fisioterapia', icon: Activity, roles: ['FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'nursing', label: 'Enfermagem', icon: Stethoscope, roles: ['ENFERMEIRA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'psychology', label: 'Psicologia', icon: Brain, roles: ['PSICOLOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'professionals', label: 'Cadastro de Profissionais', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'schedule', label: 'Cronograma', icon: Calendar, roles: ['ANY'] },
-    { id: 'volunteers', label: 'Voluntários/Estagiários', icon: BookOpen, roles: ['ANY'] },
-    { id: 'family', label: 'Acompanhamento Familiar', icon: Users, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'donors', label: 'Doadores e Sócios', icon: Heart, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'diaperDonations', label: 'Doação de Fraldas', icon: Gift, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PRESIDENTE', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'diaperFactory', label: 'Fábrica de Fraldas', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
-    { id: 'monitoring', label: 'Monitoramento e Avaliação', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'gallery', label: 'Galeria de Fotos', icon: ImageIcon, roles: ['ANY'] },
-    { id: 'reports', label: 'Relatórios Mensais', icon: FileText, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-    { id: 'settings', label: 'Configurações', icon: Settings, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+  const menuGroups = [
+    {
+      title: 'Geral',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'elderly', label: 'Idosos', icon: Users, roles: ['ANY'] },
+        { id: 'schedule', label: 'Cronograma', icon: Calendar, roles: ['ANY'] },
+        { id: 'gallery', label: 'Galeria de Fotos', icon: ImageIcon, roles: ['ANY'] },
+      ]
+    },
+    {
+      title: 'Assitência Técnica',
+      items: [
+        { id: 'physio', label: 'Fisioterapia', icon: Activity, roles: ['FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'nursing', label: 'Enfermagem', icon: Stethoscope, roles: ['ENFERMEIRA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'psychology', label: 'Psicologia', icon: Brain, roles: ['PSICOLOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+      ]
+    },
+    {
+      title: 'Administrativo',
+      items: [
+        { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'professionals', label: 'Cadastro de Profissionais', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'volunteers', label: 'Voluntários/Estagiários', icon: BookOpen, roles: ['ANY'] },
+        { id: 'family', label: 'Acompanhamento Familiar', icon: Users, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'donors', label: 'Doadores e Sócios', icon: Heart, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+      ]
+    },
+    {
+      title: 'Operacional',
+      items: [
+        { id: 'diaperDonations', label: 'Doação de Fraldas', icon: Gift, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PRESIDENTE', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
+        { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
+        { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+      ]
+    },
+    {
+      title: 'Sistema',
+      items: [
+        { id: 'settings', label: 'Configurações', icon: Settings, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+      ]
+    }
   ];
-
-  const filteredItems = menuItems.filter(item => 
-    item.roles.includes('ANY') || item.roles.includes(user.role)
-  );
 
   const handleTabChange = (id: string) => {
     setActiveTab(id);
@@ -933,82 +961,100 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       <motion.div 
         initial={false}
         animate={{ 
-          x: isOpen ? 0 : (window.innerWidth < 1024 ? -256 : 0),
-          width: window.innerWidth < 1024 ? 256 : 256
+          x: isOpen ? 0 : (window.innerWidth < 1024 ? -280 : 0),
+          width: 280
         }}
         className={cn(
-          "fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-900 border-r border-green-100 dark:border-gray-800 flex flex-col z-50 transition-colors duration-300 overflow-hidden",
+          "fixed lg:sticky top-0 left-0 h-screen bg-white dark:bg-gray-900 border-r border-green-100 dark:border-gray-800 flex flex-col z-50 transition-colors duration-300 overflow-hidden shadow-2xl lg:shadow-none",
           !isOpen && "pointer-events-none lg:pointer-events-auto"
         )}
       >
-        <div className="p-6 border-b border-green-50 dark:border-gray-800 flex justify-between items-center">
+        <div className="p-6 border-b border-green-50 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-lg flex items-center justify-center shadow-sm p-1 border border-green-100 dark:border-gray-700">
+            <div className="w-10 h-10 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-sm p-1.5 border border-green-100 dark:border-gray-700">
               <Logo />
             </div>
             <div>
-              <h2 className="font-bold text-green-800 dark:text-green-400 leading-tight">OAMI</h2>
-              <p className="text-xs text-green-600 dark:text-green-500">Vitória do Mearim</p>
+              <h2 className="font-black text-green-800 dark:text-green-400 leading-tight tracking-tight">OAMI</h2>
+              <p className="text-[10px] font-bold text-green-600 dark:text-green-500 uppercase tracking-widest leading-none mt-0.5">Vitória do Mearim</p>
             </div>
           </div>
-          <button onClick={() => setIsOpen(false)} className="lg:hidden p-2 text-gray-400 hover:text-green-600 transition-colors">
+          <button onClick={() => setIsOpen(false)} className="lg:hidden p-2 text-gray-400 hover:text-green-600 transition-colors rounded-xl hover:bg-green-50 dark:hover:bg-green-900/20">
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-6 border-b border-green-50 dark:border-gray-800">
+        <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
+          {menuGroups.map((group, groupIdx) => {
+            const filteredItems = group.items.filter(item => 
+              item.roles.includes('ANY') || item.roles.includes(user.role)
+            );
+
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={groupIdx} className="space-y-3">
+                <h3 className="px-4 text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+                  {group.title}
+                </h3>
+                <div className="space-y-1">
+                  {filteredItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleTabChange(item.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all group",
+                        activeTab === item.id 
+                          ? "bg-green-600 text-white shadow-xl shadow-green-200 dark:shadow-none translate-x-1" 
+                          : "text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400"
+                      )}
+                    >
+                      <item.icon size={18} className={cn(
+                        "transition-transform group-hover:scale-110",
+                        activeTab === item.id ? "text-white" : "text-gray-400 group-hover:text-green-600"
+                      )} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="p-4 border-t border-green-50 dark:border-gray-800 space-y-2 bg-white dark:bg-gray-900">
           <button 
             onClick={() => {
               onOpenProfile();
               if (window.innerWidth < 1024) setIsOpen(false);
             }}
-            className="w-full bg-green-50 dark:bg-green-900/20 p-3 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors text-left group"
+            className="w-full bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl hover:bg-green-50 dark:hover:bg-green-900/20 transition-all border border-transparent hover:border-green-100 dark:hover:border-green-900/30 group"
           >
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg overflow-hidden bg-green-200 dark:bg-green-800 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-green-200 dark:bg-green-800 flex-shrink-0 shadow-sm border-2 border-white dark:border-gray-700">
                 {user.photoUrl ? (
                   <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-green-700 dark:text-green-400 font-bold text-xs">
+                  <div className="w-full h-full flex items-center justify-center text-green-700 dark:text-green-400 font-black text-sm">
                     {user.name.charAt(0)}
                   </div>
                 )}
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-green-800 dark:text-green-300 truncate group-hover:text-green-900 dark:group-hover:text-green-200">{user.name}</p>
-                <p className="text-[10px] text-green-600 dark:text-green-500 uppercase tracking-wider truncate">{ROLE_LABELS[user.role]}</p>
+              <div className="min-w-0 text-left">
+                <p className="text-xs font-black text-gray-900 dark:text-white truncate group-hover:text-green-600 transition-colors uppercase tracking-tight">{user.name}</p>
+                <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{ROLE_LABELS[user.role]}</p>
               </div>
             </div>
           </button>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          {filteredItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleTabChange(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
-                activeTab === item.id 
-                  ? "bg-green-600 text-white shadow-md shadow-green-200 dark:shadow-none" 
-                  : "text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-700 dark:hover:text-green-400"
-              )}
-            >
-              <item.icon size={18} />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-green-50 dark:border-gray-800">
+          
           <button 
             onClick={() => {
               onLogout();
               if (window.innerWidth < 1024) setIsOpen(false);
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all group"
           >
-            <LogOut size={18} />
+            <LogOut size={16} className="transition-transform group-hover:-translate-x-1" />
             Sair do Sistema
           </button>
         </div>
@@ -1134,7 +1180,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Nome Completo</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.name || ''}
@@ -1144,7 +1189,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Cargo/Função</label>
                     <select 
-                      required
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.role || ''}
                       onChange={(e) => setFormData({...formData, role: e.target.value as Role})}
@@ -1157,7 +1201,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Número de Registro (COREN, CRM, etc.)</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.registrationNumber || ''}
@@ -1167,7 +1210,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Telefone</label>
                     <input 
-                      required
                       type="tel"
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.phone || ''}
@@ -1177,7 +1219,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">E-mail</label>
                     <input 
-                      required
                       type="email"
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.email || ''}
@@ -1187,7 +1228,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Data de Admissão</label>
                     <input 
-                      required
                       type="date"
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.admissionDate || ''}
@@ -1198,7 +1238,6 @@ const ProfessionalsSection = ({ professionals, showToast, showConfirm }: {
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Endereço Completo</label>
                   <textarea 
-                    required
                     className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white h-24 resize-none"
                     value={formData.address || ''}
                     onChange={(e) => setFormData({...formData, address: e.target.value})}
@@ -1246,7 +1285,9 @@ const DashboardSection = ({
   vitalSigns,
   workshops,
   socialFamilyVisits,
-  onNavigate
+  onNavigate,
+  diaperRawProductions,
+  diaperFinalPackings
 }: { 
   elderly: Elderly[], 
   communityElderly: CommunityElderly[],
@@ -1266,7 +1307,9 @@ const DashboardSection = ({
   vitalSigns: VitalSigns[],
   workshops: Workshop[],
   socialFamilyVisits: SocialFamilyVisit[],
-  onNavigate: (tab: string) => void
+  onNavigate: (tab: string) => void,
+  diaperRawProductions: DiaperRawProduction[],
+  diaperFinalPackings: DiaperFinalPacking[]
 }) => {
   // Aggregate all evolutions
   const allEvolutions = useMemo(() => {
@@ -1342,7 +1385,20 @@ const DashboardSection = ({
     const evolutionsPrevMonth = (allEvolutions || []).filter(e => e.date && e.date >= format(twoMonthsAgo, 'yyyy-MM-dd') && e.date < format(lastMonth, 'yyyy-MM-dd')).length;
     const evolutionsGrowth = evolutionsPrevMonth === 0 ? 0 : Math.round(((evolutionsThisMonth - evolutionsPrevMonth) / evolutionsPrevMonth) * 100);
 
+    const diaperThisMonth = (diaperFinalPackings || []).filter(p => p.date >= format(startOfMonth(now), 'yyyy-MM-dd')).reduce((acc, p) => acc + p.quantityPackaged, 0);
+    const diaperPrevMonth = (diaperFinalPackings || []).filter(p => p.date >= format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd') && p.date < format(startOfMonth(now), 'yyyy-MM-dd')).reduce((acc, p) => acc + p.quantityPackaged, 0);
+    const diaperGrowth = diaperPrevMonth === 0 ? 0 : Math.round(((diaperThisMonth - diaperPrevMonth) / diaperPrevMonth) * 100);
+
     return [
+      { 
+        label: 'Produção (Mês)', 
+        value: diaperThisMonth.toLocaleString('pt-BR'), 
+        growth: diaperGrowth >= 0 ? `+${diaperGrowth}%` : `${diaperGrowth}%`,
+        icon: Package, 
+        color: 'text-amber-600', 
+        bg: 'bg-amber-50', 
+        tab: 'diaperProduction' 
+      },
       { 
         label: 'Evoluções (30d)', 
         value: evolutionsThisMonth.toString(), 
@@ -1360,15 +1416,6 @@ const DashboardSection = ({
         color: 'text-emerald-600', 
         bg: 'bg-emerald-50', 
         tab: 'workshops' 
-      },
-      { 
-        label: 'Visitas Domic.', 
-        value: (socialFamilyVisits || []).length.toString(), 
-        growth: (socialFamilyVisits || []).length > 0 ? '+2%' : '0%',
-        icon: Home, 
-        color: 'text-amber-600', 
-        bg: 'bg-amber-50', 
-        tab: 'socialWork' 
       },
       { 
         label: 'Alertas Saúde', 
@@ -1411,7 +1458,7 @@ const DashboardSection = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
           <motion.button 
-            key={i}
+            key={stat.label}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onNavigate(stat.tab)}
@@ -1638,10 +1685,37 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
         data,
         fileName: 'lista_acolhidos'
       });
-      showToast('Lista de acolhidos exportada com sucesso!');
+      showToast('Lista de acolhidos exportada com sucesso (PDF)!');
     } catch (err) {
       console.error("Export Error:", err);
       showToast('Erro ao exportar lista de acolhidos', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const generateElderlyListWord = async () => {
+    setExporting(true);
+    try {
+      const columns = ['Nome', 'CPF', 'Data Nasc.', 'Status'];
+      const data = (elderly || []).map(e => [
+        e.name || 'N/A',
+        e.cpf || 'N/A',
+        e.birthDate ? format(parseISO(e.birthDate), 'dd/MM/yyyy') : 'N/A',
+        e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
+      ]);
+
+      await generateModernWord({
+        title: 'Lista de Acolhidos',
+        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+        columns,
+        data,
+        fileName: 'lista_acolhidos'
+      });
+      showToast('Lista de acolhidos exportada com sucesso (Word)!');
+    } catch (err) {
+      console.error("Export Error:", err);
+      showToast('Erro ao exportar lista de acolhidos (Word)', 'error');
     } finally {
       setExporting(false);
     }
@@ -1654,6 +1728,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
     birthCertificate: '',
     lastProfession: '',
     birthDate: '',
+    photoUrl: '',
     entryDate: new Date().toISOString().split('T')[0],
     status: 'ATIVO' as const
   });
@@ -1685,6 +1760,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
         birthCertificate: '',
         lastProfession: '',
         birthDate: '',
+        photoUrl: '',
         entryDate: new Date().toISOString().split('T')[0],
         status: 'ATIVO'
       });
@@ -1715,10 +1791,23 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
       birthCertificate: e.birthCertificate || '',
       lastProfession: e.lastProfession || '',
       birthDate: e.birthDate,
+      photoUrl: e.photoUrl || '',
       entryDate: e.entryDate,
       status: e.status
     });
     setIsEditModalOpen(true);
+    setSelectedElderly(null);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const filtered = elderly.filter(e => e.name?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -1750,7 +1839,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
@@ -1769,11 +1858,39 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
               </div>
 
               <form onSubmit={handleAddElderly} className="space-y-6">
+                <div className="flex flex-col items-center mb-6">
+                  <div className="relative group">
+                    <div className="w-32 h-32 bg-gray-100 dark:bg-gray-800 rounded-3xl overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center transition-all group-hover:border-green-500">
+                      {formData.photoUrl ? (
+                        <img src={formData.photoUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="flex flex-col items-center text-gray-400 dark:text-gray-500">
+                          <Camera size={32} />
+                          <span className="text-[10px] font-bold mt-2 uppercase tracking-widest">Foto</span>
+                        </div>
+                      )}
+                    </div>
+                    <label className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-3xl">
+                      <Upload className="text-white" size={24} />
+                      <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                    </label>
+                    {formData.photoUrl && (
+                      <button 
+                        type="button"
+                        onClick={() => setFormData({...formData, photoUrl: ''})}
+                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-600 font-bold mt-3 uppercase tracking-tighter">Clique para enviar foto ou arrastar</p>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Nome Curto (Apelido)</label>
                     <input 
-                      required
                       type="text" 
                       placeholder="Ex: Dona Maria"
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
@@ -1814,7 +1931,6 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Data de Nascimento</label>
                     <input 
-                      required
                       type="date" 
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.birthDate}
@@ -1824,7 +1940,6 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Data de Entrada</label>
                     <input 
-                      required
                       type="date" 
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.entryDate}
@@ -1902,11 +2017,20 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
             <button 
               onClick={generateElderlyListPDF}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50" 
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all disabled:opacity-50" 
               title="Exportar Lista em PDF"
             >
               <FileDown size={18} />
               PDF
+            </button>
+            <button 
+              onClick={generateElderlyListWord}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-100 dark:hover:bg-green-900/30 transition-all disabled:opacity-50" 
+              title="Exportar Lista em Word"
+            >
+              <FileText size={18} />
+              Word
             </button>
           </div>
         </div>
@@ -1921,8 +2045,12 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
             className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all cursor-pointer group"
           >
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-600 dark:text-green-400 font-bold text-xl group-hover:bg-green-600 group-hover:text-white transition-colors">
-                {elderly.name.charAt(0)}
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400 font-bold text-xl group-hover:bg-green-600 group-hover:text-white transition-all overflow-hidden shadow-sm">
+                {elderly.photoUrl ? (
+                  <img src={elderly.photoUrl} alt={elderly.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  elderly.name.charAt(0)
+                )}
               </div>
               <div>
                 <h4 className="font-bold text-gray-800 dark:text-white">{elderly.name}</h4>
@@ -1942,7 +2070,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
             onClick={() => setSelectedElderly(null)}
           >
             <motion.div 
@@ -1955,8 +2083,12 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
               <div className="p-8">
                 <div className="flex justify-between items-start mb-8">
                   <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 bg-green-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                      {selectedElderly.name.charAt(0)}
+                    <div className="w-24 h-24 bg-green-600 rounded-3xl flex items-center justify-center text-white text-3xl font-bold shadow-lg overflow-hidden">
+                      {selectedElderly.photoUrl ? (
+                        <img src={selectedElderly.photoUrl} alt={selectedElderly.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        selectedElderly.name.charAt(0)
+                      )}
                     </div>
                     <div>
                       <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{selectedElderly.fullName || selectedElderly.name}</h2>
@@ -2220,39 +2352,36 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
           fileName: `PIA_${selectedElderly.name.replace(/\s+/g, '_')}`
         });
       } else {
-        const content = `
-          <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-          <head><meta charset='utf-8'><title>PIA - OAMI</title></head>
-          <body>
-            <h1 style="color: #16a34a; text-align: center;">Plano Individual de Atendimento (PIA)</h1>
-            <p><b>Idoso:</b> ${selectedElderly.name}</p>
-            <p><b>Data:</b> ${new Date(formData.date).toLocaleDateString('pt-BR')}</p>
-            <p><b>Responsável:</b> ${formData.responsible}</p>
-            <hr/>
-            <h2>Situação Socioeconômica</h2>
-            <p><b>Renda Mensal:</b> R$ ${formData.monthlyIncome}</p>
-            <p><b>Possui BPC:</b> ${formData.hasBPC ? 'Sim' : 'Não'}</p>
-            <p><b>Possui Aposentadoria:</b> ${formData.hasPension ? 'Sim' : 'Não'}</p>
-            <p><b>Empréstimos:</b> ${formData.hasLoans ? 'Sim (' + formData.loanDetails + ')' : 'Não'}</p>
-            <hr/>
-            <h2>Saúde e Mobilidade</h2>
-            <p><b>Estado de Saúde:</b> ${formData.healthStatus}</p>
-            <p><b>Medicações:</b> ${formData.medications}</p>
-            <p><b>Mobilidade:</b> ${formData.mobilityStatus}</p>
-            <hr/>
-            <h2>Planejamento</h2>
-            <p><b>Objetivos:</b> ${formData.objectives}</p>
-            <p><b>Ações:</b> ${formData.actions}</p>
-            <p><b>Observações:</b> ${formData.observations}</p>
-          </body>
-          </html>
-        `;
-        const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `PIA_${selectedElderly.name.replace(/\s+/g, '_')}.doc`;
-        link.click();
+        const columns = ['Campo', 'Informação'];
+        const data = [
+          ['Idoso', selectedElderly.name],
+          ['Data', format(parseISO(formData.date), 'dd/MM/yyyy')],
+          ['Responsável', formData.responsible],
+          ['', ''], // Spacer
+          ['SITUAÇÃO SOCIOECONÔMICA', ''],
+          ['Renda Mensal', `R$ ${formData.monthlyIncome}`],
+          ['Possui BPC', formData.hasBPC ? 'Sim' : 'Não'],
+          ['Possui Aposentadoria', formData.hasPension ? 'Sim' : 'Não'],
+          ['Empréstimos', formData.hasLoans ? 'Sim (' + formData.loanDetails + ')' : 'Não'],
+          ['', ''], // Spacer
+          ['SAÚDE E MOBILIDADE', ''],
+          ['Estado de Saúde', formData.healthStatus],
+          ['Medicações', formData.medications],
+          ['Mobilidade', formData.mobilityStatus],
+          ['', ''], // Spacer
+          ['PLANEJAMENTO', ''],
+          ['Objetivos', formData.objectives],
+          ['Ações', formData.actions],
+          ['Observações', formData.observations]
+        ];
+
+        await generateModernWord({
+          title: 'Plano Individual de Atendimento (PIA)',
+          subtitle: `Acolhido: ${selectedElderly.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+          columns,
+          data,
+          fileName: `PIA_${selectedElderly.name.replace(/\s+/g, '_')}`
+        });
       }
       showToast(`PIA exportado com sucesso em ${fileFormat.toUpperCase()}!`);
     } catch (err) {
@@ -2325,7 +2454,6 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
           <div className="space-y-4">
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Idoso Selecionado</label>
             <select 
-              required
               className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
               value={formData.elderlyId}
               onChange={e => setFormData({...formData, elderlyId: e.target.value})}
@@ -2337,7 +2465,6 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
           <div className="space-y-4">
             <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">Data do Plano</label>
             <input 
-              required
               type="date" 
               className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
               value={formData.date}
@@ -2624,10 +2751,36 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
         data,
         fileName: `relatorio_${user.role.toLowerCase()}`
       });
-      showToast('Relatório profissional exportado com sucesso!');
+      showToast('Relatório profissional exportado com sucesso (PDF)!');
     } catch (err) {
       console.error("Export Error:", err);
       showToast('Erro ao exportar relatório profissional', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const generateProfessionalReportWord = async () => {
+    setExporting(true);
+    try {
+      const columns = ['Data', 'Acolhido', 'Evolução'];
+      const data = filteredEvolutions.map(ev => [
+        format(parseISO(ev.date), 'dd/MM/yyyy'),
+        elderly.find(e => e.id === ev.elderlyId)?.name || 'N/A',
+        ev.content
+      ]);
+
+      await generateModernWord({
+        title: `Relatório Mensal - ${ROLE_LABELS[user.role]}`,
+        subtitle: `Profissional: ${user.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: `relatorio_${user.role.toLowerCase()}`
+      });
+      showToast('Relatório profissional exportado com sucesso (Word)!');
+    } catch (err) {
+      console.error("Export Error:", err);
+      showToast('Erro ao exportar relatório profissional (Word)', 'error');
     } finally {
       setExporting(false);
     }
@@ -2669,10 +2822,20 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
             <button 
               onClick={generateProfessionalReportPDF}
               disabled={exporting}
-              className="p-3 bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 rounded-xl transition-all disabled:opacity-50" 
-              title="Exportar Relatório Mensal"
+              className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2" 
+              title="Exportar Relatório Mensal (PDF)"
             >
               <FileDown size={20} />
+              <span className="text-xs font-bold">PDF</span>
+            </button>
+            <button 
+              onClick={generateProfessionalReportWord}
+              disabled={exporting}
+              className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2" 
+              title="Exportar Relatório Mensal (Word)"
+            >
+              <FileText size={20} />
+              <span className="text-xs font-bold">Word</span>
             </button>
           </div>
         </div>
@@ -2972,64 +3135,28 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
     return { receitas, despesas, saldo: receitas - despesas };
   }, [records]);
 
-  const generateFinancialDoc = async (fileFormat: 'pdf' | 'doc') => {
+  const generateFinancialDoc = async (fileFormat: 'pdf' | 'doc' | 'xls') => {
     setExporting(true);
     try {
-      if (fileFormat === 'pdf') {
-        const columns = ['Mês', 'Receitas', 'Despesas', 'Saldo'];
-        const data = chartData.map(d => [
-          d.month,
-          `R$ ${d.receitas}`,
-          `R$ ${d.despesas}`,
-          `R$ ${d.receitas - d.despesas}`
-        ]);
+      const columns = ['Mês', 'Receitas', 'Despesas', 'Saldo'];
+      const data = chartData.map(d => [
+        d.month,
+        `R$ ${d.receitas}`,
+        `R$ ${d.despesas}`,
+        `R$ ${d.receitas - d.despesas}`
+      ]);
+      const title = 'Relatório Financeiro';
+      const subtitle = `Resumo do Fluxo de Caixa (Últimos 6 Meses) - Gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+      const fileName = 'relatorio_financeiro';
 
-        generateModernPDF({
-          title: 'Relatório Financeiro',
-          subtitle: `Resumo do Fluxo de Caixa (Últimos 6 Meses) - Gerado em ${new Date().toLocaleDateString('pt-BR')}`,
-          columns,
-          data,
-          fileName: 'relatorio_financeiro'
-        });
-      } else {
-        const content = `
-          <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-          <head><meta charset='utf-8'><title>Relatório Financeiro - OAMI</title></head>
-          <body>
-            <h1 style="color: #16a34a; text-align: center;">Relatório Financeiro OAMI</h1>
-            <hr/>
-            <h2>Resumo do Fluxo de Caixa (Últimos 6 Meses)</h2>
-            <table border="1" style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr style="background-color: #f3f4f6;">
-                  <th>Mês</th>
-                  <th>Receitas</th>
-                  <th>Despesas</th>
-                  <th>Saldo</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${chartData.map(data => `
-                  <tr>
-                    <td style="padding: 8px;">${data.month}</td>
-                    <td style="padding: 8px;">R$ ${data.receitas}</td>
-                    <td style="padding: 8px;">R$ ${data.despesas}</td>
-                    <td style="padding: 8px;">R$ ${data.receitas - data.despesas}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </body>
-          </html>
-        `;
-        const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'Relatorio_Financeiro_OAMI.doc';
-        link.click();
+      if (fileFormat === 'pdf') {
+        generateModernPDF({ title, subtitle, columns, data, fileName });
+      } else if (fileFormat === 'doc') {
+        await generateModernWord({ title, subtitle, columns, data, fileName });
+      } else if (fileFormat === 'xls') {
+        generateModernExcel({ title, columns, data, fileName });
       }
-      showToast(`Relatório financeiro exportado em ${fileFormat.toUpperCase()}!`);
+      showToast(`Relatório financeiro exportado em ${fileFormat.toUpperCase().replace('XLS', 'EXCEL')}!`);
     } catch (err) {
       console.error("Export Error:", err);
       showToast('Erro ao exportar relatório financeiro', 'error');
@@ -3050,18 +3177,26 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
             <button 
               onClick={() => generateFinancialDoc('pdf')}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold hover:bg-red-100 transition-all disabled:opacity-50"
+              title="Exportar PDF"
             >
-              <FileDown size={18} />
-              Relatório PDF
+              <FileText size={18} />
             </button>
             <button 
               onClick={() => generateFinancialDoc('doc')}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 p-3 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold hover:bg-blue-100 transition-all disabled:opacity-50"
+              title="Exportar Word"
             >
               <FileDown size={18} />
-              Relatório DOC
+            </button>
+            <button 
+              onClick={() => generateFinancialDoc('xls')}
+              disabled={exporting}
+              className="flex items-center gap-2 p-3 bg-green-50 text-green-600 rounded-xl text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50"
+              title="Exportar Excel"
+            >
+              <TableIcon size={18} />
             </button>
           </div>
         </div>
@@ -3108,7 +3243,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
               >
                 <motion.div 
                   initial={{ scale: 0.9, opacity: 0 }}
@@ -3160,7 +3295,6 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Data</label>
                       <input 
-                        required
                         type="date" 
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                         value={formData.date}
@@ -3171,7 +3305,6 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Descrição</label>
                       <input 
-                        required
                         type="text" 
                         placeholder="Ex: Doação Mensal"
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
@@ -3183,7 +3316,6 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Categoria</label>
                       <input 
-                        required
                         type="text" 
                         placeholder="Ex: Doação, Saúde, Manutenção"
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
@@ -3195,7 +3327,6 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Valor (R$)</label>
                       <input 
-                        required
                         type="number" 
                         step="0.01"
                         placeholder="0,00"
@@ -3347,6 +3478,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
 const DonorsSection = ({ donors }: { donors: Donor[] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -3356,6 +3488,56 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
     status: 'ATIVO' as 'ATIVO' | 'INATIVO',
     startDate: new Date().toISOString().split('T')[0]
   });
+
+  const handleExportPDF = () => {
+    setExporting(true);
+    try {
+      const columns = ['Nome', 'Tipo', 'E-mail', 'Telefone', 'Valor Mensal', 'Status'];
+      const data = donors.map(d => [
+        d.name,
+        d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador',
+        d.email,
+        d.phone,
+        d.amount ? `R$ ${d.amount}` : '-',
+        d.status
+      ]);
+
+      generateModernPDF({
+        title: 'Lista de Doadores e Sócios',
+        subtitle: `Total de registros: ${donors.length} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: 'lista_doadores_oami'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportWord = async () => {
+    setExporting(true);
+    try {
+      const columns = ['Nome', 'Tipo', 'E-mail', 'Telefone', 'Valor Mensal', 'Status'];
+      const data = donors.map(d => [
+        d.name,
+        d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador',
+        d.email,
+        d.phone,
+        d.amount ? `R$ ${d.amount}` : '-',
+        d.status
+      ]);
+
+      await generateModernWord({
+        title: 'Lista de Doadores e Sócios',
+        subtitle: `Total de registros: ${donors.length} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: 'lista_doadores_oami'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3388,18 +3570,36 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Cadastro de Doadores e Sócios</h2>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Novo Cadastro
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportPDF}
+            disabled={exporting || donors.length === 0}
+            className="p-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 transition-all disabled:opacity-50"
+            title="Exportar PDF"
+          >
+            <FileDown size={20} />
+          </button>
+          <button 
+            onClick={handleExportWord}
+            disabled={exporting || donors.length === 0}
+            className="p-2.5 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl hover:bg-green-100 transition-all disabled:opacity-50"
+            title="Exportar Word"
+          >
+            <FileText size={20} />
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Plus size={18} />
+            Novo Cadastro
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -3419,7 +3619,6 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
                     <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Nome Completo</label>
                     <input 
                       type="text" 
-                      required
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -3429,7 +3628,6 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
                     <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">E-mail</label>
                     <input 
                       type="email" 
-                      required
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -3439,7 +3637,6 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
                     <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Telefone</label>
                     <input 
                       type="tel" 
-                      required
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -3602,7 +3799,7 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -3632,7 +3829,6 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
                     <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Quantidade (un)</label>
                     <input 
                       type="number" 
-                      required
                       min="1"
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.quantity}
@@ -3860,7 +4056,7 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
             <div className={cn(
               "p-6 text-white flex justify-between items-center",
@@ -3879,7 +4075,6 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Quantidade (unidades)</label>
                 <input
                   type="number"
-                  required
                   min="1"
                   value={quantity || ''}
                   onChange={(e) => setQuantity(parseInt(e.target.value))}
@@ -3924,7 +4119,7 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
       )}
 
       {deletingLog && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
           <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-6">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto">
@@ -4126,7 +4321,58 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleExportPDF = () => {
+    setExporting(true);
+    try {
+      const columns = ['Nome', 'Tipo', 'Início', 'CPF', 'Endereço', 'Atividades'];
+      const data = volunteers.map(v => [
+        v.name,
+        v.type,
+        new Date(v.startDate).toLocaleDateString('pt-BR'),
+        v.cpf || '-',
+        v.address || '-',
+        v.activities
+      ]);
+
+      generateModernPDF({
+        title: 'Lista de Voluntários e Estagiários',
+        subtitle: `Total: ${volunteers.length} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: 'voluntarios_oami'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportWord = async () => {
+    setExporting(true);
+    try {
+      const columns = ['Nome', 'Tipo', 'Início', 'CPF', 'Endereço', 'Atividades'];
+      const data = volunteers.map(v => [
+        v.name,
+        v.type,
+        new Date(v.startDate).toLocaleDateString('pt-BR'),
+        v.cpf || '-',
+        v.address || '-',
+        v.activities
+      ]);
+
+      await generateModernWord({
+        title: 'Lista de Voluntários e Estagiários',
+        subtitle: `Total: ${volunteers.length} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: 'voluntarios_oami'
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
   const [formData, setFormData] = useState<Omit<Volunteer, 'id'>>({
     name: '',
     cpf: '',
@@ -4225,15 +4471,35 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Voluntários e Estagiários</h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Gestão de colaboradores voluntários e acadêmicos</p>
         </div>
-        {canEdit && (
+        <div className="flex gap-3">
           <button 
-            onClick={() => handleOpenModal()}
-            className="bg-green-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl hover:bg-green-700 transition-all transform hover:-translate-y-1 flex items-center gap-2"
+            onClick={handleExportPDF}
+            disabled={exporting || volunteers.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all disabled:opacity-50"
+            title="Exportar PDF"
           >
-            <Plus size={20} />
-            Novo Cadastro
+            <FileDown size={18} />
+            PDF
           </button>
-        )}
+          <button 
+            onClick={handleExportWord}
+            disabled={exporting || volunteers.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-100 dark:hover:bg-green-900/40 transition-all disabled:opacity-50"
+            title="Exportar Word"
+          >
+            <FileText size={18} />
+            Word
+          </button>
+          {canEdit && (
+            <button 
+              onClick={() => handleOpenModal()}
+              className="bg-green-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl hover:bg-green-700 transition-all transform hover:-translate-y-1 flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Novo Cadastro
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -4301,7 +4567,7 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -4322,7 +4588,6 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
                       <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome Completo</label>
                       <input 
                         type="text" 
-                        required
                         disabled={!canEdit}
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
@@ -4334,7 +4599,6 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
                       <label className="text-xs font-bold text-gray-400 uppercase ml-1">CPF</label>
                       <input 
                         type="text" 
-                        required
                         disabled={!canEdit}
                         value={formData.cpf}
                         onChange={e => setFormData({ ...formData, cpf: e.target.value })}
@@ -4347,7 +4611,6 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
                     <label className="text-xs font-bold text-gray-400 uppercase ml-1">Endereço Residencial</label>
                     <input 
                       type="text" 
-                      required
                       disabled={!canEdit}
                       value={formData.address}
                       onChange={e => setFormData({ ...formData, address: e.target.value })}
@@ -4372,7 +4635,6 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
                       <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data de Início</label>
                       <input 
                         type="date" 
-                        required
                         disabled={!canEdit}
                         value={formData.startDate}
                         onChange={e => setFormData({ ...formData, startDate: e.target.value })}
@@ -4383,7 +4645,6 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase ml-1">Atividades / Observações</label>
                     <textarea 
-                      required
                       disabled={!canEdit}
                       value={formData.activities}
                       onChange={e => setFormData({ ...formData, activities: e.target.value })}
@@ -4518,7 +4779,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -4536,7 +4797,6 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
                 <div>
                   <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Idoso Referente</label>
                   <select 
-                    required
                     className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                     value={formData.elderlyId}
                     onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
@@ -4574,7 +4834,6 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
                 <div>
                   <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Resumo do Contato</label>
                   <textarea 
-                    required
                     className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 h-32 text-gray-800 dark:text-white"
                     placeholder="Descreva como foi o contato..."
                     value={formData.summary}
@@ -4782,8 +5041,8 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
                 {holiday && <div className="w-2 h-2 bg-red-400 rounded-full" title={holiday.title} />}
               </div>
               <div className="mt-1 space-y-1">
-                {dayEvents.slice(0, 2).map((ev, idx) => (
-                  <div key={idx} className="text-[9px] p-1 bg-green-100 text-green-800 rounded truncate font-medium">
+                {dayEvents.slice(0, 2).map((ev) => (
+                  <div key={ev.id} className="text-[9px] p-1 bg-green-100 text-green-800 rounded truncate font-medium">
                     {ev.title}
                   </div>
                 ))}
@@ -4962,7 +5221,7 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -4981,7 +5240,6 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
                   <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Título do Evento</label>
                   <input 
                     type="text" 
-                    required
                     className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -5301,12 +5559,12 @@ const ReportsSection = ({
 
   const unifiedEvolutions = useMemo(() => {
     const all: any[] = [
-      ...evolutions.map(e => ({ ...e, professionalRole: e.professionalRole, source: 'Geral' })),
-      ...socialEvolutions.map(e => ({ ...e, date: e.date, professionalRole: 'ASSISTENTE_SOCIAL', source: 'Social' })),
-      ...psychEvolutions.map(e => ({ ...e, date: e.date, professionalRole: 'PSICOLOGA', source: 'Psicologia' })),
-      ...pedagogyEvolutions.map(e => ({ ...e, date: e.date, professionalRole: 'PEDAGOGA', source: 'Pedagogia' })),
-      ...physioEvolutions.map(e => ({ ...e, date: e.date, professionalRole: 'FISIOTERAPEUTA', source: 'Fisioterapia' })),
-      ...nursingEvolutions.map(e => ({ ...e, date: e.date, professionalRole: 'ENFERMEIRA', source: 'Enfermagem' })),
+      ...evolutions.map(e => ({ ...e, id: `gen-${e.id}`, professionalRole: e.professionalRole, source: 'Geral' })),
+      ...socialEvolutions.map(e => ({ ...e, id: `soc-${e.id}`, date: e.date, professionalRole: 'ASSISTENTE_SOCIAL', source: 'Social' })),
+      ...psychEvolutions.map(e => ({ ...e, id: `psy-${e.id}`, date: e.date, professionalRole: 'PSICOLOGA', source: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, id: `ped-${e.id}`, date: e.date, professionalRole: 'PEDAGOGA', source: 'Pedagogia' })),
+      ...physioEvolutions.map(e => ({ ...e, id: `phy-${e.id}`, date: e.date, professionalRole: 'FISIOTERAPEUTA', source: 'Fisioterapia' })),
+      ...nursingEvolutions.map(e => ({ ...e, id: `nur-${e.id}`, date: e.date, professionalRole: 'ENFERMEIRA', source: 'Enfermagem' })),
     ];
     return all;
   }, [evolutions, socialEvolutions, psychEvolutions, pedagogyEvolutions, physioEvolutions, nursingEvolutions]);
@@ -5345,6 +5603,45 @@ const ReportsSection = ({
     } catch (error) {
       console.error("PDF Generation Error:", error);
       showToast('Erro ao gerar PDF', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const generateWord = async () => {
+    setGenerating(true);
+    try {
+      const monthDate = parseISO(`${selectedMonth}-01`);
+      const monthLabel = format(monthDate, 'MMMM yyyy', { locale: ptBR });
+      const monthEvolutions = unifiedEvolutions.filter(ev => ev.date.startsWith(selectedMonth));
+      const monthPIAs = pias.filter(p => p.date.startsWith(selectedMonth));
+      const roles = [...new Set(monthEvolutions.map(e => e.professionalRole))];
+
+      const columns = ['Categoria', 'Informação'];
+      const data = [
+        ['RESUMO DAS AÇÕES', ''],
+        ['Total de Idosos Atendidos', elderly.filter(e => e.status === 'ATIVO').length.toString()],
+        ['Evoluções Registradas no Mês', monthEvolutions.length.toString()],
+        ['Novos PIAs/Revisões', monthPIAs.length.toString()],
+        ['', ''],
+        ['ATENDIMENTOS POR ÁREA', ''],
+        ...roles.map(role => [
+          ROLE_LABELS[role as Role] || role,
+          `${monthEvolutions.filter(e => e.professionalRole === role).length} atendimentos`
+        ])
+      ];
+
+      await generateModernWord({
+        title: 'Relatório Mensal OAMI',
+        subtitle: `Período: ${monthLabel} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: `relatorio_mensal_${selectedMonth}`
+      });
+      showToast('Relatório Word gerado com sucesso!');
+    } catch (error) {
+      console.error("Word Generation Error:", error);
+      showToast('Erro ao gerar Word', 'error');
     } finally {
       setGenerating(false);
     }
@@ -5408,12 +5705,12 @@ const ReportsSection = ({
               onChange={(e) => setSelectedMonth(e.target.value)}
             />
             <button 
-              onClick={generatePDF}
+              onClick={generateWord}
               disabled={generating}
               className="flex-1 md:flex-none bg-green-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {generating ? <Activity className="animate-spin" size={18} /> : <FileDown size={18} />}
-              {generating ? 'Gerando...' : 'Gerar Relatório PDF'}
+              {generating ? <Activity className="animate-spin" size={18} /> : <FileText size={18} />}
+              {generating ? 'Gerando...' : 'Gerar Relatório Word'}
             </button>
           </div>
         </div>
@@ -5447,10 +5744,11 @@ const ReportsSection = ({
                 Relatório PDF
               </button>
               <button 
-                onClick={generateDOC}
-                className="flex-1 py-2 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 transition-colors"
+                onClick={generateWord}
+                disabled={generating}
+                className="flex-1 py-2 bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 text-xs font-bold rounded-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-50 transition-colors disabled:opacity-50"
               >
-                Relatório DOC
+                Relatório Word
               </button>
             </div>
           </div>
@@ -5641,7 +5939,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
       {/* Modal Cadastro Idoso Comunidade */}
       <AnimatePresence>
         {isElderlyModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -5660,7 +5958,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Nome Completo</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                       value={elderlyFormData.name}
@@ -5671,7 +5968,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase">Idade</label>
                       <input 
-                        required
                         type="number"
                         className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                         value={elderlyFormData.age}
@@ -5681,7 +5977,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-400 uppercase">Nascimento</label>
                       <input 
-                        required
                         type="date"
                         className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                         value={elderlyFormData.birthDate}
@@ -5695,7 +5990,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Endereço</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                       value={elderlyFormData.address}
@@ -5705,7 +5999,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Telefone</label>
                     <input 
-                      required
                       type="tel"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                       value={elderlyFormData.phone}
@@ -5746,7 +6039,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Contato de Emergência</label>
                     <input 
-                      required
                       type="text"
                       placeholder="Nome e Telefone"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
@@ -5781,7 +6073,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
       {/* Modal Cadastro Cuidador */}
       <AnimatePresence>
         {isCaregiverModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -5800,7 +6092,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Nome Completo</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
                       value={caregiverFormData.name}
@@ -5810,7 +6101,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Telefone</label>
                     <input 
-                      required
                       type="tel"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
                       value={caregiverFormData.phone}
@@ -5832,7 +6122,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Endereço</label>
                     <input 
-                      required
                       type="text"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-purple-500"
                       value={caregiverFormData.address}
@@ -5876,7 +6165,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
       {/* Modal Agendar Atividade */}
       <AnimatePresence>
         {isWorkshopModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -5894,7 +6183,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-400 uppercase">Título da Atividade</label>
                   <input 
-                    required
                     type="text"
                     className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                     value={workshopFormData.title}
@@ -5906,7 +6194,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Data</label>
                     <input 
-                      required
                       type="date"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                       value={workshopFormData.date}
@@ -5993,12 +6280,12 @@ const MonitoringSection = ({
 
   const unifiedEvolutions = useMemo(() => {
     const all: any[] = [
-      ...evolutions.map(e => ({ ...e, professional: e.professionalRole, source: 'Geral' })),
-      ...socialEvolutions.map(e => ({ ...e, elderlyId: e.patientId, professional: 'ASSISTENTE_SOCIAL', content: e.observation, source: 'Social' })),
-      ...psychEvolutions.map(e => ({ ...e, elderlyId: e.patientId, professional: 'PSICOLOGA', content: e.observation, source: 'Psicologia' })),
-      ...pedagogyEvolutions.map(e => ({ ...e, elderlyId: e.patientId, professional: 'PEDAGOGA', content: e.observations, source: 'Pedagogia' })),
-      ...physioEvolutions.map(e => ({ ...e, elderlyId: e.patientId, professional: 'FISIOTERAPEUTA', content: e.evolution, source: 'Fisioterapia' })),
-      ...nursingEvolutions.map(e => ({ ...e, elderlyId: e.patientId, professional: 'ENFERMEIRA', content: e.content, source: 'Enfermagem' })),
+      ...evolutions.map(e => ({ ...e, id: `gen-${e.id}`, professional: e.professionalRole, source: 'Geral' })),
+      ...socialEvolutions.map(e => ({ ...e, id: `soc-${e.id}`, elderlyId: e.patientId, professional: 'ASSISTENTE_SOCIAL', content: e.observation, source: 'Social' })),
+      ...psychEvolutions.map(e => ({ ...e, id: `psy-${e.id}`, elderlyId: e.patientId, professional: 'PSICOLOGA', content: e.observation, source: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, id: `ped-${e.id}`, elderlyId: e.patientId, professional: 'PEDAGOGA', content: e.observations, source: 'Pedagogia' })),
+      ...physioEvolutions.map(e => ({ ...e, id: `phy-${e.id}`, elderlyId: e.patientId, professional: 'FISIOTERAPEUTA', content: e.evolution, source: 'Fisioterapia' })),
+      ...nursingEvolutions.map(e => ({ ...e, id: `nur-${e.id}`, elderlyId: e.patientId, professional: 'ENFERMEIRA', content: e.content, source: 'Enfermagem' })),
     ];
     return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [evolutions, socialEvolutions, psychEvolutions, pedagogyEvolutions, physioEvolutions, nursingEvolutions]);
@@ -6182,8 +6469,8 @@ const MonitoringSection = ({
             </div>
 
             <div className="space-y-4">
-              {(selectedElderlyId ? elderlyEvolutions : unifiedEvolutions).slice(0, 20).map((ev, i) => (
-                <div key={i} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 flex gap-4">
+              {(selectedElderlyId ? elderlyEvolutions : unifiedEvolutions).slice(0, 20).map((ev) => (
+                <div key={ev.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 flex gap-4">
                   <div className={cn(
                     "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
                     ev.source === 'Social' ? 'bg-blue-100 text-blue-600' :
@@ -6363,8 +6650,8 @@ const NotificationsModal = ({ events, onClose, onViewSchedule }: {
           {upcoming.length > 0 ? (
             <>
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Próximos Eventos</p>
-              {upcoming.map((ev, i) => (
-                <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+              {upcoming.map((ev) => (
+                <div key={ev.id} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                   <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex flex-col items-center justify-center text-green-600 dark:text-green-400">
                     <span className="text-[8px] font-bold uppercase">{format(parseISO(ev.date), 'MMM', { locale: ptBR })}</span>
                     <span className="text-sm font-bold leading-none">{format(parseISO(ev.date), 'dd')}</span>
@@ -6476,7 +6763,7 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -6558,7 +6845,6 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nome Completo</label>
                 <input 
                   type="text" 
-                  required
                   className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -6568,7 +6854,6 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-2">E-mail de Acesso</label>
                 <input 
                   type="email" 
-                  required
                   className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -6906,6 +7191,10 @@ export default function App() {
   const [diaperDonations, setDiaperDonations] = useState<DiaperDonation[]>([]);
   const [diaperStock, setDiaperStock] = useState<DiaperStock | null>(null);
   const [diaperProductionLogs, setDiaperProductionLogs] = useState<DiaperProductionLog[]>([]);
+  const [diaperRawProductions, setDiaperRawProductions] = useState<DiaperRawProduction[]>([]);
+  const [diaperWIPProcessings, setDiaperWIPProcessings] = useState<DiaperWIPProcessing[]>([]);
+  const [diaperFinalPackings, setDiaperFinalPackings] = useState<DiaperFinalPacking[]>([]);
+  const [diaperProductionGoals, setDiaperProductionGoals] = useState<DiaperProductionGoal[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -7189,14 +7478,28 @@ export default function App() {
   useEffect(() => {
     if (!isAuthReady || !user) return;
 
-    // Listen to Elderly
+    // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString();
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+    // Listen to Elderly (Mantém todos pois é a base do sistema)
     const qElderly = query(collection(db, 'elderly'), orderBy('name'));
     const unsubElderly = onSnapshot(qElderly, (snapshot) => {
       setElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Elderly)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'elderly'));
 
-    // Listen to Evolutions
-    const qEvolutions = query(collection(db, 'evolutions'), orderBy('date', 'desc'));
+    // Listen to Evolutions (Limitado a 7 dias para economizar cota)
+    const qEvolutions = query(
+      collection(db, 'evolutions'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(100)
+    );
     const unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
       setEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EvolutionRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'evolutions'));
@@ -7204,7 +7507,7 @@ export default function App() {
     // Listen to Donors
     let unsubDonors = () => {};
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-      const qDonors = query(collection(db, 'donors'), orderBy('name'));
+      const qDonors = query(collection(db, 'donors'), orderBy('name'), limit(200));
       unsubDonors = onSnapshot(qDonors, (snapshot) => {
         setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'donors'));
@@ -7213,14 +7516,19 @@ export default function App() {
     // Listen to Diaper Donations
     let unsubDiaperDonations = () => {};
     if (['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-      const qDiaperDonations = query(collection(db, 'diaperDonations'), orderBy('date', 'desc'));
+      const qDiaperDonations = query(
+        collection(db, 'diaperDonations'), 
+        where('date', '>=', sevenDaysAgoStr),
+        orderBy('date', 'desc'),
+        limit(100)
+      );
       unsubDiaperDonations = onSnapshot(qDiaperDonations, (snapshot) => {
         setDiaperDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperDonation)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperDonations'));
     }
 
     // Listen to Volunteers
-    const qVolunteers = query(collection(db, 'volunteers'), orderBy('name'));
+    const qVolunteers = query(collection(db, 'volunteers'), orderBy('name'), limit(100));
     const unsubVolunteers = onSnapshot(qVolunteers, (snapshot) => {
       setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
@@ -7233,13 +7541,53 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.GET, 'diaperStock/current'));
 
     // Listen to Diaper Production Logs
-    const qProductionLogs = query(collection(db, 'diaperProductionLogs'), orderBy('date', 'desc'));
+    const qProductionLogs = query(
+      collection(db, 'diaperProductionLogs'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(100)
+    );
     const unsubProductionLogs = onSnapshot(qProductionLogs, (snapshot) => {
       setDiaperProductionLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperProductionLog)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperProductionLogs'));
 
+    // Listen to Diaper Raw Productions
+    const unsubRawProd = onSnapshot(query(
+      collection(db, 'diaperRawProductions'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
+      setDiaperRawProductions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperRawProduction)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperRawProductions'));
+
+    // Listen to Diaper WIP Processings
+    const unsubWIP = onSnapshot(query(
+      collection(db, 'diaperWIPProcessings'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
+      setDiaperWIPProcessings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperWIPProcessing)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperWIPProcessings'));
+
+    // Listen to Diaper Final Packings
+    const unsubFinal = onSnapshot(query(
+      collection(db, 'diaperFinalPackings'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
+      setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
+
+    // Listen to Diaper Production Goals
+    const unsubGoals = onSnapshot(collection(db, 'diaperProductionGoals'), (snapshot) => {
+      setDiaperProductionGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperProductionGoal)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperProductionGoals'));
+
     // Listen to Calendar Events
-    const qEvents = query(collection(db, 'calendarEvents'), orderBy('date'));
+    const qEvents = query(collection(db, 'calendarEvents'), orderBy('date'), limit(100));
     const unsubEvents = onSnapshot(qEvents, (snapshot) => {
       setCalendarEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'calendarEvents'));
@@ -7247,14 +7595,18 @@ export default function App() {
     // Listen to Financial Records
     let unsubFinancial = () => {};
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-      const qFinancial = query(collection(db, 'financial'), orderBy('date', 'desc'));
+      const qFinancial = query(
+        collection(db, 'financial'), 
+        where('date', '>=', thirtyDaysAgoStr),
+        orderBy('date', 'desc')
+      );
       unsubFinancial = onSnapshot(qFinancial, (snapshot) => {
         setFinancialRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'financial'));
     }
 
-    // Listen to All Users (for Settings)
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+    // Listen to All Users (Limitado para evitar leitura massiva)
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(50)), (snapshot) => {
       setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'users');
@@ -7262,7 +7614,7 @@ export default function App() {
     });
 
     // Listen to PIAs
-    const unsubPias = onSnapshot(collection(db, 'pias'), (snapshot) => {
+    const unsubPias = onSnapshot(query(collection(db, 'pias'), limit(100)), (snapshot) => {
       setPias(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'pias');
@@ -7270,7 +7622,7 @@ export default function App() {
     });
 
     // Listen to Gallery
-    const qGallery = query(collection(db, 'gallery'), orderBy('date', 'desc'));
+    const qGallery = query(collection(db, 'gallery'), orderBy('date', 'desc'), limit(50));
     const unsubGallery = onSnapshot(qGallery, (snapshot) => {
       const galleryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
       if (!galleryData || galleryData.length === 0) {
@@ -7284,25 +7636,25 @@ export default function App() {
     });
 
     // Listen to Community Elderly
-    const qCommunityElderly = query(collection(db, 'communityElderly'), orderBy('name'));
+    const qCommunityElderly = query(collection(db, 'communityElderly'), orderBy('name'), limit(100));
     const unsubCommunityElderly = onSnapshot(qCommunityElderly, (snapshot) => {
       setCommunityElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'communityElderly'));
 
     // Listen to Workshops
-    const qWorkshops = query(collection(db, 'workshops'), orderBy('date', 'desc'));
+    const qWorkshops = query(collection(db, 'workshops'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50));
     const unsubWorkshops = onSnapshot(qWorkshops, (snapshot) => {
       setWorkshops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Workshop)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'workshops'));
 
     // Listen to Caregivers
-    const qCaregivers = query(collection(db, 'caregivers'), orderBy('name'));
+    const qCaregivers = query(collection(db, 'caregivers'), orderBy('name'), limit(100));
     const unsubCaregivers = onSnapshot(qCaregivers, (snapshot) => {
       setCaregivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregivers'));
 
     // Listen to Family Engagements
-    const qFamilyEngagements = query(collection(db, 'familyEngagements'), orderBy('date', 'desc'));
+    const qFamilyEngagements = query(collection(db, 'familyEngagements'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'));
     const unsubFamilyEngagements = onSnapshot(qFamilyEngagements, (snapshot) => {
       setFamilyEngagements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyEngagement)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'familyEngagements'));
@@ -7315,182 +7667,303 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.GET, 'settings/institutional'));
 
     // Physio Listeners
-    const qPhysioPatients = query(collection(db, 'physioPatients'), orderBy('name'));
+    const qPhysioPatients = query(collection(db, 'physioPatients'), orderBy('name'), limit(100));
     const unsubPhysioPatients = onSnapshot(qPhysioPatients, (snapshot) => {
       setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
 
-    const qPhysioAssessments = query(collection(db, 'physioAssessments'), orderBy('date', 'desc'));
+    const qPhysioAssessments = query(collection(db, 'physioAssessments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'));
     const unsubPhysioAssessments = onSnapshot(qPhysioAssessments, (snapshot) => {
       setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
 
-    const qPhysioEvolutions = query(collection(db, 'physioEvolutions'), orderBy('date', 'desc'));
+    const qPhysioEvolutions = query(collection(db, 'physioEvolutions'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'));
     const unsubPhysioEvolutions = onSnapshot(qPhysioEvolutions, (snapshot) => {
       setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
 
-    const qPhysioExercises = query(collection(db, 'physioExercises'), orderBy('title'));
+    const qPhysioExercises = query(collection(db, 'physioExercises'), orderBy('title'), limit(100));
     const unsubPhysioExercises = onSnapshot(qPhysioExercises, (snapshot) => {
       setPhysioExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioExercise)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioExercises'));
 
-    const qPhysioAppointments = query(collection(db, 'physioAppointments'), orderBy('date', 'desc'));
+    const qPhysioAppointments = query(collection(db, 'physioAppointments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'));
     const unsubPhysioAppointments = onSnapshot(qPhysioAppointments, (snapshot) => {
       setPhysioAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAppointment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
 
     // Nursing Listeners
-    const unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name')), (snapshot) => {
+    const unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
       setNursingPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingPatient)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingPatients'));
 
-    const unsubMedications = onSnapshot(collection(db, 'medications'), (snapshot) => {
+    const unsubMedications = onSnapshot(query(collection(db, 'medications'), limit(200)), (snapshot) => {
       setMedications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Medication)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'medications'));
 
-    const unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubMedicationAdministrations = onSnapshot(query(
+      collection(db, 'medicationAdministrations'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
 
-    const unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubVitalSigns = onSnapshot(query(
+      collection(db, 'vitalSigns'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
 
-    const unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubDressingRecords = onSnapshot(query(
+      collection(db, 'dressingRecords'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
 
-    const unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubNursingEvolutions = onSnapshot(query(
+      collection(db, 'nursingEvolutions'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
 
-    const unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubIncidentRecords = onSnapshot(query(
+      collection(db, 'incidentRecords'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setIncidentRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncidentRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'incidentRecords'));
 
-    const unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubShiftSchedules = onSnapshot(query(
+      collection(db, 'shiftSchedules'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setShiftSchedules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShiftSchedule)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'shiftSchedules'));
 
-    const unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubAvdRecords = onSnapshot(query(
+      collection(db, 'avdRecords'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setAvdRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AVDRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'avdRecords'));
 
-    const unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubDiaperChangeRecords = onSnapshot(query(
+      collection(db, 'diaperChangeRecords'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setDiaperChangeRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperChangeRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperChangeRecords'));
 
-    const unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name')), (snapshot) => {
+    const unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name'), limit(100)), (snapshot) => {
       setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
 
-    const unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychInitialAssessments = onSnapshot(query(
+      collection(db, 'psychInitialAssessments'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
 
-    const unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychEvolutions = onSnapshot(query(
+      collection(db, 'psychEvolutions'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(100)
+    ), (snapshot) => {
       setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
 
-    const unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychAppointments = onSnapshot(query(
+      collection(db, 'psychAppointments'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPsychAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychAppointment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychAppointments'));
 
-    const unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychEmotionalMonitorings = onSnapshot(query(
+      collection(db, 'psychEmotionalMonitorings'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(100)
+    ), (snapshot) => {
       setPsychEmotionalMonitorings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEmotionalMonitoring)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEmotionalMonitorings'));
 
-    const unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychFamilyBonds = onSnapshot(query(
+      collection(db, 'psychFamilyBonds'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPsychFamilyBonds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychFamilyBond)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychFamilyBonds'));
 
-    const unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychActivities = onSnapshot(query(
+      collection(db, 'psychActivities'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPsychActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychActivity)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychActivities'));
 
-    const unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychCognitionAssessments = onSnapshot(query(
+      collection(db, 'psychCognitionAssessments'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPsychCognitionAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychCognitionAssessment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychCognitionAssessments'));
 
-    const unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPsychInterventionPlans = onSnapshot(query(
+      collection(db, 'psychInterventionPlans'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPsychInterventionPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInterventionPlan)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInterventionPlans'));
 
     // Pedagogy listeners
-    const unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name')), (snapshot) => {
+    const unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name'), limit(100)), (snapshot) => {
       setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
 
-    const unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogyInitialAssessments = onSnapshot(query(
+      collection(db, 'pedagogyInitialAssessments'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
 
-    const unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogyEvolutions = onSnapshot(query(
+      collection(db, 'pedagogyEvolutions'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(100)
+    ), (snapshot) => {
       setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
 
-    const unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogyActivities = onSnapshot(query(
+      collection(db, 'pedagogyActivities'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPedagogyActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyActivity)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyActivities'));
 
-    const unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogyStimulationTrackings = onSnapshot(query(
+      collection(db, 'pedagogyStimulationTrackings'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPedagogyStimulationTrackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyStimulationTracking)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyStimulationTrackings'));
 
-    const unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogySocialParticipations = onSnapshot(query(
+      collection(db, 'pedagogySocialParticipations'), 
+      where('date', '>=', sevenDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPedagogySocialParticipations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogySocialParticipation)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogySocialParticipations'));
 
-    const unsubPedagogyIndividualPlans = onSnapshot(query(collection(db, 'pedagogyIndividualPlans'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubPedagogyIndividualPlans = onSnapshot(query(
+      collection(db, 'pedagogyIndividualPlans'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc'),
+      limit(50)
+    ), (snapshot) => {
       setPedagogyIndividualPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyIndividualPlan)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyIndividualPlans'));
 
-    const unsubPedagogyLifeHistories = onSnapshot(collection(db, 'pedagogyLifeHistories'), (snapshot) => {
+    const unsubPedagogyLifeHistories = onSnapshot(query(collection(db, 'pedagogyLifeHistories'), limit(100)), (snapshot) => {
       setPedagogyLifeHistories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyLifeHistory)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyLifeHistories'));
 
     // Social Work Listeners
-    const unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name')), (snapshot) => {
+    const unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name'), limit(100)), (snapshot) => {
       setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
 
-    const unsubSocialFamilyTies = onSnapshot(collection(db, 'socialFamilyTies'), (snapshot) => {
+    const unsubSocialFamilyTies = onSnapshot(query(collection(db, 'socialFamilyTies'), limit(100)), (snapshot) => {
       setSocialFamilyTies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyTie)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyTies'));
 
-    const unsubSocialDocumentations = onSnapshot(collection(db, 'socialDocumentations'), (snapshot) => {
+    const unsubSocialDocumentations = onSnapshot(query(collection(db, 'socialDocumentations'), limit(100)), (snapshot) => {
       setSocialDocumentations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialDocumentation)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialDocumentations'));
 
-    const unsubSocialLegalSituations = onSnapshot(collection(db, 'socialLegalSituations'), (snapshot) => {
+    const unsubSocialLegalSituations = onSnapshot(query(collection(db, 'socialLegalSituations'), limit(100)), (snapshot) => {
       setSocialLegalSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialLegalSituation)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialLegalSituations'));
 
-    const unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubSocialStudies = onSnapshot(query(
+      collection(db, 'socialStudies'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
 
-    const unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubSocialEvolutions = onSnapshot(query(
+      collection(db, 'socialEvolutions'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
 
-    const unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubSocialReferrals = onSnapshot(query(
+      collection(db, 'socialReferrals'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setSocialReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialReferral)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialReferrals'));
 
-    const unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubSocialFamilyVisits = onSnapshot(query(
+      collection(db, 'socialFamilyVisits'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setSocialFamilyVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyVisit)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyVisits'));
 
-    const unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), orderBy('date', 'desc')), (snapshot) => {
+    const unsubSocialRiskSituations = onSnapshot(query(
+      collection(db, 'socialRiskSituations'), 
+      where('date', '>=', thirtyDaysAgoStr),
+      orderBy('date', 'desc')
+    ), (snapshot) => {
       setSocialRiskSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialRiskSituation)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialRiskSituations'));
 
     // Listen to Professionals
     let unsubProfessionals = () => {};
     if (user && (['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com')) {
-      const qProfessionals = query(collection(db, 'professionals'), orderBy('name'));
+      const qProfessionals = query(collection(db, 'professionals'), orderBy('name'), limit(100));
       unsubProfessionals = onSnapshot(qProfessionals, (snapshot) => {
         setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
@@ -7556,8 +8029,12 @@ export default function App() {
       unsubSocialReferrals();
       unsubSocialFamilyVisits();
       unsubSocialRiskSituations();
+      unsubRawProd();
+      unsubWIP();
+      unsubFinal();
+      unsubGoals();
     };
-  }, [isAuthReady, user]);
+  }, [isAuthReady, user?.id, user?.role]); // Use primitive values for stability
 
   const handleGoogleLogin = async () => {
     try {
@@ -7643,42 +8120,66 @@ export default function App() {
     });
   };
 
-  const handleSavePhysioAssessment = async (data: Omit<PhysioAssessment, 'id'>) => {
+  const handleSavePhysioAssessment = async (data: Omit<PhysioAssessment, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'physioAssessments'), data);
-      showToast('Avaliação salva com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'physioAssessments', id), rest);
+        showToast('Avaliação atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'physioAssessments'), data);
+        showToast('Avaliação salva com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'physioAssessments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'physioAssessments');
       showToast('Erro ao salvar avaliação', 'error');
     }
   };
 
-  const handleSavePhysioEvolution = async (data: Omit<PhysioEvolution, 'id'>) => {
+  const handleSavePhysioEvolution = async (data: Omit<PhysioEvolution, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'physioEvolutions'), data);
-      showToast('Evolução registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'physioEvolutions', id), rest);
+        showToast('Evolução atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'physioEvolutions'), data);
+        showToast('Evolução registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'physioEvolutions');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'physioEvolutions');
       showToast('Erro ao registrar evolução', 'error');
     }
   };
 
-  const handleSavePhysioExercise = async (data: Omit<PhysioExercise, 'id'>) => {
+  const handleSavePhysioExercise = async (data: Omit<PhysioExercise, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'physioExercises'), data);
-      showToast('Exercício salvo com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'physioExercises', id), rest);
+        showToast('Exercício atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'physioExercises'), data);
+        showToast('Exercício salvo com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'physioExercises');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'physioExercises');
       showToast('Erro ao salvar exercício', 'error');
     }
   };
 
-  const handleSavePhysioAppointment = async (data: Omit<PhysioAppointment, 'id'>) => {
+  const handleSavePhysioAppointment = async (data: Omit<PhysioAppointment, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'physioAppointments'), data);
-      showToast('Agendamento realizado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'physioAppointments', id), rest);
+        showToast('Agendamento atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'physioAppointments'), data);
+        showToast('Agendamento realizado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'physioAppointments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'physioAppointments');
       showToast('Erro ao realizar agendamento', 'error');
     }
   };
@@ -7937,82 +8438,130 @@ export default function App() {
     }
   };
 
-  const handleSavePsychInitialAssessment = async (data: Omit<PsychInitialAssessment, 'id'>) => {
+  const handleSavePsychInitialAssessment = async (data: Omit<PsychInitialAssessment, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychInitialAssessments'), data);
-      showToast('Avaliação inicial salva com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychInitialAssessments', id), rest);
+        showToast('Avaliação inicial atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychInitialAssessments'), data);
+        showToast('Avaliação inicial salva com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychInitialAssessments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychInitialAssessments');
       showToast('Erro ao salvar avaliação inicial', 'error');
     }
   };
 
-  const handleSavePsychEvolution = async (data: Omit<PsychEvolution, 'id'>) => {
+  const handleSavePsychEvolution = async (data: Omit<PsychEvolution, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychEvolutions'), data);
-      showToast('Evolução registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychEvolutions', id), rest);
+        showToast('Evolução atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychEvolutions'), data);
+        showToast('Evolução registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychEvolutions');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychEvolutions');
       showToast('Erro ao registrar evolução', 'error');
     }
   };
 
-  const handleSavePsychAppointment = async (data: Omit<PsychAppointment, 'id'>) => {
+  const handleSavePsychAppointment = async (data: Omit<PsychAppointment, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychAppointments'), data);
-      showToast('Atendimento registrado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychAppointments', id), rest);
+        showToast('Atendimento atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychAppointments'), data);
+        showToast('Atendimento registrado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychAppointments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychAppointments');
       showToast('Erro ao registrar atendimento', 'error');
     }
   };
 
-  const handleSavePsychEmotionalMonitoring = async (data: Omit<PsychEmotionalMonitoring, 'id'>) => {
+  const handleSavePsychEmotionalMonitoring = async (data: Omit<PsychEmotionalMonitoring, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychEmotionalMonitorings'), data);
-      showToast('Monitoramento emocional registrado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychEmotionalMonitorings', id), rest);
+        showToast('Monitoramento emocional atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychEmotionalMonitorings'), data);
+        showToast('Monitoramento emocional registrado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychEmotionalMonitorings');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychEmotionalMonitorings');
       showToast('Erro ao registrar monitoramento emocional', 'error');
     }
   };
 
-  const handleSavePsychFamilyBond = async (data: Omit<PsychFamilyBond, 'id'>) => {
+  const handleSavePsychFamilyBond = async (data: Omit<PsychFamilyBond, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychFamilyBonds'), data);
-      showToast('Vínculo familiar registrado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychFamilyBonds', id), rest);
+        showToast('Vínculo familiar atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychFamilyBonds'), data);
+        showToast('Vínculo familiar registrado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychFamilyBonds');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychFamilyBonds');
       showToast('Erro ao registrar vínculo familiar', 'error');
     }
   };
 
-  const handleSavePsychActivity = async (data: Omit<PsychActivity, 'id'>) => {
+  const handleSavePsychActivity = async (data: Omit<PsychActivity, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychActivities'), data);
-      showToast('Atividade registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychActivities', id), rest);
+        showToast('Atividade atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychActivities'), data);
+        showToast('Atividade registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychActivities');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychActivities');
       showToast('Erro ao registrar atividade', 'error');
     }
   };
 
-  const handleSavePsychCognitionAssessment = async (data: Omit<PsychCognitionAssessment, 'id'>) => {
+  const handleSavePsychCognitionAssessment = async (data: Omit<PsychCognitionAssessment, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychCognitionAssessments'), data);
-      showToast('Avaliação cognitiva registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychCognitionAssessments', id), rest);
+        showToast('Avaliação cognitiva atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychCognitionAssessments'), data);
+        showToast('Avaliação cognitiva registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychCognitionAssessments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychCognitionAssessments');
       showToast('Erro ao registrar avaliação cognitiva', 'error');
     }
   };
 
-  const handleSavePsychInterventionPlan = async (data: Omit<PsychInterventionPlan, 'id'>) => {
+  const handleSavePsychInterventionPlan = async (data: Omit<PsychInterventionPlan, 'id'> & { id?: string }) => {
     try {
-      await addDoc(collection(db, 'psychInterventionPlans'), data);
-      showToast('Plano de intervenção registrado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'psychInterventionPlans', id), rest);
+        showToast('Plano de intervenção atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'psychInterventionPlans'), data);
+        showToast('Plano de intervenção registrado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'psychInterventionPlans');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychInterventionPlans');
       showToast('Erro ao registrar plano de intervenção', 'error');
     }
   };
@@ -8038,60 +8587,96 @@ export default function App() {
 
   const handleSavePedagogyAssessment = async (data: Partial<PedagogyInitialAssessment>) => {
     try {
-      await addDoc(collection(db, 'pedagogyInitialAssessments'), data);
-      showToast('Avaliação inicial salva com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogyInitialAssessments', id), rest);
+        showToast('Avaliação inicial atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogyInitialAssessments'), data);
+        showToast('Avaliação inicial salva com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogyInitialAssessments');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyInitialAssessments');
       showToast('Erro ao salvar avaliação inicial', 'error');
     }
   };
 
   const handleSavePedagogyEvolution = async (data: Partial<PedagogyEvolution>) => {
     try {
-      await addDoc(collection(db, 'pedagogyEvolutions'), data);
-      showToast('Evolução registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogyEvolutions', id), rest);
+        showToast('Evolução atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogyEvolutions'), data);
+        showToast('Evolução registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogyEvolutions');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyEvolutions');
       showToast('Erro ao registrar evolução', 'error');
     }
   };
 
   const handleSavePedagogyActivity = async (data: Partial<PedagogyActivity>) => {
     try {
-      await addDoc(collection(db, 'pedagogyActivities'), data);
-      showToast('Atividade registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogyActivities', id), rest);
+        showToast('Atividade atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogyActivities'), data);
+        showToast('Atividade registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogyActivities');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyActivities');
       showToast('Erro ao registrar atividade', 'error');
     }
   };
 
   const handleSavePedagogyStimulation = async (data: Partial<PedagogyStimulationTracking>) => {
     try {
-      await addDoc(collection(db, 'pedagogyStimulationTrackings'), data);
-      showToast('Estimulação registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogyStimulationTrackings', id), rest);
+        showToast('Estimulação atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogyStimulationTrackings'), data);
+        showToast('Estimulação registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogyStimulationTrackings');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyStimulationTrackings');
       showToast('Erro ao registrar estimulação', 'error');
     }
   };
 
   const handleSavePedagogySocial = async (data: Partial<PedagogySocialParticipation>) => {
     try {
-      await addDoc(collection(db, 'pedagogySocialParticipations'), data);
-      showToast('Participação social registrada com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogySocialParticipations', id), rest);
+        showToast('Participação social atualizada com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogySocialParticipations'), data);
+        showToast('Participação social registrada com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogySocialParticipations');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogySocialParticipations');
       showToast('Erro ao registrar participação social', 'error');
     }
   };
 
   const handleSavePedagogyPlan = async (data: Partial<PedagogyIndividualPlan>) => {
     try {
-      await addDoc(collection(db, 'pedagogyIndividualPlans'), data);
-      showToast('Plano pedagógico registrado com sucesso');
+      if (data.id) {
+        const { id, ...rest } = data;
+        await updateDoc(doc(db, 'pedagogyIndividualPlans', id), rest);
+        showToast('Plano pedagógico atualizado com sucesso');
+      } else {
+        await addDoc(collection(db, 'pedagogyIndividualPlans'), data);
+        showToast('Plano pedagógico registrado com sucesso');
+      }
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'pedagogyIndividualPlans');
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyIndividualPlans');
       showToast('Erro ao registrar plano pedagógico', 'error');
     }
   };
@@ -8307,6 +8892,8 @@ export default function App() {
           workshops={workshops}
           socialFamilyVisits={socialFamilyVisits}
           onNavigate={(tab) => setActiveTab(tab)}
+          diaperRawProductions={diaperRawProductions}
+          diaperFinalPackings={diaperFinalPackings}
         />
       );
       case 'adminAssistant': return (
@@ -8538,7 +9125,16 @@ export default function App() {
       );
       case 'donors': return <DonorsSection donors={donors} />;
       case 'diaperDonations': return <DiaperDonationSection donations={diaperDonations} stock={diaperStock} user={user} />;
-      case 'diaperFactory': return <DiaperFactorySection stock={diaperStock} logs={diaperProductionLogs} user={user} />;
+      case 'diaperProduction': return (
+        <DiaperProductionSection 
+          user={user}
+          rawProductions={diaperRawProductions}
+          wipProcessings={diaperWIPProcessings}
+          finalPackings={diaperFinalPackings}
+          goals={diaperProductionGoals}
+          showToast={showToast}
+        />
+      );
       case 'settings': return <SettingsSection users={allUsers} showToast={showToast} institutionalInfo={institutionalInfo} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400 space-y-4">
@@ -8584,7 +9180,8 @@ export default function App() {
                  activeTab === 'financial' ? 'Financeiro' : 
                  activeTab === 'donors' ? 'Doadores e Sócios' :
                  activeTab === 'diaperDonations' ? 'Doação de Fraldas' :
-                 activeTab === 'diaperFactory' ? 'Fábrica de Fraldas' : 
+                 activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
+                 activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :
                  activeTab === 'settings' ? 'Configurações' : 
                  activeTab === 'gallery' ? 'Galeria Multidisciplinar' : 'Institucional'}
               </h1>
@@ -8646,7 +9243,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
             className={cn(
-              "fixed bottom-8 right-8 px-6 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-3",
+              "fixed bottom-8 right-8 px-6 py-3 rounded-2xl shadow-2xl z-[110] flex items-center gap-3",
               toast.type === 'success' ? "bg-green-600 text-white" : "bg-red-600 text-white"
             )}
           >

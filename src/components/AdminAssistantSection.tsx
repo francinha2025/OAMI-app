@@ -12,7 +12,7 @@ import {
   ArrowRight,
   ClipboardList
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { 
   Elderly, 
@@ -82,7 +82,7 @@ export const AdminAssistantSection: React.FC<AdminAssistantSectionProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {quickStats.map((stat, i) => (
           <motion.div
-            key={i}
+            key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
@@ -109,7 +109,7 @@ export const AdminAssistantSection: React.FC<AdminAssistantSectionProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {quickActions.map((action, i) => (
               <button
-                key={i}
+                key={action.title}
                 onClick={() => onNavigate(action.tab)}
                 className="group p-6 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 hover:border-green-500 dark:hover:border-green-600 hover:shadow-xl hover:shadow-green-500/5 transition-all text-left"
               >

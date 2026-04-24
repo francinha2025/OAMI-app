@@ -70,6 +70,47 @@ export interface DiaperProductionLog {
   observations?: string;
 }
 
+export interface DiaperRawProduction {
+  id: string;
+  date: string;
+  quantity: number;
+  operator: string;
+  shift: 'MANHA' | 'TARDE' | 'INTEGRAL';
+  observations?: string;
+  createdAt: string;
+}
+
+export interface DiaperWIPProcessing {
+  id: string;
+  date: string;
+  quantityIn: number;
+  quantityOut: number;
+  wasteAmount: number;
+  wasteReason?: string;
+  operator: string;
+  observations?: string;
+  createdAt: string;
+}
+
+export interface DiaperFinalPacking {
+  id: string;
+  date: string;
+  quantityPackaged: number;
+  packageType: 'INFANTIL' | 'GERIATRICA' | 'TAMANHO_UNICO';
+  batchNumber: string;
+  operator: string;
+  observations?: string;
+  createdAt: string;
+}
+
+export interface DiaperProductionGoal {
+  id: string;
+  month: string; // format YYYY-MM
+  targetQuantity: number;
+  notes?: string;
+  updatedAt: string;
+}
+
 export interface FinancialDocument {
   id: string;
   date: string;
@@ -246,7 +287,21 @@ export interface PhysioAssessment {
   patientId: string;
   date: string;
   complaint: string;
-  history: string;
+  hda?: string; // História da Doença Atual
+  hpp?: string; // História Patológica Pregressa
+  complementaryExams?: string;
+  currentMedications?: string;
+  vitals?: {
+    heartRate?: number;
+    respRate?: number;
+    bloodPressure?: string;
+  };
+  inspectionPalpation?: string;
+  specificTests?: string;
+  medicalDiagnosis?: string;
+  functionalDiagnosis?: string; // Diagnóstico Cinético Funcional
+  treatmentObjectives?: string;
+  treatmentPlan?: string;
   painScale: number;
   motionLimitation: string;
   physicalTests: string;
@@ -395,6 +450,7 @@ export interface AVDRecord {
   date: string;
   feeding: 'INDEPENDENTE' | 'ASSISTIDA' | 'DEPENDENTE';
   hygiene: 'INDEPENDENTE' | 'ASSISTIDA' | 'DEPENDENTE';
+  dressing: 'INDEPENDENTE' | 'ASSISTIDA' | 'DEPENDENTE';
   mobility: 'INDEPENDENTE' | 'ASSISTIDA' | 'DEPENDENTE';
   sleep: 'BOM' | 'AGITADO' | 'INSÔNIA';
   observations?: string;
