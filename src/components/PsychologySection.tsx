@@ -1023,7 +1023,7 @@ const ReportsView = ({ patients, evolutions }: any) => {
     });
 
     if (formatType === 'pdf') {
-      generateModernPDF({
+      await generateModernPDF({
         title,
         subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
@@ -1205,15 +1205,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-gray-900 rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+        className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
       >
-        <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+        <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-20">
           <div>
-            <h3 className="text-2xl font-black text-gray-800 dark:text-white flex items-center gap-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+              <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Psicologia</span>
+            </div>
+            <h3 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white flex items-center gap-3">
               {editingData ? 'Editar' : 'Novo'} {
                 type === 'patient' ? 'Idoso' : 
                 type === 'initial' ? 'Avaliação Inicial' :
@@ -1227,19 +1231,22 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
               {isExtracting && (
                 <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Extraindo Dados...
+                  Processando...
                 </span>
               )}
             </h3>
-            <p className="text-sm text-gray-400 font-medium">Preencha as informações abaixo</p>
           </div>
-          <button onClick={onClose} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 transition-colors">
-            <X size={24} />
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="p-2 md:p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all hover:rotate-90"
+          >
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-8 overflow-y-auto flex-1 space-y-8">
+          <div className="p-5 md:p-8 overflow-y-auto flex-1 space-y-6 md:space-y-8">
             {type === 'patient' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
@@ -1547,13 +1554,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
               </div>
             )}
 
-
-
-
-
-          
-          
-            <div className="space-y-4 mt-8">
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
                 <DigitizeButton onDigitize={handleDigitize} />
@@ -1562,11 +1563,18 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
             </div>
           </div>
 
-          <div className="p-8 border-t border-gray-100 dark:border-gray-800 flex gap-4">
-            <button type="button" onClick={onClose} className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+          <div className="p-5 md:p-8 border-t border-gray-100 dark:border-gray-800 flex gap-4 bg-white dark:bg-gray-900 sticky bottom-0 z-20">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-100 dark:hover:bg-gray-700 transition-all border border-transparent active:scale-95"
+            >
               Cancelar
             </button>
-            <button type="submit" className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
+            <button 
+              type="submit" 
+              className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all active:scale-95"
+            >
               {editingData ? 'Salvar Edição' : 'Salvar Registro'}
             </button>
           </div>
@@ -1617,19 +1625,28 @@ const Select = ({ label, options, value, onChange }: { label: string, options: {
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }: any) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white dark:bg-gray-900 rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-gray-100 dark:border-gray-800"
       >
-        <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">{title}</h3>
-        <p className="text-gray-500 dark:text-gray-400 mb-8 font-bold">{message}</p>
+        <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-600 mb-6">
+          <Trash2 size={24} />
+        </div>
+        <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{title}</h3>
+        <p className="text-gray-500 dark:text-gray-400 mb-8 font-bold leading-relaxed">{message}</p>
         <div className="flex gap-4">
-          <button onClick={onClose} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-200 transition-all">
+          <button 
+            onClick={onClose} 
+            className="flex-1 py-4 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95"
+          >
             Cancelar
           </button>
-          <button onClick={onConfirm} className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition-all">
+          <button 
+            onClick={onConfirm} 
+            className="flex-1 py-4 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition-all active:scale-95"
+          >
             Confirmar
           </button>
         </div>

@@ -354,23 +354,32 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
       {/* Add Photo Modal */}
       <AnimatePresence>
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-2 md:p-4 bg-black/60 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[32px] overflow-hidden shadow-2xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] rounded-[32px] md:rounded-[40px] overflow-hidden shadow-2xl flex flex-col"
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                <h3 className="text-xl font-black text-gray-800 dark:text-white">Adicionar Fotos à Galeria</h3>
-                <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-20">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Galeria</span>
+                  </div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white">Adicionar Fotos</h3>
+                </div>
+                <button 
+                  onClick={() => setIsAddModalOpen(false)} 
+                  className="p-2 md:p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all hover:rotate-90"
+                >
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Categoria do Registro</label>
+              <div className="p-5 md:p-8 space-y-6 md:space-y-8 overflow-y-auto flex-1">
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Categoria do Registro</label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {(['MULTIDISCIPLINAR', 'OFICINA', 'REUNIAO', 'OUTROS'] as const).map((cat) => (
                       <button
@@ -378,9 +387,9 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                         type="button"
                         onClick={() => setNewCategory(cat)}
                         className={cn(
-                          "py-3 px-2 rounded-2xl text-[10px] font-bold transition-all border-2",
+                          "py-3 px-2 rounded-2xl text-[10px] font-bold transition-all border-2 active:scale-95",
                           newCategory === cat
-                            ? "bg-green-50 dark:bg-green-900/20 border-green-500 text-green-600"
+                            ? "bg-green-50 dark:bg-green-900/20 border-green-500 text-green-600 shadow-sm"
                             : "bg-gray-50 dark:bg-gray-800 border-transparent text-gray-400 hover:bg-gray-100"
                         )}
                       >
@@ -393,9 +402,9 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {newCategory === 'MULTIDISCIPLINAR' && (
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Idoso Relacionado</label>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Idoso Relacionado</label>
                       <select 
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold border-none"
                         value={selectedPatientId}
                         onChange={(e) => setSelectedPatientId(e.target.value)}
                       >
@@ -408,13 +417,13 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                   )}
 
                   <div className={cn("space-y-2", newCategory !== 'MULTIDISCIPLINAR' && "md:col-span-2")}>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">
                       {newCategory === 'OFICINA' ? 'Nome da Oficina' : newCategory === 'REUNIAO' ? 'Pauta da Reunião' : 'Tipo de Atividade'}
                     </label>
                     <input 
                       type="text"
                       placeholder={newCategory === 'OFICINA' ? "Ex: Oficina de Artes" : newCategory === 'REUNIAO' ? "Ex: Reunião de Equipe" : "Ex: Passeio, Evento..."}
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-bold border-none"
                       value={activityType}
                       onChange={(e) => setActivityType(e.target.value)}
                     />
@@ -422,36 +431,39 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Descrição (Opcional)</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Descrição (Opcional)</label>
                   <textarea 
                     placeholder="Detalhes sobre o registro..."
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium h-24 resize-none"
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-sm font-medium h-24 resize-none border-none"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
 
-                <PhotoUpload 
-                  photos={newPhotos}
-                  onChange={setNewPhotos}
-                  maxPhotos={10}
-                />
+                <div className="pt-4">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mb-4 block text-center">Selecione ou Arraste as Fotos</label>
+                  <PhotoUpload 
+                    photos={newPhotos}
+                    onChange={setNewPhotos}
+                    maxPhotos={10}
+                  />
+                </div>
               </div>
 
-              <div className="p-6 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3">
+              <div className="p-5 md:p-8 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 flex gap-4 sticky bottom-0 z-20">
                 <button 
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-6 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all"
+                  className="flex-1 py-3 md:py-4 text-sm font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-all border border-transparent active:scale-95"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={handleSaveNewPhotos}
                   disabled={isSaving || newPhotos.length === 0}
-                  className="px-8 py-3 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="flex-[2] py-3 md:py-4 bg-green-600 text-white text-sm font-bold rounded-2xl hover:bg-green-700 transition-all shadow-lg shadow-green-200 dark:shadow-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
                 >
-                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
-                  Salvar Fotos
+                  {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Plus size={20} />}
+                  Salvar na Galeria
                 </button>
               </div>
             </motion.div>
@@ -462,15 +474,15 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
       {/* Detail Modal */}
       <AnimatePresence>
         {selectedItem && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/95 backdrop-blur-md" onClick={() => setSelectedItem(null)}>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-8 bg-black/95 backdrop-blur-md" onClick={() => setSelectedItem(null)}>
             <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="relative w-full max-w-5xl bg-white dark:bg-gray-900 rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row h-full max-h-[800px]"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-5xl bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] overflow-hidden shadow-2xl flex flex-col md:flex-row h-[95vh] md:h-full md:max-h-[800px]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex-1 bg-black relative flex items-center justify-center">
+              <div className="flex-[3] bg-black relative flex items-center justify-center min-h-[40vh] md:min-h-0">
                 <img 
                   src={selectedItem.url} 
                   alt={selectedItem.activityType} 
@@ -479,61 +491,65 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                 />
                 <button 
                   onClick={() => setSelectedItem(null)}
-                  className="absolute top-6 left-6 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-all backdrop-blur-md"
+                  className="absolute top-4 left-4 p-2 md:top-6 md:left-6 md:p-3 bg-black/50 text-white rounded-2xl hover:bg-black/70 transition-all backdrop-blur-md active:scale-95 z-30"
                 >
                   <X size={24} />
                 </button>
               </div>
 
-              <div className="w-full md:w-[350px] p-8 flex flex-col bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800">
-                <div className="space-y-8 flex-1 overflow-y-auto pr-2">
-                  <div>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white leading-tight">
-                      {selectedItem.activityType}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                      {format(parseISO(selectedItem.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-                    </p>
+              <div className="flex-[2] w-full md:w-[400px] flex flex-col bg-white dark:bg-gray-900 border-t md:border-t-0 md:border-l border-gray-100 dark:border-gray-800 overflow-hidden">
+                <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Detalhes do Registro</span>
                   </div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white leading-tight">
+                    {selectedItem.activityType}
+                  </h3>
+                  <p className="text-[10px] md:text-sm text-gray-400 font-bold mt-1">
+                    {format(parseISO(selectedItem.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+                  </p>
+                </div>
 
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                      <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
+                <div className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="space-y-4 md:space-y-6">
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-[24px] border border-gray-100 dark:border-gray-700/50">
+                      <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
                         <Tag size={24} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Categoria</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Categoria</p>
                         <p className="text-sm font-bold text-gray-800 dark:text-white">{selectedItem.category || 'Multidisciplinar'}</p>
                       </div>
                     </div>
 
                     {selectedItem.patientName && (
-                      <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                        <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
+                      <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-[24px] border border-gray-100 dark:border-gray-700/50">
+                        <div className="w-12 h-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400">
                           <User size={24} />
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Idoso</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Idoso</p>
                           <p className="text-sm font-bold text-gray-800 dark:text-white">{selectedItem.patientName}</p>
                         </div>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                      <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                    <div className="flex items-center gap-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-[24px] border border-blue-100 dark:border-blue-900/30">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <Briefcase size={24} />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Profissional</p>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Profissional</p>
                         <p className="text-sm font-bold text-gray-800 dark:text-white">{selectedItem.professionalName}</p>
-                        <p className="text-[10px] font-medium text-blue-600 uppercase">{ROLE_LABELS[selectedItem.professionalRole]}</p>
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{ROLE_LABELS[selectedItem.professionalRole]}</p>
                       </div>
                     </div>
 
                     {selectedItem.description && (
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase px-1">Descrição / Observações</p>
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Descrição / Observações</label>
+                        <div className="p-5 bg-gray-50 dark:bg-gray-800/50 rounded-[24px] border border-gray-100 dark:border-gray-700/50">
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed italic">
                             "{selectedItem.description}"
                           </p>
@@ -543,10 +559,10 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-8 grid grid-cols-2 gap-4">
+                <div className="p-6 md:p-8 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4 sticky bottom-0 z-20">
                   <button 
                     onClick={() => onDownload?.(selectedItem)}
-                    className="flex items-center justify-center gap-2 py-4 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                    className="flex items-center justify-center gap-2 py-4 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95"
                   >
                     <Download size={20} />
                     Baixar
@@ -556,7 +572,7 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
                       onDelete?.(selectedItem.id);
                       setSelectedItem(null);
                     }}
-                    className="flex items-center justify-center gap-2 py-4 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 transition-all"
+                    className="flex items-center justify-center gap-2 py-4 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 transition-all active:scale-95"
                   >
                     <Trash2 size={20} />
                     Excluir

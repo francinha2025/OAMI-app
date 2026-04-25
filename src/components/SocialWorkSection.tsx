@@ -2180,22 +2180,39 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   );
 
   const renderReports = () => {
-    const handleGeneratePDF = (title: string) => {
-      if ((patients || []).length === 0) return;
-
-      const data = (patients || []).map(p => {
-        const patientEvolutions = evolutions.filter(e => e.patientId === p.id);
-        const patientReferrals = referrals.filter(r => r.patientId === p.id);
+    const prepareReportData = () => {
+      if ((patients || []).length === 0) return null;
+      return (patients || []).map(p => {
+        const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
+        const patientReferrals = (referrals || []).filter(r => r.patientId === p.id);
         return [
           p.name,
-          p.age,
-          patientEvolutions.length,
-          patientReferrals.length,
+          String(p.age),
+          String(patientEvolutions.length),
+          String(patientReferrals.length),
           p.status
         ];
       });
+    };
 
-      generateModernPDF({
+    const handleGeneratePDF = async (title: string) => {
+      const data = prepareReportData();
+      if (!data) return;
+
+      await generateModernPDF({
+        title,
+        subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
+        columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
+        data,
+        fileName: title.toLowerCase().replace(/\s/g, '_')
+      });
+    };
+
+    const handleGenerateWord = async (title: string) => {
+      const data = prepareReportData();
+      if (!data) return;
+
+      await generateModernWord({
         title,
         subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
@@ -2226,10 +2243,28 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 <div className="flex-1">
                   <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight">{report.title}</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">{report.desc}</p>
-                  <button className="mt-4 flex items-center gap-2 text-sm font-black text-blue-600 dark:text-blue-400">
-                    <Download className="w-4 h-4" />
-                    Gerar PDF
-                  </button>
+                  <div className="flex gap-4 mt-4">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGeneratePDF(report.title);
+                      }}
+                      className="flex items-center gap-2 text-sm font-black text-blue-600 dark:text-blue-400 hover:scale-105 transition-transform"
+                    >
+                      <Download className="w-4 h-4" />
+                      Gerar PDF
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleGenerateWord(report.title);
+                      }}
+                      className="flex items-center gap-2 text-sm font-black text-green-600 dark:text-green-400 hover:scale-105 transition-transform"
+                    >
+                      <FileCheck className="w-4 h-4" />
+                      Gerar Word
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2241,7 +2276,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'profile', label: 'Perfil do Idoso', icon: Users },
@@ -2300,40 +2335,42 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border dark:border-gray-800"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden border dark:border-gray-800 flex flex-col"
             >
-              <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-800/50">
-              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                {modalType === 'patient' || modalType === 'profile' ? 'Novo Cadastro de Idoso' : 
-                 modalType === 'evolution' ? 'Nova Evolução Social' :
-                 modalType === 'referral' ? 'Novo Encaminhamento' :
-                 modalType === 'visit' ? 'Novo Registro de Visita' :
-                 modalType === 'risk' ? 'Nova Situação de Risco' :
-                 modalType === 'study' ? 'Novo Estudo Social' :
-                 modalType === 'legal' ? 'Nova Situação Legal' :
-                 modalType === 'family' ? 'Novo Vínculo Familiar' :
-                 modalType === 'docs' ? 'Atualização de Documentos' :
-                 modalType || activeTab}
-                {isExtracting && (
-                  <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Extraindo Dados...
-                  </span>
-                )}
-              </h3>
-              <button 
-                onClick={() => setIsModalOpen(false)} 
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors text-gray-500 dark:text-gray-400"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 sticky top-0 z-10 font-black">
+                <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                  {modalType === 'patient' || modalType === 'profile' ? 'Novo Cadastro de Idoso' : 
+                   modalType === 'evolution' ? 'Nova Evolução Social' :
+                   modalType === 'referral' ? 'Novo Encaminhamento' :
+                   modalType === 'visit' ? 'Novo Registro de Visita' :
+                   modalType === 'risk' ? 'Nova Situação de Risco' :
+                   modalType === 'study' ? 'Novo Estudo Social' :
+                   modalType === 'legal' ? 'Nova Situação Legal' :
+                   modalType === 'family' ? 'Novo Vínculo Familiar' :
+                   modalType === 'docs' ? 'Atualização de Documentos' :
+                   modalType || activeTab}
+                  {isExtracting && (
+                    <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse capitalize">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Salvando...
+                    </span>
+                  )}
+                </h3>
+                <button 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} className="text-gray-900 dark:text-gray-100" />
+                </button>
               </div>
-              {renderModalContent()}
+              <div className="flex-1 overflow-y-auto">
+                {renderModalContent()}
+              </div>
             </motion.div>
           </div>
         )}

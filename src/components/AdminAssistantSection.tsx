@@ -58,6 +58,7 @@ export const AdminAssistantSection: React.FC<AdminAssistantSectionProps> = ({
     { title: 'Fluxo de Caixa', desc: 'Lançamentos financeiros e balanços.', tab: 'financial', icon: DollarSign, color: 'bg-green-600' },
     { title: 'Escala e Cronograma', desc: 'Organização de turnos e atividades.', tab: 'schedule', icon: Calendar, color: 'bg-purple-600' },
     { title: 'Relatórios Mensais', desc: 'Emissão e conferência de dados.', tab: 'reports', icon: FileText, color: 'bg-orange-600' },
+    { title: 'Gestão de Funcionários', desc: 'Controle de cuidadores e serviços.', tab: 'staff', icon: Briefcase, color: 'bg-teal-600' },
     { title: 'Suporte a Presidência', desc: 'Gestão de documentos e minutas.', tab: 'presidency_support', icon: ClipboardList, color: 'bg-amber-600' },
     { title: 'Apoio Institucional', desc: 'Contatos e ofícios externos.', tab: 'institutional_support', icon: Briefcase, color: 'bg-indigo-600' },
   ];

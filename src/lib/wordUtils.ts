@@ -1,6 +1,6 @@
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle, ImageRun } from 'docx';
 import { saveAs } from 'file-saver';
-import { INSTITUTION_NAME } from '../constants';
+import { INSTITUTION_NAME, INSTITUTION_LOGO } from '../constants';
 
 interface WordOptions {
   title: string;
@@ -17,6 +17,27 @@ export const generateModernWord = async ({
   data,
   fileName
 }: WordOptions) => {
+  // Try to fetch the logo for the Word document
+  let logoImageRun: ImageRun | null = null;
+  try {
+    const response = await fetch(INSTITUTION_LOGO, {
+      referrerPolicy: "no-referrer",
+      cache: "force-cache"
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const buffer = await response.arrayBuffer();
+    logoImageRun = new ImageRun({
+      data: new Uint8Array(buffer),
+      transformation: {
+        width: 80,
+        height: 80,
+      },
+    } as any);
+  } catch (e) {
+    console.error("Error fetching logo for Word", e);
+    // Silent fail for logo, better generate report without logo than fail completely
+  }
+
   const tableHeader = new TableRow({
     children: columns.map(col => new TableCell({
       children: [new Paragraph({
@@ -52,8 +73,18 @@ export const generateModernWord = async ({
     sections: [{
       properties: {},
       children: [
+        ...(logoImageRun ? [new Paragraph({
+          children: [logoImageRun],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 }
+        })] : []),
         new Paragraph({
-          children: [new TextRun({ text: INSTITUTION_NAME, bold: true, size: 28 })],
+          children: [new TextRun({ text: INSTITUTION_NAME, bold: true, size: 32 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 100 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Relatório Oficial de Atendimento', size: 20, color: '666666' })],
           alignment: AlignmentType.CENTER,
           spacing: { after: 200 }
         }),
@@ -69,7 +100,7 @@ export const generateModernWord = async ({
           spacing: { after: 400 }
         })] : []),
         new Paragraph({
-          children: [new TextRun({ text: `Gerado em: ${new Date().toLocaleString('pt-BR')}`, size: 16, color: '999999' })],
+          children: [new TextRun({ text: `Documento gerado pelo Sistema OAMI em: ${new Date().toLocaleString('pt-BR')}`, size: 16, color: '999999' })],
           alignment: AlignmentType.RIGHT,
           spacing: { after: 400 }
         }),

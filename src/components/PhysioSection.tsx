@@ -104,7 +104,7 @@ export const PhysioSection = ({
     reader.readAsDataURL(file);
   };
 
-  const handleGeneratePatientPDF = () => {
+  const handleGeneratePatientPDF = async () => {
     if (!reportPatientId) {
       showToast('Selecione um paciente para gerar o prontuário', 'error');
       return;
@@ -154,7 +154,7 @@ export const PhysioSection = ({
       data.push([format(parseISO(e.date), 'dd/MM/yyyy'), `Evolução: ${e.evolution}\nProcedimentos: ${e.procedures}`]);
     });
 
-    generateModernPDF({
+    await generateModernPDF({
       title: `Prontuário de Fisioterapia - ${patient.name}`,
       subtitle: `Documento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
       columns: ['Campo/Data', 'Descrição/Informação'],
@@ -163,7 +163,7 @@ export const PhysioSection = ({
     });
   };
 
-  const handleGenerateActivityPDF = () => {
+  const handleGenerateActivityPDF = async () => {
     const [year, month] = reportMonth.split('-');
     const monthEvolutions = evolutions.filter(e => {
       const date = parseISO(e.date);
@@ -180,7 +180,7 @@ export const PhysioSection = ({
       ];
     });
 
-    generateModernPDF({
+    await generateModernPDF({
       title: `Relatório de Atividades - ${format(parseISO(`${reportMonth}-01`), 'MMMM/yyyy', { locale: ptBR })}`,
       subtitle: `Resumo mensal de atendimentos de fisioterapia`,
       columns: ['Data', 'Paciente', 'Procedimentos', 'Evolução'],
@@ -313,7 +313,7 @@ export const PhysioSection = ({
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 min-h-[80vh]">
       {/* Internal Navigation */}
-      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -994,21 +994,21 @@ export const PhysioSection = ({
       {/* Patient Modal */}
       <AnimatePresence>
         {isPatientModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setIsPatientModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4" onClick={() => setIsPatientModalOpen(false)}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{selectedPatient ? 'Editar Paciente' : 'Novo Paciente'}</h3>
-                <button onClick={() => setIsPatientModalOpen(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
+                <h3 className="text-xl md:text-2xl font-black">{selectedPatient ? 'Editar Paciente' : 'Novo Paciente'}</h3>
+                <button onClick={() => setIsPatientModalOpen(false)} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <PatientForm 
                   initialData={selectedPatient} 
                   onSave={async (data) => {
@@ -1023,21 +1023,21 @@ export const PhysioSection = ({
         )}
 
         {isAssessmentModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4" onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{editingData ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
-                <button onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
+                <h3 className="text-xl md:text-2xl font-black">{editingData ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
+                <button onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <AssessmentForm 
                   patients={patients}
                   initialData={editingData}
@@ -1055,21 +1055,21 @@ export const PhysioSection = ({
         )}
 
         {isEvolutionModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4" onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{editingData ? 'Editar Evolução' : 'Nova Evolução'}</h3>
-                <button onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
+                <h3 className="text-xl md:text-2xl font-black">{editingData ? 'Editar Evolução' : 'Nova Evolução'}</h3>
+                <button onClick={() => { setIsEvolutionModalOpen(false); setEditingData(null); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <EvolutionForm 
                   patients={patients}
                   showToast={showToast}
@@ -1088,21 +1088,21 @@ export const PhysioSection = ({
         )}
 
         {isExerciseModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4" onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{editingData ? 'Editar Exercício' : 'Novo Exercício'}</h3>
-                <button onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
+                <h3 className="text-xl md:text-2xl font-black">{editingData ? 'Editar Exercício' : 'Novo Exercício'}</h3>
+                <button onClick={() => { setIsExerciseModalOpen(false); setEditingData(null); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <ExerciseForm 
                   initialData={editingData}
                   onSave={async (data) => {
@@ -1118,51 +1118,21 @@ export const PhysioSection = ({
         )}
 
         {isAppointmentModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}>
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4" onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[95vh] md:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{editingData ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
-                <button onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
+                <h3 className="text-xl md:text-2xl font-black">{editingData ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
+                <button onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
                   <X size={20} />
                 </button>
               </div>
-              <div className="overflow-y-auto p-8">
-                <AppointmentForm 
-                  patients={patients}
-                  initialData={editingData}
-                  onSave={async (data) => {
-                    await onSaveAppointment(data, editingData?.id);
-                    setIsAppointmentModalOpen(false);
-                    setEditingData(null);
-                  }}
-                  onCancel={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}
-                />
-              </div>
-            </motion.div>
-          </div>
-        )}
-        {isAppointmentModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}>
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white">
-                <h3 className="text-xl font-bold">{editingData ? 'Editar Agendamento' : 'Agendar Sessão'}</h3>
-                <button onClick={() => { setIsAppointmentModalOpen(false); setEditingData(null); }} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="overflow-y-auto p-8">
+              <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <AppointmentForm 
                   patients={patients}
                   initialData={editingData}

@@ -25,8 +25,8 @@ import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   NursingPatient, Medication, MedicationAdministration, 
   VitalSigns, DressingRecord, NursingEvolution, 
-  IncidentRecord, ShiftSchedule, AVDRecord, 
-  DiaperChangeRecord, User as UserType 
+  IncidentRecord, ShiftSchedule, StaffMember, AVDRecord, 
+  DiaperChangeRecord, User as UserType, Professional
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
@@ -42,6 +42,8 @@ interface NursingSectionProps {
   evolutions: NursingEvolution[];
   incidents: IncidentRecord[];
   shifts: ShiftSchedule[];
+  staffMembers: StaffMember[];
+  professionals: Professional[];
   avds: AVDRecord[];
   diaperChanges: DiaperChangeRecord[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
@@ -73,7 +75,7 @@ export const NursingSection = (props: NursingSectionProps) => {
   const { 
     patients, medications, administrations, vitalSigns, 
     dressings, evolutions, incidents, shifts, 
-    avds, diaperChanges 
+    staffMembers, professionals, avds, diaperChanges 
   } = props;
   const [activeTab, setActiveTab] = useState<NursingTab>('dashboard');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -362,7 +364,7 @@ export const NursingSection = (props: NursingSectionProps) => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         <NavButton active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setEditingData(null); }} icon={<LayoutDashboard size={18} />} label="Dashboard" />
         <NavButton active={activeTab === 'patients'} onClick={() => { setActiveTab('patients'); setEditingData(null); }} icon={<Users size={18} />} label="Pacientes" />
         <NavButton active={activeTab === 'medication'} onClick={() => { setActiveTab('medication'); setEditingData(null); }} icon={<Pill size={18} />} label="Medicação" />
@@ -418,6 +420,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 administrations={props.administrations}
                 onSaveMedication={props.onSaveMedication}
                 onSaveAdministration={props.onSaveAdministration}
+                onAddMedication={() => { setModalType('medication'); setIsModalOpen(true); }}
               />
             )}
             {activeTab === 'vitals' && (
@@ -459,6 +462,7 @@ export const NursingSection = (props: NursingSectionProps) => {
             {activeTab === 'shift' && (
               <ShiftView 
                 shifts={props.shifts}
+                staffMembers={props.staffMembers}
                 onAdd={() => { setModalType('shift'); setIsModalOpen(true); }}
                 onEdit={(s) => { setEditingData(s); setModalType('shift'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'shift' })}
@@ -493,11 +497,14 @@ export const NursingSection = (props: NursingSectionProps) => {
           {isModalOpen && (
             <NursingModal 
               type={modalType} 
-              patients={props.patients}
-              medications={props.medications}
+              patients={patients}
+              medications={medications}
+              staffMembers={staffMembers}
+              professionals={professionals}
               editingData={editingData}
               initialPatientId={selectedPatientId || undefined}
               showToast={props.showToast}
+              user={props.user}
               onClose={() => { 
                 setIsModalOpen(false); 
                 setModalType(null); 
@@ -556,8 +563,9 @@ export const NursingSection = (props: NursingSectionProps) => {
 
 // --- Sub-components ---
 
-const ShiftView = ({ shifts, onAdd, onEdit, onDelete }: { 
+const ShiftView = ({ shifts, staffMembers, onAdd, onEdit, onDelete }: { 
   shifts: ShiftSchedule[], 
+  staffMembers: StaffMember[],
   onAdd: () => void,
   onEdit: (s: ShiftSchedule) => void,
   onDelete: (id: string) => void
@@ -572,7 +580,7 @@ const ShiftView = ({ shifts, onAdd, onEdit, onDelete }: {
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {(shifts || []).map(s => (
-        <div key={s.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 group relative">
+        <div key={s.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 group relative flex flex-col h-full">
           <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button 
               onClick={() => onEdit(s)}
@@ -596,15 +604,39 @@ const ShiftView = ({ shifts, onAdd, onEdit, onDelete }: {
               <p className="text-xs font-bold text-green-600 uppercase">{s.shift}</p>
             </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-xs text-gray-500 mb-2">{s.activities}</p>
-            <div className="flex flex-wrap gap-2">
-              {s.professionals.map((p) => (
-                <span key={p} className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold">
-                  {p}
-                </span>
-              ))}
+          <div className="space-y-4 flex-1">
+            {s.observations && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
+                <p className="text-xs text-blue-700 dark:text-blue-300 font-medium leading-relaxed italic">"{s.observations}"</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Enfermagem</p>
+              <div className="flex flex-wrap gap-2">
+                {s.professionals.map((p) => (
+                  <span key={p} className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold">
+                    {p}
+                  </span>
+                ))}
+              </div>
             </div>
+
+            {(s.staffMemberIds || []).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Apoio (Cuidadores/Cozinha/Vigia)</p>
+                <div className="flex flex-wrap gap-2">
+                  {s.staffMemberIds?.map((id) => {
+                    const member = staffMembers.find(m => m.id === id);
+                    return (
+                      <span key={id} className="px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-[10px] font-bold">
+                        {member?.name || 'Membro removido'}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -627,7 +659,7 @@ const ReportsView = ({ patients, evolutions, administrations, vitalSigns, incide
     const body = data.map(item => Object.values(item));
     
     if (formatType === 'pdf') {
-      generateModernPDF({
+      await generateModernPDF({
         title,
         subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
         columns,
@@ -842,10 +874,12 @@ const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }:
   </div>
 );
 
-const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast }: {
+const NursingModal = ({ type, patients, medications, staffMembers, professionals, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
   type: string | null,
   patients: NursingPatient[],
   medications: Medication[],
+  staffMembers: StaffMember[],
+  professionals: Professional[],
   onClose: () => void,
   onSavePatient: any,
   onSaveMedication: any,
@@ -860,7 +894,8 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
   onSavePhotos: any,
   editingData?: any,
   initialPatientId?: string,
-  showToast: (msg: string, type?: 'success' | 'error') => void
+  showToast: (msg: string, type?: 'success' | 'error') => void,
+  user: UserType
 }) => {
   const [formData, setFormData] = useState<any>(editingData || {
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -918,7 +953,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
 
       switch (type) {
         case 'patient': await onSavePatient(data, id); break;
-        case 'medication': await onSaveMedication(data, id); break;
+        case 'medication': await onSaveMedication({ ...data, registeredBy: user.name }, id); break;
         case 'vital': await onSaveVitalSigns(data, id); break;
         case 'dressing': await onSaveDressing(data, id); break;
         case 'evolution': await onSaveEvolution(data, id); break;
@@ -950,7 +985,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
         animate={{ scale: 1, opacity: 1, y: 0 }}
         className="bg-white dark:bg-gray-900 rounded-[2.5rem] max-w-2xl w-full shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[95vh] overflow-hidden"
       >
-        <div className="p-4 sm:p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-10 shrink-0">
+        <div className="p-5 md:p-8 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-10 shrink-0">
           <div className="flex items-center gap-4">
             <div className={cn(
               "p-3 rounded-2xl hidden sm:flex",
@@ -965,7 +1000,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                <Plus size={24} />}
             </div>
             <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-0.5 leading-none">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1 leading-none">
                 {type === 'patient' ? 'Cadastro' : 
                  type === 'medication' ? 'Medicação' :
                  type === 'vital' ? 'Sinais Vitais' :
@@ -975,7 +1010,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                  type === 'shift' ? 'Escala de Plantão' :
                  type === 'avd' ? 'Status AVD' : 'Troca de Fralda'}
               </p>
-              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">
                 {editingData ? 'Editar Registro' : 'Novo Registro'}
               </h3>
               {formData.patientId && type !== 'patient' && (
@@ -999,13 +1034,13 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           </button>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar">
-          <form id="nursing-form" onSubmit={handleSubmit} className="space-y-6 pb-20">
+        <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+          <form id="nursing-form" onSubmit={handleSubmit} className="space-y-8 pb-32">
             {type !== 'patient' && type !== 'shift' && (
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-400 uppercase">Paciente</label>
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
               <select 
-                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold"
+                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
@@ -1016,24 +1051,24 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'patient' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
               <Input label="Idade" type="number" value={formData.age} onChange={(v) => setFormData({ ...formData, age: parseInt(v) })} />
               <Input label="Diagnóstico" value={formData.diagnosis} onChange={(v) => setFormData({ ...formData, diagnosis: v })} />
               <Input label="Comorbidades" value={formData.comorbidities} onChange={(v) => setFormData({ ...formData, comorbidities: v })} />
               <Input label="Alergias" value={formData.allergies} onChange={(v) => setFormData({ ...formData, allergies: v })} />
               <Input label="Contato Familiar" value={formData.familyContact} onChange={(v) => setFormData({ ...formData, familyContact: v })} />
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Nível de Risco</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm" value={formData.riskLevel || 'BAIXO'} onChange={(e) => setFormData({ ...formData, riskLevel: e.target.value })}>
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Risco</label>
+                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.riskLevel || 'BAIXO'} onChange={(e) => setFormData({ ...formData, riskLevel: e.target.value })}>
                   <option value="BAIXO">Baixo</option>
                   <option value="MEDIO">Médio</option>
                   <option value="ALTO">Alto</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Acamado?</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm" value={formData.isBedridden ? 'true' : 'false'} onChange={(e) => setFormData({ ...formData, isBedridden: e.target.value === 'true' })}>
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Acamado?</label>
+                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.isBedridden ? 'true' : 'false'} onChange={(e) => setFormData({ ...formData, isBedridden: e.target.value === 'true' })}>
                   <option value="false">Não</option>
                   <option value="true">Sim</option>
                 </select>
@@ -1042,14 +1077,14 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'medication' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <Input label="Nome do Medicamento" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
               <Input label="Dosagem" value={formData.dosage} onChange={(v) => setFormData({ ...formData, dosage: v })} />
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Tipo de Medicação</label>
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Tipo de Medicação</label>
                 <select 
                   value={formData.type || 'CONTINUA'}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold focus:ring-2 focus:ring-green-500 transition-all"
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                 >
                   <option value="CONTINUA">Contínua</option>
@@ -1057,11 +1092,11 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                   <option value="PONTUAL">Pontual</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Via de Administração</label>
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Via de Administração</label>
                 <select 
                   value={formData.route || 'ORAL'}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold focus:ring-2 focus:ring-green-500 transition-all"
                   onChange={(e) => setFormData({ ...formData, route: e.target.value })}
                 >
                   <option value="ORAL">Oral</option>
@@ -1074,31 +1109,34 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
               </div>
               <Input label="Frequência" value={formData.frequency} onChange={(v) => setFormData({ ...formData, frequency: v })} />
               <Input label="Data de Início" type="date" value={formData.startDate} onChange={(v) => setFormData({ ...formData, startDate: v })} />
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Horários (separados por vírgula)</label>
+              <Input label="Data de Término (Opcional)" type="date" value={formData.endDate} onChange={(v) => setFormData({ ...formData, endDate: v })} />
+              <Input label="Período de Uso (Ex: 7 dias)" value={formData.period} onChange={(v) => setFormData({ ...formData, period: v })} />
+              <Input label="Prescritor / Médico" value={formData.prescriber} onChange={(v) => setFormData({ ...formData, prescriber: v })} />
+              <div className="space-y-3 md:col-span-2">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Horários (separados por vírgula)</label>
                 <input 
                   type="text"
                   placeholder="Ex: 08:00, 20:00"
                   value={formData.times?.join(', ') || ''}
                   onChange={(e) => setFormData({ ...formData, times: e.target.value.split(',').map((t: string) => t.trim()) })}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold"
                 />
               </div>
             </div>
           )}
 
           {type === 'dressing' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <Input label="Tipo de Lesão" value={formData.woundType} onChange={(v) => setFormData({ ...formData, woundType: v })} />
               <Input label="Localização" value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} />
-              <div className="md:col-span-2 space-y-2">
+              <div className="md:col-span-2 space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Aspecto</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Aspecto</label>
                   <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, aspect: (formData.aspect || '') + ' ' + t })} />
                 </div>
                 <textarea 
                   value={formData.aspect || ''}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm min-h-[100px]"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm min-h-[120px] font-medium"
                   onChange={(e) => setFormData({ ...formData, aspect: e.target.value })}
                 />
               </div>
@@ -1107,10 +1145,10 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'incident' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Tipo de Intercorrência</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm" value={formData.type || 'FEBRE'} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+            <div className="space-y-8">
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Tipo de Intercorrência</label>
+                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.type || 'FEBRE'} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                   <option value="FEBRE">Febre</option>
                   <option value="QUEDA">Queda</option>
                   <option value="MAL_ESTAR">Mal-estar</option>
@@ -1118,14 +1156,14 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                   <option value="OUTRO">Outro</option>
                 </select>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Descrição</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Descrição</label>
                   <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, description: (formData.description || '') + ' ' + t })} />
                 </div>
                 <textarea 
                   value={formData.description || ''}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm min-h-[100px]"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm min-h-[120px] font-medium"
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
@@ -1134,7 +1172,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'avd' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <AVDSelect label="Alimentação" value={formData.feeding} onChange={(v) => setFormData({ ...formData, feeding: v })} />
               <AVDSelect label="Higiene" value={formData.hygiene} onChange={(v) => setFormData({ ...formData, hygiene: v })} />
               <AVDSelect label="Vestuário" value={formData.dressing} onChange={(v) => setFormData({ ...formData, dressing: v })} />
@@ -1143,10 +1181,10 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'diaper' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Tipo de Eliminação</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm" value={formData.type || 'DIURESE'} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Tipo de Eliminação</label>
+                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.type || 'DIURESE'} onChange={(e) => setFormData({ ...formData, type: e.target.value })}>
                   <option value="DIURESE">Diurese</option>
                   <option value="EVACUAÇÃO">Evacuação</option>
                   <option value="AMBOS">Ambos</option>
@@ -1157,22 +1195,97 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'shift' && (
-            <div className="space-y-4">
-              <Input label="Data" type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Turno</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm" onChange={(e) => setFormData({ ...formData, shift: e.target.value })}>
-                  <option value="MANHÃ">Manhã</option>
-                  <option value="TARDE">Tarde</option>
-                  <option value="NOITE">Noite</option>
-                </select>
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Input label="Data" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Turno</label>
+                  <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.shift || 'MANHÃ'} onChange={(e) => setFormData({ ...formData, shift: e.target.value })}>
+                    <option value="MANHÃ">Manhã</option>
+                    <option value="TARDE">Tarde</option>
+                    <option value="NOITE">Noite</option>
+                  </select>
+                </div>
               </div>
-              <p className="text-[10px] text-gray-400 italic">* Adição de profissionais simplificada para este protótipo.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Column: Projeto Conviver */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Profissionais do Projeto Conviver</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 rounded-3xl custom-scrollbar border border-gray-100 dark:border-gray-700">
+                    {professionals.filter(p => p.status === 'ATIVO').map(p => (
+                      <label key={p.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-xl cursor-pointer hover:ring-2 hover:ring-blue-500 border border-transparent transition-all shadow-sm">
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                          checked={(formData.professionals || []).includes(p.name)}
+                          onChange={(e) => {
+                            const names = formData.professionals || [];
+                            if (e.target.checked) {
+                              setFormData({ ...formData, professionals: [...names, p.name] });
+                            } else {
+                              setFormData({ ...formData, professionals: names.filter((n: string) => n !== p.name) });
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-gray-800 dark:text-white">{p.name}</span>
+                          <span className="text-[10px] text-gray-400 uppercase font-black">{p.role}</span>
+                        </div>
+                      </label>
+                    ))}
+                    {professionals.filter(p => p.status === 'ATIVO').length === 0 && (
+                      <p className="text-center text-xs text-gray-500 font-bold py-4 italic">Nenhum profissional disponível.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Column: Instituição */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Profissionais da Instituição (Apoio)</label>
+                  <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 rounded-3xl custom-scrollbar border border-green-100 dark:border-green-900/20">
+                    {staffMembers.filter(s => s.status === 'ATIVO').map(s => (
+                      <label key={s.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-xl cursor-pointer hover:ring-2 hover:ring-green-500 border border-transparent transition-all shadow-sm">
+                        <input 
+                          type="checkbox" 
+                          className="w-5 h-5 rounded text-green-600 focus:ring-green-500"
+                          checked={(formData.staffMemberIds || []).includes(s.id)}
+                          onChange={(e) => {
+                            const ids = formData.staffMemberIds || [];
+                            if (e.target.checked) {
+                              setFormData({ ...formData, staffMemberIds: [...ids, s.id] });
+                            } else {
+                              setFormData({ ...formData, staffMemberIds: ids.filter((id: string) => id !== s.id) });
+                            }
+                          }}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-gray-800 dark:text-white">{s.name}</span>
+                          <span className="text-[10px] text-gray-400 uppercase font-black">{s.role.replace('_', ' ')}</span>
+                        </div>
+                      </label>
+                    ))}
+                    {staffMembers.filter(s => s.status === 'ATIVO').length === 0 && (
+                      <p className="text-center text-xs text-gray-500 font-bold py-4 italic">Nenhum apoio disponível.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Observações Gerais</label>
+                <textarea 
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-[2rem] px-6 py-5 text-sm font-medium min-h-[120px] outline-none focus:ring-2 focus:ring-green-500 shadow-inner"
+                  placeholder="Relate aqui as ocorrências e observações do turno..."
+                  value={formData.observations || ''}
+                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                />
+              </div>
             </div>
           )}
 
           {type === 'vital' && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
               <Input label="Sistólica" type="number" value={formData.systolicBP} onChange={(v) => setFormData({ ...formData, systolicBP: parseInt(v) })} />
               <Input label="Diastólica" type="number" value={formData.diastolicBP} onChange={(v) => setFormData({ ...formData, diastolicBP: parseInt(v) })} />
               <Input label="FC (bpm)" type="number" value={formData.heartRate} onChange={(v) => setFormData({ ...formData, heartRate: parseInt(v) })} />
@@ -1183,11 +1296,11 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           {type === 'evolution' && (
-            <div className="space-y-4">
+            <div className="space-y-8">
               <Input label="Data da Evolução" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-400 uppercase">Evolução</label>
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Evolução</label>
                   <div className="flex gap-2">
                     <button 
                       type="button"
@@ -1206,7 +1319,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                           setIsExtracting(false);
                         }
                       }}
-                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded-lg disabled:opacity-50"
+                      className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-xl disabled:opacity-50"
                     >
                       {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
                       Corrigir Texto
@@ -1216,7 +1329,7 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
                 </div>
                 <textarea 
                   value={formData.content || ''}
-                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm min-h-[150px]"
+                  className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm min-h-[180px] font-medium"
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   placeholder="Descreva a evolução do paciente..."
                 />
@@ -1225,23 +1338,34 @@ const NursingModal = ({ type, patients, medications, onClose, onSavePatient, onS
           )}
 
           <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
-          <DigitizeButton onDigitize={handleDigitize} />
-        </div>
-        <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} />
-      </div>
+            <div className="flex justify-between items-center">
+              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
+              <DigitizeButton onDigitize={handleDigitize} />
+            </div>
+            <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} />
+          </div>
 
-      <div className="flex gap-4 pt-4">
-            <button type="button" onClick={onClose} className="flex-1 px-8 py-4 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-bold rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">
+          </form>
+        </div>
+
+        <div className="p-6 md:p-8 bg-white dark:bg-gray-900 border-t border-gray-50 dark:border-gray-800 sticky bottom-0 z-10 shrink-0">
+          <div className="flex gap-4">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="flex-1 px-8 py-5 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-black rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all uppercase tracking-tight text-sm"
+            >
               Cancelar
             </button>
-            <button type="submit" className="flex-1 px-8 py-4 bg-green-600 text-white font-bold rounded-2xl shadow-lg shadow-green-100 dark:shadow-none hover:bg-green-700 transition-all">
-              Salvar Registro
+            <button 
+              form="nursing-form"
+              type="submit" 
+              className="flex-1 px-8 py-5 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all uppercase tracking-tight text-sm"
+            >
+              {editingData ? 'Salvar Edição' : 'Salvar Registro'}
             </button>
           </div>
-        </form>
-      </div>
+        </div>
       </motion.div>
     </div>
   );
@@ -1894,12 +2018,13 @@ const PatientDetailView = ({
 );
 }
 
-const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration }: { 
+const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration, onAddMedication }: { 
   patients: NursingPatient[], 
   medications: Medication[], 
   administrations: MedicationAdministration[],
   onSaveMedication: (data: Omit<Medication, 'id'>, id?: string) => Promise<void>,
-  onSaveAdministration: (data: Omit<MedicationAdministration, 'id'>) => Promise<void>
+  onSaveAdministration: (data: Omit<MedicationAdministration, 'id'>) => Promise<void>,
+  onAddMedication: () => void
 }) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
@@ -1922,6 +2047,13 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
             onChange={(e) => setSelectedDate(e.target.value)}
             className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-2 text-sm font-bold"
           />
+          <button 
+            onClick={onAddMedication}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-100 dark:shadow-none"
+          >
+            <Plus size={18} />
+            Novo Registro
+          </button>
         </div>
       </div>
 
@@ -1942,7 +2074,7 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-800 dark:text-white">{med?.name} <span className="text-xs font-normal text-gray-400">({med?.dosage})</span></h4>
-                      <p className="text-xs text-gray-500">{patient?.name} • {med?.route}</p>
+                      <p className="text-xs text-gray-500">{patient?.name} • {med?.route} {med?.period ? `• Uso: ${med.period}` : ''}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

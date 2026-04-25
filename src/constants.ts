@@ -26,8 +26,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 // Adicione aqui a URL ou Base64 do seu timbrado (Logo)
-export const INSTITUTION_LOGO = 'https://picsum.photos/seed/oami-logo/200/200'; 
-export const INSTITUTION_NAME = 'OAMI - Gestão ILPI';
+export const INSTITUTION_LOGO = 'https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0815771750.firebasestorage.app/o/opera%20assistenza%20malati%20impedit%20(1).png?alt=media&token=0597989c-8352-4f24-b41d-7062a27bd5d5'; 
+export const INSTITUTION_NAME = 'Opera Assistenza Malati Impediti (OAMI)';
 
 export const MOCK_GALLERY: any[] = [
   {

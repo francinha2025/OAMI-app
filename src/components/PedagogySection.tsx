@@ -113,6 +113,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
 
+  const onClose = () => setIsModalOpen(false);
+
   const handleDigitize = async (text: string) => {
     const type = modalType || activeTab;
     if (!text) return;
@@ -233,8 +235,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'patient':
       case 'residents':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSave} className="p-5 md:p-8 space-y-6 md:space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-2">
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nome Completo</label>
                 <input
@@ -335,7 +337,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
                 <DigitizeButton onDigitize={handleDigitize} />
@@ -343,9 +345,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
-              {editingData ? 'Atualizar Cadastro' : 'Salvar Cadastro'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              </button>
+            </div>
           </form>
         );
       case 'assessment':
@@ -393,7 +400,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               />
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
                 <DigitizeButton onDigitize={handleDigitize} />
@@ -401,9 +408,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
-              {editingData ? 'Atualizar Avaliação' : 'Salvar Avaliação'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              </button>
+            </div>
           </form>
         );
       case 'evolution':
@@ -503,7 +515,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               />
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
                 <DigitizeButton onDigitize={handleDigitize} />
@@ -511,16 +523,21 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700">
-              {editingData ? 'Atualizar Evolução' : 'Salvar Evolução'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-none hover:bg-purple-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              </button>
+            </div>
           </form>
         );
       case 'activity':
       case 'activities':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSave} className="p-5 md:p-8 space-y-6 md:space-y-8 text-gray-900 dark:text-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-2">
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Título da Atividade</label>
                 <input
@@ -599,7 +616,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               />
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
+            <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
                 <DigitizeButton onDigitize={handleDigitize} />
@@ -607,9 +624,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-pink-600 text-white rounded-xl font-bold hover:bg-pink-700">
-              {editingData ? 'Atualizar Atividade' : 'Criar Atividade'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-pink-600 text-white rounded-2xl font-bold shadow-lg shadow-pink-200 dark:shadow-none hover:bg-pink-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Atividade'}
+              </button>
+            </div>
           </form>
         );
       case 'stimulation':
@@ -664,9 +686,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
-              {editingData ? 'Atualizar Estimulação' : 'Salvar Estimulação'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Estimulação'}
+              </button>
+            </div>
           </form>
         );
       case 'social':
@@ -740,9 +767,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700">
-              {editingData ? 'Atualizar Registro' : 'Salvar Registro Social'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Registro Social'}
+              </button>
+            </div>
           </form>
         );
       case 'plan':
@@ -799,15 +831,20 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
-              {editingData ? 'Atualizar Plano' : 'Salvar Plano'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar Plano'}
+              </button>
+            </div>
           </form>
         );
       case 'history':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-gray-900 dark:text-gray-100">
-            <div>
+          <form onSubmit={handleSave} className="p-5 md:p-8 space-y-6 md:space-y-8 text-gray-900 dark:text-gray-100">
+            <div className="space-y-6">
               <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
               <select
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
@@ -919,9 +956,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700">
-              {editingData ? 'Atualizar História' : 'Salvar História de Vida'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
+                Cancelar
+              </button>
+              <button type="submit" className="flex-[2] py-3 md:py-4 bg-orange-600 text-white rounded-2xl font-bold shadow-lg shadow-orange-200 dark:shadow-none hover:bg-orange-700 transition-all">
+                {editingData ? 'Salvar Edição' : 'Salvar História'}
+              </button>
+            </div>
           </form>
         );
       default:
@@ -1690,7 +1732,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
+      <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'residents', label: 'Residentes', icon: Users },
@@ -1735,13 +1777,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </p>
                 <div className="flex gap-4 mt-6">
                   <button 
-                    onClick={() => {
+                    onClick={async () => {
                       if ((patients || []).length === 0) return;
                       const data = (patients || []).map(p => {
                         const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
                         return [p.name, p.age, patientEvolutions.length, p.status];
                       });
-                      generateModernPDF({
+                      await generateModernPDF({
                         title: 'Relatório Pedagógico Geral',
                         subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
                         columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
@@ -1783,23 +1825,25 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-transparent dark:border-gray-800 transition-all">
-            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden shadow-2xl border border-transparent dark:border-gray-800 transition-all flex flex-col">
+            <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 sticky top-0 z-10">
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                 Novo Registro Pedagógico
                 {isExtracting && (
                   <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Extraindo Dados...
+                    Salvando...
                   </span>
                 )}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors">
-                <X className="w-6 h-6 text-gray-900 dark:text-gray-100" />
+              <button onClick={() => setIsModalOpen(false)} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={20} className="text-gray-900 dark:text-gray-100" />
               </button>
             </div>
-            {renderModalContent()}
+            <div className="flex-1 overflow-y-auto">
+              {renderModalContent()}
+            </div>
           </div>
         </div>
       )}

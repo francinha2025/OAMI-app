@@ -195,7 +195,17 @@ export interface Workshop {
   date: string;
   description: string;
   participants: string[];
-  type: 'PROFISSIONAL' | 'IDOSOS';
+  type: 'OFICINA' | 'CAPACITACAO';
+  // 5W2H fields
+  what: string;
+  why: string;
+  where: string;
+  when: string;
+  who: string;
+  how: string;
+  howMuch: string;
+  registeredBy?: string;
+  professionalId?: string;
 }
 
 export interface CommunityElderly {
@@ -251,6 +261,7 @@ export interface Professional {
   name: string;
   role: Role;
   registrationNumber: string;
+  cpf?: string;
   phone: string;
   email: string;
   address: string;
@@ -371,6 +382,9 @@ export interface Medication {
   type: 'CONTINUA' | 'CONTROLADA' | 'PONTUAL';
   startDate: string;
   endDate?: string;
+  period?: string;
+  registeredBy?: string;
+  prescriber?: string;
 }
 
 export interface MedicationAdministration {
@@ -441,7 +455,25 @@ export interface ShiftSchedule {
   date: string;
   shift: 'MANHA' | 'TARDE' | 'NOITE';
   professionals: string[];
+  staffMemberIds?: string[];
+  observations?: string;
   activities: string;
+}
+
+export type StaffRole = 'CUIDADOR' | 'SERVICO_GERAIS' | 'COZINHEIRA' | 'VIGIA';
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: StaffRole;
+  cpf?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  admissionDate?: string;
+  status: 'ATIVO' | 'INATIVO';
+  observations?: string;
+  createdAt: string;
 }
 
 export interface AVDRecord {

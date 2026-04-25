@@ -18,7 +18,8 @@ import {
   ArrowDownRight,
   Search,
   Filter,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -288,7 +289,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       const fileName = `producao_fraldas_${selectedMonth}`;
 
       if (type === 'pdf') {
-        generateModernPDF({ title, columns, data, fileName, subtitle: `Resumo Mensal de Produção Finalizada` });
+        await generateModernPDF({ title, columns, data, fileName, subtitle: `Resumo Mensal de Produção Finalizada` });
       } else if (type === 'word') {
         await generateModernWord({ title, columns, data, fileName, subtitle: `Resumo Mensal de Produção Finalizada` });
       } else if (type === 'excel') {
@@ -733,13 +734,23 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                 onChange={e => setRawForm({...rawForm, observations: e.target.value})}
               />
             </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-xl hover:bg-green-700 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Salvando...' : 'Confirmar Produção'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="flex-[2] py-4 bg-green-600 text-white rounded-2xl font-bold shadow-xl hover:bg-green-700 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Confirmar Produção
+              </button>
+            </div>
           </form>
         );
       case 'wip':
@@ -794,13 +805,23 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                 </select>
               </div>
             )}
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Salvando...' : 'Finalizar Processamento'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Finalizar Processamento
+              </button>
+            </div>
           </form>
         );
       case 'final':
@@ -843,13 +864,23 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                 />
               </div>
             </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-amber-600 text-white rounded-2xl font-bold shadow-xl hover:bg-amber-700 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Salvando...' : 'Concluir Embalagem'}
-            </button>
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="flex-[2] py-4 bg-amber-600 text-white rounded-2xl font-bold shadow-xl hover:bg-amber-700 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Concluir Embalagem
+              </button>
+            </div>
           </form>
         );
       case 'dashboard':
@@ -866,13 +897,23 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                 onChange={e => setGoalForm({...goalForm, targetQuantity: e.target.value})}
               />
             </div>
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-4 bg-green-600 text-white rounded-2xl font-bold shadow-xl hover:bg-green-700 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Salvando...' : 'Salvar Nova Meta'}
-            </button>
+            <div className="flex gap-4 pt-6">
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="flex-[2] py-4 bg-green-600 text-white rounded-2xl font-bold shadow-xl hover:bg-green-700 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Salvar Nova Meta
+              </button>
+            </div>
           </form>
         );
       default: return null;
@@ -937,33 +978,41 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       {/* Modal Genérico para CRUD */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl w-full max-w-lg overflow-hidden relative"
+              className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] shadow-2xl w-full max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col relative"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-black text-gray-800 dark:text-white">
-                  {activeTab === 'raw' ? 'Entrada de Produção' : 
-                   activeTab === 'wip' ? 'Registro de Processo' : 
-                   activeTab === 'final' ? 'Saída de Lote' : 'Definir Meta'}
-                </h3>
+              <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-20">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Produção</span>
+                  </div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white">
+                    {activeTab === 'raw' ? 'Entrada de Produção' : 
+                     activeTab === 'wip' ? 'Registro de Processo' : 
+                     activeTab === 'final' ? 'Saída de Lote' : 'Definir Meta'}
+                  </h3>
+                </div>
                 <button 
                   onClick={() => setIsModalOpen(false)} 
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-colors text-gray-400"
+                  className="p-2 md:p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl text-gray-400 hover:text-gray-600 dark:hover:text-white transition-all hover:rotate-90"
                 >
                   <Plus size={24} className="rotate-45" />
                 </button>
               </div>
 
-              {renderModalForm()}
-
-              <p className="text-[10px] text-center text-gray-400 mt-6 font-bold uppercase tracking-widest">
-                Sistema SGPF - Rastreabilidade Garantida
-              </p>
+              <div className="p-5 md:p-8 overflow-y-auto flex-1">
+                {renderModalForm()}
+                
+                <p className="text-[10px] text-center text-gray-400 mt-8 font-bold uppercase tracking-widest">
+                  Sistema SGPF - Rastreabilidade Garantida
+                </p>
+              </div>
             </motion.div>
           </div>
         )}

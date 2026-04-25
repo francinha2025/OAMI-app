@@ -4,6 +4,53 @@
   --dark-mode: class;
 }
 
+/* Print Styles */
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: black !important;
+  }
+
+  /* Force background colors and colors to show up in PDF */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Hide common UI patterns */
+  nav, aside, button, footer, .sidebar, .topbar, .no-print {
+    display: none !important;
+  }
+
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Optimize for A4 */
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+}
+
+.print-only {
+  display: none;
+}
+
 /* Prevent auto-zoom on iOS by ensuring inputs have 16px font size */
 @layer base {
   input, select, textarea {
@@ -14,6 +61,7 @@
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {

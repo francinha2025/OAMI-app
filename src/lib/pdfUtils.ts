@@ -12,7 +12,7 @@ interface PDFOptions {
   institutionLogo?: string; // Base64 or URL
 }
 
-export const generateModernPDF = ({
+export const generateModernPDF = async ({
   title,
   subtitle,
   columns,
@@ -30,6 +30,21 @@ export const generateModernPDF = ({
   const secondaryGreen: [number, number, number] = [5, 150, 105]; // #059669
   const lightGray: [number, number, number] = [249, 250, 251];
 
+  // Pre-load logo to avoid jspdf URL issues
+  let logoData: string | ArrayBuffer | null = null;
+  if (institutionLogo) {
+    try {
+      const response = await fetch(institutionLogo, {
+        referrerPolicy: "no-referrer",
+        cache: "force-cache"
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      logoData = await response.arrayBuffer();
+    } catch (e) {
+      console.error("Error pre-loading logo", e);
+    }
+  }
+
   // Header Function
   const addHeader = (doc: jsPDF, pageNum: number) => {
     // Top Green Bar
@@ -37,9 +52,11 @@ export const generateModernPDF = ({
     doc.rect(0, 0, pageWidth, 15, 'F');
 
     // Institution Logo/Letterhead placeholder
-    if (institutionLogo) {
+    const hasLogo = !!logoData;
+    if (logoData) {
       try {
-        doc.addImage(institutionLogo, 'PNG', 14, 20, 40, 20);
+        // Larger logo for "Official" look
+        doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 18, 30, 30);
       } catch (e) {
         console.error("Error adding logo to PDF", e);
       }
@@ -47,25 +64,31 @@ export const generateModernPDF = ({
 
     // Institution Name
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setTextColor(50, 50, 50);
-    doc.text(institutionName, institutionLogo ? 60 : 14, 28);
+    doc.text(institutionName, hasLogo ? 50 : 14, 28);
+    
+    // Unidade text
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Relatório Oficial de Atendimento', hasLogo ? 50 : 14, 34);
 
     // Report Title
     doc.setFontSize(18);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(title, institutionLogo ? 60 : 14, 38);
+    doc.text(title, hasLogo ? 50 : 14, 44);
 
     if (subtitle) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(subtitle, institutionLogo ? 60 : 14, 44);
+      doc.text(subtitle, hasLogo ? 50 : 14, 50);
     }
 
     // Horizontal Line
-    doc.setDrawColor(230, 230, 230);
-    doc.line(14, 50, pageWidth - 14, 50);
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(14, 54, pageWidth - 14, 54);
   };
 
   // Footer Function
@@ -74,7 +97,7 @@ export const generateModernPDF = ({
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(150, 150, 150);
     
-    const footerText = `Gerado em: ${new Date().toLocaleString('pt-BR')}`;
+    const footerText = `Documento gerado pelo Sistema OAMI em ${new Date().toLocaleString('pt-BR')}`;
     doc.text(footerText, 14, pageHeight - 10);
     
     const pageText = `Página ${pageNum} de ${totalPages}`;
@@ -83,12 +106,12 @@ export const generateModernPDF = ({
     
     // Bottom Green Accent
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.rect(pageWidth - 40, pageHeight - 2, 40, 2, 'F');
+    doc.rect(14, pageHeight - 5, pageWidth - 28, 0.5, 'F');
   };
 
   // Generate Table
   autoTable(doc, {
-    startY: 55,
+    startY: 60,
     head: [columns],
     body: data,
     theme: 'striped',
