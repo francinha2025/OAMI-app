@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -197,7 +197,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               Monitoramento de Bem-estar
             </h3>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={(props.emotionalMonitorings || []).slice(-7).map(m => ({
                   date: m.date,
                   score: m.wellBeing === 'FELIZ' ? 3 : m.wellBeing === 'NEUTRO' ? 2 : 1
@@ -1028,7 +1028,7 @@ const ReportsView = ({ patients, evolutions }: any) => {
         subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
         data,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     } else {
       await generateModernWord({
@@ -1036,7 +1036,7 @@ const ReportsView = ({ patients, evolutions }: any) => {
         subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
         data,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     }
   };

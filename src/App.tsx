@@ -99,7 +99,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { cn } from './lib/utils';
+import { cn, safeReplace } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
@@ -317,7 +317,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
       let potentialCommand: AISmartCommandResult | undefined = undefined;
 
       if (parsed && parsed.isCommand && parsed.confidence > 0.4 && parsed.recordType) {
-        aiContent = `Entendido! Identifiquei um registro de ${parsed.recordType?.replace('_', ' ') || ''}. Deseja salvar estas informações?`;
+        aiContent = `Entendido! Identifiquei um registro de ${safeReplace(parsed.recordType, '_', ' ')}. Deseja salvar estas informações?`;
         
         if (parsed.patientNameHint) {
           const searchName = parsed.patientNameHint.toLowerCase().trim();
@@ -328,7 +328,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
           );
           if (match) {
             parsed.patientId = match.id;
-            aiContent = `Identifiquei um registro de ${parsed.recordType?.replace('_', ' ') || ''} para **${match.name}**. Deseja salvar?`;
+            aiContent = `Identifiquei um registro de ${safeReplace(parsed.recordType, '_', ' ')} para **${match.name}**. Deseja salvar?`;
           }
         }
         potentialCommand = parsed;
@@ -1288,7 +1288,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
                 </div>
                 <div className="flex-1">
                   <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{s.name}</h4>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-wider mt-1">{s.role?.replace('_', ' ') || 'FUNÇÃO'}</p>
+                  <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-wider mt-1">{safeReplace(s.role, '_', ' ') || 'FUNÇÃO'}</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><UserIcon size={10} /> CPF: {s.cpf || 'N/A'}</span>
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><Phone size={10} /> {s.phone || 'N/A'}</span>
@@ -2606,7 +2606,7 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
           subtitle: `Acolhido: ${selectedElderly.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
           columns,
           data,
-          fileName: `PIA_${selectedElderly.name.replace(/\s+/g, '_')}`
+          fileName: `PIA_${safeReplace(selectedElderly.name, /\s+/g, '_')}`
         });
       } else {
         const columns = ['Campo', 'Informação'];
@@ -2637,7 +2637,7 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
           subtitle: `Acolhido: ${selectedElderly.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
           columns,
           data,
-          fileName: `PIA_${selectedElderly.name.replace(/\s+/g, '_')}`
+          fileName: `PIA_${safeReplace(selectedElderly.name, /\s+/g, '_')}`
         });
       }
       showToast(`PIA exportado com sucesso em ${fileFormat.toUpperCase()}!`);
@@ -3413,7 +3413,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
       } else if (fileFormat === 'xls') {
         generateModernExcel({ title, columns, data, fileName });
       }
-      showToast(`Relatório financeiro exportado em ${fileFormat.toUpperCase().replace('XLS', 'EXCEL')}!`);
+      showToast(`Relatório financeiro exportado em ${safeReplace(fileFormat.toUpperCase(), 'XLS', 'EXCEL')}!`);
     } catch (err) {
       console.error("Export Error:", err);
       showToast('Erro ao exportar relatório financeiro', 'error');
@@ -5138,7 +5138,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
                 e.type === 'REUNIAO' ? 'bg-purple-100 text-purple-700' :
                 'bg-gray-100 text-gray-700'
               )}>
-                {e.type?.replace('_', ' ') || 'INDIVIDUAL'}
+                {safeReplace(e.type, '_', ' ') || 'INDIVIDUAL'}
               </span>
             </div>
             
@@ -5899,7 +5899,7 @@ const ReportsSection = ({
         subtitle: `Período: ${periodLabel} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
         columns,
         data,
-        fileName: `relatorio_${reportPeriod}_${periodLabel.replace(/\//g, '-')}`
+        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
       });
       showToast('Relatório PDF gerado com sucesso!');
     } catch (error) {
@@ -5921,7 +5921,7 @@ const ReportsSection = ({
         subtitle: `Período: ${periodLabel} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
         columns,
         data,
-        fileName: `relatorio_${reportPeriod}_${periodLabel.replace(/\//g, '-')}`
+        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
       });
       showToast('Relatório Word gerado com sucesso!');
     } catch (error) {
@@ -5942,7 +5942,7 @@ const ReportsSection = ({
         title: 'Relatório OAMI',
         columns,
         data,
-        fileName: `relatorio_${reportPeriod}_${periodLabel.replace(/\//g, '-')}`
+        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
       });
       showToast('Relatório Excel gerado com sucesso!');
     } catch (error) {
@@ -6716,7 +6716,7 @@ const StaffManagementSection = ({ staff, onSave, showToast }: { staff: StaffMemb
             <h4 className="font-bold text-gray-900 dark:text-white text-lg mb-1">{s.name}</h4>
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
               <Briefcase size={14} className="text-green-600" />
-              <span className="font-medium uppercase tracking-tight">{s.role?.replace('_', ' ') || 'CUIDADORA'}</span>
+              <span className="font-medium uppercase tracking-tight">{safeReplace(s.role, '_', ' ') || 'CUIDADORA'}</span>
             </div>
             {s.phone && (
               <p className="text-xs text-gray-400 mb-4">Tel: {s.phone}</p>
@@ -7031,7 +7031,7 @@ const MonitoringSection = ({
                     return (
                       <div key={status} className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="font-bold text-gray-600 dark:text-gray-400">{status?.replace('_', ' ') || 'ATIVO'}</span>
+                          <span className="font-bold text-gray-600 dark:text-gray-400">{safeReplace(status, '_', ' ') || 'ATIVO'}</span>
                           <span className="font-bold text-gray-800 dark:text-white">{count}</span>
                         </div>
                         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -7119,7 +7119,7 @@ const MonitoringSection = ({
                         pia.status === 'CONCLUIDO' ? 'bg-green-100 text-green-600' :
                         'bg-yellow-100 text-yellow-600'
                       )}>
-                        {pia.status?.replace('_', ' ') || 'ATIVO'}
+                        {safeReplace(pia.status, '_', ' ') || 'ATIVO'}
                       </span>
                     </div>
                     <div className="space-y-3">
@@ -7755,6 +7755,33 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // --- Initial System Cleanup and Connection Test ---
+  useEffect(() => {
+    // Unregister stale service workers that might cause fetch errors
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const registration of registrations) {
+          registration.unregister();
+          console.log("Service Worker desregistrado para evitar erro de fetch.");
+        }
+      });
+    }
+
+    // Connection Test
+    const testConnection = async () => {
+      try {
+        const { doc, getDocFromServer } = await import('firebase/firestore');
+        await getDocFromServer(doc(db, 'settings', 'institutional'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('offline')) {
+          console.error("Conexão instável ou offline.");
+        }
+      }
+    };
+    testConnection();
+  }, []);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -8123,13 +8150,13 @@ export default function App() {
     if (!isAuthReady || !user) return;
 
     // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString();
-
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
 
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -8145,8 +8172,58 @@ export default function App() {
     let unsubRawProd = () => {};
     let unsubWIP = () => {};
     let unsubGoals = () => {};
+    let unsubCommunityElderly = () => {};
+    let unsubCaregivers = () => {};
+    let unsubEvolutions = () => {};
+    let unsubEvents = () => {};
+    let unsubStock = () => {};
+    let unsubFinal = () => {};
+    let unsubFinancial = () => {};
+    let unsubUsers = () => {};
+    let unsubPias = () => {};
+    let unsubGallery = () => {};
+    let unsubWorkshops = () => {};
+    let unsubFamilyEngagements = () => {};
+    let unsubProfessionals = () => {};
+    let unsubPhysioPatients = () => {};
+    let unsubPhysioAssessments = () => {};
+    let unsubPhysioEvolutions = () => {};
+    let unsubPhysioExercises = () => {};
+    let unsubPhysioAppointments = () => {};
+    let unsubNursingPatients = () => {};
+    let unsubMedications = () => {};
+    let unsubMedicationAdministrations = () => {};
+    let unsubVitalSigns = () => {};
+    let unsubDressingRecords = () => {};
+    let unsubNursingEvolutions = () => {};
+    let unsubIncidentRecords = () => {};
+    let unsubShiftSchedules = () => {};
+    let unsubAvdRecords = () => {};
+    let unsubDiaperChangeRecords = () => {};
+    let unsubPsychPatients = () => {};
+    let unsubPsychInitialAssessments = () => {};
+    let unsubPsychEvolutions = () => {};
+    let unsubPsychAppointments = () => {};
+    let unsubPsychEmotionalMonitorings = () => {};
+    let unsubPsychFamilyBonds = () => {};
+    let unsubPsychActivities = () => {};
+    let unsubPsychCognitionAssessments = () => {};
+    let unsubPsychInterventionPlans = () => {};
+    let unsubPedagogyPatients = () => {};
+    let unsubPedagogyInitialAssessments = () => {};
+    let unsubPedagogyEvolutions = () => {};
+    let unsubPedagogyActivities = () => {};
+    let unsubPedagogyStimulationTrackings = () => {};
+    let unsubPedagogySocialParticipations = () => {};
+    let unsubPedagogyIndividualPlans = () => {};
+    let unsubSocialPatients = () => {};
+    let unsubSocialStudies = () => {};
+    let unsubSocialEvolutions = () => {};
+    let unsubSocialReferrals = () => {};
+    let unsubSocialFamilyVisits = () => {};
+    let unsubSocialRiskSituations = () => {};
 
-    // 1. Core Data (Always needed, but use getDocs for less volatile info)
+    // 1. Core Data (Always needed, real-time listeners)
     // --- Data Seeding for Francisco Gomes da Silva (User Request) ---
     const seedFranciscoRequest = async () => {
       if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
@@ -8192,33 +8269,18 @@ export default function App() {
     };
     seedFranciscoRequest();
 
-    const fetchStaticData = async () => {
-      try {
-        const elderlySnap = await getDocs(query(collection(db, 'elderly'), orderBy('name'), limit(150)));
-        setElderly(elderlySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Elderly)));
+    // Replaced fetchStaticData with real-time listeners
+    unsubElderly = onSnapshot(query(collection(db, 'elderly'), orderBy('name'), limit(300)), (snapshot) => {
+      setElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Elderly)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'elderly'));
 
-        const staffSnap = await getDocs(collection(db, 'staffMembers'));
-        setStaffMembers(staffSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
+    unsubStaff = onSnapshot(collection(db, 'staffMembers'), (snapshot) => {
+      setStaffMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'staffMembers'));
 
-        const volunteersSnap = await getDocs(query(collection(db, 'volunteers'), orderBy('name'), limit(50)));
-        setVolunteers(volunteersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
-
-        const communitySnap = await getDocs(query(collection(db, 'communityElderly'), limit(50)));
-        setCommunityElderly(communitySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
-
-        const caregiversSnap = await getDocs(query(collection(db, 'caregivers'), limit(50)));
-        setCaregivers(caregiversSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
-
-        const piasSnap = await getDocs(query(collection(db, 'pias'), limit(50)));
-        setPias(piasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
-
-        const usersSnap = await getDocs(query(collection(db, 'users'), limit(50)));
-        setAllUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, 'static_collections');
-      }
-    };
-    fetchStaticData();
+    unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
+      setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
 
     // 2. Real-time Critical Listeners (Keep as onSnapshot)
     // Listen to Evolutions (Histórico de 1 ano para Dashboard)
@@ -8228,24 +8290,24 @@ export default function App() {
       orderBy('date', 'desc'),
       limit(500)
     );
-    const unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
+    unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
       setEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EvolutionRecord)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'evolutions'));
 
     // Calendar Events
-    const unsubEvents = onSnapshot(query(collection(db, 'calendarEvents'), orderBy('date'), limit(100)), (snapshot) => {
+    unsubEvents = onSnapshot(query(collection(db, 'calendarEvents'), orderBy('date'), limit(100)), (snapshot) => {
       setCalendarEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'calendarEvents'));
 
     // Stock for Diapers
-    const unsubStock = onSnapshot(doc(db, 'diaperStock', 'current'), (docSnap) => {
+    unsubStock = onSnapshot(doc(db, 'diaperStock', 'current'), (docSnap) => {
       if (docSnap.exists()) {
         setDiaperStock({ id: docSnap.id, ...docSnap.data() } as DiaperStock);
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'diaperStock/current'));
 
     // Final Packings (Histórico de 1 ano para Dashboard)
-    const unsubFinal = onSnapshot(query(
+    unsubFinal = onSnapshot(query(
       collection(db, 'diaperFinalPackings'), 
       where('date', '>=', oneYearAgoStr),
       orderBy('date', 'desc'),
@@ -8255,7 +8317,6 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
 
     // Listen to Financial Records
-    let unsubFinancial = () => {};
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qFinancial = query(
         collection(db, 'financial'), 
@@ -8269,7 +8330,7 @@ export default function App() {
     }
 
     // Listen to All Users (Limitado para evitar leitura massiva)
-    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(50)), (snapshot) => {
+    unsubUsers = onSnapshot(query(collection(db, 'users'), limit(50)), (snapshot) => {
       setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'users');
@@ -8277,7 +8338,7 @@ export default function App() {
     });
 
     // Listen to PIAs
-    const unsubPias = onSnapshot(query(collection(db, 'pias'), limit(100)), (snapshot) => {
+    unsubPias = onSnapshot(query(collection(db, 'pias'), limit(100)), (snapshot) => {
       setPias(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'pias');
@@ -8286,7 +8347,7 @@ export default function App() {
 
     // Listen to Gallery
     const qGallery = query(collection(db, 'gallery'), orderBy('date', 'desc'), limit(50));
-    const unsubGallery = onSnapshot(qGallery, (snapshot) => {
+    unsubGallery = onSnapshot(qGallery, (snapshot) => {
       const galleryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
       if (!galleryData || galleryData.length === 0) {
         setAllPhotos(MOCK_GALLERY);
@@ -8298,27 +8359,27 @@ export default function App() {
       showToast('Erro ao carregar galeria', 'error');
     });
 
-    // Listen to Community Elderly
+    // Listen for Community Elderly (real-time)
     const qCommunityElderly = query(collection(db, 'communityElderly'), orderBy('name'), limit(100));
-    const unsubCommunityElderly = onSnapshot(qCommunityElderly, (snapshot) => {
+    unsubCommunityElderly = onSnapshot(qCommunityElderly, (snapshot) => {
       setCommunityElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'communityElderly'));
 
     // Listen to Workshops (1 ano para dashboard)
     const qWorkshops = query(collection(db, 'workshops'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(150));
-    const unsubWorkshops = onSnapshot(qWorkshops, (snapshot) => {
+    unsubWorkshops = onSnapshot(qWorkshops, (snapshot) => {
       setWorkshops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Workshop)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'workshops'));
 
-    // Listen to Caregivers
+    // Listen for Caregivers (real-time)
     const qCaregivers = query(collection(db, 'caregivers'), orderBy('name'), limit(100));
-    const unsubCaregivers = onSnapshot(qCaregivers, (snapshot) => {
+    unsubCaregivers = onSnapshot(qCaregivers, (snapshot) => {
       setCaregivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregivers'));
 
     // Listen to Family Engagements
-    const qFamilyEngagements = query(collection(db, 'familyEngagements'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50));
-    const unsubFamilyEngagements = onSnapshot(qFamilyEngagements, (snapshot) => {
+    const qFamilyEngagements = query(collection(db, 'familyEngagements'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50));
+    unsubFamilyEngagements = onSnapshot(qFamilyEngagements, (snapshot) => {
       setFamilyEngagements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyEngagement)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'familyEngagements'));
 
@@ -8330,12 +8391,6 @@ export default function App() {
     }).catch(err => handleFirestoreError(err, OperationType.GET, 'settings/institutional'));
 
     // 3. Tab-Specific Lazy Listeners
-    let unsubPhysioPatients = () => {};
-    let unsubPhysioAssessments = () => {};
-    let unsubPhysioEvolutions = () => {};
-    let unsubPhysioExercises = () => {};
-    let unsubPhysioAppointments = () => {};
-
     if (activeTab === 'physio' || activeTab === 'professional' || activeTab === 'dashboard') {
       if (['PRESIDENTE', 'COORDENADORA', 'FISIOTERAPEUTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
         const qPhysioPatients = query(collection(db, 'physioPatients'), orderBy('name'), limit(100));
@@ -8343,11 +8398,11 @@ export default function App() {
           setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
 
-        unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
 
-        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
           setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
 
@@ -8355,24 +8410,13 @@ export default function App() {
           setPhysioExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioExercise)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioExercises'));
 
-        unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPhysioAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAppointment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
       }
     }
 
     // Nursing Listeners (Cargo ou Board)
-    let unsubNursingPatients = () => {};
-    let unsubMedications = () => {};
-    let unsubMedicationAdministrations = () => {};
-    let unsubVitalSigns = () => {};
-    let unsubDressingRecords = () => {};
-    let unsubNursingEvolutions = () => {};
-    let unsubIncidentRecords = () => {};
-    let unsubShiftSchedules = () => {};
-    let unsubAvdRecords = () => {};
-    let unsubDiaperChangeRecords = () => {};
-
     if (activeTab === 'nursing' || activeTab === 'professional' || activeTab === 'dashboard') {
       if (['PRESIDENTE', 'COORDENADORA', 'ENFERMEIRA', 'TECNICO_ENFERMAGEM', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
         unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
@@ -8383,15 +8427,15 @@ export default function App() {
           setMedications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Medication)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'medications'));
 
-        unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
           setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
 
-        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
 
-        unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
 
@@ -8399,42 +8443,32 @@ export default function App() {
           setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
 
-        unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setIncidentRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncidentRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'incidentRecords'));
 
-        unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setShiftSchedules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShiftSchedule)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'shiftSchedules'));
 
-        unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setAvdRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AVDRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'avdRecords'));
 
-        unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
           setDiaperChangeRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperChangeRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperChangeRecords'));
       }
     }
 
     // Psych Listeners (Cargo ou Board)
-    let unsubPsychPatients = () => {};
-    let unsubPsychInitialAssessments = () => {};
-    let unsubPsychEvolutions = () => {};
-    let unsubPsychAppointments = () => {};
-    let unsubPsychEmotionalMonitorings = () => {};
-    let unsubPsychFamilyBonds = () => {};
-    let unsubPsychActivities = () => {};
-    let unsubPsychCognitionAssessments = () => {};
-    let unsubPsychInterventionPlans = () => {};
-
     if (activeTab === 'psychology' || activeTab === 'professional' || activeTab === 'dashboard') {
       if (['PRESIDENTE', 'COORDENADORA', 'PSICOLOGA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
         unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name'), limit(100)), (snapshot) => {
           setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
 
-        unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
 
@@ -8442,48 +8476,40 @@ export default function App() {
           setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
 
-        unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPsychAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychAppointment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychAppointments'));
 
-        unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPsychEmotionalMonitorings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEmotionalMonitoring)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEmotionalMonitorings'));
 
-        unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPsychFamilyBonds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychFamilyBond)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychFamilyBonds'));
 
-        unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPsychActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychActivity)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychActivities'));
 
-        unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPsychCognitionAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychCognitionAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychCognitionAssessments'));
 
-        unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPsychInterventionPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInterventionPlan)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInterventionPlans'));
       }
     }
 
     // Pedagogy listeners (Cargo ou Board)
-    let unsubPedagogyPatients = () => {};
-    let unsubPedagogyInitialAssessments = () => {};
-    let unsubPedagogyEvolutions = () => {};
-    let unsubPedagogyActivities = () => {};
-    let unsubPedagogyStimulationTrackings = () => {};
-    let unsubPedagogySocialParticipations = () => {};
-    let unsubPedagogyIndividualPlans = () => {};
-
     if (activeTab === 'pedagogy' || activeTab === 'professional' || activeTab === 'dashboard') {
       if (['PRESIDENTE', 'COORDENADORA', 'PEDAGOGA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
         unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name'), limit(100)), (snapshot) => {
           setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
 
-        unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
 
@@ -8491,15 +8517,15 @@ export default function App() {
           setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
 
-        unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPedagogyActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyActivity)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyActivities'));
 
-        unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPedagogyStimulationTrackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyStimulationTracking)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyStimulationTrackings'));
 
-        unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
           setPedagogySocialParticipations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogySocialParticipation)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogySocialParticipations'));
 
@@ -8515,23 +8541,13 @@ export default function App() {
     }
 
     // Social Work Listeners (Cargo ou Board)
-    let unsubSocialPatients = () => {};
-    let unsubSocialFamilyTies = () => {};
-    let unsubSocialDocumentations = () => {};
-    let unsubSocialLegalSituations = () => {};
-    let unsubSocialStudies = () => {};
-    let unsubSocialEvolutions = () => {};
-    let unsubSocialReferrals = () => {};
-    let unsubSocialFamilyVisits = () => {};
-    let unsubSocialRiskSituations = () => {};
-
     if (activeTab === 'socialWork' || activeTab === 'professional' || activeTab === 'dashboard') {
       if (['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
         unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name'), limit(100)), (snapshot) => {
           setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
 
-        unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
 
@@ -8539,15 +8555,15 @@ export default function App() {
           setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
 
-        unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setSocialReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialReferral)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialReferrals'));
 
-        unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setSocialFamilyVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyVisit)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyVisits'));
 
-        unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
           setSocialRiskSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialRiskSituation)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialRiskSituations'));
       }
@@ -8555,7 +8571,6 @@ export default function App() {
 
 
     // Listen to Professionals
-    let unsubProfessionals = () => {};
     if (user && (['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com')) {
       const qProfessionals = query(collection(db, 'professionals'), orderBy('name'), limit(100));
       unsubProfessionals = onSnapshot(qProfessionals, (snapshot) => {
@@ -8624,7 +8639,7 @@ export default function App() {
       unsubFinal();
       unsubGoals();
     };
-  }, [isAuthReady, user?.id, user?.role]);
+  }, [isAuthReady, user?.id, user?.role, activeTab]);
 
   const handleGoogleLogin = async () => {
     try {

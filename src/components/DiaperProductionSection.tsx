@@ -40,7 +40,7 @@ import {
 } from 'recharts';
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO, subMonths, eachDayOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { 
   User as UserType, 
   DiaperRawProduction, 
@@ -279,7 +279,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
         .map(p => [
           format(parseISO(p.date), 'dd/MM/yyyy'),
           p.batchNumber,
-          p.packageType.replace('_', ' '),
+          safeReplace(p.packageType, '_', ' '),
           p.quantityPackaged,
           p.operator
         ]);
@@ -473,7 +473,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   <div className="flex items-center gap-3">
                     <span className="text-lg font-black text-gray-800 dark:text-white">{record.quantityPackaged} un.</span>
                     <span className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold rounded uppercase">
-                      {record.packageType.replace('_', ' ')}
+                      {safeReplace(record.packageType, '_', ' ')}
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-1">
@@ -619,7 +619,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   Evolução de Fluxo Diário
                 </h4>
              </div>
-             <ResponsiveContainer width="100%" height="85%">
+             <ResponsiveContainer width="100%" height="85%" minWidth={0}>
                <AreaChart data={dailyData}>
                  <defs>
                    <linearGradient id="colorRaw" x1="0" y1="0" x2="0" y2="1">
@@ -650,7 +650,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               Mix de Produção (Tipos)
             </h4>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie
                     data={pieData}

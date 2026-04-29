@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -383,7 +383,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             Evolução de Atendimentos
           </h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={evolutionChartData}>
                 <defs>
                   <linearGradient id="colorEvolution" x1="0" y1="0" x2="0" y2="1">
@@ -407,7 +407,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             Situações de Risco por Tipo
           </h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie
                   data={[
@@ -459,7 +459,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 text-blue-700" :
                   "bg-red-100 text-red-700"
                 )}>
-                  {referral.status?.replace('_', ' ') || 'PENDENTE'}
+                  {safeReplace(referral.status, '_', ' ') || 'PENDENTE'}
                 </span>
               </div>
             ))}
@@ -1758,7 +1758,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" :
                     "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400"
                   )}>
-                    {patient.benefitStatus?.replace('_', ' ') || 'ATIVO'}
+                    {safeReplace(patient.benefitStatus, '_', ' ') || 'ATIVO'}
                   </div>
                 </div>
 
@@ -1932,7 +1932,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   referral.status === 'CONCLUIDO' ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" :
                   referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
                 )}>
-                  {referral.status?.replace('_', ' ') || 'PENDENTE'}
+                  {safeReplace(referral.status, '_', ' ') || 'PENDENTE'}
                 </span>
               </div>
               
@@ -2039,7 +2039,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               <p className="text-gray-700 bg-gray-50 p-4 rounded-xl border border-gray-100">{risk.description}</p>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">Status: <span className="font-bold text-gray-700">{risk.status?.replace('_', ' ') || 'EM_ANALISE'}</span></span>
+                <span className="text-xs font-medium text-gray-500">Status: <span className="font-bold text-gray-700">{safeReplace(risk.status, '_', ' ') || 'EM_ANALISE'}</span></span>
                 <button className="text-blue-600 text-sm font-bold hover:underline">Atualizar Acompanhamento</button>
               </div>
             </div>
@@ -2084,7 +2084,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     pia.status === 'EM_ANDAMENTO' ? "bg-blue-100 text-blue-700" :
                     "bg-orange-100 text-orange-700"
                   )}>
-                    {pia.status?.replace('_', ' ') || 'EM_ANDAMENTO'}
+                    {safeReplace(pia.status, '_', ' ') || 'EM_ANDAMENTO'}
                   </span>
                   <button 
                     onClick={() => openModal('pia', pia)}
@@ -2173,7 +2173,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 text-red-700" :
                   "bg-gray-100 text-gray-700"
                 )}>
-                  {patient.benefitStatus.replace('_', ' ')}
+                  {safeReplace(patient.benefitStatus, '_', ' ')}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2215,7 +2215,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
         data,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     };
 
@@ -2228,7 +2228,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
         columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
         data,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     };
 

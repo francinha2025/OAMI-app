@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -159,7 +159,7 @@ export const PhysioSection = ({
       subtitle: `Documento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
       columns: ['Campo/Data', 'Descrição/Informação'],
       data,
-      fileName: `prontuario_${patient.name.toLowerCase().replace(/\s/g, '_')}`
+      fileName: `prontuario_${safeReplace(patient.name.toLowerCase(), /\s/g, '_')}`
     });
   };
 
@@ -232,7 +232,7 @@ export const PhysioSection = ({
       subtitle: `Documento gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
       columns: ['Campo/Data', 'Descrição/Informação'],
       data,
-      fileName: `prontuario_${patient.name.toLowerCase().replace(/\s/g, '_')}`
+      fileName: `prontuario_${safeReplace(patient.name.toLowerCase(), /\s/g, '_')}`
     });
   };
 
@@ -379,7 +379,7 @@ export const PhysioSection = ({
                 <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
                   <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">Atendimentos da Semana</h3>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={weeklyAttendanceData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} />

@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -1090,7 +1090,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             Evolução de Participação
           </h3>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={(socialParticipations || []).slice(-7)}>
                 <defs>
                   <linearGradient id="colorParticipation" x1="0" y1="0" x2="0" y2="1">
@@ -1223,7 +1223,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       Cognitivo: {selectedPatient.cognitiveLevel}
                     </span>
                     <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-black uppercase tracking-wider border border-white/20">
-                      {selectedPatient.literacyLevel.replace('_', ' ')}
+                      {safeReplace(selectedPatient.literacyLevel, '_', ' ')}
                     </span>
                   </div>
                 </div>
@@ -1493,7 +1493,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
                     <BookOpen className="w-4 h-4 text-blue-500" />
-                    <span>{patient.literacyLevel.replace('_', ' ')}</span>
+                    <span>{safeReplace(patient.literacyLevel, '_', ' ')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
                     <Star className="w-4 h-4 text-yellow-500" />
@@ -1859,7 +1859,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   };
   return (
     <span className={cn("px-2 py-1 rounded-full text-[10px] font-bold uppercase", colors[status as keyof typeof colors])}>
-      {status.replace('_', ' ')}
+      {safeReplace(status, '_', ' ')}
     </span>
   );
 };

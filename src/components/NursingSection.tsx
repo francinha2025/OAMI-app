@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from '../lib/utils';
+import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -228,7 +228,7 @@ export const NursingSection = (props: NursingSectionProps) => {
               </select>
             </div>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={(props.vitalSigns || []).slice(0, 7).reverse()}>
                   <defs>
                     <linearGradient id="colorBP" x1="0" y1="0" x2="0" y2="1">
@@ -664,7 +664,7 @@ const ReportsView = ({ patients, evolutions, administrations, vitalSigns, incide
         subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
         columns,
         data: body,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     } else {
       await generateModernWord({
@@ -672,7 +672,7 @@ const ReportsView = ({ patients, evolutions, administrations, vitalSigns, incide
         subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
         columns,
         data: body,
-        fileName: title.toLowerCase().replace(/\s/g, '_')
+        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
       });
     }
   };
@@ -1261,7 +1261,7 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
                         />
                         <div className="flex flex-col">
                           <span className="text-sm font-bold text-gray-800 dark:text-white">{s.name}</span>
-                          <span className="text-[10px] text-gray-400 uppercase font-black">{s.role.replace('_', ' ')}</span>
+                          <span className="text-[10px] text-gray-400 uppercase font-black">{safeReplace(s.role, '_', ' ')}</span>
                         </div>
                       </label>
                     ))}
