@@ -87,8 +87,8 @@ export const PhysioSection = ({
 
   const filteredPatients = useMemo(() => {
     return (patients || []).filter(p => 
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.diagnosis?.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.diagnosis || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [patients, searchQuery]);
 

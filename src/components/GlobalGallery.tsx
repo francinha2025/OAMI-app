@@ -50,10 +50,10 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
   const filteredItems = useMemo(() => {
     return (items || []).filter(item => {
       const matchesSearch = 
-        item.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.professionalName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.activityType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.description?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
+      (item.patientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.professionalName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.activityType || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((item.description || '').toLowerCase().includes(searchTerm.toLowerCase()) || false);
       
       const matchesRole = selectedRole === 'ALL' || item.professionalRole === selectedRole;
       const matchesCategory = selectedCategory === 'ALL' || item.category === selectedCategory;

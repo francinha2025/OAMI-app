@@ -100,8 +100,8 @@ export const NursingSection = (props: NursingSectionProps) => {
 
   const filteredPatients = useMemo(() => {
     return (props.patients || []).filter(p => 
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p as any).diagnosis?.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (String((p as any).diagnosis || '')).toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [props.patients, searchQuery]);
 

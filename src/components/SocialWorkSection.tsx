@@ -69,6 +69,17 @@ type TabType =
   | 'legal' | 'study' | 'evolution' | 'referrals' 
   | 'visits' | 'risk' | 'benefits' | 'reports' | 'settings' | 'pia';
 
+const safeFormat = (dateStr: string | undefined | null, formatStr: string, fallback = '--/--') => {
+  if (!dateStr) return fallback;
+  try {
+    const date = parseISO(dateStr);
+    if (isNaN(date.getTime())) return fallback;
+    return format(date, formatStr, { locale: ptBR });
+  } catch (e) {
+    return fallback;
+  }
+};
+
 const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string }> = ({ active, onClick, icon: Icon, label }) => (
   <button
     onClick={onClick}
@@ -149,7 +160,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   }, [patients, familyTies, documentations, referrals, familyVisits]);
 
   const filteredPatients = (patients || []).filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const openModal = (type: string, initialData: any = {}) => {
@@ -327,7 +338,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     }).reverse();
 
     return last7Days.map(date => {
-      const count = evolutions.filter(e => e.date.startsWith(date)).length;
+      const count = (evolutions || []).filter(e => e.date && String(e.date).startsWith(date)).length;
       return {
         date,
         count
@@ -381,7 +392,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="date" tickFormatter={(str) => format(parseISO(str), 'dd/MM')} />
+                <XAxis dataKey="date" tickFormatter={(str) => safeFormat(str, 'dd/MM')} />
                 <YAxis />
                 <Tooltip />
                 <Area type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorEvolution)" />
@@ -448,7 +459,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 text-blue-700" :
                   "bg-red-100 text-red-700"
                 )}>
-                  {referral.status.replace('_', ' ')}
+                  {referral.status?.replace('_', ' ') || 'PENDENTE'}
                 </span>
               </div>
             ))}
@@ -1567,7 +1578,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   )}
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPatient.name}</h3>
-                <p className="text-sm text-gray-500 mb-4">{format(parseISO(selectedPatient.birthDate), 'dd/MM/yyyy')} ({new Date().getFullYear() - new Date(selectedPatient.birthDate).getFullYear()} anos)</p>
+                <p className="text-sm text-gray-500 mb-4">{safeFormat(selectedPatient.birthDate, 'dd/MM/yyyy')} ({selectedPatient.birthDate ? (new Date().getFullYear() - new Date(selectedPatient.birthDate).getFullYear()) : '--'} anos)</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase">{selectedPatient.maritalStatus}</span>
                   <span className={cn(
@@ -1599,7 +1610,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                   <div className="flex justify-between py-2 border-b border-gray-50">
                     <span className="text-gray-500">Renda Mensal</span>
-                    <span className="font-bold text-green-600">R$ {selectedPatient.income.toLocaleString()}</span>
+                    <span className="font-bold text-green-600">R$ {Number(selectedPatient.income || 0).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -1681,7 +1692,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <div key={i} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">{evo.serviceType}</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 font-bold">{format(parseISO(evo.date), 'dd/MM/yyyy')}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-bold">{safeFormat(evo.date, 'dd/MM/yyyy')}</span>
                       </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{evo.observation}</p>
                     </div>
@@ -1738,7 +1749,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight">{patient.name}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{format(parseISO(patient.birthDate), 'dd/MM/yyyy')}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{safeFormat(patient.birthDate, 'dd/MM/yyyy')}</p>
                     </div>
                   </div>
                   <div className={cn(
@@ -1747,7 +1758,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" :
                     "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400"
                   )}>
-                    {patient.benefitStatus.replace('_', ' ')}
+                    {patient.benefitStatus?.replace('_', ' ') || 'ATIVO'}
                   </div>
                 </div>
 
@@ -1758,7 +1769,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-medium">
                     <DollarSign className="w-4 h-4 text-green-500 dark:text-green-400" />
-                    <span>R$ {patient.income.toLocaleString()} ({patient.benefits.join(', ')})</span>
+                    <span>R$ {Number(patient.income || 0).toLocaleString()} ({(Array.isArray(patient.benefits) ? patient.benefits.join(', ') : 'Nenhum')})</span>
                   </div>
                 </div>
 
@@ -1798,7 +1809,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Realizado em {format(parseISO(study.date), 'dd/MM/yyyy')}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
                 <button className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
@@ -1861,7 +1872,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     </div>
                     <div>
                       <h4 className="font-bold text-gray-900 dark:text-white">{patient?.name}</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(evolution.date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
                     </div>
                   </div>
                   <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase">
@@ -1921,7 +1932,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   referral.status === 'CONCLUIDO' ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" :
                   referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
                 )}>
-                  {referral.status.replace('_', ' ')}
+                  {referral.status?.replace('_', ' ') || 'PENDENTE'}
                 </span>
               </div>
               
@@ -1933,7 +1944,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
 
               <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
-                <span className="font-bold">{format(parseISO(referral.date), 'dd/MM/yyyy')}</span>
+                <span className="font-bold">{safeFormat(referral.date, 'dd/MM/yyyy')}</span>
                 <button className="text-blue-600 dark:text-blue-400 font-black hover:underline">Ver Detalhes</button>
               </div>
             </div>
@@ -1972,7 +1983,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               const patient = (patients || []).find(p => p.id === visit.patientId);
               return (
                 <tr key={visit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">{format(parseISO(visit.date), 'dd/MM/yyyy')}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">{safeFormat(visit.date, 'dd/MM/yyyy')}</td>
                   <td className="px-6 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</td>
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold">{visit.visitorName}</td>
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{visit.kinship}</td>
@@ -2023,12 +2034,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   )}>
                     Gravidade {risk.severity}
                   </span>
-                  <span className="text-xs text-gray-400">{format(parseISO(risk.date), 'dd/MM/yyyy')}</span>
+                  <span className="text-xs text-gray-400">{safeFormat(risk.date, 'dd/MM/yyyy')}</span>
                 </div>
               </div>
               <p className="text-gray-700 bg-gray-50 p-4 rounded-xl border border-gray-100">{risk.description}</p>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">Status: <span className="font-bold text-gray-700">{risk.status.replace('_', ' ')}</span></span>
+                <span className="text-xs font-medium text-gray-500">Status: <span className="font-bold text-gray-700">{risk.status?.replace('_', ' ') || 'EM_ANALISE'}</span></span>
                 <button className="text-blue-600 text-sm font-bold hover:underline">Atualizar Acompanhamento</button>
               </div>
             </div>
@@ -2063,7 +2074,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                   <div>
                     <h4 className="font-bold text-gray-900 dark:text-white text-lg">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500">Data: {format(parseISO(pia.date), 'dd/MM/yyyy')}</p>
+                    <p className="text-sm text-gray-500">Data: {safeFormat(pia.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2073,7 +2084,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     pia.status === 'EM_ANDAMENTO' ? "bg-blue-100 text-blue-700" :
                     "bg-orange-100 text-orange-700"
                   )}>
-                    {pia.status.replace('_', ' ')}
+                    {pia.status?.replace('_', ' ') || 'EM_ANDAMENTO'}
                   </span>
                   <button 
                     onClick={() => openModal('pia', pia)}
@@ -2098,7 +2109,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     </p>
                     <p className="text-sm flex items-center justify-between">
                       <span>Renda:</span>
-                      <span className="font-bold">R$ {pia.monthlyIncome.toLocaleString()}</span>
+                      <span className="font-bold">R$ {Number(pia.monthlyIncome || 0).toLocaleString()}</span>
                     </p>
                   </div>
                 </div>
@@ -2149,7 +2160,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               <div>
                 <h4 className="font-bold text-gray-900">{patient.name}</h4>
-                <p className="text-xs text-gray-500">Renda: R$ {patient.income.toLocaleString()}</p>
+                <p className="text-xs text-gray-500">Renda: R$ {Number(patient.income || 0).toLocaleString()}</p>
               </div>
             </div>
 

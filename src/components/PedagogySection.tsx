@@ -999,7 +999,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   }, [patients, activities, socialParticipations, individualPlans, evolutions]);
 
   const filteredPatients = (patients || []).filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const renderSettings = () => (

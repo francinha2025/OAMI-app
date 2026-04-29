@@ -317,7 +317,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
       let potentialCommand: AISmartCommandResult | undefined = undefined;
 
       if (parsed && parsed.isCommand && parsed.confidence > 0.4 && parsed.recordType) {
-        aiContent = `Entendido! Identifiquei um registro de ${parsed.recordType.replace('_', ' ')}. Deseja salvar estas informações?`;
+        aiContent = `Entendido! Identifiquei um registro de ${parsed.recordType?.replace('_', ' ') || ''}. Deseja salvar estas informações?`;
         
         if (parsed.patientNameHint) {
           const searchName = parsed.patientNameHint.toLowerCase().trim();
@@ -328,7 +328,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
           );
           if (match) {
             parsed.patientId = match.id;
-            aiContent = `Identifiquei um registro de ${parsed.recordType.replace('_', ' ')} para **${match.name}**. Deseja salvar?`;
+            aiContent = `Identifiquei um registro de ${parsed.recordType?.replace('_', ' ') || ''} para **${match.name}**. Deseja salvar?`;
           }
         }
         potentialCommand = parsed;
@@ -1288,7 +1288,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
                 </div>
                 <div className="flex-1">
                   <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{s.name}</h4>
-                  <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-wider mt-1">{s.role.replace('_', ' ')}</p>
+                  <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-wider mt-1">{s.role?.replace('_', ' ') || 'FUNÇÃO'}</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><UserIcon size={10} /> CPF: {s.cpf || 'N/A'}</span>
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><Phone size={10} /> {s.phone || 'N/A'}</span>
@@ -5138,7 +5138,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
                 e.type === 'REUNIAO' ? 'bg-purple-100 text-purple-700' :
                 'bg-gray-100 text-gray-700'
               )}>
-                {e.type.replace('_', ' ')}
+                {e.type?.replace('_', ' ') || 'INDIVIDUAL'}
               </span>
             </div>
             
@@ -6716,7 +6716,7 @@ const StaffManagementSection = ({ staff, onSave, showToast }: { staff: StaffMemb
             <h4 className="font-bold text-gray-900 dark:text-white text-lg mb-1">{s.name}</h4>
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
               <Briefcase size={14} className="text-green-600" />
-              <span className="font-medium uppercase tracking-tight">{s.role.replace('_', ' ')}</span>
+              <span className="font-medium uppercase tracking-tight">{s.role?.replace('_', ' ') || 'CUIDADORA'}</span>
             </div>
             {s.phone && (
               <p className="text-xs text-gray-400 mb-4">Tel: {s.phone}</p>
@@ -7031,7 +7031,7 @@ const MonitoringSection = ({
                     return (
                       <div key={status} className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="font-bold text-gray-600 dark:text-gray-400">{status.replace('_', ' ')}</span>
+                          <span className="font-bold text-gray-600 dark:text-gray-400">{status?.replace('_', ' ') || 'ATIVO'}</span>
                           <span className="font-bold text-gray-800 dark:text-white">{count}</span>
                         </div>
                         <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -7119,7 +7119,7 @@ const MonitoringSection = ({
                         pia.status === 'CONCLUIDO' ? 'bg-green-100 text-green-600' :
                         'bg-yellow-100 text-yellow-600'
                       )}>
-                        {pia.status.replace('_', ' ')}
+                        {pia.status?.replace('_', ' ') || 'ATIVO'}
                       </span>
                     </div>
                     <div className="space-y-3">

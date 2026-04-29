@@ -81,7 +81,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
 
   const filteredPatients = useMemo(() => {
     return (props.patients || []).filter(p => 
-      p.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.name || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [props.patients, searchQuery]);
 
