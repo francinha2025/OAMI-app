@@ -614,7 +614,7 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete 
     </div>
     <div className="space-y-4">
       {(assessments || []).map((a: PsychInitialAssessment) => {
-        const patient = patients.find((p: any) => p.id === a.patientId);
+        const patient = (patients || []).find((p: any) => p.id === a.patientId);
         return (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-2">
@@ -753,7 +753,7 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete }: any) =
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {(monitorings || []).map((m: PsychEmotionalMonitoring) => {
-        const patient = patients.find((p: any) => p.id === m.patientId);
+        const patient = (patients || []).find((p: any) => p.id === m.patientId);
         return (
           <div key={m.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-4">
@@ -818,7 +818,7 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete }: any) => (
     </div>
     <div className="space-y-4">
       {(bonds || []).map((b: PsychFamilyBond) => {
-        const patient = patients.find((p: any) => p.id === b.patientId);
+        const patient = (patients || []).find((p: any) => p.id === b.patientId);
         return (
           <div key={b.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-start gap-4">
             <div className={cn(
@@ -1012,8 +1012,8 @@ const ReportsView = ({ patients, evolutions }: any) => {
   const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
     if ((patients || []).length === 0) return;
 
-    const data = patients.map((p: any) => {
-      const patientEvolutions = evolutions.filter((e: any) => e.patientId === p.id);
+    const data = (patients || []).map((p: any) => {
+      const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === p.id);
       return [
         p.name,
         p.age,
@@ -1189,7 +1189,7 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
       await onSave(data, editingData?.id);
 
       if (photos && photos.length > 0 && formData.patientId) {
-        const patient = patients.find((p: any) => p.id === formData.patientId);
+        const patient = (patients || []).find((p: any) => p.id === formData.patientId);
         const activityType = 
           type === 'evolution' ? 'Evolução Psicológica' :
           type === 'activity' ? 'Atividade Psicológica' : 'Atendimento Psicológico';

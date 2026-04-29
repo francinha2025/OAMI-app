@@ -147,6 +147,17 @@ import {
 import { googleProvider } from './firebase';
 
 // --- Error Handling ---
+const safeFormat = (dateStr: string | undefined | null, formatStr: string, fallback = '--/--') => {
+  if (!dateStr) return fallback;
+  try {
+    const date = parseISO(dateStr);
+    if (isNaN(date.getTime())) return fallback;
+    return format(date, formatStr, { locale: ptBR });
+  } catch (e) {
+    return fallback;
+  }
+};
+
 enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -310,7 +321,7 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
         
         if (parsed.patientNameHint) {
           const searchName = parsed.patientNameHint.toLowerCase().trim();
-          const match = elderly.find(e => 
+          const match = (elderly || []).find(e => 
             e.name.toLowerCase().includes(searchName) ||
             searchName.includes(e.name.toLowerCase()) ||
             e.name.toLowerCase().split(' ')[0] === searchName
@@ -1282,7 +1293,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><UserIcon size={10} /> CPF: {s.cpf || 'N/A'}</span>
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><Phone size={10} /> {s.phone || 'N/A'}</span>
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><CheckCircle2 size={10} className={s.status === 'ATIVO' ? 'text-green-500' : 'text-red-500'} /> {s.status}</span>
-                    <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><Calendar size={10} /> Adm: {s.admissionDate ? format(parseISO(s.admissionDate), 'dd/MM/yyyy') : 'N/A'}</span>
+                    <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><Calendar size={10} /> Adm: {safeFormat(s.admissionDate, 'dd/MM/yyyy', 'N/A')}</span>
                   </div>
                   {s.address && <p className="text-[9px] text-gray-400 mt-1 line-clamp-1 flex items-center gap-1"><Home size={9} /> {s.address}</p>}
                 </div>
@@ -1570,7 +1581,7 @@ const DashboardSection = ({
   }, [evolutions, physioEvolutions, nursingEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions]);
 
   const evolutionStats = useMemo(() => {
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const last12Months = Array.from({ length: 12 }, (_, i) => {
       const d = subMonths(new Date(), i);
       return {
         name: format(d, 'MMM', { locale: ptBR }),
@@ -1585,25 +1596,25 @@ const DashboardSection = ({
     }).reverse();
 
     allEvolutions.forEach(ev => {
-      const monthKey = ev.date.substring(0, 7);
-      const monthData = last6Months.find(m => m.monthKey === monthKey);
+      const monthKey = ev.date?.substring(0, 7);
+      const monthData = last12Months.find(m => m.monthKey === monthKey);
       if (monthData) {
         monthData.Total++;
         if (ev.specialty === 'Fisioterapia') monthData.Fisioterapia++;
         if (ev.specialty === 'Enfermagem') monthData.Enfermagem++;
         if (ev.specialty === 'Psicologia') monthData.Psicologia++;
         if (ev.specialty === 'Pedagogia') monthData.Pedagogia++;
-        if (ev.specialty === 'S. Social') monthData.Social++;
+        if (ev.specialty === 'S. Social' || ev.source === 'Social') monthData.Social++;
       }
     });
 
-    return last6Months;
+    return last12Months;
   }, [allEvolutions]);
 
   const vitalSignsStats = useMemo(() => {
-    const last10 = [...(vitalSigns || [])].sort((a,b) => (a.date || '').localeCompare(b.date || '')).slice(-15);
-    return last10.map(v => ({
-      date: v.date ? format(parseISO(v.date), 'dd/MM') : '--/--',
+    const last15 = [...(vitalSigns || [])].sort((a,b) => (a.date || '').localeCompare(b.date || '')).slice(-30);
+    return last15.map(v => ({
+      date: safeFormat(v.date, 'dd/MM'),
       sistolica: v.systolicBP || 120,
       diastolica: v.diastolicBP || 80,
       pulso: v.heartRate
@@ -1739,7 +1750,7 @@ const DashboardSection = ({
           <div className="flex justify-between items-start mb-8">
             <div>
               <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">Evoluções por Especialidade</h3>
-              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Histórico Multidisciplinar (6 meses)</p>
+              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Histórico Multidisciplinar (12 meses)</p>
             </div>
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
               <TrendingUp size={20} />
@@ -1779,7 +1790,7 @@ const DashboardSection = ({
           <div className="flex justify-between items-start mb-8">
             <div>
               <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">Tendência de Sinais Vitais</h3>
-              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Médias de Monitoramento (Recent)</p>
+              <p className="text-sm text-gray-500 font-medium font-mono uppercase tracking-tighter">Médias de Monitoramento (Histórico)</p>
             </div>
             <div className="p-2 bg-rose-50 text-rose-600 rounded-xl">
               <HeartPulse size={20} />
@@ -1870,7 +1881,7 @@ const DashboardSection = ({
                   </div>
                   <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">Última Visita</p>
-                     <p className="text-xl font-black text-gray-900 dark:text-white">{socialFamilyVisits[0] ? format(parseISO(socialFamilyVisits[0].date), 'dd/MM') : '--'}</p>
+                     <p className="text-xl font-black text-gray-900 dark:text-white">{safeFormat(socialFamilyVisits[0]?.date, 'dd/MM', '--')}</p>
                   </div>
                </div>
                <button 
@@ -1920,7 +1931,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
       const data = (elderly || []).map(e => [
         e.name || 'N/A',
         e.cpf || 'N/A',
-        e.birthDate ? format(parseISO(e.birthDate), 'dd/MM/yyyy') : 'N/A',
+        safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
         e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
       ]);
 
@@ -1947,7 +1958,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
       const data = (elderly || []).map(e => [
         e.name || 'N/A',
         e.cpf || 'N/A',
-        e.birthDate ? format(parseISO(e.birthDate), 'dd/MM/yyyy') : 'N/A',
+        safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
         e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
       ]);
 
@@ -2421,8 +2432,8 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                         <FileText className="text-green-600 dark:text-green-400" size={20} />
                         Plano Individual de Atendimento (PIA)
                       </h3>
-                      {pias.filter(p => p.elderlyId === selectedElderly.id).length > 0 ? (
-                        pias.filter(p => p.elderlyId === selectedElderly.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 1).map(pia => (
+                      {(pias || []).filter(p => p.elderlyId === selectedElderly.id).length > 0 ? (
+                        (pias || []).filter(p => p.elderlyId === selectedElderly.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 1).map(pia => (
                           <div key={pia.id} className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                               <div>
@@ -2463,8 +2474,8 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                         Evolução Profissional Recente
                       </h3>
                       <div className="space-y-4">
-                        {evolutions.filter(ev => ev.elderlyId === selectedElderly.id).length > 0 ? (
-                          evolutions.filter(ev => ev.elderlyId === selectedElderly.id).slice(0, 5).map(ev => (
+                        {(evolutions || []).filter(ev => ev.elderlyId === selectedElderly.id).length > 0 ? (
+                          (evolutions || []).filter(ev => ev.elderlyId === selectedElderly.id).slice(0, 5).map(ev => (
                             <div key={ev.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm group">
                               <div className="flex justify-between items-center mb-2">
                                 <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase">{ROLE_LABELS[ev.professionalRole]}</span>
@@ -2563,7 +2574,7 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
       showToast('Selecione um idoso primeiro', 'error');
       return;
     }
-    const selectedElderly = elderly.find(e => e.id === formData.elderlyId);
+    const selectedElderly = (elderly || []).find(e => e.id === formData.elderlyId);
     if (!selectedElderly) return;
 
     setExporting(true);
@@ -2572,7 +2583,7 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
         const columns = ['Campo', 'Informação'];
         const data = [
           ['Idoso', selectedElderly.name],
-          ['Data', format(parseISO(formData.date), 'dd/MM/yyyy')],
+          ['Data', safeFormat(formData.date, 'dd/MM/yyyy')],
           ['Responsável', formData.responsible],
           ['', ''], // Spacer
           ['SITUAÇÃO SOCIOECONÔMICA', ''],
@@ -2601,7 +2612,7 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
         const columns = ['Campo', 'Informação'];
         const data = [
           ['Idoso', selectedElderly.name],
-          ['Data', format(parseISO(formData.date), 'dd/MM/yyyy')],
+          ['Data', safeFormat(formData.date, 'dd/MM/yyyy')],
           ['Responsável', formData.responsible],
           ['', ''], // Spacer
           ['SITUAÇÃO SOCIOECONÔMICA', ''],
@@ -2985,8 +2996,8 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
     try {
       const columns = ['Data', 'Acolhido', 'Evolução'];
       const data = filteredEvolutions.map(ev => [
-        format(parseISO(ev.date), 'dd/MM/yyyy'),
-        elderly.find(e => e.id === ev.elderlyId)?.name || 'N/A',
+        safeFormat(ev.date, 'dd/MM/yyyy'),
+        (elderly || []).find(e => e.id === ev.elderlyId)?.name || 'N/A',
         ev.content
       ]);
 
@@ -3011,8 +3022,8 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
     try {
       const columns = ['Data', 'Acolhido', 'Evolução'];
       const data = filteredEvolutions.map(ev => [
-        format(parseISO(ev.date), 'dd/MM/yyyy'),
-        elderly.find(e => e.id === ev.elderlyId)?.name || 'N/A',
+        safeFormat(ev.date, 'dd/MM/yyyy'),
+        (elderly || []).find(e => e.id === ev.elderlyId)?.name || 'N/A',
         ev.content
       ]);
 
@@ -3179,7 +3190,7 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">
-                            {elderly.find(e => e.id === ev.elderlyId)?.name || 'Desconhecido'}
+                            {(elderly || []).find(e => e.id === ev.elderlyId)?.name || 'Desconhecido'}
                           </p>
                           <p className="text-[10px] text-gray-400 dark:text-gray-500">{new Date(ev.date).toLocaleDateString('pt-BR')}</p>
                         </div>
@@ -5132,7 +5143,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
             </div>
             
             <h4 className="font-bold text-gray-800 dark:text-white text-lg">
-              {elderly.find(res => res.id === e.elderlyId)?.name || 'Idoso não identificado'}
+              {(elderly || []).find(res => res.id === e.elderlyId)?.name || 'Idoso não identificado'}
             </h4>
             <div className="flex items-center gap-2 mt-1 text-gray-400 dark:text-gray-500">
               <Calendar size={14} />
@@ -5146,7 +5157,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
             </div>
           </motion.div>
         ))}
-        {engagements.length === 0 && (
+        {(engagements || []).length === 0 && (
           <div className="col-span-full py-20 text-center bg-gray-50 dark:bg-gray-800/20 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-800">
             <Users className="mx-auto text-gray-300 dark:text-gray-700 mb-4" size={48} />
             <p className="text-gray-500 dark:text-gray-400 font-medium">Nenhum registro de contato familiar encontrado</p>
@@ -5454,7 +5465,7 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
                   .slice(0, 3)
                   .map((h, i) => (
                     <div key={i} className="flex justify-between items-center text-sm">
-                      <span className="opacity-70">{format(parseISO(h.date), "dd/MM")}</span>
+                      <span className="opacity-70">{safeFormat(h.date, "dd/MM")}</span>
                       <span className="font-medium">{h.title}</span>
                     </div>
                   ))}
@@ -6834,7 +6845,11 @@ const MonitoringSection = ({
       ...physioEvolutions.map(e => ({ ...e, id: `phy-${e.id}`, elderlyId: e.patientId, professional: 'FISIOTERAPEUTA', content: e.evolution, source: 'Fisioterapia' })),
       ...nursingEvolutions.map(e => ({ ...e, id: `nur-${e.id}`, elderlyId: e.patientId, professional: 'ENFERMEIRA', content: e.content, source: 'Enfermagem' })),
     ];
-    return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return all.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      return (dateB || 0) - (dateA || 0);
+    });
   }, [evolutions, socialEvolutions, psychEvolutions, pedagogyEvolutions, physioEvolutions, nursingEvolutions]);
 
   const generateMonitoringPDF = async () => {
@@ -6868,7 +6883,38 @@ const MonitoringSection = ({
     }
   };
 
-  const selectedElderly = elderly.find(e => e.id === selectedElderlyId);
+  const generateMonitoringWord = async () => {
+    setExporting(true);
+    try {
+      const columns = ['Indicador', 'Valor'];
+      const data = [
+        ['Total de Idosos Atendidos', elderly.length.toString()],
+        ['PIAs em Andamento', pias.filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
+        ['Evoluções Totais', unifiedEvolutions.length.toString()],
+        ['Atendimentos de Fisioterapia', physioEvolutions.length.toString()],
+        ['Atendimentos de Psicologia', psychEvolutions.length.toString()],
+        ['Atendimentos de Pedagogia', pedagogyEvolutions.length.toString()],
+        ['Atendimentos de Serviço Social', socialEvolutions.length.toString()],
+        ['Atendimentos de Enfermagem', nursingEvolutions.length.toString()]
+      ];
+
+      await generateModernWord({
+        title: 'Relatório de Monitoramento e Impacto',
+        subtitle: `Indicadores Institucionais - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        columns,
+        data,
+        fileName: 'relatorio_monitoramento'
+      });
+      showToast('Relatório Word gerado com sucesso!');
+    } catch (err) {
+      console.error("Export Error:", err);
+      showToast('Erro ao exportar relatório em Word', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const selectedElderly = (elderly || []).find(e => e.id === selectedElderlyId);
   const elderlyPia = pias.find(p => p.elderlyId === selectedElderlyId);
   const elderlyEvolutions = unifiedEvolutions.filter(ev => ev.elderlyId === selectedElderlyId);
   const elderlyVitals = vitalSigns.filter(v => v.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -6884,9 +6930,17 @@ const MonitoringSection = ({
           </div>
           <div className="flex gap-2">
             <button 
+              onClick={generateMonitoringWord}
+              disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all disabled:opacity-50"
+            >
+              <FileText size={18} />
+              Relatório Word
+            </button>
+            <button 
               onClick={generateMonitoringPDF}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-all disabled:opacity-50"
             >
               <FileDown size={18} />
               Relatório PDF
@@ -7032,11 +7086,11 @@ const MonitoringSection = ({
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <h4 className="font-bold text-gray-800 dark:text-white">
-                          {elderly.find(e => e.id === ev.elderlyId)?.name || 'Idoso não encontrado'}
+                          {(elderly || []).find(e => e.id === ev.elderlyId)?.name || 'Idoso não encontrado'}
                         </h4>
                         <span className="text-xs font-bold text-blue-600 uppercase">{ev.source}</span>
                       </div>
-                      <span className="text-xs text-gray-400 font-bold">{format(parseISO(ev.date), 'dd/MM/yyyy HH:mm')}</span>
+                      <span className="text-xs text-gray-400 font-bold">{safeFormat(ev.date, 'dd/MM/yyyy HH:mm')}</span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">{ev.content}</p>
                   </div>
@@ -7054,7 +7108,7 @@ const MonitoringSection = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {pias.map(pia => {
-                const resident = elderly.find(e => e.id === pia.elderlyId);
+                const resident = (elderly || []).find(e => e.id === pia.elderlyId);
                 return (
                   <div key={pia.id} className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
                     <div className="flex justify-between items-start mb-4">
@@ -7132,7 +7186,7 @@ const MonitoringSection = ({
                     {elderlyEmotions.slice(0, 5).map((m, i) => (
                       <div key={i} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-bold text-gray-400">{format(parseISO(m.date), 'dd/MM/yyyy')}</span>
+                          <span className="text-xs font-bold text-gray-400">{safeFormat(m.date, 'dd/MM/yyyy')}</span>
                           <span className={cn(
                             "px-2 py-1 rounded-lg text-[10px] font-bold uppercase",
                             m.wellBeing === 'FELIZ' ? 'bg-green-100 text-green-600' :
@@ -7200,8 +7254,8 @@ const NotificationsModal = ({ events, onClose, onViewSchedule }: {
               {upcoming.map((ev) => (
                 <div key={ev.id} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                   <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex flex-col items-center justify-center text-green-600 dark:text-green-400">
-                    <span className="text-[8px] font-bold uppercase">{format(parseISO(ev.date), 'MMM', { locale: ptBR })}</span>
-                    <span className="text-sm font-bold leading-none">{format(parseISO(ev.date), 'dd')}</span>
+                    <span className="text-[8px] font-bold uppercase">{safeFormat(ev.date, 'MMM')}</span>
+                    <span className="text-sm font-bold leading-none">{safeFormat(ev.date, 'dd')}</span>
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-gray-800 dark:text-white">{ev.title}</h4>
@@ -8033,8 +8087,14 @@ export default function App() {
             }
           }
         }).catch(err => {
-          console.error("Error fetching user profile:", err);
-          // Se falhar por cota, mas for a admin, deixa entrar
+          if (err.message?.includes('the client is offline') || err.message?.includes('offline')) {
+            console.warn("User profile fetch delayed: the client is offline. Network issues or caching issues.");
+            showToast('Conexão instável ou offline.', 'error');
+          } else {
+            console.error("Error fetching user profile:", err);
+          }
+          
+          // Se falhar por cota ou offline, mas for a admin, deixa entrar
           if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
             setUser({
               id: firebaseUser.uid,
@@ -8045,7 +8105,7 @@ export default function App() {
             setNeedsProfile(false);
           } else {
             if (err.message?.includes('Quota exceeded') || err.message?.includes('quota')) {
-              showToast('Limite diário de acesso atingido (Quota). Tente novamente amanhã ou contate o suporte.', 'error');
+              showToast('Limite diário de acesso atingido (Quota). Tente novamente amanhã.', 'error');
             }
             setNeedsProfile(true);
           }
@@ -8071,7 +8131,67 @@ export default function App() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
 
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const oneYearAgoStr = oneYearAgo.toISOString();
+
+    // Listeners for cleanup
+    let unsubElderly = () => {};
+    let unsubStaff = () => {};
+    let unsubDonors = () => {};
+    let unsubDiaperDonations = () => {};
+    let unsubProductionLogs = () => {};
+    let unsubVolunteers = () => {};
+    let unsubRawProd = () => {};
+    let unsubWIP = () => {};
+    let unsubGoals = () => {};
+
     // 1. Core Data (Always needed, but use getDocs for less volatile info)
+    // --- Data Seeding for Francisco Gomes da Silva (User Request) ---
+    const seedFranciscoRequest = async () => {
+      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
+      
+      try {
+        const q = query(collection(db, 'elderly'), where('cpf', '==', '056811913-46'));
+        const snapshot = await getDocs(q);
+        
+        if (snapshot.empty) {
+          const elderlyRef = await addDoc(collection(db, 'elderly'), {
+            name: 'Francisco Gomes da Silva',
+            fullName: 'Francisco Gomes da Silva',
+            cpf: '056811913-46',
+            birthDate: '1950-10-04',
+            entryDate: '2020-12-17',
+            status: 'ATIVO',
+            lastProfession: 'Não informada'
+          });
+          
+          await addDoc(collection(db, 'pias'), {
+            elderlyId: elderlyRef.id,
+            date: '2020-12-17',
+            responsible: 'Antonilson Lima Moreira',
+            status: 'CONCLUIDO',
+            hasBPC: true,
+            hasPension: true,
+            hasLoans: false,
+            hasProperty: false,
+            familyInvolvement: 'BAIXO',
+            familyObservations: 'Relação distanciada. Não possui filhos.',
+            healthStatus: 'Pessoa com deficiência física e visual. Sem resistência alimentar.',
+            mobilityStatus: 'Deficiência física e visual',
+            objectives: 'Acompanhamento Social',
+            actions: 'Recebimento institucional e início de acompanhamento social.',
+            observations: 'Religião: Católica. Naturalidade: São Luís - MA. Não alfabetizado. Cor: Pardo. Estado Civil: Viúvo. Registro: 000059565296-4/MA.'
+          });
+          
+          console.log("Dados do Sr. Francisco Gomes da Silva semeados com sucesso!");
+        }
+      } catch (error) {
+        console.error("Erro ao semear dados:", error);
+      }
+    };
+    seedFranciscoRequest();
+
     const fetchStaticData = async () => {
       try {
         const elderlySnap = await getDocs(query(collection(db, 'elderly'), orderBy('name'), limit(150)));
@@ -8101,12 +8221,12 @@ export default function App() {
     fetchStaticData();
 
     // 2. Real-time Critical Listeners (Keep as onSnapshot)
-    // Listen to Evolutions (Limitado a 7 dias para economizar cota)
+    // Listen to Evolutions (Histórico de 1 ano para Dashboard)
     const qEvolutions = query(
       collection(db, 'evolutions'), 
-      where('date', '>=', sevenDaysAgoStr),
+      where('date', '>=', oneYearAgoStr),
       orderBy('date', 'desc'),
-      limit(100)
+      limit(500)
     );
     const unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
       setEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EvolutionRecord)));
@@ -8124,12 +8244,12 @@ export default function App() {
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'diaperStock/current'));
 
-    // Final Packings (Real-time dashboard feedback)
+    // Final Packings (Histórico de 1 ano para Dashboard)
     const unsubFinal = onSnapshot(query(
       collection(db, 'diaperFinalPackings'), 
-      where('date', '>=', sevenDaysAgoStr),
+      where('date', '>=', oneYearAgoStr),
       orderBy('date', 'desc'),
-      limit(50)
+      limit(300)
     ), (snapshot) => {
       setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
@@ -8139,9 +8259,9 @@ export default function App() {
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qFinancial = query(
         collection(db, 'financial'), 
-        where('date', '>=', thirtyDaysAgoStr),
+        where('date', '>=', oneYearAgoStr),
         orderBy('date', 'desc'),
-        limit(100)
+        limit(500)
       );
       unsubFinancial = onSnapshot(qFinancial, (snapshot) => {
         setFinancialRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord)));
@@ -8184,8 +8304,8 @@ export default function App() {
       setCommunityElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'communityElderly'));
 
-    // Listen to Workshops
-    const qWorkshops = query(collection(db, 'workshops'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50));
+    // Listen to Workshops (1 ano para dashboard)
+    const qWorkshops = query(collection(db, 'workshops'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(150));
     const unsubWorkshops = onSnapshot(qWorkshops, (snapshot) => {
       setWorkshops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Workshop)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'workshops'));
@@ -8227,7 +8347,7 @@ export default function App() {
           setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
 
-        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
 
@@ -8267,7 +8387,7 @@ export default function App() {
           setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
 
-        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
 
@@ -8275,7 +8395,7 @@ export default function App() {
           setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
 
-        unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
 
@@ -8318,7 +8438,7 @@ export default function App() {
           setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
 
-        unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
 
@@ -8367,7 +8487,7 @@ export default function App() {
           setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
 
-        unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
 
@@ -8415,7 +8535,7 @@ export default function App() {
           setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
 
-        unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), where('date', '>=', sevenDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
 

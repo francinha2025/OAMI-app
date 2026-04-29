@@ -110,11 +110,11 @@ export const PhysioSection = ({
       return;
     }
 
-    const patient = patients.find(p => p.id === reportPatientId);
+    const patient = (patients || []).find(p => p.id === reportPatientId);
     if (!patient) return;
 
-    const patientAssessments = assessments.filter(a => a.patientId === reportPatientId);
-    const patientEvolutions = evolutions.filter(e => e.patientId === reportPatientId);
+    const patientAssessments = (assessments || []).filter(a => a.patientId === reportPatientId);
+    const patientEvolutions = (evolutions || []).filter(e => e.patientId === reportPatientId);
 
     const data: any[] = [
       ['Nome', patient.name],
@@ -171,7 +171,7 @@ export const PhysioSection = ({
     });
 
     const data = monthEvolutions.map(e => {
-      const patient = patients.find(p => p.id === e.patientId);
+      const patient = (patients || []).find(p => p.id === e.patientId);
       return [
         format(parseISO(e.date), 'dd/MM/yyyy'),
         patient?.name || 'N/A',
@@ -194,11 +194,11 @@ export const PhysioSection = ({
       showToast('Selecione um paciente para gerar o prontuário', 'error');
       return;
     }
-    const patient = patients.find(p => p.id === reportPatientId);
+    const patient = (patients || []).find(p => p.id === reportPatientId);
     if (!patient) return;
 
-    const patientAssessments = assessments.filter(a => a.patientId === reportPatientId);
-    const patientEvolutions = evolutions.filter(e => e.patientId === reportPatientId);
+    const patientAssessments = (assessments || []).filter(a => a.patientId === reportPatientId);
+    const patientEvolutions = (evolutions || []).filter(e => e.patientId === reportPatientId);
 
     const data: any[][] = [
       ['Nome', patient.name],
@@ -244,7 +244,7 @@ export const PhysioSection = ({
     });
 
     const data = monthEvolutions.map(e => {
-      const patient = patients.find(p => p.id === e.patientId);
+      const patient = (patients || []).find(p => p.id === e.patientId);
       return [
         format(parseISO(e.date), 'dd/MM/yyyy'),
         patient?.name || 'N/A',
@@ -632,7 +632,7 @@ export const PhysioSection = ({
 
               <div className="space-y-4">
                 {evolutions.map((e) => {
-                  const patient = patients.find(p => p.id === e.patientId);
+                  const patient = (patients || []).find(p => p.id === e.patientId);
                   return (
                     <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
                       <div className="flex justify-between items-start">
@@ -766,7 +766,7 @@ export const PhysioSection = ({
 
                 <div className="space-y-4">
                   {appointments.filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).sort((a, b) => a.time.localeCompare(b.time)).map((a) => {
-                    const patient = patients.find(p => p.id === a.patientId);
+                    const patient = (patients || []).find(p => p.id === a.patientId);
                     return (
                       <div key={a.id} className="flex items-center gap-6 p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-2xl transition-all border border-transparent hover:border-gray-100 dark:hover:border-gray-700">
                         <div className="w-20 text-center">
@@ -1371,7 +1371,7 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
     const { photos, ...data } = formData;
     await onSave(data);
     if (photos.length > 0) {
-      const patient = patients.find(p => p.id === formData.patientId);
+      const patient = (patients || []).find(p => p.id === formData.patientId);
       await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Avaliação Fisioterapêutica', formData.complaint);
     }
   };
@@ -1730,7 +1730,7 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
     const { photos, ...data } = formData;
     await onSave(data);
     if (photos.length > 0) {
-      const patient = patients.find(p => p.id === formData.patientId);
+      const patient = (patients || []).find(p => p.id === formData.patientId);
       await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Evolução Fisioterapêutica', formData.evolution);
     }
   };

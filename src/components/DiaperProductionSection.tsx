@@ -74,7 +74,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   goals,
   showToast
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('raw');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -926,10 +926,10 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-gray-900 p-2 md:p-4 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 backdrop-blur-md sticky top-0 z-30">
         <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto">
           {[
+            { id: 'dashboard', label: 'Balanço', icon: BarChart3 },
             { id: 'raw', label: 'Bruta', icon: Scissors },
             { id: 'wip', label: 'Processo', icon: Activity },
-            { id: 'final', label: 'Embalagem', icon: Truck },
-            { id: 'dashboard', label: 'Balanço', icon: BarChart3 }
+            { id: 'final', label: 'Embalagem', icon: Truck }
           ].map((tab) => (
             <button
               key={tab.id}

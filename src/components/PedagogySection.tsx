@@ -204,7 +204,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       }
 
       if (photos && photos.length > 0 && formData.patientId) {
-        const patient = patients.find(p => p.id === formData.patientId);
+        const patient = (patients || []).find(p => p.id === formData.patientId);
         const activityType = 
           type === 'evolution' ? 'Evolução Pedagógica' :
           type === 'activity' || type === 'activities' ? 'Atividade Pedagógica' : 'Atendimento Pedagógico';
@@ -1149,7 +1149,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         </h3>
         <div className="space-y-4">
           {(activities || []).filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).length > 0 ? (
-            activities.filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).map((activity, i) => (
+            (activities || []).filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).map((activity, i) => (
               <div key={i} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
@@ -1182,9 +1182,9 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
   const renderResidents = () => {
     if (selectedPatient) {
-      const history = lifeHistories.find(h => h.patientId === selectedPatient.id);
-      const assessment = assessments.find(a => a.patientId === selectedPatient.id);
-      const plan = individualPlans.find(p => p.patientId === selectedPatient.id);
+      const history = (lifeHistories || []).find(h => h.patientId === selectedPatient.id);
+      const assessment = (assessments || []).find(a => a.patientId === selectedPatient.id);
+      const plan = (individualPlans || []).find(p => p.patientId === selectedPatient.id);
 
       return (
         <div className="space-y-6">
@@ -1399,7 +1399,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div>
                       <h5 className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Atividades Indicadas</h5>
                       <div className="flex flex-wrap gap-2">
-                        {plan.indicatedActivities.map((act, i) => (
+                        {(plan.indicatedActivities || []).map((act, i) => (
                           <span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold">
                             {act}
                           </span>

@@ -82,7 +82,7 @@ export const GlobalGallery: React.FC<GlobalGalleryProps> = ({
       return;
     }
 
-    const patient = patients.find(p => p.id === selectedPatientId);
+    const patient = (patients || []).find(p => p.id === selectedPatientId);
     const patientName = patient?.name || '';
 
     setIsSaving(true);

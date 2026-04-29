@@ -9,7 +9,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 // Use initializeFirestore with long polling to avoid WebSocket issues in proxy environments
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+});
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

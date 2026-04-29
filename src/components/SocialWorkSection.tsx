@@ -253,7 +253,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       }
 
       if (photos && photos.length > 0 && formData.patientId) {
-        const patient = patients.find(p => p.id === formData.patientId);
+        const patient = (patients || []).find(p => p.id === formData.patientId);
         const activityType = 
           type === 'evolution' ? 'Evolução Social' :
           type === 'docs' ? 'Documentação Social' :
@@ -1399,7 +1399,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {documentations.map((doc) => {
-              const patient = patients.find(p => p.id === doc.patientId);
+              const patient = (patients || []).find(p => p.id === doc.patientId);
               const getStatusBadge = (status: string) => (
                 <span className={cn(
                   "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
@@ -1443,7 +1443,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {familyTies.map((tie) => {
-          const patient = patients.find(p => p.id === tie.patientId);
+          const patient = (patients || []).find(p => p.id === tie.patientId);
           return (
             <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center justify-between mb-4">
@@ -1500,7 +1500,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {legalSituations.map((legal) => {
-          const patient = patients.find(p => p.id === legal.patientId);
+          const patient = (patients || []).find(p => p.id === legal.patientId);
           return (
             <div key={legal.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-6">
@@ -1540,11 +1540,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
   const renderPatients = () => {
     if (selectedPatient) {
-      const patientFamily = familyTies.find(f => f.patientId === selectedPatient.id);
-      const patientDocs = documentations.find(d => d.patientId === selectedPatient.id);
-      const patientLegal = legalSituations.find(l => l.patientId === selectedPatient.id);
-      const patientStudy = socialStudies.find(s => s.patientId === selectedPatient.id);
-      const patientEvolutions = evolutions.filter(e => e.patientId === selectedPatient.id);
+      const patientFamily = (familyTies || []).find(f => f.patientId === selectedPatient.id);
+      const patientDocs = (documentations || []).find(d => d.patientId === selectedPatient.id);
+      const patientLegal = (legalSituations || []).find(l => l.patientId === selectedPatient.id);
+      const patientStudy = (socialStudies || []).find(s => s.patientId === selectedPatient.id);
+      const patientEvolutions = (evolutions || []).filter(e => e.patientId === selectedPatient.id);
 
       return (
         <div className="space-y-6">
@@ -1625,7 +1625,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                         <div className="space-y-3">
                           <p className="text-sm text-gray-600">{patientFamily.observations}</p>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {patientFamily.members.map(m => (
+                            {(patientFamily.members || []).map(m => (
                               <div key={m.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                                 <p className="font-bold text-gray-900 dark:text-white">{m.name} ({m.kinship})</p>
                                 <p className="text-xs text-gray-500">{m.phone}</p>
@@ -1788,7 +1788,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="space-y-6">
         {socialStudies.map((study) => {
-          const patient = patients.find(p => p.id === study.patientId);
+          const patient = (patients || []).find(p => p.id === study.patientId);
           return (
             <div key={study.id} className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:shadow-md">
               <div className="flex items-center justify-between mb-6">
@@ -1851,7 +1851,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {evolutions.map((evolution) => {
-            const patient = patients.find(p => p.id === evolution.patientId);
+            const patient = (patients || []).find(p => p.id === evolution.patientId);
             return (
               <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <div className="flex items-start justify-between mb-4">
@@ -1901,7 +1901,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {referrals.map((referral) => {
-          const patient = patients.find(p => p.id === referral.patientId);
+          const patient = (patients || []).find(p => p.id === referral.patientId);
           return (
             <div key={referral.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-4">
@@ -1969,7 +1969,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {familyVisits.map((visit) => {
-              const patient = patients.find(p => p.id === visit.patientId);
+              const patient = (patients || []).find(p => p.id === visit.patientId);
               return (
                 <tr key={visit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">{format(parseISO(visit.date), 'dd/MM/yyyy')}</td>
@@ -2001,7 +2001,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="space-y-4">
         {riskSituations.map((risk) => {
-          const patient = patients.find(p => p.id === risk.patientId);
+          const patient = (patients || []).find(p => p.id === risk.patientId);
           return (
             <div key={risk.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 dark:border-gray-800">
               <div className="flex items-start justify-between mb-4">
@@ -2053,7 +2053,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="grid grid-cols-1 gap-6">
         {pias.map((pia) => {
-          const patient = patients.find(p => p.id === pia.elderlyId);
+          const patient = (patients || []).find(p => p.id === pia.elderlyId);
           return (
             <div key={pia.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
               <div className="flex items-center justify-between mb-6">
@@ -2166,7 +2166,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {patient.benefits.map((benefit, i) => (
+                {(patient.benefits || []).map((benefit, i) => (
                   <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold uppercase">
                     {benefit}
                   </span>
