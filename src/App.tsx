@@ -8147,21 +8147,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthReady || !user) return;
-
-    // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
-
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
-
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const oneYearAgoStr = oneYearAgo.toISOString();
-
     // Listeners for cleanup
     let unsubElderly = () => {};
     let unsubStaff = () => {};
@@ -8222,6 +8207,21 @@ export default function App() {
     let unsubSocialReferrals = () => {};
     let unsubSocialFamilyVisits = () => {};
     let unsubSocialRiskSituations = () => {};
+
+    if (!isAuthReady || !user) return;
+
+    // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
+
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
+
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const oneYearAgoStr = oneYearAgo.toISOString();
 
     // 1. Core Data (Always needed, real-time listeners)
     // --- Data Seeding for Francisco Gomes da Silva (User Request) ---
