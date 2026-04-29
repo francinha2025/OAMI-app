@@ -1757,7 +1757,7 @@ const DashboardSection = ({
             </div>
           </div>
           
-          <div className="h-80">
+          <div className="h-80" style={{ minHeight: '300px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={evolutionStats} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#f8f8f8'} />
@@ -1797,7 +1797,7 @@ const DashboardSection = ({
             </div>
           </div>
 
-          <div className="h-80">
+          <div className="h-80" style={{ minHeight: '300px', width: '100%' }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={vitalSignsStats}>
                 <defs>
