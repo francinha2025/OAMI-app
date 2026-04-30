@@ -1760,7 +1760,7 @@ const DashboardSection = ({
             </div>
           </div>
           
-          <div className="h-80" style={{ minHeight: '300px', width: '100%' }}>
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={evolutionStats} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme === 'dark' ? '#374151' : '#f8f8f8'} />
@@ -1800,7 +1800,7 @@ const DashboardSection = ({
             </div>
           </div>
 
-          <div className="h-80" style={{ minHeight: '300px', width: '100%' }}>
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={vitalSignsStats}>
                 <defs>
@@ -1838,7 +1838,7 @@ const DashboardSection = ({
         {/* Workshop Distrubution */}
         <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6">Oficinas vs Capacitações</h3>
-           <div className="h-64 flex items-center justify-center relative">
+           <div style={{ width: '100%', height: 300 }} className="relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -1895,7 +1895,7 @@ const DashboardSection = ({
                </button>
             </div>
 
-            <div className="w-full md:w-64 h-64 shrink-0">
+            <div style={{ width: '100%', height: 300 }} className="shrink-0">
                <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
                     { subject: 'Saúde', A: 120, B: 110, fullMark: 150 },
@@ -3460,7 +3460,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
             </button>
           </div>
         </div>
-        <div className="h-80">
+        <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -4499,7 +4499,7 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
 
       <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
         <h3 className="font-bold text-gray-800 mb-6">Relatório de Produção Semanal</h3>
-        <div className="h-80">
+        <div style={{ width: '100%', height: 300 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weeklyProductionData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -6997,32 +6997,32 @@ const MonitoringSection = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
                 <h3 className="font-bold text-gray-800 dark:text-white mb-6">Distribuição de Atendimentos</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Social', value: socialEvolutions.length },
-                          { name: 'Psicologia', value: psychEvolutions.length },
-                          { name: 'Pedagogia', value: pedagogyEvolutions.length },
-                          { name: 'Fisioterapia', value: physioEvolutions.length },
-                          { name: 'Enfermagem', value: nursingEvolutions.length },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map((color, index) => (
-                          <Cell key={`cell-${index}`} fill={color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
+                 <div style={{ width: '100%', height: 300 }}>
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                       <Pie
+                         data={[
+                           { name: 'Social', value: socialEvolutions.length },
+                           { name: 'Psicologia', value: psychEvolutions.length },
+                           { name: 'Pedagogia', value: pedagogyEvolutions.length },
+                           { name: 'Fisioterapia', value: physioEvolutions.length },
+                           { name: 'Enfermagem', value: nursingEvolutions.length },
+                         ]}
+                         cx="50%"
+                         cy="50%"
+                         innerRadius={60}
+                         outerRadius={80}
+                         paddingAngle={5}
+                         dataKey="value"
+                       >
+                         {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map((color, index) => (
+                           <Cell key={`cell-${index}`} fill={color} />
+                         ))}
+                       </Pie>
+                       <Tooltip />
+                     </PieChart>
+                   </ResponsiveContainer>
+                 </div>
               </div>
 
               <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">

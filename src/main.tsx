@@ -10,7 +10,7 @@ if ('serviceWorker' in navigator) {
   });
 
   // 🚫 Bloqueia qualquer novo registro
-  navigator.serviceWorker.register = () => {
+  (navigator.serviceWorker.register as any) = () => {
     console.log('Service Worker bloqueado');
     return Promise.resolve();
   };

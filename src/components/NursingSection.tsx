@@ -227,7 +227,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 <option>Últimos 30 dias</option>
               </select>
             </div>
-            <div className="h-64">
+            <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={(props.vitalSigns || []).slice(0, 7).reverse()}>
                   <defs>

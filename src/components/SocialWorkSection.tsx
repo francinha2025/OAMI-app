@@ -385,7 +385,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <TrendingUp className="w-5 h-5 text-blue-600" />
             Evolução de Atendimentos
           </h3>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={evolutionChartData}>
                 <defs>
@@ -409,7 +409,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <ShieldAlert className="w-5 h-5 text-red-600" />
             Situações de Risco por Tipo
           </h3>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <PieChart>
                 <Pie

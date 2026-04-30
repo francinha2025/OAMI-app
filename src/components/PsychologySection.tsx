@@ -196,7 +196,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <TrendingUp className="text-blue-600" size={20} />
               Monitoramento de Bem-estar
             </h3>
-            <div className="h-[300px]">
+            <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={(props.emotionalMonitorings || []).slice(-7).map(m => ({
                   date: m.date,

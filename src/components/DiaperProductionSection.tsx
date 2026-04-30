@@ -619,7 +619,8 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   Evolução de Fluxo Diário
                 </h4>
              </div>
-             <ResponsiveContainer width="100%" height="85%" minWidth={0}>
+             <div style={{ width: '100%', height: 300 }}>
+               <ResponsiveContainer width="100%" height="85%" minWidth={0}>
                <AreaChart data={dailyData}>
                  <defs>
                    <linearGradient id="colorRaw" x1="0" y1="0" x2="0" y2="1">
@@ -641,6 +642,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                  <Area type="monotone" dataKey="embalagem" stroke="#3b82f6" fillOpacity={1} fill="url(#colorFinal)" name="Final" strokeWidth={3} />
                </AreaChart>
              </ResponsiveContainer>
+           </div>
           </div>
 
           {/* Package Type Breakdown */}
@@ -649,7 +651,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               <Package size={20} className="text-amber-600" />
               Mix de Produção (Tipos)
             </h4>
-            <div className="h-[300px]">
+            <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie

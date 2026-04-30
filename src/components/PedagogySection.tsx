@@ -1089,7 +1089,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             Evolução de Participação
           </h3>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={(socialParticipations || []).slice(-7)}>
                 <defs>
@@ -1114,7 +1114,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <Brain className="w-5 h-5 text-purple-600" />
             Nível Cognitivo Geral
           </h3>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -1666,7 +1666,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <Brain className="w-5 h-5 text-blue-500" />
             Estimulação Cognitiva (Média)
           </h4>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
                 { name: 'Memória', value: (stimulationTrackings || []).reduce((acc, curr) => acc + curr.memoryScore, 0) / ((stimulationTrackings || []).length || 1) },
@@ -1689,7 +1689,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <Users2 className="w-5 h-5 text-green-500" />
             Interação Social
           </h4>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie

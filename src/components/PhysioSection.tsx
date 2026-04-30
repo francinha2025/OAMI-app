@@ -378,7 +378,7 @@ export const PhysioSection = ({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
                   <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-6">Atendimentos da Semana</h3>
-                  <div className="h-64">
+                  <div style={{ width: '100%', height: 300 }}>
                     <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={weeklyAttendanceData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
