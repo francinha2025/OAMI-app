@@ -7762,16 +7762,6 @@ export default function App() {
 
   // --- Initial System Cleanup and Connection Test ---
   useEffect(() => {
-    // Unregister stale service workers that might cause fetch errors
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister();
-          console.log("Service Worker desregistrado para evitar erro de fetch.");
-        }
-      });
-    }
-
     // Connection Test
     const testConnection = async () => {
       try {

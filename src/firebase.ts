@@ -1,28 +1,37 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 
-// Singleton pattern for App initialization
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// 🔥 CONFIG DO SEU FIREBASE (OAMI OFICIAL)
+const firebaseConfig = {
+  apiKey: "AIzaSyD5V-sYEIhbUN7w_b8Hz6_kbRvU8GphDYY",
+  authDomain: "oami-oficial.firebaseapp.com",
+  projectId: "oami-oficial",
+  storageBucket: "oami-oficial.firebasestorage.app",
+  messagingSenderId: "264092482774",
+  appId: "1:264092482774:web:fa69e36f256cb55cb91d77"
+};
 
-// Use initializeFirestore with long polling to avoid WebSocket issues in proxy environments
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-});
+// ✅ Inicializa Firebase (evita duplicação)
+const app = getApps().length === 0
+  ? initializeApp(firebaseConfig)
+  : getApps()[0];
 
+// ✅ Firestore (CORRETO)
+export const db = getFirestore(app);
+
+// ✅ Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
+// 🔎 Teste de conexão com Firestore
 async function testConnection() {
   try {
-    // Attempting a server-side fetch to verify connectivity
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("Firestore connection established successfully.");
+    console.log("🔥 Firestore conectado com sucesso!");
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Firestore is offline. Check your network or Firebase project configuration.");
-    }
+    console.error("❌ Erro no Firestore:", error);
   }
 }
+
 testConnection();
