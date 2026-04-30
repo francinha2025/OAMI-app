@@ -5,15 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Essa função é segura e você pode usá-la importando nos componentes
 export function safeReplace(valor: string | null | undefined, busca: string | RegExp, troca: string): string {
-  return (valor || "").replace(busca, troca);
+  return (valor || "")?.replace(busca, troca);
 }
-(String.prototype as any)._replace = String.prototype.replace;
-
-String.prototype.replace = function (busca, troca) {
-  try {
-    return (this || "")._replace(busca, troca);
-  } catch {
-    return "";
-  }
-};

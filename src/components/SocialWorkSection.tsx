@@ -141,23 +141,26 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     const referralsList = referrals || [];
     const familyVisitsList = familyVisits || [];
     const patientsList = patients || [];
+    const piasList = pias || [];
 
-    const noFamily = familyTiesList.filter(f => !f.hasFamily || f.abandonmentRisk).length;
+    const noFamily = familyTiesList.filter(f => f && (!f.hasFamily || f.abandonmentRisk)).length;
     const pendingDocs = documentationsList.filter(d => 
-      d.rg === 'PENDENTE' || d.cpf === 'PENDENTE' || d.sus === 'PENDENTE' ||
-      d.rg === 'INEXISTENTE' || d.cpf === 'INEXISTENTE' || d.sus === 'INEXISTENTE'
+      d && (d.rg === 'PENDENTE' || d.cpf === 'PENDENTE' || d.sus === 'PENDENTE' ||
+      d.rg === 'INEXISTENTE' || d.cpf === 'INEXISTENTE' || d.sus === 'INEXISTENTE')
     ).length;
-    const activeReferrals = referralsList.filter(r => r.status === 'EM_ANDAMENTO').length;
-    const upcomingVisits = familyVisitsList.filter(v => parseISO(v.date) >= startOfToday()).length;
+    const activeReferrals = referralsList.filter(r => r && r.status === 'EM_ANDAMENTO').length;
+    const upcomingVisits = familyVisitsList.filter(v => v && v.date && parseISO(v.date) >= startOfToday()).length;
+    const activePias = piasList.filter(p => p && p.status === 'EM_ANDAMENTO').length;
 
     return {
       totalPatients: patientsList.length,
       noFamily,
       pendingDocs,
       activeReferrals,
-      upcomingVisits
+      upcomingVisits,
+      activePias
     };
-  }, [patients, familyTies, documentations, referrals, familyVisits]);
+  }, [patients, familyTies, documentations, referrals, familyVisits, pias]);
 
   const filteredPatients = (patients || []).filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -2063,7 +2066,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {pias.map((pia) => {
+        {(pias || []).map((pia) => {
+          if (!pia || !pia.id) return null;
           const patient = (patients || []).find(p => p.id === pia.elderlyId);
           return (
             <div key={pia.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
@@ -2073,7 +2077,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <ClipboardList className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white text-lg">{patient?.name}</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white text-lg">{patient?.name || 'Idoso não encontrado'}</h4>
                     <p className="text-sm text-gray-500">Data: {safeFormat(pia.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
@@ -2109,7 +2113,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     </p>
                     <p className="text-sm flex items-center justify-between">
                       <span>Renda:</span>
-                      <span className="font-bold">R$ {Number(pia.monthlyIncome || 0).toLocaleString()}</span>
+                      <span className="font-bold">R$ {Number(pia.monthlyIncome || 0).toLocaleString('pt-BR')}</span>
                     </p>
                   </div>
                 </div>
@@ -2118,24 +2122,24 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <div className="space-y-1">
                     <p className="text-sm flex items-center justify-between">
                       <span>Envolvimento:</span>
-                      <span className="font-bold">{pia.familyInvolvement}</span>
+                      <span className="font-bold">{pia.familyInvolvement || 'MÉDIO'}</span>
                     </p>
                   </div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <p className="text-xs font-bold text-gray-400 uppercase mb-2">Responsável</p>
-                  <p className="text-sm font-bold text-gray-700">{pia.responsible}</p>
+                  <p className="text-sm font-bold text-gray-700">{pia.responsible || 'Coordenadora'}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
                   <h5 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Objetivos</h5>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.objectives}</p>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.objectives || 'Sem objetivos descritos'}</p>
                 </div>
                 <div>
                   <h5 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Ações</h5>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.actions}</p>
+                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.actions || 'Sem ações propostas'}</p>
                 </div>
               </div>
             </div>

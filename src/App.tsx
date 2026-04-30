@@ -6857,14 +6857,14 @@ const MonitoringSection = ({
     try {
       const columns = ['Indicador', 'Valor'];
       const data = [
-        ['Total de Idosos Atendidos', elderly.length.toString()],
-        ['PIAs em Andamento', pias.filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
-        ['Evoluções Totais', unifiedEvolutions.length.toString()],
-        ['Atendimentos de Fisioterapia', physioEvolutions.length.toString()],
-        ['Atendimentos de Psicologia', psychEvolutions.length.toString()],
-        ['Atendimentos de Pedagogia', pedagogyEvolutions.length.toString()],
-        ['Atendimentos de Serviço Social', socialEvolutions.length.toString()],
-        ['Atendimentos de Enfermagem', nursingEvolutions.length.toString()]
+        ['Total de Idosos Atendidos', (elderly || []).length.toString()],
+        ['PIAs em Andamento', (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
+        ['Evoluções Totais', (unifiedEvolutions || []).length.toString()],
+        ['Atendimentos de Fisioterapia', (physioEvolutions || []).length.toString()],
+        ['Atendimentos de Psicologia', (psychEvolutions || []).length.toString()],
+        ['Atendimentos de Pedagogia', (pedagogyEvolutions || []).length.toString()],
+        ['Atendimentos de Serviço Social', (socialEvolutions || []).length.toString()],
+        ['Atendimentos de Enfermagem', (nursingEvolutions || []).length.toString()]
       ];
 
       await generateModernPDF({
@@ -6888,14 +6888,14 @@ const MonitoringSection = ({
     try {
       const columns = ['Indicador', 'Valor'];
       const data = [
-        ['Total de Idosos Atendidos', elderly.length.toString()],
-        ['PIAs em Andamento', pias.filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
-        ['Evoluções Totais', unifiedEvolutions.length.toString()],
-        ['Atendimentos de Fisioterapia', physioEvolutions.length.toString()],
-        ['Atendimentos de Psicologia', psychEvolutions.length.toString()],
-        ['Atendimentos de Pedagogia', pedagogyEvolutions.length.toString()],
-        ['Atendimentos de Serviço Social', socialEvolutions.length.toString()],
-        ['Atendimentos de Enfermagem', nursingEvolutions.length.toString()]
+        ['Total de Idosos Atendidos', (elderly || []).length.toString()],
+        ['PIAs em Andamento', (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
+        ['Evoluções Totais', (unifiedEvolutions || []).length.toString()],
+        ['Atendimentos de Fisioterapia', (physioEvolutions || []).length.toString()],
+        ['Atendimentos de Psicologia', (psychEvolutions || []).length.toString()],
+        ['Atendimentos de Pedagogia', (pedagogyEvolutions || []).length.toString()],
+        ['Atendimentos de Serviço Social', (socialEvolutions || []).length.toString()],
+        ['Atendimentos de Enfermagem', (nursingEvolutions || []).length.toString()]
       ];
 
       await generateModernWord({
@@ -6915,7 +6915,7 @@ const MonitoringSection = ({
   };
 
   const selectedElderly = (elderly || []).find(e => e.id === selectedElderlyId);
-  const elderlyPia = pias.find(p => p.elderlyId === selectedElderlyId);
+  const elderlyPia = (pias || []).find(p => p.elderlyId === selectedElderlyId);
   const elderlyEvolutions = unifiedEvolutions.filter(ev => ev.elderlyId === selectedElderlyId);
   const elderlyVitals = vitalSigns.filter(v => v.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const elderlyEmotions = psychEmotionalMonitorings.filter(m => m.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -6977,7 +6977,7 @@ const MonitoringSection = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {[
                 { label: 'Total Idosos', value: elderly.length, icon: Users, color: 'text-blue-600' },
-                { label: 'PIAs Ativos', value: pias.filter(p => p.status === 'EM_ANDAMENTO').length, icon: ClipboardList, color: 'text-green-600' },
+                { label: 'PIAs Ativos', value: (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length, icon: ClipboardList, color: 'text-green-600' },
                 { label: 'Evoluções (Total)', value: unifiedEvolutions.length, icon: Activity, color: 'text-purple-600' },
                 { label: 'Workshops', value: workshops.length, icon: BookOpen, color: 'text-orange-600' },
               ].map((m, i) => (
@@ -7026,8 +7026,8 @@ const MonitoringSection = ({
                 <h3 className="font-bold text-gray-800 dark:text-white mb-6">Status dos PIAs</h3>
                 <div className="space-y-4">
                   {['EM_ANDAMENTO', 'CONCLUIDO', 'REVISAR'].map(status => {
-                    const count = pias.filter(p => p.status === status).length;
-                    const percentage = pias.length > 0 ? (count / pias.length) * 100 : 0;
+                    const count = (pias || []).filter(p => p.status === status).length;
+                    const percentage = (pias || []).length > 0 ? (count / (pias || []).length) * 100 : 0;
                     return (
                       <div key={status} className="space-y-2">
                         <div className="flex justify-between text-sm">
@@ -7107,12 +7107,13 @@ const MonitoringSection = ({
               Planos Individuais de Atendimento (PIA)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pias.map(pia => {
+              {(pias || []).map(pia => {
+                if (!pia || !pia.id) return null;
                 const resident = (elderly || []).find(e => e.id === pia.elderlyId);
                 return (
                   <div key={pia.id} className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
                     <div className="flex justify-between items-start mb-4">
-                      <h4 className="font-bold text-gray-800 dark:text-white">{resident?.name}</h4>
+                      <h4 className="font-bold text-gray-800 dark:text-white">{resident?.name || 'Idoso não encontrado'}</h4>
                       <span className={cn(
                         "px-2 py-1 rounded-lg text-[10px] font-bold uppercase",
                         pia.status === 'EM_ANDAMENTO' ? 'bg-blue-100 text-blue-600' :
@@ -7125,11 +7126,11 @@ const MonitoringSection = ({
                     <div className="space-y-3">
                       <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase">Objetivos</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.objectives}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.objectives || 'Nenhum objetivo definido'}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-gray-400 uppercase">Ações</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.actions}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.actions || 'Nenhuma ação definida'}</p>
                       </div>
                     </div>
                   </div>

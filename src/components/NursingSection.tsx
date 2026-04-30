@@ -1126,6 +1126,13 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
           )}
 
           {type === 'dressing' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-gray-50 dark:border-gray-800 pb-8">
+              <Input label="Data do Procedimento" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
+            </div>
+          )}
+
+          {type === 'dressing' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <Input label="Tipo de Lesão" value={formData.woundType} onChange={(v) => setFormData({ ...formData, woundType: v })} />
               <Input label="Localização" value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} />
@@ -1141,6 +1148,13 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
                 />
               </div>
               <Input label="Próxima Troca" type="date" value={formData.nextChangeDate} onChange={(v) => setFormData({ ...formData, nextChangeDate: v })} />
+            </div>
+          )}
+
+          {type === 'incident' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-gray-50 dark:border-gray-800 pb-8">
+              <Input label="Data da Ocorrência" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
             </div>
           )}
 
@@ -1172,11 +1186,25 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
           )}
 
           {type === 'avd' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-gray-50 dark:border-gray-800 pb-8">
+              <Input label="Data da Avaliação" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
+            </div>
+          )}
+
+          {type === 'avd' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <AVDSelect label="Alimentação" value={formData.feeding} onChange={(v) => setFormData({ ...formData, feeding: v })} />
               <AVDSelect label="Higiene" value={formData.hygiene} onChange={(v) => setFormData({ ...formData, hygiene: v })} />
               <AVDSelect label="Vestuário" value={formData.dressing} onChange={(v) => setFormData({ ...formData, dressing: v })} />
               <AVDSelect label="Mobilidade" value={formData.mobility} onChange={(v) => setFormData({ ...formData, mobility: v })} />
+            </div>
+          )}
+
+          {type === 'diaper' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-gray-50 dark:border-gray-800 pb-8">
+              <Input label="Data do Registro" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
             </div>
           )}
 
@@ -1281,6 +1309,13 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
                   onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
                 />
               </div>
+            </div>
+          )}
+
+          {type === 'vital' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border-b border-gray-50 dark:border-gray-800 pb-8">
+              <Input label="Data do Registro" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
             </div>
           )}
 
