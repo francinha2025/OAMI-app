@@ -198,6 +198,9 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
     console.warn("ALERTA: Limite de cota do banco de dados atingido.");
   }
+
+  // Despachar evento para que o App possa mostrar um toast (showToast não está disponível aqui fora)
+  window.dispatchEvent(new CustomEvent('firestore-error-toast', { detail: { message: `Erro ao acessar ${path}: ${errorMessage}` } }));
 }
 
 // --- AI Assistant Component ---
@@ -6916,9 +6919,9 @@ const MonitoringSection = ({
 
   const selectedElderly = (elderly || []).find(e => e.id === selectedElderlyId);
   const elderlyPia = (pias || []).find(p => p.elderlyId === selectedElderlyId);
-  const elderlyEvolutions = unifiedEvolutions.filter(ev => ev.elderlyId === selectedElderlyId);
-  const elderlyVitals = vitalSigns.filter(v => v.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const elderlyEmotions = psychEmotionalMonitorings.filter(m => m.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const elderlyEvolutions = (unifiedEvolutions || []).filter(ev => ev && ev.elderlyId === selectedElderlyId);
+  const elderlyVitals = (vitalSigns || []).filter(v => v && v.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const elderlyEmotions = (psychEmotionalMonitorings || []).filter(m => m && m.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="space-y-8">
@@ -8114,6 +8117,7 @@ export default function App() {
               setNeedsProfile(true);
             }
           }
+          setIsAuthReady(true);
         }).catch(err => {
           if (err.message?.includes('the client is offline') || err.message?.includes('offline')) {
             console.warn("User profile fetch delayed: the client is offline. Network issues or caching issues.");
@@ -8137,14 +8141,26 @@ export default function App() {
             }
             setNeedsProfile(true);
           }
+          setIsAuthReady(true);
         });
       } else {
         setUser(null);
         setNeedsProfile(false);
+        setIsAuthReady(true);
       }
-      setIsAuthReady(true);
     });
-    return () => unsubscribe();
+
+    const handleGlobalErrorToast = (e: any) => {
+      if (e.detail?.message) {
+        showToast(e.detail.message, 'error');
+      }
+    };
+
+    window.addEventListener('firestore-error-toast', handleGlobalErrorToast);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('firestore-error-toast', handleGlobalErrorToast);
+    };
   }, []);
 
   useEffect(() => {
@@ -8212,6 +8228,10 @@ export default function App() {
     if (!isAuthReady || !user) return;
 
     // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
+    const farPast = new Date();
+    farPast.setFullYear(farPast.getFullYear() - 10);
+    const farPastStr = farPast.toISOString();
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
@@ -8287,7 +8307,7 @@ export default function App() {
     // Listen to Evolutions (Histórico de 1 ano para Dashboard)
     const qEvolutions = query(
       collection(db, 'evolutions'), 
-      where('date', '>=', oneYearAgoStr),
+      where('date', '>=', farPastStr),
       orderBy('date', 'desc'),
       limit(500)
     );
@@ -8310,7 +8330,7 @@ export default function App() {
     // Final Packings (Histórico de 1 ano para Dashboard)
     unsubFinal = onSnapshot(query(
       collection(db, 'diaperFinalPackings'), 
-      where('date', '>=', oneYearAgoStr),
+      where('date', '>=', farPastStr),
       orderBy('date', 'desc'),
       limit(300)
     ), (snapshot) => {
@@ -8321,7 +8341,7 @@ export default function App() {
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qFinancial = query(
         collection(db, 'financial'), 
-        where('date', '>=', oneYearAgoStr),
+        where('date', '>=', farPastStr),
         orderBy('date', 'desc'),
         limit(500)
       );
@@ -8339,7 +8359,7 @@ export default function App() {
     });
 
     // Listen to PIAs
-    unsubPias = onSnapshot(query(collection(db, 'pias'), limit(100)), (snapshot) => {
+    unsubPias = onSnapshot(query(collection(db, 'pias'), limit(500)), (snapshot) => {
       setPias(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'pias');
@@ -8399,19 +8419,19 @@ export default function App() {
           setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
 
-        unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
 
-        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
+        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
 
-        unsubPhysioExercises = onSnapshot(query(collection(db, 'physioExercises'), orderBy('title'), limit(100)), (snapshot) => {
+        unsubPhysioExercises = onSnapshot(query(collection(db, 'physioExercises'), orderBy('title'), limit(200)), (snapshot) => {
           setPhysioExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioExercise)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioExercises'));
 
-        unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPhysioAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAppointment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
       }
@@ -8428,35 +8448,35 @@ export default function App() {
           setMedications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Medication)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'medications'));
 
-        unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
+        unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
 
-        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
 
-        unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
 
-        unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
 
-        unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setIncidentRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncidentRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'incidentRecords'));
 
-        unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setShiftSchedules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShiftSchedule)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'shiftSchedules'));
 
-        unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setAvdRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AVDRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'avdRecords'));
 
-        unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
+        unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setDiaperChangeRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperChangeRecord)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperChangeRecords'));
       }
@@ -8469,35 +8489,35 @@ export default function App() {
           setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
 
-        unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
 
-        unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
 
-        unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychAppointment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychAppointments'));
 
-        unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setPsychEmotionalMonitorings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEmotionalMonitoring)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEmotionalMonitorings'));
 
-        unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychFamilyBonds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychFamilyBond)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychFamilyBonds'));
 
-        unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychActivity)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychActivities'));
 
-        unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychCognitionAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychCognitionAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychCognitionAssessments'));
 
-        unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPsychInterventionPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInterventionPlan)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInterventionPlans'));
       }
@@ -8510,27 +8530,27 @@ export default function App() {
           setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
 
-        unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), where('date', '>=', ninetyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
 
-        unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
 
-        unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogyActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyActivity)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyActivities'));
 
-        unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogyStimulationTrackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyStimulationTracking)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyStimulationTrackings'));
 
-        unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogySocialParticipations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogySocialParticipation)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogySocialParticipations'));
 
-        unsubPedagogyIndividualPlans = onSnapshot(query(collection(db, 'pedagogyIndividualPlans'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubPedagogyIndividualPlans = onSnapshot(query(collection(db, 'pedagogyIndividualPlans'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setPedagogyIndividualPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyIndividualPlan)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyIndividualPlans'));
 
@@ -8548,23 +8568,23 @@ export default function App() {
           setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
 
-        unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
 
-        unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
           setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
 
-        unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setSocialReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialReferral)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialReferrals'));
 
-        unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setSocialFamilyVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyVisit)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyVisits'));
 
-        unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
           setSocialRiskSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialRiskSituation)));
         }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialRiskSituations'));
       }

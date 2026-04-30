@@ -1473,7 +1473,7 @@ const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete }: {
               return (
                 <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
                   <td className="px-6 py-4 font-bold">{patient?.name}</td>
-                  <td className="px-6 py-4 text-gray-500">{v.date} {v.time}</td>
+                  <td className="px-6 py-4 text-gray-500">{(v.date || (v as any).createdAt || '').split('T')[0]} {v.time || ''}</td>
                   <td className="px-6 py-4 font-bold">{v.systolicBP}/{v.diastolicBP}</td>
                   <td className="px-6 py-4">{v.heartRate} bpm</td>
                   <td className="px-6 py-4">{v.temperature}°C</td>
@@ -1605,7 +1605,7 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete }: {
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
-                  <p className="text-xs text-gray-500">{e.date} às {e.time} • Enf. Responsável</p>
+                  <p className="text-xs text-gray-500">{(e.date || (e as any).createdAt || '').split('T')[0]} às {e.time || '--:--'} • Enf. Responsável</p>
                 </div>
               </div>
               <div className="flex gap-2">
