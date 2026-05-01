@@ -1,24 +1,17 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-
-// 🔥 CONFIG DO SEU FIREBASE (OAMI OFICIAL)
-const firebaseConfig = {
-  apiKey: "AIzaSyD5V-sYEIhbUN7w_b8Hz6_kbRvU8GphDYY",
-  authDomain: "oami-oficial.firebaseapp.com",
-  projectId: "oami-oficial",
-  storageBucket: "oami-oficial.firebasestorage.app",
-  messagingSenderId: "264092482774",
-  appId: "1:264092482774:web:fa69e36f256cb55cb91d77"
-};
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
 
 // ✅ Inicializa Firebase (evita duplicação)
-const app = getApps().length === 0
-  ? initializeApp(firebaseConfig)
+const app = getApps().length === 0 
+  ? initializeApp(firebaseConfig) 
   : getApps()[0];
 
-// ✅ Firestore (CORRETO)
-export const db = getFirestore(app);
+// 🔥 Conectando no banco CERTO (onde estão seus dados)
+export const db = initializeFirestore(app, {
+  databaseId: "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031"
+});
 
 // ✅ Auth
 export const auth = getAuth(app);
