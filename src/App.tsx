@@ -109,7 +109,7 @@ import { generateModernExcel } from './lib/excelUtils';
 import { Table as TableIcon } from 'lucide-react';
 import { processSmartIA, AISmartCommandResult } from './services/geminiService';
 import { GoogleGenAI } from "@google/genai";
-import { db, auth } from './firebase';
+import { db, auth, testConnection } from './firebase';
 import { PhysioSection } from './components/PhysioSection';
 import { NursingSection } from './components/NursingSection';
 import { PsychologySection } from './components/PsychologySection';
@@ -966,7 +966,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       title: 'Administrativo',
       items: [
         { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'professionals', label: 'Cadastro de Profissionais', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'professionals', label: 'Usuários', icon: Users, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'volunteers', label: 'Voluntários/Estagiários', icon: BookOpen, roles: ['ANY'] },
@@ -1118,9 +1118,9 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
   );
 };
 
-const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDeleteStaff, showToast, showConfirm }: { 
+const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff, showToast, showConfirm }: { 
   professionals: Professional[], 
-  staffMembers: StaffMember[],
+  users: StaffMember[],
   onSaveStaff: (data: Omit<StaffMember, 'id'>, id?: string) => Promise<void>,
   onDeleteStaff: (id: string) => Promise<void>,
   showToast: (msg: string, type: 'success' | 'error') => void,
@@ -1196,7 +1196,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
       {/* Search and Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Gestão de <span className="text-green-600">Profissionais</span></h2>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Gestão de <span className="text-green-600">Usuários</span></h2>
           <p className="text-gray-500 font-medium font-mono text-xs uppercase tracking-widest mt-1">Recursos Humanos & Equipe</p>
         </div>
         <div className="flex gap-2">
@@ -1204,13 +1204,13 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
             onClick={() => { setModalType('CONVIVER'); setIsModalOpen(true); }}
             className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm"
           >
-            <Plus size={18} /> Novo Projeto Conviver
+            <Plus size={18} /> Novo Usuário Conviver
           </button>
           <button 
             onClick={() => { setModalType('INSTITUICAO'); setIsModalOpen(true); }}
             className="flex items-center gap-2 bg-green-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all text-sm"
           >
-            <Plus size={18} /> Novo Instituição
+            <Plus size={18} /> Novo Usuário Instituição
           </button>
         </div>
       </div>
@@ -1222,7 +1222,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600">
               <Users size={20} />
             </div>
-            <h3 className="text-xl font-black text-gray-800 dark:text-white">Profissionais do Projeto Conviver</h3>
+            <h3 className="text-xl font-black text-gray-800 dark:text-white">Usuários do Projeto Conviver</h3>
           </div>
           
           <div className="grid grid-cols-1 gap-4">
@@ -1269,11 +1269,11 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
             <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center text-green-600">
               <ShieldCheck size={20} />
             </div>
-            <h3 className="text-xl font-black text-gray-800 dark:text-white">Profissionais da Instituição (OAMI)</h3>
+            <h3 className="text-xl font-black text-gray-800 dark:text-white">Usuários da Instituição (OAMI)</h3>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {(staffMembers || []).map((s) => (
+            {(users || []).map((s) => (
               <motion.div 
                 key={s.id}
                 initial={{ opacity: 0, x: 20 }}
@@ -1302,7 +1302,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
                 </div>
               </motion.div>
             ))}
-            {staffMembers.length === 0 && (
+            {users.length === 0 && (
               <div className="text-center py-10 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
                 <p className="text-gray-400 font-bold text-sm">Nenhum funcionário institutional.</p>
               </div>
@@ -1326,7 +1326,7 @@ const ProfessionalsSection = ({ professionals, staffMembers, onSaveStaff, onDele
             >
               <div className="flex justify-between items-center p-8 pb-4 bg-white dark:bg-gray-900 sticky top-0 z-10">
                 <h3 className="text-2xl font-black text-gray-800 dark:text-white">
-                  Cadastrar {modalType === 'CONVIVER' ? 'Profissional Conviver' : 'Funcionário da Instituição'}
+                  Cadastrar {modalType === 'CONVIVER' ? 'Usuário Conviver' : 'Usuário da Instituição'}
                 </h3>
                 <button 
                   onClick={() => setIsModalOpen(false)} 
@@ -7316,7 +7316,7 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
     try {
       if (auth.currentUser) {
         // Update Firestore
-        await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        await updateDoc(doc(db, 'profiles', auth.currentUser.uid), {
           name: formData.name,
           photoUrl: formData.photoUrl,
           registrationNumber: formData.registrationNumber
@@ -7552,10 +7552,10 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
   const handleUpdateRole = async (userId: string, newRole: Role) => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      await updateDoc(doc(db, 'profiles', userId), { role: newRole });
       showToast('Cargo atualizado com sucesso!');
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `profiles/${userId}`);
       showToast('Erro ao atualizar cargo', 'error');
     } finally {
       setLoading(false);
@@ -7818,7 +7818,7 @@ export default function App() {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   // Real-time data states
-  const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [users, setUsers] = useState<StaffMember[]>([]);
   const [elderly, setElderly] = useState<Elderly[]>([]);
   const [evolutions, setEvolutions] = useState<EvolutionRecord[]>([]);
   const [donors, setDonors] = useState<Donor[]>([]);
@@ -7831,7 +7831,7 @@ export default function App() {
   const [diaperProductionGoals, setDiaperProductionGoals] = useState<DiaperProductionGoal[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([]);
-  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [adminUsers, setAdminUsers] = useState<User[]>([]);
   const [pias, setPias] = useState<PIA[]>([]);
   const [allPhotos, setAllPhotos] = useState<GalleryItem[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
@@ -8088,11 +8088,13 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocRef = doc(db, 'profiles', firebaseUser.uid);
         getDoc(userDocRef).then((docSnap) => {
           if (docSnap.exists()) {
             setUser({ id: docSnap.id, ...docSnap.data() } as User);
             setNeedsProfile(false);
+            console.log("👤 Perfil do usuário carregado:", docSnap.data()?.role);
+            testConnection();
           } else {
             // Bypass para a criadora/admin se o documento não existir ou falhar por cota
             if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
@@ -8109,11 +8111,16 @@ export default function App() {
           }
           setIsAuthReady(true);
         }).catch(err => {
+          const profilePath = `profiles/${firebaseUser.uid}`;
           if (err.message?.includes('the client is offline') || err.message?.includes('offline')) {
-            console.warn("User profile fetch delayed: the client is offline. Network issues or caching issues.");
+            console.warn(`User profile fetch delayed (${profilePath}): client is offline.`);
             showToast('Conexão instável ou offline.', 'error');
           } else {
-            console.error("Error fetching user profile:", err);
+            console.error(`Error fetching user profile (${profilePath}):`, err);
+            // More detailed info for the user/developer
+            if (err.code === 'permission-denied') {
+              console.error("🔥 Permission Denied on Profile! Check Firestore Rules for 'profiles' collection.");
+            }
           }
           
           // Se falhar por cota ou offline, mas for a admin, deixa entrar
@@ -8125,6 +8132,8 @@ export default function App() {
               photoUrl: firebaseUser.photoURL || ''
             });
             setNeedsProfile(false);
+            console.log("⭐ Admin logada (Bypass de Perfil)");
+            testConnection();
           } else {
             if (err.message?.includes('Quota exceeded') || err.message?.includes('quota')) {
               showToast('Limite diário de acesso atingido (Quota). Tente novamente amanhã.', 'error');
@@ -8282,12 +8291,13 @@ export default function App() {
 
     // Replaced fetchStaticData with real-time listeners
     unsubElderly = onSnapshot(query(collection(db, 'elderly'), orderBy('name'), limit(300)), (snapshot) => {
+      console.log(`📦 Firestore: ${snapshot.size} idosos encontrados.`);
       setElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Elderly)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'elderly'));
 
-    unsubStaff = onSnapshot(collection(db, 'staffMembers'), (snapshot) => {
-      setStaffMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'staffMembers'));
+    unsubStaff = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
 
     unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
       setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
@@ -8341,10 +8351,10 @@ export default function App() {
     }
 
     // Listen to All Users (Limitado para evitar leitura massiva)
-    unsubUsers = onSnapshot(query(collection(db, 'users'), limit(50)), (snapshot) => {
-      setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    unsubUsers = onSnapshot(query(collection(db, 'profiles'), limit(50)), (snapshot) => {
+      setAdminUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
     }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'users');
+      handleFirestoreError(err, OperationType.LIST, 'profiles');
       showToast('Erro ao carregar usuários', 'error');
     });
 
@@ -8671,7 +8681,7 @@ export default function App() {
     };
 
     try {
-      await setDoc(doc(db, 'users', auth.currentUser.uid), {
+      await setDoc(doc(db, 'profiles', auth.currentUser.uid), {
         name: newUser.name,
         role: newUser.role,
         photoUrl: newUser.photoUrl,
@@ -8698,7 +8708,7 @@ export default function App() {
   const handleUpdateProfile = async (data: Partial<User>) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'users', user.id), data);
+      await updateDoc(doc(db, 'profiles', user.id), data);
       setUser({ ...user, ...data });
       showToast('Perfil atualizado com sucesso!');
     } catch (err) {
@@ -8960,14 +8970,14 @@ export default function App() {
   const handleSaveStaffMember = async (data: Omit<StaffMember, 'id'>, id?: string) => {
     try {
       if (id) {
-        await updateDoc(doc(db, 'staffMembers', id), data);
+        await updateDoc(doc(db, 'users', id), data);
         showToast('Funcionário atualizado!', 'success');
       } else {
-        await addDoc(collection(db, 'staffMembers'), data);
+        await addDoc(collection(db, 'users'), data);
         showToast('Funcionário registrado!', 'success');
       }
     } catch (err) {
-      handleFirestoreError(err, id ? OperationType.UPDATE : OperationType.CREATE, 'staffMembers');
+      handleFirestoreError(err, id ? OperationType.UPDATE : OperationType.CREATE, 'users');
       showToast('Erro ao salvar funcionário', 'error');
     }
   };
@@ -9574,7 +9584,7 @@ export default function App() {
           evolutions={nursingEvolutions}
           incidents={incidentRecords}
           shifts={shiftSchedules}
-          staffMembers={staffMembers}
+          users={users}
           professionals={professionals}
           avds={avdRecords}
           diaperChanges={diaperChangeRecords}
@@ -9694,11 +9704,11 @@ export default function App() {
       case 'professionals': return (
         <ProfessionalsSection 
           professionals={professionals} 
-          staffMembers={staffMembers}
+          users={users}
           onSaveStaff={handleSaveStaffMember}
           onDeleteStaff={async (id) => {
             try {
-              await deleteDoc(doc(db, 'staffMembers', id));
+              await deleteDoc(doc(db, 'users', id));
               showToast('Funcionário institucional excluído!', 'success');
             } catch (err) {
               showToast('Erro ao excluir funcionário', 'error');
@@ -9713,7 +9723,7 @@ export default function App() {
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
       case 'volunteers': return <VolunteersSection volunteers={volunteers} showToast={showToast} user={user} />;
       case 'family': return <FamilySection engagements={familyEngagements} elderly={elderly} showToast={showToast} />;
-      case 'staff': return <StaffManagementSection staff={staffMembers} onSave={handleSaveStaffMember} showToast={showToast} />;
+      case 'staff': return <StaffManagementSection staff={users} onSave={handleSaveStaffMember} showToast={showToast} />;
       case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} />;
       case 'workshops': return <WorkshopsSection workshops={workshops} communityElderly={communityElderly} caregivers={caregivers} showToast={showToast} />;
       case 'monitoring': return (
@@ -9785,7 +9795,7 @@ export default function App() {
           showToast={showToast}
         />
       );
-      case 'settings': return <SettingsSection users={allUsers} showToast={showToast} institutionalInfo={institutionalInfo} />;
+      case 'settings': return <SettingsSection users={adminUsers} showToast={showToast} institutionalInfo={institutionalInfo} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400 space-y-4">
           <AlertCircle size={64} />

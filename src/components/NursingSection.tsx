@@ -42,7 +42,7 @@ interface NursingSectionProps {
   evolutions: NursingEvolution[];
   incidents: IncidentRecord[];
   shifts: ShiftSchedule[];
-  staffMembers: StaffMember[];
+  users: StaffMember[];
   professionals: Professional[];
   avds: AVDRecord[];
   diaperChanges: DiaperChangeRecord[];
@@ -75,7 +75,7 @@ export const NursingSection = (props: NursingSectionProps) => {
   const { 
     patients, medications, administrations, vitalSigns, 
     dressings, evolutions, incidents, shifts, 
-    staffMembers, professionals, avds, diaperChanges 
+    users, professionals, avds, diaperChanges 
   } = props;
   const [activeTab, setActiveTab] = useState<NursingTab>('dashboard');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -462,7 +462,7 @@ export const NursingSection = (props: NursingSectionProps) => {
             {activeTab === 'shift' && (
               <ShiftView 
                 shifts={props.shifts}
-                staffMembers={props.staffMembers}
+                users={users}
                 onAdd={() => { setModalType('shift'); setIsModalOpen(true); }}
                 onEdit={(s) => { setEditingData(s); setModalType('shift'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'shift' })}
@@ -499,7 +499,7 @@ export const NursingSection = (props: NursingSectionProps) => {
               type={modalType} 
               patients={patients}
               medications={medications}
-              staffMembers={staffMembers}
+              users={users}
               professionals={professionals}
               editingData={editingData}
               initialPatientId={selectedPatientId || undefined}
@@ -563,9 +563,9 @@ export const NursingSection = (props: NursingSectionProps) => {
 
 // --- Sub-components ---
 
-const ShiftView = ({ shifts, staffMembers, onAdd, onEdit, onDelete }: { 
+const ShiftView = ({ shifts, users, onAdd, onEdit, onDelete }: { 
   shifts: ShiftSchedule[], 
-  staffMembers: StaffMember[],
+  users: StaffMember[],
   onAdd: () => void,
   onEdit: (s: ShiftSchedule) => void,
   onDelete: (id: string) => void
@@ -627,7 +627,7 @@ const ShiftView = ({ shifts, staffMembers, onAdd, onEdit, onDelete }: {
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Apoio (Cuidadores/Cozinha/Vigia)</p>
                 <div className="flex flex-wrap gap-2">
                   {s.staffMemberIds?.map((id) => {
-                    const member = staffMembers.find(m => m.id === id);
+                    const member = users.find(m => m.id === id);
                     return (
                       <span key={id} className="px-2 py-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-[10px] font-bold">
                         {member?.name || 'Membro removido'}
@@ -874,11 +874,11 @@ const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }:
   </div>
 );
 
-const NursingModal = ({ type, patients, medications, staffMembers, professionals, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
+const NursingModal = ({ type, patients, medications, users, professionals, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
   type: string | null,
   patients: NursingPatient[],
   medications: Medication[],
-  staffMembers: StaffMember[],
+  users: StaffMember[],
   professionals: Professional[],
   onClose: () => void,
   onSavePatient: any,
@@ -1272,7 +1272,7 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Profissionais da Instituição (Apoio)</label>
                   <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto p-4 bg-gray-50 dark:bg-gray-800 rounded-3xl custom-scrollbar border border-green-100 dark:border-green-900/20">
-                    {staffMembers.filter(s => s.status === 'ATIVO').map(s => (
+                    {users.filter(s => s.status === 'ATIVO').map(s => (
                       <label key={s.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-xl cursor-pointer hover:ring-2 hover:ring-green-500 border border-transparent transition-all shadow-sm">
                         <input 
                           type="checkbox" 
@@ -1293,7 +1293,7 @@ const NursingModal = ({ type, patients, medications, staffMembers, professionals
                         </div>
                       </label>
                     ))}
-                    {staffMembers.filter(s => s.status === 'ATIVO').length === 0 && (
+                    {users.filter(s => s.status === 'ATIVO').length === 0 && (
                       <p className="text-center text-xs text-gray-500 font-bold py-4 italic">Nenhum apoio disponível.</p>
                     )}
                   </div>

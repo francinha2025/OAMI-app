@@ -9,25 +9,40 @@ const app = getApps().length === 0
   : getApps()[0];
 
 // 🔥 Conectando no banco CERTO com Long Polling para evitar erros de Fetch (importante para o preview)
+const targetDatabaseId = (firebaseConfig as any).firestoreDatabaseId || "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031";
 export const db = initializeFirestore(app, 
   {
     experimentalForceLongPolling: true,
   }, 
-  firebaseConfig.firestoreDatabaseId || "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031"
+  targetDatabaseId
 );
+
+console.log(`📡 Firebase Inicializado. Projeto: ${firebaseConfig.projectId} | Banco: ${targetDatabaseId}`);
 
 // ✅ Auth
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // 🔎 Teste de conexão com Firestore
-async function testConnection() {
+export async function testConnection() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.log("ℹ️ Firestore: Aguardando login para teste completo...");
+    return;
+  }
+
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log("🔥 Firestore conectado com sucesso!");
-  } catch (error) {
-    console.error("❌ Erro no Firestore:", error);
+    const testDoc = doc(db, 'test', 'connection');
+    await getDocFromServer(testDoc);
+    console.log("✅ Firestore: Conexão bem-sucedida para o usuário:", user.email);
+  } catch (error: any) {
+    if (error.message.includes('permission-denied')) {
+      console.warn("🛡️ Firestore: Permissão negada para teste. Verifique se o documento 'test/connection' existe e se as regras permitem seu acesso.");
+    } else {
+      console.error("❌ Firestore: Erro na conexão:", error.message);
+    }
   }
 }
 
-testConnection();
+// O teste agora será chamado pelo App.tsx após o login para evitar erro prematuro
+// testConnection(); 

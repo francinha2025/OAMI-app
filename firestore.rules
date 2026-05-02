@@ -405,53 +405,55 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         ((request.auth.token.email == "franciaraeabreucoelho@gmail.com" && request.auth.token.email_verified == true) ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PRESIDENTE'));
+         (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'PRESIDENTE'));
     }
 
     function isCoordinator() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'COORDENADORA' || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PROJETISTA');
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'COORDENADORA' || get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'PROJETISTA');
     }
 
     function isPhysio() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'FISIOTERAPEUTA';
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'FISIOTERAPEUTA';
     }
 
     function isNurse() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ENFERMEIRA';
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'ENFERMEIRA';
     }
 
     function isPsychologist() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PSICOLOGA';
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'PSICOLOGA';
     }
 
     function isPedagogue() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'PEDAGOGA';
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'PEDAGOGA';
     }
 
     function isSocialWorker() {
       return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ASSISTENTE_SOCIAL';
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'ASSISTENTE_SOCIAL';
     }
 
     function hasRole(role) {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == role;
     }
 
     function hasAnyRole(roles) {
       return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+             exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role in roles;
     }
 
     function hasRequiredFields(fields) {
@@ -555,6 +557,13 @@ service cloud.firestore {
              data.createdAt is string;
     }
 
+    function isValidUserStaff(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.role is string && data.role in ['CUIDADOR', 'SERVICO_GERAIS', 'COZINHEIRA', 'VIGIA'] &&
+             data.status in ['ATIVO', 'INATIVO'] &&
+             data.createdAt is string;
+    }
+
     function isValidPhysioPatient(data) {
       return data.name is string && data.name.size() > 0 &&
              data.category in ['ortopedia', 'neurologico', 'idosos', 'outros'];
@@ -580,10 +589,19 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
-    match /users/{userId} {
+    match /profiles/{userId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+    }
+
+    match /users/{memberId} {
+      allow read: if isAuthenticated();
+      allow write: if (hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'PROJETISTA']) || isAdmin()) && (request.method == 'delete' || isValidUserStaff(incoming()));
+    }
+
+    match /test/{docId} {
+      allow read: if isAuthenticated();
     }
 
     match /elderly/{elderlyId} {
@@ -688,6 +706,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
     }
+
 
     match /physioPatients/{patientId} {
       allow read: if isAuthenticated();

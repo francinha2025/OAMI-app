@@ -694,7 +694,7 @@
     }
   },
   "firestore": {
-    "users": { "schema": "User", "description": "System users" },
+    "profiles": { "schema": "User", "description": "System user profiles" },
     "elderly": { "schema": "Elderly", "description": "Institutionalized elderly" },
     "pias": { "schema": "PIA", "description": "Care plans" },
     "evolutions": { "schema": "EvolutionRecord", "description": "Professional evolutions" },
@@ -738,6 +738,7 @@
     "socialEvolutions": { "schema": "SocialEvolution", "description": "Social work evolutions" },
     "socialReferrals": { "schema": "SocialReferral", "description": "Social work referrals" },
     "socialFamilyVisits": { "schema": "SocialFamilyVisit", "description": "Social work family visits" },
-    "socialRiskSituations": { "schema": "SocialRiskSituation", "description": "Social work risk situations" }
+    "socialRiskSituations": { "schema": "SocialRiskSituation", "description": "Social work risk situations" },
+    "users": { "schema": "StaffMember", "description": "Support staff records" }
   }
 }
