@@ -9,11 +9,24 @@ if ('serviceWorker' in navigator) {
     regs.forEach(r => r.unregister());
   });
 
-  // 🚫 Bloqueia qualquer novo registro
-  (navigator.serviceWorker.register as any) = () => {
-    console.log('Service Worker bloqueado');
-    return Promise.resolve();
-  };
+  // 🚫 Bloqueia qualquer novo registro de Service Worker para evitar cache stale
+  try {
+    (navigator.serviceWorker.register as any) = () => {
+      console.log('✅ Service Worker propositalmente bloqueado para estabilidade.');
+      return Promise.resolve({
+        active: null,
+        installing: null,
+        waiting: null,
+        onupdatefound: null,
+        pushManager: null as any,
+        scope: '',
+        unregister: () => Promise.resolve(true),
+        update: () => Promise.resolve()
+      });
+    };
+  } catch (e) {
+    console.warn('Não foi possível bloquear SW register:', e);
+  }
 
   // 🧹 Limpa todos os caches
   caches.keys().then(names => {

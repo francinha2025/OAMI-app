@@ -8,10 +8,13 @@ const app = getApps().length === 0
   ? initializeApp(firebaseConfig) 
   : getApps()[0];
 
-// 🔥 Conectando no banco CERTO (onde estão seus dados)
-export const db = initializeFirestore(app, {
-  databaseId: "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031"
-});
+// 🔥 Conectando no banco CERTO com Long Polling para evitar erros de Fetch (importante para o preview)
+export const db = initializeFirestore(app, 
+  {
+    experimentalForceLongPolling: true,
+  }, 
+  firebaseConfig.firestoreDatabaseId || "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031"
+);
 
 // ✅ Auth
 export const auth = getAuth(app);
