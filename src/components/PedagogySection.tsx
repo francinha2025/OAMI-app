@@ -140,6 +140,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   setTheme,
   onLogout
 }) => {
+  if (!user || !user.role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Autenticando acesso pedagógico...</p>
+          <p className="text-[10px] text-gray-400">Se demorar muito, tente atualizar a página.</p>
+        </div>
+      </div>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const saved = localStorage.getItem('oami-pedagogy-tab');
     return (saved as TabType) || 'dashboard';
@@ -1231,6 +1243,15 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       return format(parsed, formatStr);
     } catch (e) {
       return '--/--';
+    }
+  };
+
+  const safeReplace = (str: string | null | undefined, search: string, replacement: string) => {
+    if (!str) return 'N/A';
+    try {
+      return String(str).split(search).join(replacement);
+    } catch (e) {
+      return String(str || 'N/A');
     }
   };
 

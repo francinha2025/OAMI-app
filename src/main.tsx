@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
 
 // 🔥 BLOQUEIO TOTAL DO SERVICE WORKER
@@ -37,6 +38,8 @@ if ('serviceWorker' in navigator) {
 // ✅ ESSA PARTE NÃO PODE APAGAR
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>
 );
