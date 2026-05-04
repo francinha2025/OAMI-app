@@ -46,14 +46,30 @@ export interface Donor {
 
 export interface DiaperDonation {
   id: string;
+  beneficiaryId: string;
   beneficiaryName: string;
-  beneficiaryId?: string;
   date: string;
   quantity: number;
   size: 'TAMANHO_UNICO';
   observations?: string;
   registeredBy: string;
   createdAt?: string;
+}
+
+export interface DiaperBeneficiary {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  document?: string;
+  needsEvolution: boolean; // For multi-team accompaniment
+  evolutions?: {
+    date: string;
+    description: string;
+    professional: string;
+  }[];
+  registrationDate: string;
+  status: 'ATIVO' | 'INATIVO';
 }
 
 export interface DiaperStock {
@@ -640,6 +656,7 @@ export interface PedagogyEvolution {
   id: string;
   patientId: string;
   date: string;
+  time?: string;
   activityTitle: string;
   participation: 'ATIVO' | 'PASSIVO' | 'RECUSOU';
   response: string;
@@ -664,6 +681,7 @@ export interface PedagogyStimulationTracking {
   id: string;
   patientId: string;
   date: string;
+  time?: string;
   memoryScore: number; // 0-10
   attentionScore: number; // 0-10
   reasoningScore: number; // 0-10
@@ -676,6 +694,7 @@ export interface PedagogySocialParticipation {
   id: string;
   patientId: string;
   date: string;
+  time?: string;
   interactionLevel: 'ALTO' | 'MEDIO' | 'BAIXO';
   isIsolated: boolean;
   isCommunicative: boolean;
@@ -687,6 +706,7 @@ export interface PedagogyIndividualPlan {
   id: string;
   patientId: string;
   date: string;
+  time?: string;
   objectives: string;
   indicatedActivities: string[];
   strategies: string;
@@ -715,6 +735,12 @@ export interface SocialPatient {
   income: number;
   benefits: ('BPC' | 'APOSENTADORIA' | 'OUTRO' | 'NENHUM')[];
   benefitStatus: 'ATIVO' | 'SUSPENSO' | 'NAO_POSSUI';
+  inssMonitoring?: string;
+  cadUnicoUpdateDate?: string;
+  hasLoans?: boolean;
+  loanDetails?: string;
+  isFamilyComplementing?: boolean;
+  familyComplementDetails?: string;
   photoUrl?: string;
   createdAt: string;
 }

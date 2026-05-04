@@ -102,7 +102,7 @@ import {
 } from 'recharts';
 import { cn, safeReplace, cleanData } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -8131,6 +8131,10 @@ export default function App() {
     return saved || 'dashboard';
   });
 
+  useEffect(() => {
+    localStorage.setItem('oami-active-tab', activeTab);
+  }, [activeTab]);
+
   // --- Initial System Cleanup and Connection Test ---
   useEffect(() => {
     // Connection Test
@@ -8325,6 +8329,9 @@ export default function App() {
   const [socialReferrals, setSocialReferrals] = useState<SocialReferral[]>([]);
   const [socialFamilyVisits, setSocialFamilyVisits] = useState<SocialFamilyVisit[]>([]);
   const [socialRiskSituations, setSocialRiskSituations] = useState<SocialRiskSituation[]>([]);
+
+  // Diaper States
+  const [diaperBeneficiaries, setDiaperBeneficiaries] = useState<DiaperBeneficiary[]>([]);
 
   const physioPatientsList = useMemo(() => {
     return (elderly || []).map(e => {
@@ -9940,6 +9947,48 @@ export default function App() {
     }
   };
 
+  const handleSaveDiaperDonation = async (data: Partial<DiaperDonation>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperDonations', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperDonations'), cleanedData);
+      }
+      showToast('Doação registrada com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperDonations');
+      showToast('Erro ao registrar doação', 'error');
+    }
+  };
+
+  const handleSaveDiaperBeneficiary = async (data: Partial<DiaperBeneficiary>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperBeneficiaries', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperBeneficiaries'), cleanedData);
+      }
+      showToast('Beneficiário salvo com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperBeneficiaries');
+      showToast('Erro ao salvar beneficiário', 'error');
+    }
+  };
+
+  const handleDeleteDiaperRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro excluído com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, collectionName);
+      showToast('Erro ao excluir registro', 'error');
+    }
+  };
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-50">
@@ -10279,7 +10328,12 @@ export default function App() {
           rawProductions={diaperRawProductions}
           wipProcessings={diaperWIPProcessings}
           finalPackings={diaperFinalPackings}
+          donations={diaperDonations}
+          beneficiaries={diaperBeneficiaries}
           goals={diaperProductionGoals}
+          onSaveDonation={handleSaveDiaperDonation}
+          onSaveBeneficiary={handleSaveDiaperBeneficiary}
+          onDeleteRecord={handleDeleteDiaperRecord}
           showToast={showToast}
         />
       );

@@ -602,6 +602,62 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <option value="NAO_POSSUI">Não Possui</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Acompanhamento INSS</label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                  value={formData.inssMonitoring || ''}
+                  onChange={(e) => setFormData({ ...formData, inssMonitoring: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Última Atu. CadÚnico</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                  value={formData.cadUnicoUpdateDate || ''}
+                  onChange={(e) => setFormData({ ...formData, cadUnicoUpdateDate: e.target.value })}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="checkbox"
+                  checked={formData.hasLoans || false}
+                  onChange={(e) => setFormData({ ...formData, hasLoans: e.target.checked })}
+                />
+                <label className="text-sm font-medium text-gray-700">Possui Empréstimos</label>
+              </div>
+              <div className="flex items-center gap-2 mt-4">
+                <input
+                  type="checkbox"
+                  checked={formData.isFamilyComplementing || false}
+                  onChange={(e) => setFormData({ ...formData, isFamilyComplementing: e.target.checked })}
+                />
+                <label className="text-sm font-medium text-gray-700">Família Complementa</label>
+              </div>
+              {formData.hasLoans && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Detalhes Empréstimos</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                    value={formData.loanDetails || ''}
+                    onChange={(e) => setFormData({ ...formData, loanDetails: e.target.value })}
+                  />
+                </div>
+              )}
+              {formData.isFamilyComplementing && (
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Detalhes Complemento Familiar</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                    value={formData.familyComplementDetails || ''}
+                    onChange={(e) => setFormData({ ...formData, familyComplementDetails: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -2257,36 +2313,45 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderBenefits = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Benefícios Sociais</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-tighter">Gerenciamento de Benefícios e Renda</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {patients.map((patient) => (
-          <div key={patient.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+          <div key={patient.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
-                  <Receipt className="w-6 h-6 text-green-600" />
+                <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center border border-green-100 dark:border-green-800">
+                  <Receipt className="w-7 h-7 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-900">{patient.name}</h4>
-                  <p className="text-xs text-gray-500">Renda: R$ {Number(patient.income || 0).toLocaleString()}</p>
+                  <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient.name}</h4>
+                  <p className="text-xs text-gray-500 font-bold">Renda: <span className="text-green-600">R$ {Number(patient.income || 0).toLocaleString()}</span></p>
                 </div>
               </div>
-              <button
-                onClick={() => onDeletePatient(patient.id)}
-                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                title="Excluir Idoso"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openModal('patient', patient)}
+                  className="p-3 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-2xl transition-colors border border-transparent hover:border-blue-100"
+                  title="Editar Benefícios"
+                >
+                  <Edit2 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => onDeletePatient(patient.id)}
+                  className="p-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-colors"
+                  title="Excluir Idoso"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                <span className="text-sm text-gray-600">Status Geral</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Status do Benefício</p>
                 <span className={cn(
-                  "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase inline-block",
                   patient.benefitStatus === 'ATIVO' ? "bg-green-100 text-green-700" :
                   patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 text-red-700" :
                   "bg-gray-100 text-gray-700"
@@ -2294,14 +2359,37 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   {safeReplace(patient.benefitStatus, '_', ' ')}
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {(patient.benefits || []).map((benefit, i) => (
-                  <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-bold uppercase">
-                    {benefit}
-                  </span>
-                ))}
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Acompanhamento INSS</p>
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{patient.inssMonitoring || 'Não registrado'}</p>
+              </div>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-2">CadÚnico</p>
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  {patient.cadUnicoUpdateDate ? `Atu: ${format(parseISO(patient.cadUnicoUpdateDate), 'dd/MM/yy')}` : 'Não atualizado'}
+                </p>
+              </div>
+
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Empréstimos</p>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2 h-2 rounded-full",
+                    patient.hasLoans ? "bg-red-500" : "bg-green-500"
+                  )} />
+                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{patient.hasLoans ? 'Sim' : 'Não'}</p>
+                </div>
               </div>
             </div>
+
+            {patient.isFamilyComplementing && (
+              <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/20">
+                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Complemento Familiar</p>
+                <p className="text-xs font-bold text-blue-800 dark:text-blue-200">{patient.familyComplementDetails || 'Família auxilia no sustento/medicação.'}</p>
+              </div>
+            )}
           </div>
         ))}
       </div>

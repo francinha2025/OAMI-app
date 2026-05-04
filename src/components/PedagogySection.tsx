@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, LineChart as ReLineChart, Line,
-  PieChart, Pie, Cell, AreaChart, Area
+  PieChart, Pie, Cell, AreaChart, Area, Legend
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -238,10 +238,32 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
   const openModal = (type: string, initialData: any = null) => {
     setModalType(type);
-    setFormData(initialData || {});
+    if (!initialData) {
+      const now = new Date();
+      setFormData({
+        date: format(now, 'yyyy-MM-dd'),
+        time: format(now, 'HH:mm'),
+        participants: []
+      });
+    } else {
+      setFormData(initialData || {});
+    }
     setEditingData(initialData);
     setIsModalOpen(true);
     setSelectedPatient(null);
+  };
+
+  const modalTitles: Record<string, string> = {
+    patient: 'Cadastro Educacional',
+    residents: 'Cadastro Educacional',
+    assessment: 'Avaliação Inicial Pedagógica',
+    evolution: 'Evolução Pedagógica',
+    activity: 'Nova Oficina/Atividade',
+    activities: 'Nova Oficina/Atividade',
+    stimulation: 'Estimulação Cognitiva',
+    social: 'Interação Social',
+    plan: 'Plano Pedagógico Individual',
+    history: 'História de Vida'
   };
 
   const renderModalContent = () => {
@@ -466,18 +488,28 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 onChange={(e) => setFormData({ ...formData, activityTitle: e.target.value })}
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Data do Registro</label>
-              <input
-                type="date"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
-                value={formData.date || format(new Date(), 'yyyy-MM-dd')}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Participação</label>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Data do Registro</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                  value={formData.date || ''}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Horário</label>
+                  <input
+                    type="time"
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                    value={formData.time || ''}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Participação</label>
                 <select
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
                   value={formData.participation || ''}
@@ -684,8 +716,31 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Data do Registro</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                  value={formData.date || ''}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Horário</label>
+                <input
+                  type="time"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                  value={formData.time || ''}
+                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               {[
                 { field: 'memoryScore', label: 'Memória' },
+                { field: 'attentionScore', label: 'Atenção' },
+                { field: 'reasoningScore', label: 'Raciocínio' },
                 { field: 'languageScore', label: 'Linguagem' }
               ].map((item) => (
                 <div key={item.field}>
@@ -749,6 +804,27 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <option value="">Selecione o idoso</option>
                 {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Data</label>
+                <input
+                  type="date"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                  value={formData.date || ''}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Horário</label>
+                <input
+                  type="time"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
+                  value={formData.time || ''}
+                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1031,11 +1107,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
     const today = format(new Date(), 'yyyy-MM-dd');
     const activitiesToday = activitiesList.filter(a => a.date === today);
-    const lowParticipation = socialParticipationsList.filter(s => s.interactionLevel === 'BAIXO' && isToday(parseISO(s.date)));
+    const lowParticipation = socialParticipationsList.filter(s => s.interactionLevel === 'BAIXO' && (s.date ? isToday(parseISO(s.date)) : false));
     
     const patientsWithEvolutionToday = new Set(
       evolutionsList
-        .filter(e => isToday(parseISO(e.date)))
+        .filter(e => e.date ? isToday(parseISO(e.date)) : false)
         .map(e => e.patientId)
     ).size;
     
@@ -1044,9 +1120,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       activitiesToday: activitiesToday.length,
       lowParticipation: lowParticipation.length,
       noParticipation: Math.max(0, patientsList.length - patientsWithEvolutionToday),
-      activePlans: individualPlansList.length
+      activePlans: individualPlansList.length,
+      totalActivities: activitiesList.length
     };
   }, [patients, activities, socialParticipations, individualPlans, evolutions]);
+
+  const activityTypeStats = useMemo(() => {
+    const types: Record<string, number> = {};
+    (activities || []).forEach(a => {
+      types[a.type] = (types[a.type] || 0) + 1;
+    });
+    return Object.entries(types).map(([name, value]) => ({ name, value }));
+  }, [activities]);
 
   const filteredPatients = (patients || []).filter(p => 
     (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -1104,12 +1189,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderDashboard = () => (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         {[
-          { label: 'Idosos Acompanhados', value: stats.totalPatients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Atividades Hoje', value: stats.activitiesToday, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Sem Participação', value: stats.noParticipation, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: 'Baixa Participação', value: stats.lowParticipation, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Idosos', value: stats.totalPatients, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Oficinas Hoje', value: stats.activitiesToday, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Total Oficinas', value: stats.totalActivities, icon: Palette, color: 'text-pink-600', bg: 'bg-pink-50' },
+          { label: 'Sem Evolução', value: stats.noParticipation, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Baixa Part.', value: stats.lowParticipation, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
           { label: 'Planos Ativos', value: stats.activePlans, icon: ClipboardList, color: 'text-green-600', bg: 'bg-green-50' },
         ].map((stat, i) => (
           <motion.div
@@ -1141,7 +1227,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </h3>
           <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={(socialParticipations || []).slice(-7).map(s => ({
+                <AreaChart data={(socialParticipations || []).slice(0, 15).reverse().map(s => ({
                   ...s,
                   interactionValue: s.interactionLevel === 'ALTO' ? 3 : s.interactionLevel === 'MEDIO' ? 2 : 1
                 }))}>
@@ -1209,8 +1295,58 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <Cell fill="#ef4444" />
                 </Pie>
                 <Tooltip />
+                <Legend iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Activity Distribution Chart */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+            <Palette className="w-5 h-5 text-pink-600" />
+            Distribuição de Oficinas
+          </h3>
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={activityTypeStats}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10, fontWeight: 'bold'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 10, fontWeight: 'bold'}} />
+                <Tooltip contentStyle={{ borderRadius: '16px', border: 'none' }} />
+                <Bar dataKey="value" fill="#ec4899" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Recent Pedagogy Evolutions */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <History className="w-5 h-5 text-green-600" />
+            Últimas Evoluções
+          </h3>
+          <div className="space-y-4">
+            {(evolutions || []).slice(0, 5).map((ev, i) => {
+              const patient = (patients || []).find(p => p.id === ev.patientId);
+              return (
+                <div key={i} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-gray-100">
+                     <UserIcon className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 dark:text-white truncate">{patient?.name || 'Desconhecido'}</p>
+                    <p className="text-xs text-gray-500 truncate">{ev.activityTitle} • {ev.date ? format(parseISO(ev.date), 'dd/MM') : ''}</p>
+                  </div>
+                  <div className={cn(
+                    "px-2 py-1 rounded-md text-[10px] font-black",
+                    ev.participation === 'ATIVO' ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                  )}>
+                    {ev.participation}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1647,9 +1783,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-4">
-          <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">Próximas Oficinas</h4>
+          <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">Agenda de Oficinas</h4>
           <div className="grid grid-cols-1 gap-4">
-            {(activities || []).map((activity) => (
+            {(activities || []).slice().sort((a, b) => {
+              const dateDiff = b.date.localeCompare(a.date);
+              if (dateDiff !== 0) return dateDiff;
+              return (b.time || '').localeCompare(a.time || '');
+            }).map((activity) => (
               <div key={activity.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-4">
@@ -1696,7 +1836,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         <div className="space-y-4">
           <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Evoluções Recentes</h4>
         <div className="space-y-3">
-          {(evolutions || []).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((evolution) => {
+          {(evolutions || []).slice().sort((a, b) => {
+            const dateDiff = b.date.localeCompare(a.date);
+            if (dateDiff !== 0) return dateDiff;
+            return (b.time || '').localeCompare(a.time || '');
+          }).slice(0, 8).map((evolution) => {
             const patient = (patients || []).find(p => p.id === evolution.patientId);
             return (
               <div key={evolution.id} className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between hover:shadow-sm transition-shadow">
@@ -1704,10 +1848,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
                     {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
                   </div>
-                  <div>
-                    <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
-                    <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">{evolution.activityTitle}</p>
-                  </div>
+                    <div>
+                      <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                      <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">
+                        {evolution.activityTitle} • {evolution.date ? format(parseISO(evolution.date), 'dd/MM') : ''}{evolution.time ? ` às ${evolution.time}` : ''}
+                      </p>
+                    </div>
                 </div>
                 <div className="text-right">
                   <span className={cn(
@@ -1753,13 +1899,6 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <Plus className="w-5 h-5" />
             Nova Estimulação
           </button>
-          <button
-            onClick={() => openModal('social')}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Registro Social
-          </button>
         </div>
       </div>
 
@@ -1772,10 +1911,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={[
-                { name: 'Memória', value: (stimulationTrackings || []).reduce((acc, curr) => acc + curr.memoryScore, 0) / ((stimulationTrackings || []).length || 1) },
-                { name: 'Atenção', value: (stimulationTrackings || []).reduce((acc, curr) => acc + curr.attentionScore, 0) / ((stimulationTrackings || []).length || 1) },
-                { name: 'Raciocínio', value: (stimulationTrackings || []).reduce((acc, curr) => acc + curr.reasoningScore, 0) / ((stimulationTrackings || []).length || 1) },
-                { name: 'Linguagem', value: (stimulationTrackings || []).reduce((acc, curr) => acc + curr.languageScore, 0) / ((stimulationTrackings || []).length || 1) },
+                { name: 'Memória', value: (stimulationTrackings || []).reduce((acc, curr) => acc + (curr.memoryScore || 0), 0) / ((stimulationTrackings || []).length || 1) },
+                { name: 'Atenção', value: (stimulationTrackings || []).reduce((acc, curr) => acc + (curr.attentionScore || 0), 0) / ((stimulationTrackings || []).length || 1) },
+                { name: 'Raciocínio', value: (stimulationTrackings || []).reduce((acc, curr) => acc + (curr.reasoningScore || 0), 0) / ((stimulationTrackings || []).length || 1) },
+                { name: 'Linguagem', value: (stimulationTrackings || []).reduce((acc, curr) => acc + (curr.languageScore || 0), 0) / ((stimulationTrackings || []).length || 1) },
               ]}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" tick={{fill: 'black', fontWeight: 'bold'}} />
@@ -1789,13 +1928,17 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <div className="mt-8 space-y-4">
             <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Estimulações</h5>
             <div className="space-y-3">
-              {(stimulationTrackings || []).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((stim) => {
+              {(stimulationTrackings || []).slice().sort((a, b) => {
+                const dateDiff = b.date.localeCompare(a.date);
+                if (dateDiff !== 0) return dateDiff;
+                return (b.time || '').localeCompare(a.time || '');
+              }).slice(0, 5).map((stim) => {
                 const patient = (patients || []).find(p => p.id === stim.patientId);
                 return (
                   <div key={stim.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{format(parseISO(stim.date), 'dd/MM/yyyy')}</p>
+                      <p className="text-xs text-gray-500">{format(parseISO(stim.date), 'dd/MM/yyyy')}{stim.time ? ` às ${stim.time}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2">
                        <button 
@@ -1863,13 +2006,17 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <div className="mt-8 space-y-4">
             <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Participações</h5>
             <div className="space-y-3">
-              {(socialParticipations || []).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((soc) => {
+              {(socialParticipations || []).slice().sort((a, b) => {
+                const dateDiff = b.date.localeCompare(a.date);
+                if (dateDiff !== 0) return dateDiff;
+                return (b.time || '').localeCompare(a.time || '');
+              }).slice(0, 5).map((soc) => {
                 const patient = (patients || []).find(p => p.id === soc.patientId);
                 return (
                   <div key={soc.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{format(parseISO(soc.date), 'dd/MM/yyyy')}</p>
+                      <p className="text-xs text-gray-500">{format(parseISO(soc.date), 'dd/MM/yyyy')}{soc.time ? ` às ${soc.time}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2">
                        <button 
@@ -2047,7 +2194,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           <div className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden shadow-2xl border border-transparent dark:border-gray-800 transition-all flex flex-col">
             <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 sticky top-0 z-10">
               <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                Novo Registro Pedagógico
+                {modalTitles[modalType || activeTab] || 'Novo Registro Pedagógico'}
                 {isExtracting && (
                   <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
                     <Loader2 className="w-3 h-3 animate-spin" />

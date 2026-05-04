@@ -19,7 +19,11 @@ import {
   Search,
   Filter,
   Activity,
-  Loader2
+  Loader2,
+  Edit2,
+  Phone,
+  MapPin,
+  Users
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -46,7 +50,9 @@ import {
   DiaperRawProduction, 
   DiaperWIPProcessing, 
   DiaperFinalPacking, 
-  DiaperProductionGoal 
+  DiaperProductionGoal,
+  DiaperDonation,
+  DiaperBeneficiary
 } from '../types';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -60,18 +66,28 @@ interface DiaperProductionSectionProps {
   rawProductions: DiaperRawProduction[];
   wipProcessings: DiaperWIPProcessing[];
   finalPackings: DiaperFinalPacking[];
+  donations: DiaperDonation[];
+  beneficiaries: DiaperBeneficiary[];
   goals: DiaperProductionGoal[];
+  onSaveDonation: (data: Partial<DiaperDonation>) => Promise<void>;
+  onSaveBeneficiary: (data: Partial<DiaperBeneficiary>) => Promise<void>;
+  onDeleteRecord: (collection: string, id: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
-type TabType = 'raw' | 'wip' | 'final' | 'dashboard';
+type TabType = 'raw' | 'wip' | 'final' | 'dashboard' | 'donations' | 'beneficiaries';
 
 export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = ({
   user,
   rawProductions,
   wipProcessings,
   finalPackings,
+  donations,
+  beneficiaries,
   goals,
+  onSaveDonation,
+  onSaveBeneficiary,
+  onDeleteRecord,
   showToast
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -119,6 +135,25 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     targetQuantity: '',
     notes: ''
   });
+
+  const [donationForm, setDonationForm] = useState({
+    beneficiaryId: '',
+    beneficiaryName: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    quantity: '',
+    observations: ''
+  });
+
+  const [beneficiaryForm, setBeneficiaryForm] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    needsEvolution: false,
+    status: 'ATIVO' as 'ATIVO' | 'INATIVO'
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [modalType, setModalType] = useState<string>('');
 
   // Calculations for Dashboard
   const dashboardData = useMemo(() => {
@@ -217,6 +252,59 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       setWipForm({ ...wipForm, quantityIn: '', quantityOut: '', wasteReason: '', observations: '' });
     } catch (err: any) {
       showToast(err.message || 'Erro ao registrar processamento', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveDonation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const payload = {
+        ...donationForm,
+        quantity: parseInt(donationForm.quantity) || 0,
+        createdAt: new Date().toISOString()
+      };
+      
+      await onSaveDonation(payload);
+      showToast('Doação registrada com sucesso!');
+      setIsModalOpen(false);
+      setDonationForm({ ...donationForm, quantity: '', observations: '', beneficiaryId: '', beneficiaryName: '' });
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao registrar doação', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveBeneficiary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const payload = {
+        ...beneficiaryForm,
+        createdAt: new Date().toISOString()
+      };
+      
+      if (editingId) {
+        await onSaveBeneficiary({ ...payload, id: editingId });
+        showToast('Beneficiário atualizado com sucesso!');
+      } else {
+        await onSaveBeneficiary(payload);
+        showToast('Beneficiário cadastrado com sucesso!');
+      }
+      setIsModalOpen(false);
+      setBeneficiaryForm({
+        name: '',
+        phone: '',
+        address: '',
+        needsEvolution: false,
+        status: 'ATIVO'
+      });
+      setEditingId(null);
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao salvar beneficiário', 'error');
     } finally {
       setLoading(false);
     }
@@ -691,6 +779,133 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     );
   };
 
+  const renderDonationsTab = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Doações Realizadas</h2>
+          <p className="text-sm text-gray-500 font-bold">Registro de saída de fraldas para beneficiários externos</p>
+        </div>
+        <button
+          onClick={() => { setModalType('donations' as any); setEditingId(null); setIsModalOpen(true); }}
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
+        >
+          <Plus size={20} />
+          Nova Doação
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(donations || []).slice().sort((a, b) => b.date.localeCompare(a.date)).map((donation) => (
+          <div key={donation.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm relative group overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                onClick={() => onDeleteRecord('diaperDonations', donation.id)}
+                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-600">
+                <Truck size={24} />
+              </div>
+              <div>
+                <h4 className="font-black text-gray-800 dark:text-white uppercase tracking-tight leading-tight">{donation.beneficiaryName}</h4>
+                <p className="text-xs text-gray-500 font-bold">{format(parseISO(donation.date), 'dd/MM/yyyy')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase">
+                {donation.quantity} Fraldas
+              </span>
+              <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-bold uppercase">
+                U
+              </span>
+            </div>
+            {donation.observations && (
+              <p className="text-xs text-gray-500 italic line-clamp-2">"{donation.observations}"</p>
+            )}
+          </div>
+        ))}
+        {(donations || []).length === 0 && (
+          <div className="col-span-full py-12 bg-white dark:bg-gray-900 rounded-[2.5rem] border border-dashed border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center text-gray-400">
+             <Truck size={48} className="mb-4 opacity-20" />
+             <p className="font-bold">Nenhuma doação registrada ainda.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderBeneficiariesTab = () => (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Cadastro de Beneficiários</h2>
+          <p className="text-sm text-gray-500 font-bold">Gestão das famílias e pessoas atendidas pelas doações</p>
+        </div>
+        <button
+          onClick={() => { setModalType('beneficiaries' as any); setEditingId(null); setIsModalOpen(true); }}
+          className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-2xl font-bold hover:bg-green-700 shadow-lg shadow-green-100 transition-all"
+        >
+          <Plus size={20} />
+          Novo Beneficiário
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(beneficiaries || []).map((beneficiary) => (
+          <div key={beneficiary.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:border-green-100 transition-all">
+            <div className="flex justify-between items-start mb-4">
+              <div className="w-14 h-14 bg-green-50 dark:bg-green-900/20 rounded-2xl flex items-center justify-center text-green-600">
+                <User size={28} />
+              </div>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => { setEditingId(beneficiary.id); setBeneficiaryForm({...beneficiary}); setModalType('beneficiaries' as any); setIsModalOpen(true); }}
+                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button 
+                  onClick={() => onDeleteRecord('diaperBeneficiaries', beneficiary.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+            
+            <h4 className="text-lg font-black text-gray-800 dark:text-white uppercase tracking-tight mb-1">{beneficiary.name}</h4>
+            <div className="space-y-2 mb-4">
+              <p className="text-xs text-gray-500 font-bold flex items-center gap-2">
+                <Phone size={12} className="text-green-500" /> {beneficiary.phone || 'Sem telefone'}
+              </p>
+              <p className="text-xs text-gray-500 font-bold flex items-center gap-2">
+                <MapPin size={12} className="text-green-500" /> {beneficiary.address || 'Sem endereço'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-50 dark:border-gray-800">
+              <span className={cn(
+                "px-2 py-1 rounded-lg text-[10px] font-black uppercase",
+                beneficiary.status === 'ATIVO' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              )}>
+                {beneficiary.status}
+              </span>
+              {beneficiary.needsEvolution && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-lg text-[10px] font-black uppercase flex items-center gap-1">
+                  <Activity size={10} /> Multi
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderModalForm = () => {
     switch (activeTab) {
       case 'raw':
@@ -920,6 +1135,122 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             </div>
           </form>
         );
+      case 'donations':
+        return (
+          <form onSubmit={handleSaveDonation} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Beneficiário</label>
+                <select
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                  value={donationForm.beneficiaryId}
+                  onChange={e => setDonationForm({...donationForm, beneficiaryId: e.target.value})}
+                  required
+                >
+                  <option value="">Selecione o beneficiário...</option>
+                  {(beneficiaries || []).filter(b => b.status === 'ATIVO').map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Data</label>
+                  <input
+                    type="date"
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={donationForm.date}
+                    onChange={e => setDonationForm({...donationForm, date: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Quantidade</label>
+                  <input
+                    type="number"
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={donationForm.quantity}
+                    onChange={e => setDonationForm({...donationForm, quantity: e.target.value})}
+                    placeholder="Ex: 30"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Observações</label>
+                <textarea
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 h-24"
+                  value={donationForm.observations}
+                  onChange={e => setDonationForm({...donationForm, observations: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl">Cancelar</button>
+              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Confirmar Doação
+              </button>
+            </div>
+          </form>
+        );
+      case 'beneficiaries':
+        return (
+          <form onSubmit={handleSaveBeneficiary} className="space-y-6 text-gray-900 dark:text-gray-100">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Nome do Beneficiário</label>
+                <input
+                  type="text"
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                  value={beneficiaryForm.name}
+                  onChange={e => setBeneficiaryForm({...beneficiaryForm, name: e.target.value})}
+                  placeholder="Ex: João da Silva"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Telefone de Contato</label>
+                <input
+                  type="text"
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                  value={beneficiaryForm.phone}
+                  onChange={e => setBeneficiaryForm({...beneficiaryForm, phone: e.target.value})}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Endereço Residencial</label>
+                <input
+                  type="text"
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                  value={beneficiaryForm.address}
+                  onChange={e => setBeneficiaryForm({...beneficiaryForm, address: e.target.value})}
+                  placeholder="Rua, Número, Bairro..."
+                />
+              </div>
+              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/20">
+                <input
+                  type="checkbox"
+                  id="needsEvolution"
+                  className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
+                  checked={beneficiaryForm.needsEvolution}
+                  onChange={e => setBeneficiaryForm({...beneficiaryForm, needsEvolution: e.target.checked})}
+                />
+                <label htmlFor="needsEvolution" className="text-sm font-bold text-green-800 dark:text-green-300">
+                  Habilitar acompanhamento pela equipe multidisciplinar
+                </label>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl">Cancelar</button>
+              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-green-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
+                {loading && <Loader2 className="animate-spin" size={18} />}
+                Salvar Beneficiário
+              </button>
+            </div>
+          </form>
+        );
       default: return null;
     }
   };
@@ -928,18 +1259,20 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
       {/* Header com Tabs */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-gray-900 p-2 md:p-4 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 backdrop-blur-md sticky top-0 z-30">
-        <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto">
+        <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
           {[
             { id: 'dashboard', label: 'Balanço', icon: BarChart3 },
             { id: 'raw', label: 'Bruta', icon: Scissors },
             { id: 'wip', label: 'Processo', icon: Activity },
-            { id: 'final', label: 'Embalagem', icon: Truck }
+            { id: 'final', label: 'Embalagem', icon: Truck },
+            { id: 'donations', label: 'Doações', icon: Package },
+            { id: 'beneficiaries', label: 'Beneficiários', icon: Users }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
               className={cn(
-                "flex-1 md:flex-none flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all",
+                "flex-1 md:flex-none flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
                 activeTab === tab.id 
                   ? "bg-white dark:bg-gray-700 text-green-600 dark:text-green-400 shadow-sm" 
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
@@ -975,6 +1308,8 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           {activeTab === 'raw' && renderRawTab()}
           {activeTab === 'wip' && renderWipTab()}
           {activeTab === 'final' && renderFinalTab()}
+          {activeTab === 'donations' && renderDonationsTab()}
+          {activeTab === 'beneficiaries' && renderBeneficiariesTab()}
           {activeTab === 'dashboard' && renderDashboardTab()}
         </motion.div>
       </AnimatePresence>
@@ -999,7 +1334,10 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   <h3 className="text-xl md:text-2xl font-black text-gray-800 dark:text-white">
                     {activeTab === 'raw' ? 'Entrada de Produção' : 
                      activeTab === 'wip' ? 'Registro de Processo' : 
-                     activeTab === 'final' ? 'Saída de Lote' : 'Definir Meta'}
+                     activeTab === 'final' ? 'Saída de Lote' : 
+                     activeTab === 'donations' ? 'Lançar Doação' : 
+                     activeTab === 'beneficiaries' ? (editingId ? 'Editar Beneficiário' : 'Novo Beneficiário') : 
+                     'Definir Meta'}
                   </h3>
                 </div>
                 <button 
