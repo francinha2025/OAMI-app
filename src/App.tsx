@@ -140,6 +140,8 @@ import {
 } from 'firebase/firestore';
 import { 
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   onAuthStateChanged,
   signOut,
   updateEmail,
@@ -882,13 +884,13 @@ const LoginLogo = () => {
   );
 };
 
-const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile }: { 
+const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginError }: { 
   onGoogleLogin: () => void, 
   onCompleteProfile: (role: Role) => void,
-  needsProfile: boolean 
+  needsProfile: boolean,
+  error: string | null
 }) => {
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
-  const [error, setError] = useState('');
 
   if (needsProfile) {
     return (
@@ -954,6 +956,29 @@ const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile }: {
             <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
             Entrar com Google
           </button>
+
+          {loginError && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
+                <p className="text-xs text-red-700 dark:text-red-400 font-medium">
+                  {loginError}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider italic">Dica: Tente abrir o sistema em uma nova aba.</p>
+                <a 
+                  href={window.location.href} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg hover:bg-blue-100"
+                >
+                  ABRIR EM NOVA ABA
+                  <ChevronRight size={12} />
+                </a>
+              </div>
+            </div>
+          )}
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200 dark:border-gray-700"></div></div>
@@ -1023,7 +1048,6 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
     {
       title: 'Operacional',
       items: [
-        { id: 'diaperDonations', label: 'Doação de Fraldas', icon: Gift, roles: ['COORDENADORA', 'ASSISTENTE_SOCIAL', 'PRESIDENTE', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
         { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
         { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
@@ -8205,6 +8229,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [needsProfile, setNeedsProfile] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Real-time data states
   const [users, setUsers] = useState<StaffMember[]>([]);
@@ -8494,6 +8519,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Handle redirect result if any
+    getRedirectResult(auth).catch(err => {
+      console.error("Redirect sign-in error:", err);
+      if (err.code === 'auth/popup-blocked') {
+        setLoginError("O popup de login foi bloqueado pelo seu navegador.");
+      }
+    });
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         const userDocRef = doc(db, 'profiles', firebaseUser.uid);
@@ -9071,10 +9104,32 @@ export default function App() {
   }, [isAuthReady, user?.id, user?.role, activeTab]);
 
   const handleGoogleLogin = async () => {
+    setLoginError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google Login Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        const msg = "O popup de login foi bloqueado pelo seu navegador. Por favor, permita popups para este site ou utilize um navegador que permita janelas auxiliares.";
+        setLoginError(msg);
+        showToast(msg, 'error');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Ignorar se o usuário apenas fechou o popup
+      } else {
+        setLoginError("Erro ao autenticar com Google. Tente novamente.");
+        showToast("Erro ao autenticar com Google", 'error');
+      }
+    }
+  };
+
+  const handleGoogleRedirectLogin = async () => {
+    setLoginError(null);
+    try {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error: any) {
+      console.error("Google Redirect Error:", error);
+      setLoginError("Erro ao redirecionar para login. No AI Studio Build, prefira usar popups.");
+      showToast("Erro ao redirecionar para login", 'error');
     }
   };
 
@@ -10005,6 +10060,7 @@ export default function App() {
         onGoogleLogin={handleGoogleLogin} 
         onCompleteProfile={handleCompleteProfile}
         needsProfile={needsProfile}
+        error={loginError}
       />
     );
   }
@@ -10285,43 +10341,6 @@ export default function App() {
         />
       );
       case 'donors': return <DonorsSection donors={donors} />;
-      case 'diaperDonations': return (
-        <DiaperDonationSection 
-          donations={diaperDonations} 
-          stock={diaperStock} 
-          user={user} 
-          communityElderly={communityElderly}
-          elderly={elderly}
-          socialPatients={socialPatientsList}
-          onNavigate={setActiveTab}
-          onAddCommunityElderly={onSaveCommunityElderly}
-          onFollowBeneficiary={async (beneficiary) => {
-            try {
-              // Promote to Social Work Patient if not exists
-              const socialExists = socialPatientsList.some(p => p.name === beneficiary.name);
-              if (!socialExists) {
-                await handleSaveSocialPatient({
-                  name: beneficiary.name,
-                  birthDate: beneficiary.birthDate || '',
-                  naturalness: '',
-                  maritalStatus: 'SOLTEIRO',
-                  schooling: '',
-                  previousProfession: '',
-                  income: 0,
-                  benefits: [],
-                  benefitStatus: 'NAO_POSSUI',
-                  createdAt: new Date().toISOString()
-                });
-                showToast(`Beneficiário ${beneficiary.name} agora está sendo acompanhado pelo Serviço Social.`, 'success');
-              } else {
-                showToast(`Beneficiário ${beneficiary.name} já possui acompanhamento.`, 'success');
-              }
-            } catch (err) {
-              showToast('Erro ao iniciar acompanhamento', 'error');
-            }
-          }}
-        />
-      );
       case 'diaperProduction': return (
         <DiaperProductionSection 
           user={user}
@@ -10396,7 +10415,6 @@ export default function App() {
                  activeTab === 'professional' ? 'Área Técnica' : 
                  activeTab === 'financial' ? 'Financeiro' : 
                  activeTab === 'donors' ? 'Doadores e Sócios' :
-                 activeTab === 'diaperDonations' ? 'Doação de Fraldas' :
                  activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :
                  activeTab === 'settings' ? 'Configurações' : 

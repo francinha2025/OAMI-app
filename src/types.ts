@@ -61,7 +61,13 @@ export interface DiaperBeneficiary {
   name: string;
   phone: string;
   address: string;
-  document?: string;
+  document?: string; // CPF or other
+  rg?: string;
+  birthDate?: string;
+  gender?: 'M' | 'F' | 'OUTRO';
+  observations?: string;
+  familyContact?: string;
+  diaperSize?: 'P' | 'M' | 'G' | 'GG' | 'XG' | 'XXG';
   needsEvolution: boolean; // For multi-team accompaniment
   evolutions?: {
     date: string;

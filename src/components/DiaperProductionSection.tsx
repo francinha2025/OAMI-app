@@ -23,7 +23,8 @@ import {
   Edit2,
   Phone,
   MapPin,
-  Users
+  Users,
+  IdCard
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -148,6 +149,13 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     name: '',
     phone: '',
     address: '',
+    document: '',
+    rg: '',
+    birthDate: '',
+    gender: 'M' as 'M' | 'F' | 'OUTRO',
+    observations: '',
+    familyContact: '',
+    diaperSize: 'G' as 'P' | 'M' | 'G' | 'GG' | 'XG' | 'XXG',
     needsEvolution: false,
     status: 'ATIVO' as 'ATIVO' | 'INATIVO'
   });
@@ -299,6 +307,13 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
         name: '',
         phone: '',
         address: '',
+        document: '',
+        rg: '',
+        birthDate: '',
+        gender: 'M',
+        observations: '',
+        familyContact: '',
+        diaperSize: 'G',
         needsEvolution: false,
         status: 'ATIVO'
       });
@@ -879,15 +894,25 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             
             <h4 className="text-lg font-black text-gray-800 dark:text-white uppercase tracking-tight mb-1">{beneficiary.name}</h4>
             <div className="space-y-2 mb-4">
+              {beneficiary.document && (
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-2">
+                  <IdCard size={12} className="text-blue-500" /> CPF: {beneficiary.document}
+                </p>
+              )}
               <p className="text-xs text-gray-500 font-bold flex items-center gap-2">
                 <Phone size={12} className="text-green-500" /> {beneficiary.phone || 'Sem telefone'}
               </p>
               <p className="text-xs text-gray-500 font-bold flex items-center gap-2">
-                <MapPin size={12} className="text-green-500" /> {beneficiary.address || 'Sem endereço'}
+                <MapPin size={12} className="text-green-500" /> <span className="truncate">{beneficiary.address || 'Sem endereço'}</span>
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-50 dark:border-gray-800">
+              {beneficiary.diaperSize && (
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg text-[10px] font-black uppercase">
+                  TAM: {beneficiary.diaperSize}
+                </span>
+              )}
               <span className={cn(
                 "px-2 py-1 rounded-lg text-[10px] font-black uppercase",
                 beneficiary.status === 'ATIVO' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
@@ -1197,56 +1222,180 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       case 'beneficiaries':
         return (
           <form onSubmit={handleSaveBeneficiary} className="space-y-6 text-gray-900 dark:text-gray-100">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Nome do Beneficiário</label>
-                <input
-                  type="text"
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
-                  value={beneficiaryForm.name}
-                  onChange={e => setBeneficiaryForm({...beneficiaryForm, name: e.target.value})}
-                  placeholder="Ex: João da Silva"
-                  required
-                />
+            <div className="space-y-6">
+              {/* Informações Pessoais */}
+              <div className="bg-white dark:bg-gray-800/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Informações Pessoais</h5>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Nome Completo</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                      value={beneficiaryForm.name}
+                      onChange={e => setBeneficiaryForm({...beneficiaryForm, name: e.target.value})}
+                      placeholder="Ex: João da Silva"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Data de Nascimento</label>
+                      <input
+                        type="date"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                        value={beneficiaryForm.birthDate}
+                        onChange={e => setBeneficiaryForm({...beneficiaryForm, birthDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Gênero</label>
+                      <select
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                        value={beneficiaryForm.gender}
+                        onChange={e => setBeneficiaryForm({...beneficiaryForm, gender: e.target.value as any})}
+                      >
+                        <option value="M">Masculino</option>
+                        <option value="F">Feminino</option>
+                        <option value="OUTRO">Outro</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Telefone de Contato</label>
-                <input
-                  type="text"
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
-                  value={beneficiaryForm.phone}
-                  onChange={e => setBeneficiaryForm({...beneficiaryForm, phone: e.target.value})}
-                  placeholder="(00) 00000-0000"
-                />
+
+              {/* Documentação */}
+              <div className="bg-white dark:bg-gray-800/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Documentação</h5>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">CPF</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                      value={beneficiaryForm.document}
+                      onChange={e => setBeneficiaryForm({...beneficiaryForm, document: e.target.value})}
+                      placeholder="000.000.000-00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">RG</label>
+                    <input
+                      type="text"
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                      value={beneficiaryForm.rg}
+                      onChange={e => setBeneficiaryForm({...beneficiaryForm, rg: e.target.value})}
+                      placeholder="Nº da Identidade"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Endereço Residencial</label>
-                <input
-                  type="text"
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
-                  value={beneficiaryForm.address}
-                  onChange={e => setBeneficiaryForm({...beneficiaryForm, address: e.target.value})}
-                  placeholder="Rua, Número, Bairro..."
-                />
+
+              {/* Contato e Endereço */}
+              <div className="bg-white dark:bg-gray-800/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Contato e Logística</h5>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Telefone Principal</label>
+                      <input
+                        type="tel"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                        value={beneficiaryForm.phone}
+                        onChange={e => setBeneficiaryForm({...beneficiaryForm, phone: e.target.value})}
+                        placeholder="(00) 00000-0000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Contato Familiar</label>
+                      <input
+                        type="text"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                        value={beneficiaryForm.familyContact}
+                        onChange={e => setBeneficiaryForm({...beneficiaryForm, familyContact: e.target.value})}
+                        placeholder="Nome / Telefone"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Endereço Residencial</label>
+                    <textarea
+                      placeholder="Rua, Número, Bairro, Ponto de Referência..."
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-medium h-24"
+                      value={beneficiaryForm.address}
+                      onChange={e => setBeneficiaryForm({...beneficiaryForm, address: e.target.value})}
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/20">
-                <input
-                  type="checkbox"
-                  id="needsEvolution"
-                  className="w-5 h-5 rounded border-green-300 text-green-600 focus:ring-green-500"
-                  checked={beneficiaryForm.needsEvolution}
-                  onChange={e => setBeneficiaryForm({...beneficiaryForm, needsEvolution: e.target.checked})}
-                />
-                <label htmlFor="needsEvolution" className="text-sm font-bold text-green-800 dark:text-green-300">
-                  Habilitar acompanhamento pela equipe multidisciplinar
-                </label>
+
+              {/* Necessidades Operacionais */}
+              <div className="bg-white dark:bg-gray-800/50 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-700 space-y-4">
+                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Necessidades Operacionais</h5>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tamanho da Fralda</label>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                      {['P', 'M', 'G', 'GG', 'XG', 'XXG'].map(size => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setBeneficiaryForm({...beneficiaryForm, diaperSize: size as any})}
+                          className={cn(
+                            "py-3 rounded-xl text-sm font-black border-2 transition-all",
+                            beneficiaryForm.diaperSize === size 
+                              ? "bg-green-600 border-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none" 
+                              : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 text-gray-400"
+                          )}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Observações Socioassistenciais</label>
+                    <textarea
+                      placeholder="Descreva a situação de vulnerabilidade, frequência de doação necessária, etc."
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-medium h-32"
+                      value={beneficiaryForm.observations}
+                      onChange={e => setBeneficiaryForm({...beneficiaryForm, observations: e.target.value})}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 p-5 bg-green-50 dark:bg-green-900/10 rounded-[1.5rem] border border-green-100 dark:border-green-900/20">
+                    <div className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="needsEvolution"
+                        className="sr-only peer"
+                        checked={beneficiaryForm.needsEvolution}
+                        onChange={e => setBeneficiaryForm({...beneficiaryForm, needsEvolution: e.target.checked})}
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                    </div>
+                    <label htmlFor="needsEvolution" className="text-xs font-black text-green-800 dark:text-green-300 uppercase tracking-tight">
+                      Habilitar Acompanhamento Multidisciplinar
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex gap-4">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 font-bold rounded-2xl">Cancelar</button>
-              <button type="submit" disabled={loading} className="flex-[2] py-4 bg-green-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
+
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)} 
+                className="flex-1 py-5 bg-gray-100 dark:bg-gray-800 text-gray-500 font-black rounded-[1.5rem] hover:bg-gray-200 transition-all active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="flex-[2] py-5 bg-green-600 text-white rounded-[1.5rem] font-black shadow-xl shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2"
+              >
                 {loading && <Loader2 className="animate-spin" size={18} />}
-                Salvar Beneficiário
+                {editingId ? 'Atualizar Cadastro' : 'Finalizar Cadastro'}
               </button>
             </div>
           </form>

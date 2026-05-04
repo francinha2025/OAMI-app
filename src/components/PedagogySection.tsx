@@ -32,6 +32,42 @@ import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 
+// Movendo componentes auxiliares para o topo para evitar problemas de inicialização
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const colors = {
+    'PRESERVADO': 'bg-green-100 text-green-700',
+    'LEVE_COMPROMETIMENTO': 'bg-yellow-100 text-yellow-700',
+    'COMPROMETIDO': 'bg-red-100 text-red-700'
+  };
+  return (
+    <span className={cn("px-2 py-1 rounded-full text-[10px] font-bold uppercase", colors[status as keyof typeof colors])}>
+      {safeReplace(status, '_', ' ')}
+    </span>
+  );
+};
+
+const ScoreCard: React.FC<{ label: string, score: number }> = ({ label, score }) => {
+  const safeScore = isNaN(score) ? 0 : score;
+  return (
+    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-bold text-gray-500 uppercase">{label}</span>
+        <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{safeScore}/10</span>
+      </div>
+      <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${safeScore * 10}%` }}
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            safeScore >= 8 ? "bg-green-500" : safeScore >= 6 ? "bg-blue-500" : "bg-orange-500"
+          )}
+        />
+      </div>
+    </div>
+  );
+};
+
 interface PedagogySectionProps {
   user: UserType;
   patients: PedagogyPatient[];
@@ -1241,8 +1277,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <XAxis 
                     dataKey="date" 
                     tickFormatter={(str) => {
+                      if (!str) return '--/--';
                       try {
-                        return format(parseISO(str), 'dd/MM');
+                        const date = parseISO(str);
+                        if (isNaN(date.getTime())) return '--/--';
+                        return format(date, 'dd/MM');
                       } catch (e) {
                         return '--/--';
                       }
@@ -1442,13 +1481,20 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               </div>
             </div>
 
-          <div className="flex border-b border-gray-200 dark:border-gray-800 px-8 bg-gray-50/50 dark:bg-gray-900/50 overflow-x-auto">
-            {[
+                  <div className="flex border-b border-gray-200 dark:border-gray-800 px-8 bg-gray-50/50 dark:bg-gray-900/50 overflow-x-auto">
+            {(Array.isArray([
               { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
               { id: 'history', label: 'História de Vida', icon: History },
               { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
               { id: 'plan', label: 'Plano (PPI)', icon: Target },
-            ].map((sub) => (
+            ]) ? [
+              { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
+              { id: 'history', label: 'História de Vida', icon: History },
+              { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
+              { id: 'plan', label: 'Plano (PPI)', icon: Target },
+            ] : []).map((sub) => {
+              const Icon = sub.icon;
+              return (
               <button
                 key={sub.id}
                 onClick={() => setResidentSubTab(sub.id as any)}
@@ -1459,10 +1505,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     : "border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 )}
               >
-                  <sub.icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4" />
                   {sub.label}
                 </button>
-              ))}
+              );
+            })}
             </div>
 
             <div className="p-8">
@@ -1471,12 +1518,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <div className="space-y-6">
                     <div>
                       <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Profissão Anterior</h4>
-                      <p className="text-gray-900 dark:text-gray-100 font-bold">{selectedPatient.previousProfession || 'Não informada'}</p>
+                      <p className="text-gray-900 dark:text-gray-100 font-bold">{selectedPatient?.previousProfession || 'Não informada'}</p>
                     </div>
                     <div>
                       <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Interesses</h4>
                       <div className="flex flex-wrap gap-2">
-                        {(selectedPatient.interests || []).map((interest, i) => (
+                        {(Array.isArray(selectedPatient?.interests) ? selectedPatient.interests : []).map((interest, i) => (
                           <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/40 text-gray-900 dark:text-blue-300 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
                             {interest}
                           </span>
@@ -1486,7 +1533,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div>
                       <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Preferência de Rotina</h4>
                       <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/40 text-gray-900 dark:text-purple-300 rounded-full text-xs font-bold uppercase border border-purple-100 dark:border-purple-800">
-                        {selectedPatient.routinePreference}
+                        {selectedPatient?.routinePreference || 'Não informada'}
                       </span>
                     </div>
                   </div>
@@ -1545,11 +1592,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div className="relative pl-8 border-l-2 border-black">
                       <h5 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-6">Linha do Tempo</h5>
                       <div className="space-y-8">
-                        {(history.timelineEvents || []).map((event, i) => (
+                        {(Array.isArray(history?.timelineEvents) ? history.timelineEvents : []).map((event, i) => (
                           <div key={i} className="relative">
                             <div className="absolute -left-[33px] top-1 w-4 h-4 rounded-full bg-black border-4 border-white shadow-sm" />
-                            <p className="text-xs font-black text-gray-900 dark:text-white mb-1">{event.date}</p>
-                            <p className="text-sm text-gray-900 dark:text-white font-bold">{event.event}</p>
+                            <p className="text-xs font-black text-gray-900 dark:text-white mb-1">{event?.date || '--/--'}</p>
+                            <p className="text-sm text-gray-900 dark:text-white font-bold">{event?.event || 'Evento não descrito'}</p>
                           </div>
                         ))}
                       </div>
@@ -1629,7 +1676,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div>
                       <h5 className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Atividades Indicadas</h5>
                       <div className="flex flex-wrap gap-2">
-                        {(plan.indicatedActivities || []).map((act, i) => (
+                        {(Array.isArray(plan?.indicatedActivities) ? plan.indicatedActivities : []).map((act, i) => (
                           <span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-bold">
                             {act}
                           </span>
@@ -2215,31 +2262,3 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
     </div>
   );
 };
-
-const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const colors = {
-    'PRESERVADO': 'bg-green-100 text-green-700',
-    'LEVE_COMPROMETIMENTO': 'bg-yellow-100 text-yellow-700',
-    'COMPROMETIDO': 'bg-red-100 text-red-700'
-  };
-  return (
-    <span className={cn("px-2 py-1 rounded-full text-[10px] font-bold uppercase", colors[status as keyof typeof colors])}>
-      {safeReplace(status, '_', ' ')}
-    </span>
-  );
-};
-
-const ScoreCard: React.FC<{ label: string, score: number }> = ({ label, score }) => (
-  <div className="p-4 bg-gray-50 rounded-xl">
-    <div className="flex items-center justify-between mb-2">
-      <span className="text-xs font-bold text-gray-500 uppercase">{label}</span>
-      <span className="text-lg font-bold text-blue-600">{score}/10</span>
-    </div>
-    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-      <div 
-        className="h-full bg-blue-500 transition-all duration-500" 
-        style={{ width: `${score * 10}%` }}
-      />
-    </div>
-  </div>
-);
