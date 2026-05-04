@@ -41,7 +41,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({ isOpen, onClose, onCap
       setError(null);
     } catch (err) {
       console.error("Camera Error:", err);
-      setError("Não foi possível acessar a câmera. Verifique as permissões.");
+      setError("Não foi possível acessar a câmera. Verifique as permissões do navegador. Se estiver usando o modo de visualização, tente abrir em uma nova aba.");
     }
   };
 

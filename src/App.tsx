@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Users, 
-  User as UserIcon,
   UserCircle, 
   Calendar, 
   FileText, 
@@ -53,7 +52,9 @@ import {
   IdCard,
   ShieldCheck,
   Phone,
-  Printer
+  Printer,
+  History,
+  User as UserIcon
 } from 'lucide-react';
 import { 
   format, 
@@ -99,7 +100,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { cn, safeReplace } from './lib/utils';
+import { cn, safeReplace, cleanData } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
@@ -205,7 +206,13 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 // --- AI Assistant Component ---
 
-const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: Elderly[], onCommandParsed: (result: AISmartCommandResult) => void }) => {
+const AIAssistant = ({ user, elderly, onCommandParsed, isVisible, setIsVisible }: { 
+  user: User, 
+  elderly: Elderly[], 
+  onCommandParsed: (result: AISmartCommandResult) => void,
+  isVisible: boolean,
+  setIsVisible: (visible: boolean) => void
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string, command?: AISmartCommandResult }[]>([
     { role: 'ai', content: "Olá! Sou o assistente OAMI IA. Posso processar relatos de evolução, oficinas, reuniões e anexos. Como posso ajudar hoje?" }
@@ -348,24 +355,63 @@ const AIAssistant = ({ user, elderly, onCommandParsed }: { user: User, elderly: 
     }
   };
 
+  if (!isVisible) return null;
+
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(!isOpen)}
-        title={isOpen ? "Fechar Chat" : "Abrir Assistente IA"}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-green-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-green-700 transition-all z-[60] group no-print"
+      <motion.div 
+        drag
+        dragConstraints={{ left: -window.innerWidth + 100, right: 0, top: -window.innerHeight + 100, bottom: 0 }}
+        dragElastic={0.1}
+        className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-2 no-print"
       >
-        {isOpen ? (
-          <X size={28} className="animate-in zoom-in duration-300" />
-        ) : (
-          <Sparkles size={24} className="group-hover:scale-110 transition-transform" />
-        )}
-        {!isOpen && (
-          <span className="absolute right-full mr-4 bg-white dark:bg-gray-900 text-green-800 dark:text-green-400 px-3 py-1 rounded-lg text-xs font-bold shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            Assistente OAMI Smart IA
-          </span>
-        )}
-      </button>
+        <AnimatePresence>
+          {!isOpen && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              onClick={() => setIsVisible(false)}
+              className="bg-red-500 text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+              title="Ocultar Assistente"
+            >
+              <X size={12} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <div className="relative group cursor-move">
+          <button 
+            onClick={() => setIsOpen(!isOpen)}
+            title={isOpen ? "Fechar Chat" : "Abrir Assistente IA"}
+            className="w-14 h-14 bg-green-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-green-700 transition-all"
+          >
+            {isOpen ? (
+              <X size={28} className="animate-in zoom-in duration-300" />
+            ) : (
+              <Sparkles size={24} className="group-hover:scale-110 transition-transform" />
+            )}
+            {!isOpen && (
+              <span className="absolute right-full mr-4 bg-white dark:bg-gray-900 text-green-800 dark:text-green-400 px-3 py-1 rounded-lg text-xs font-bold shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                Assistente OAMI Smart IA
+              </span>
+            )}
+          </button>
+          
+          {!isOpen && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsVisible(false);
+              }}
+              className="absolute -top-2 -right-2 w-5 h-5 bg-gray-800 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
+              title="Remover da tela"
+            >
+              <X size={10} />
+            </button>
+          )}
+        </div>
+      </motion.div>
 
       <AnimatePresence>
         {isOpen && (
@@ -1156,11 +1202,11 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
     e.preventDefault();
     if (modalType === 'CONVIVER') {
       try {
-        const newProfessional = {
+        const cleanedProfessional = cleanData({
           ...formData,
           createdAt: new Date().toISOString()
-        };
-        await addDoc(collection(db, 'professionals'), newProfessional);
+        });
+        await addDoc(collection(db, 'professionals'), cleanedProfessional);
         showToast('Profissional cadastrado com sucesso!', 'success');
         setIsModalOpen(false);
         setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '' });
@@ -1345,7 +1391,6 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                       <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Nome Completo</label>
                       <input 
                         type="text"
-                        required
                         className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white font-bold"
                         value={formData.name || ''}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -1432,7 +1477,6 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                       <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Nome Completo</label>
                       <input 
                         type="text"
-                        required
                         className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold"
                         value={staffFormData.name}
                         onChange={(e) => setStaffFormData({...staffFormData, name: e.target.value})}
@@ -1545,6 +1589,7 @@ const DashboardSection = ({
   vitalSigns,
   workshops,
   socialFamilyVisits,
+  pias,
   onNavigate,
   diaperRawProductions,
   diaperFinalPackings
@@ -1567,6 +1612,7 @@ const DashboardSection = ({
   vitalSigns: VitalSigns[],
   workshops: Workshop[],
   socialFamilyVisits: SocialFamilyVisit[],
+  pias: PIA[],
   onNavigate: (tab: string) => void,
   diaperRawProductions: DiaperRawProduction[],
   diaperFinalPackings: DiaperFinalPacking[]
@@ -1613,6 +1659,19 @@ const DashboardSection = ({
 
     return last12Months;
   }, [allEvolutions]);
+
+  const radarStats = useMemo(() => {
+    const monthStr = format(new Date(), 'yyyy-MM');
+    const filterByMonth = (list: any[]) => (list || []).filter(item => (item.date || '').startsWith(monthStr)).length;
+
+    return [
+      { subject: 'Saúde', A: filterByMonth(nursingEvolutions) + filterByMonth(physioEvolutions), B: 100, fullMark: 150 },
+      { subject: 'Social', A: filterByMonth(socialEvolutions) + filterByMonth(socialFamilyVisits), B: 80, fullMark: 150 },
+      { subject: 'Psico', A: filterByMonth(psychEvolutions), B: 60, fullMark: 150 },
+      { subject: 'Lazer', A: filterByMonth(workshops) + filterByMonth(pedagogyEvolutions), B: 90, fullMark: 150 },
+      { subject: 'Doc.', A: (pias || []).length, B: elderly.length, fullMark: Math.max(10, (elderly || []).length) },
+    ];
+  }, [nursingEvolutions, physioEvolutions, socialEvolutions, socialFamilyVisits, psychEvolutions, workshops, pedagogyEvolutions, pias, elderly]);
 
   const vitalSignsStats = useMemo(() => {
     const last15 = [...(vitalSigns || [])].sort((a,b) => (a.date || '').localeCompare(b.date || '')).slice(-30);
@@ -1897,13 +1956,7 @@ const DashboardSection = ({
 
             <div style={{ width: '100%', height: 300 }} className="shrink-0">
                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={[
-                    { subject: 'Saúde', A: 120, B: 110, fullMark: 150 },
-                    { subject: 'Social', A: 98, B: 130, fullMark: 150 },
-                    { subject: 'Psico', A: 86, B: 130, fullMark: 150 },
-                    { subject: 'Lazer', A: 99, B: 100, fullMark: 150 },
-                    { subject: 'Doc.', A: 85, B: 90, fullMark: 150 },
-                  ]}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarStats}>
                     <PolarGrid stroke={theme === 'dark' ? '#374151' : '#e5e7eb'} />
                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
                     <Radar name="Meta" dataKey="B" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
@@ -1999,14 +2052,15 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
 
     setLoading(true);
     try {
+      const cleanedData = cleanData(formData);
       if (isEditModalOpen && editingElderly) {
         await updateDoc(doc(db, 'elderly', editingElderly.id), {
-          ...formData,
+          ...cleanedData,
           updatedAt: new Date().toISOString()
         });
       } else {
         await addDoc(collection(db, 'elderly'), {
-          ...formData,
+          ...cleanedData,
           createdAt: new Date().toISOString()
         });
       }
@@ -2658,11 +2712,12 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'pias'), {
+      const piasData = cleanData({
         ...formData,
         createdAt: new Date().toISOString(),
         createdBy: user.id
       });
+      await addDoc(collection(db, 'pias'), piasData);
       // Reset form or show success
       showToast('Plano Individual de Atendimento (PIA) salvo com sucesso!');
     } catch (err) {
@@ -2972,7 +3027,7 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'evolutions'), {
+      const evolutionData = cleanData({
         elderlyId: selectedElderly,
         professionalId: user.id,
         professionalRole: user.role,
@@ -2981,6 +3036,7 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
         type: evolutionType,
         createdAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'evolutions'), evolutionData);
 
       showToast('Registro de evolução salvo com sucesso!');
       setSelectedElderly('');
@@ -3341,12 +3397,13 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'financial'), {
+      const financialData = cleanData({
         ...formData,
         amount: Number(formData.amount),
         createdAt: new Date().toISOString(),
         createdBy: user.id
       });
+      await addDoc(collection(db, 'financial'), financialData);
       showToast('Lançamento financeiro salvo com sucesso!');
       setIsModalOpen(false);
       setFormData({
@@ -3805,10 +3862,11 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'donors'), {
+      const cleanedDonor = cleanData({
         ...formData,
         createdAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'donors'), cleanedDonor);
       setIsModalOpen(false);
       setFormData({
         name: '',
@@ -3998,15 +4056,53 @@ const DonorsSection = ({ donors }: { donors: Donor[] }) => {
   );
 };
 
-const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDonation[], stock: DiaperStock | null, user: User }) => {
+const DiaperDonationSection = ({ donations, stock, user, communityElderly, elderly, onFollowBeneficiary, socialPatients, onNavigate, onAddCommunityElderly }: { 
+  donations: DiaperDonation[], 
+  stock: DiaperStock | null, 
+  user: User,
+  communityElderly: CommunityElderly[],
+  elderly: Elderly[],
+  onFollowBeneficiary: (beneficiary: { name: string, birthDate?: string }) => Promise<void>,
+  socialPatients: SocialPatient[],
+  onNavigate: (tab: string) => void,
+  onAddCommunityElderly: (data: any) => Promise<void>
+}) => {
+  const [activeTab, setActiveTab] = useState<'donations' | 'beneficiaries'>('donations');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewBeneficiaryModalOpen, setIsNewBeneficiaryModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     beneficiaryName: '',
+    beneficiaryId: '',
     quantity: 0,
     date: new Date().toISOString().split('T')[0],
     observations: ''
   });
+
+  const [newBeneficiaryData, setNewBeneficiaryData] = useState({
+    name: '',
+    birthDate: '',
+    phone: '',
+    address: '',
+    age: ''
+  });
+
+  const handleAddNewBeneficiary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await onAddCommunityElderly({
+        ...newBeneficiaryData,
+        age: parseInt(newBeneficiaryData.age) || 0
+      });
+      setIsNewBeneficiaryModalOpen(false);
+      setNewBeneficiaryData({ name: '', birthDate: '', phone: '', address: '', age: '' });
+    } catch (err) {
+      // Error handled by parent
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4014,15 +4110,17 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
     
     setLoading(true);
     try {
-      // 1. Add donation record
-      await addDoc(collection(db, 'diaperDonations'), {
+      const selectedBeneficiary = [...communityElderly, ...elderly].find(b => b.name === formData.beneficiaryName);
+      
+      const cleanedDonation = cleanData({
         ...formData,
+        beneficiaryId: selectedBeneficiary?.id || '',
         size: 'TAMANHO_UNICO',
         registeredBy: user.name,
         createdAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'diaperDonations'), cleanedDonation);
 
-      // 2. Update stock
       const currentQty = stock?.quantity || 0;
       await setDoc(doc(db, 'diaperStock', 'current'), {
         quantity: Math.max(0, currentQty - formData.quantity),
@@ -4033,6 +4131,7 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
       setIsModalOpen(false);
       setFormData({
         beneficiaryName: '',
+        beneficiaryId: '',
         quantity: 0,
         date: new Date().toISOString().split('T')[0],
         observations: ''
@@ -4044,19 +4143,199 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
     }
   };
 
+  const beneficiariesList = useMemo(() => {
+    const map = new Map<string, { name: string, id?: string, total: number, lastDate: string, birthDate?: string }>();
+    
+    donations.forEach(d => {
+      const existing = map.get(d.beneficiaryName);
+      if (existing) {
+        existing.total += d.quantity;
+        if (d.date > existing.lastDate) existing.lastDate = d.date;
+      } else {
+        const profile = [...communityElderly, ...elderly].find(b => b.id === d.beneficiaryId || b.name === d.beneficiaryName);
+        map.set(d.beneficiaryName, {
+          name: d.beneficiaryName,
+          id: d.beneficiaryId,
+          total: d.quantity,
+          lastDate: d.date,
+          birthDate: profile?.birthDate
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [donations, communityElderly, elderly]);
+
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Doação de Fraldas para a Comunidade</h2>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Plus size={18} />
-          Registrar Doação
-        </button>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Doação de Fraldas</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Gestão de doações comunitárias e acompanhamento multi</p>
+        </div>
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+          <button 
+            onClick={() => setActiveTab('donations')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+              activeTab === 'donations' ? "bg-white dark:bg-gray-700 text-green-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            Doações
+          </button>
+          <button 
+            onClick={() => setActiveTab('beneficiaries')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+              activeTab === 'beneficiaries' ? "bg-white dark:bg-gray-700 text-green-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            Beneficiários
+          </button>
+        </div>
       </div>
 
+      {activeTab === 'donations' ? (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center gap-6 w-full max-w-sm">
+              <div className="p-4 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-2xl">
+                <Package size={32} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Estoque Total</p>
+                <p className="text-3xl font-bold text-gray-800 dark:text-white">{stock?.quantity || 0} <span className="text-sm font-normal text-gray-400 dark:text-gray-500">un</span></p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="bg-green-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg hover:bg-green-700 transition-all flex items-center gap-2"
+            >
+              <Plus size={20} />
+              Registrar Doação
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+            <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
+              <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <History className="text-green-600" size={20} />
+                Histórico de Doações
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800">
+                    <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Beneficiário</th>
+                    <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Data</th>
+                    <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase text-right">Quantidade</th>
+                    <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Registrado por</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {donations.map((d) => (
+                    <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <td className="p-4 text-sm font-bold text-gray-800 dark:text-white capitalize">{d.beneficiaryName}</td>
+                      <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{new Date(d.date).toLocaleDateString('pt-BR')}</td>
+                      <td className="p-4 text-sm font-bold text-right text-gray-800 dark:text-white">{d.quantity} un</td>
+                      <td className="p-4 text-xs text-gray-500">{d.registeredBy}</td>
+                    </tr>
+                  ))}
+                  {donations.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-12 text-center text-gray-500 italic">Nenhuma doação registrada.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-800 dark:text-white">Lista de Beneficiários</h3>
+            <button 
+              onClick={() => setIsNewBeneficiaryModalOpen(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Registrar Novo Beneficiário
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {beneficiariesList.map((b) => {
+            const isFollowed = socialPatients.some(p => p.name === b.name);
+            return (
+              <motion.div 
+                layout
+                key={b.name}
+                className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-12 h-12 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-2xl flex items-center justify-center">
+                      <UserIcon size={24} />
+                    </div>
+                    {isFollowed ? (
+                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 uppercase">
+                        <Activity size={10} />
+                        Monitorado
+                      </span>
+                    ) : (
+                      <span className="bg-gray-100 dark:bg-gray-800 text-gray-400 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                        Não Monitorado
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-gray-800 dark:text-white text-lg capitalize">{b.name}</h3>
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400 uppercase font-bold">Total Recebido</span>
+                      <span className="text-gray-800 dark:text-white font-bold">{b.total} un</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-400 uppercase font-bold">Última doação</span>
+                      <span className="text-gray-600 dark:text-gray-400">{new Date(b.lastDate).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-gray-50 dark:border-gray-800">
+                  {isFollowed ? (
+                    <button 
+                      onClick={() => onNavigate('socialWork')}
+                      className="w-full py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-bold rounded-2xl text-xs hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Heart size={14} />
+                      Ver Acompanhamento Social
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => onFollowBeneficiary({ name: b.name, birthDate: b.birthDate })}
+                      className="w-full py-3 bg-green-600 text-white font-bold rounded-2xl text-xs hover:bg-green-700 transition-all shadow-lg shadow-green-600/20 flex items-center justify-center gap-2"
+                    >
+                      <Activity size={14} />
+                      Iniciar Acompanhamento Multi
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+          {beneficiariesList.length === 0 && (
+            <div className="col-span-full p-12 text-center text-gray-500 bg-gray-50 dark:bg-gray-800/50 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+              <Users size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="font-bold">Nenhum beneficiário encontrado</p>
+              <p className="text-sm">Registre doações para ver o histórico aqui.</p>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+
+      {/* Modal for registering donation - unchanged structurally but needs to stay inside component */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
@@ -4078,11 +4357,16 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
                   <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Nome do Beneficiário</label>
                   <input 
                     type="text" 
-                    required
+                    list="beneficiary-options"
                     className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                    placeholder="Busque ou digite novo nome"
                     value={formData.beneficiaryName}
                     onChange={(e) => setFormData({ ...formData, beneficiaryName: e.target.value })}
                   />
+                  <datalist id="beneficiary-options">
+                    {communityElderly.map(e => <option key={e.id} value={e.name} />)}
+                    {elderly.map(e => <option key={e.id} value={e.name} />)}
+                  </datalist>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -4092,7 +4376,7 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
                       min="1"
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.quantity}
-                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 })}
                     />
                   </div>
                   <div>
@@ -4107,9 +4391,10 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Observações</label>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Observações (Opcional)</label>
                   <textarea 
                     className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 h-24 text-gray-800 dark:text-white"
+                    placeholder="Ex: Motivo da doação extra, local de entrega..."
                     value={formData.observations}
                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
                   />
@@ -4137,46 +4422,92 @@ const DiaperDonationSection = ({ donations, stock, user }: { donations: DiaperDo
         )}
       </AnimatePresence>
 
-      <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between max-w-md">
-        <div>
-          <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Estoque Total (Tamanho Único)</p>
-          <p className="text-3xl font-bold text-gray-800 dark:text-white">{stock?.quantity || 0} <span className="text-sm font-normal text-gray-400 dark:text-gray-500">unidades</span></p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl">
-          <Package size={32} />
-        </div>
-      </div>
+      {/* Modal for New Beneficiary */}
+      <AnimatePresence>
+        {isNewBeneficiaryModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-3xl p-8 shadow-2xl relative"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Novo Beneficiário (Comunidade)</h3>
+                <button onClick={() => setIsNewBeneficiaryModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={24} /></button>
+              </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-        <div className="p-6 border-b border-gray-50 dark:border-gray-800">
-          <h3 className="font-bold text-gray-800 dark:text-white">Histórico de Doações</h3>
-        </div>
-        <table className="w-full">
-          <thead>
-            <tr className="text-left bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800">
-              <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Beneficiário</th>
-              <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Data</th>
-              <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase text-right">Quantidade</th>
-              <th className="p-4 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">Registrado por</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-            {(donations || []).map((d) => (
-              <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <td className="p-4 text-sm font-bold text-gray-800">{d.beneficiaryName}</td>
-                <td className="p-4 text-sm text-gray-600">{new Date(d.date).toLocaleDateString('pt-BR')}</td>
-                <td className="p-4 text-sm font-bold text-right">{d.quantity} un</td>
-                <td className="p-4 text-xs text-gray-500">{d.registeredBy}</td>
-              </tr>
-            ))}
-            {donations.length === 0 && (
-              <tr>
-                <td colSpan={4} className="p-8 text-center text-gray-500 italic">Nenhuma doação registrada.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              <form onSubmit={handleAddNewBeneficiary} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Nome Completo</label>
+                  <input 
+                    type="text" 
+                    required
+                    className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
+                    value={newBeneficiaryData.name}
+                    onChange={(e) => setNewBeneficiaryData({ ...newBeneficiaryData, name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Idade</label>
+                    <input 
+                      type="number" 
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
+                      value={newBeneficiaryData.age}
+                      onChange={(e) => setNewBeneficiaryData({ ...newBeneficiaryData, age: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Data de Nasc.</label>
+                    <input 
+                      type="date" 
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
+                      value={newBeneficiaryData.birthDate}
+                      onChange={(e) => setNewBeneficiaryData({ ...newBeneficiaryData, birthDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Telefone</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
+                    value={newBeneficiaryData.phone}
+                    onChange={(e) => setNewBeneficiaryData({ ...newBeneficiaryData, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-2">Endereço</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
+                    value={newBeneficiaryData.address}
+                    onChange={(e) => setNewBeneficiaryData({ ...newBeneficiaryData, address: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-8">
+                  <button 
+                    type="button"
+                    onClick={() => setIsNewBeneficiaryModalOpen(false)}
+                    className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold rounded-2xl hover:bg-gray-200 transition-all transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2"
+                  >
+                    {loading ? <Activity className="animate-spin" size={18} /> : 'Cadastrar'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -4207,30 +4538,36 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
         const newEffect = modalType === 'PRODUCTION' ? quantity : -quantity;
         newQty = baseQty + newEffect;
 
-        await updateDoc(doc(db, 'diaperProductionLogs', editingLog.id), {
+        const updateData = cleanData({
           quantity,
           type: modalType,
           observations,
           date: new Date().toISOString()
         });
+
+        await updateDoc(doc(db, 'diaperProductionLogs', editingLog.id), updateData);
       } else {
         const effect = modalType === 'PRODUCTION' ? quantity : -quantity;
         newQty = currentQty + effect;
 
-        await addDoc(collection(db, 'diaperProductionLogs'), {
+        const logData = cleanData({
           quantity,
           type: modalType,
           observations,
           registeredBy: user.name,
           date: new Date().toISOString()
         });
+
+        await addDoc(collection(db, 'diaperProductionLogs'), logData);
       }
 
-      await setDoc(doc(db, 'diaperStock', 'current'), {
+      const stockData = cleanData({
         quantity: Math.max(0, newQty),
         lastUpdate: new Date().toISOString(),
         updatedBy: user.name
-      }, { merge: true });
+      });
+
+      await setDoc(doc(db, 'diaperStock', 'current'), stockData, { merge: true });
 
       setIsModalOpen(false);
       setQuantity(0);
@@ -4681,20 +5018,20 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
     }
 
     setLoading(true);
-    const cleanData = {
+    const volunteerData = cleanData({
       ...formData,
       cpf: formData.cpf.trim(),
       address: formData.address.trim(),
       name: formData.name.trim()
-    };
+    });
 
     try {
       if (selectedVolunteer) {
-        await updateDoc(doc(db, 'volunteers', selectedVolunteer.id), cleanData);
+        await updateDoc(doc(db, 'volunteers', selectedVolunteer.id), volunteerData);
         showToast('Cadastro atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'volunteers'), {
-          ...cleanData,
+          ...volunteerData,
           status: 'ATIVO',
           createdAt: new Date().toISOString()
         });
@@ -5002,10 +5339,11 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'familyEngagements'), {
+      const engagementData = cleanData({
         ...formData,
         createdAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'familyEngagements'), engagementData);
       showToast('Contato familiar registrado com sucesso!');
       setIsModalOpen(false);
       setFormData({
@@ -5216,12 +5554,13 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
 
     setLoading(true);
     try {
-      await addDoc(collection(db, 'calendarEvents'), {
+      const eventData = cleanData({
         ...formData,
         date: format(selectedDate, 'yyyy-MM-dd'),
         createdBy: user.name,
         createdAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'calendarEvents'), eventData);
       setIsModalOpen(false);
       setFormData({
         title: '',
@@ -5612,12 +5951,12 @@ const GallerySection = ({ user, showToast }: { user: User, showToast: (msg: stri
           reader.onloadend = async () => {
             try {
               const base64String = reader.result as string;
-              const photoData = {
+              const photoData = cleanData({
                 url: base64String,
                 caption: 'Clique para editar legenda',
                 date: new Date().toISOString(),
                 uploadedBy: user.name
-              };
+              });
               await addDoc(collection(db, 'gallery'), photoData);
               resolve();
             } catch (err) {
@@ -5658,7 +5997,8 @@ const GallerySection = ({ user, showToast }: { user: User, showToast: (msg: stri
 
   const saveCaption = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'gallery', id), { caption: editCaption });
+      const cleanedCaption = cleanData({ caption: editCaption });
+      await updateDoc(doc(db, 'gallery', id), cleanedCaption);
       setEditingId(null);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `gallery/${id}`);
@@ -6123,11 +6463,12 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'communityElderly'), {
+      const communityData = cleanData({
         ...elderlyFormData,
         age: parseInt(elderlyFormData.age),
         registeredAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'communityElderly'), communityData);
       showToast('Idoso da comunidade cadastrado com sucesso!');
       setIsElderlyModalOpen(false);
       setElderlyFormData({
@@ -6153,10 +6494,11 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'caregivers'), {
+      const caregiverData = cleanData({
         ...caregiverFormData,
         registeredAt: new Date().toISOString()
       });
+      await addDoc(collection(db, 'caregivers'), caregiverData);
       showToast('Cuidador cadastrado com sucesso!');
       setIsCaregiverModalOpen(false);
       setCaregiverFormData({
@@ -6178,10 +6520,11 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
     e.preventDefault();
     setLoading(true);
     try {
-      await addDoc(collection(db, 'workshops'), {
+      const workshopData = cleanData({
         ...workshopFormData,
         registeredBy: auth.currentUser?.email || 'Sistema'
       });
+      await addDoc(collection(db, 'workshops'), workshopData);
       showToast('Registro de atividade realizado com sucesso!');
       setIsWorkshopModalOpen(false);
       setWorkshopFormData({
@@ -6564,7 +6907,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                         value={workshopFormData.what}
                         onChange={e => setWorkshopFormData({...workshopFormData, what: e.target.value})}
-                        required
                       />
                     </div>
                     <div className="space-y-2">
@@ -6595,7 +6937,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                         value={workshopFormData.date}
                         onChange={e => setWorkshopFormData({...workshopFormData, date: e.target.value})}
-                        required
                       />
                     </div>
                   </div>
@@ -6753,7 +7094,6 @@ const StaffManagementSection = ({ staff, onSave, showToast }: { staff: StaffMemb
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Nome Completo</label>
                     <input 
-                      required
                       className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -7292,14 +7632,16 @@ const NotificationsModal = ({ events, onClose, onViewSchedule }: {
   );
 };
 
-const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast, showConfirm }: { 
+const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast, showConfirm, showAIAssistant, onToggleAIAssistant }: { 
   user: User, 
   theme: 'light' | 'dark',
   onThemeChange: (theme: 'light' | 'dark') => void,
   onClose: () => void, 
   onUpdate: (updatedUser: User) => void,
   showToast: (msg: string, type?: 'success' | 'error') => void,
-  showConfirm: (msg: string, onConfirm: () => void) => void
+  showConfirm: (msg: string, onConfirm: () => void) => void,
+  showAIAssistant: boolean,
+  onToggleAIAssistant: () => void
 }) => {
   const [formData, setFormData] = useState({
     name: user.name,
@@ -7316,11 +7658,12 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
     try {
       if (auth.currentUser) {
         // Update Firestore
-        await updateDoc(doc(db, 'profiles', auth.currentUser.uid), {
+        const profileUpdate = cleanData({
           name: formData.name,
           photoUrl: formData.photoUrl,
           registrationNumber: formData.registrationNumber
         });
+        await updateDoc(doc(db, 'profiles', auth.currentUser.uid), profileUpdate);
         
         // Update Email if changed
         if (formData.email !== auth.currentUser.email) {
@@ -7401,6 +7744,29 @@ const ProfileModal = ({ user, theme, onThemeChange, onClose, onUpdate, showToast
               <div className={cn(
                 "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
                 theme === 'dark' ? "left-7" : "left-1"
+              )} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/30">
+            <div className="flex items-center gap-3">
+              <Sparkles className="text-blue-500" size={20} />
+              <div>
+                <p className="text-sm font-bold text-gray-800 dark:text-white">Assistente Smart IA</p>
+                <p className="text-[10px] text-blue-400 uppercase">Bolinha do chat flutuante</p>
+              </div>
+            </div>
+            <button 
+              type="button"
+              onClick={onToggleAIAssistant}
+              className={cn(
+                "w-12 h-6 rounded-full transition-all relative p-1",
+                showAIAssistant ? "bg-blue-600" : "bg-gray-300"
+              )}
+            >
+              <div className={cn(
+                "w-4 h-4 bg-white rounded-full transition-all",
+                showAIAssistant ? "translate-x-6" : "translate-x-0"
               )} />
             </button>
           </div>
@@ -7539,7 +7905,8 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
   const handleUpdateInstitutional = async () => {
     setLoading(true);
     try {
-      await setDoc(doc(db, 'settings', 'institutional'), instData);
+      const cleanedInstData = cleanData(instData);
+      await setDoc(doc(db, 'settings', 'institutional'), cleanedInstData);
       showToast('Informações institucionais atualizadas com sucesso!');
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, 'settings/institutional');
@@ -7552,7 +7919,8 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
   const handleUpdateRole = async (userId: string, newRole: Role) => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'profiles', userId), { role: newRole });
+      const roleUpdate = cleanData({ role: newRole });
+      await updateDoc(doc(db, 'profiles', userId), roleUpdate);
       showToast('Cargo atualizado com sucesso!');
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `profiles/${userId}`);
@@ -7758,7 +8126,10 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(() => {
+    const saved = localStorage.getItem('oami-active-tab');
+    return saved || 'dashboard';
+  });
 
   // --- Initial System Cleanup and Connection Test ---
   useEffect(() => {
@@ -7779,6 +8150,10 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(() => {
+    const saved = localStorage.getItem('oami-show-ai');
+    return saved !== 'false';
+  });
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('oami-theme');
     return (saved as 'light' | 'dark') || 'light';
@@ -7794,6 +8169,16 @@ export default function App() {
   const showConfirm = (message: string, onConfirm: () => void) => {
     setConfirmModal({ message, onConfirm });
   };
+
+  useEffect(() => {
+    localStorage.setItem('oami-active-tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    localStorage.setItem('oami-show-ai', showAIAssistant.toString());
+  }, [showAIAssistant]);
+
+  const toggleAIAssistant = () => setShowAIAssistant(prev => !prev);
 
   useEffect(() => {
     localStorage.setItem('oami-theme', theme);
@@ -7841,6 +8226,21 @@ export default function App() {
   const [familyEngagements, setFamilyEngagements] = useState<FamilyEngagement[]>([]);
   const [institutionalInfo, setInstitutionalInfo] = useState<InstitutionalInfo | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+
+  const onSaveCommunityElderly = async (data: any) => {
+    try {
+      const communityData = cleanData({
+        ...data,
+        registeredAt: new Date().toISOString()
+      });
+      await addDoc(collection(db, 'communityElderly'), communityData);
+      showToast('Idoso da comunidade cadastrado com sucesso!');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, 'communityElderly');
+      throw err;
+    }
+  };
+
   const savePhotosToGallery = async (
     photos: string[], 
     patientId: string, 
@@ -7867,7 +8267,7 @@ export default function App() {
         if (patientName) galleryItem.patientName = patientName;
         if (description) galleryItem.description = description;
 
-        return addDoc(collection(db, 'gallery'), galleryItem);
+        return addDoc(collection(db, 'gallery'), cleanData(galleryItem));
       });
       await Promise.all(promises);
     } catch (err) {
@@ -8076,8 +8476,9 @@ export default function App() {
           showToast(`Tipo de registro ${result.recordType} ainda não mapeado para salvamento automático.`, 'error');
           return;
       }
-
-      await addDoc(collection(db, collectionName), dataWithMeta);
+      
+      const cleanedIAData = cleanData(dataWithMeta);
+      await addDoc(collection(db, collectionName), cleanedIAData);
       showToast('Registro salvo com sucesso via Smart IA!', 'success');
     } catch (err) {
       console.error("Error saving smart command:", err);
@@ -8253,7 +8654,7 @@ export default function App() {
         const snapshot = await getDocs(q);
         
         if (snapshot.empty) {
-          const elderlyRef = await addDoc(collection(db, 'elderly'), {
+          const elderlyRef = await addDoc(collection(db, 'elderly'), cleanData({
             name: 'Francisco Gomes da Silva',
             fullName: 'Francisco Gomes da Silva',
             cpf: '056811913-46',
@@ -8261,9 +8662,9 @@ export default function App() {
             entryDate: '2020-12-17',
             status: 'ATIVO',
             lastProfession: 'Não informada'
-          });
+          }));
           
-          await addDoc(collection(db, 'pias'), {
+          await addDoc(collection(db, 'pias'), cleanData({
             elderlyId: elderlyRef.id,
             date: '2020-12-17',
             responsible: 'Antonilson Lima Moreira',
@@ -8279,7 +8680,7 @@ export default function App() {
             objectives: 'Acompanhamento Social',
             actions: 'Recebimento institucional e início de acompanhamento social.',
             observations: 'Religião: Católica. Naturalidade: São Luís - MA. Não alfabetizado. Cor: Pardo. Estado Civil: Viúvo. Registro: 000059565296-4/MA.'
-          });
+          }));
           
           console.log("Dados do Sr. Francisco Gomes da Silva semeados com sucesso!");
         }
@@ -8708,7 +9109,8 @@ export default function App() {
   const handleUpdateProfile = async (data: Partial<User>) => {
     if (!user) return;
     try {
-      await updateDoc(doc(db, 'profiles', user.id), data);
+      const cleanedData = cleanData(data);
+      await updateDoc(doc(db, 'profiles', user.id), cleanedData);
       setUser({ ...user, ...data });
       showToast('Perfil atualizado com sucesso!');
     } catch (err) {
@@ -8719,13 +9121,13 @@ export default function App() {
 
   const handleSavePhysioPatient = async (data: Omit<PhysioPatient, 'id'>, id?: string) => {
     try {
-      // Find if there's already a physioPatient doc for this elderly person
       const existing = physioPatients.find(p => p.elderlyId === id || p.id === id);
+      const cleanedData = cleanData(data);
       if (existing) {
-        await updateDoc(doc(db, 'physioPatients', existing.id), { ...data, elderlyId: id });
+        await updateDoc(doc(db, 'physioPatients', existing.id), { ...cleanedData, elderlyId: id });
         showToast('Paciente atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'physioPatients'), { ...data, elderlyId: id });
+        await addDoc(collection(db, 'physioPatients'), { ...cleanedData, elderlyId: id });
         showToast('Paciente cadastrado com sucesso');
       }
     } catch (err) {
@@ -8748,12 +9150,13 @@ export default function App() {
 
   const handleSavePhysioAssessment = async (data: Omit<PhysioAssessment, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'physioAssessments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'physioAssessments', id), cleanedData);
         showToast('Avaliação atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'physioAssessments'), data);
+        await addDoc(collection(db, 'physioAssessments'), cleanedData);
         showToast('Avaliação salva com sucesso');
       }
     } catch (err) {
@@ -8764,12 +9167,13 @@ export default function App() {
 
   const handleSavePhysioEvolution = async (data: Omit<PhysioEvolution, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'physioEvolutions', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'physioEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'physioEvolutions'), data);
+        await addDoc(collection(db, 'physioEvolutions'), cleanedData);
         showToast('Evolução registrada com sucesso');
       }
     } catch (err) {
@@ -8780,13 +9184,14 @@ export default function App() {
 
   const handleSavePhysioExercise = async (data: Omit<PhysioExercise, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'physioExercises', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'physioExercises', id), cleanedData);
         showToast('Exercício atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'physioExercises'), data);
-        showToast('Exercício salvo com sucesso');
+        await addDoc(collection(db, 'physioExercises'), cleanedData);
+        showToast('Exercício salva com sucesso');
       }
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'physioExercises');
@@ -8796,12 +9201,13 @@ export default function App() {
 
   const handleSavePhysioAppointment = async (data: Omit<PhysioAppointment, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'physioAppointments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'physioAppointments', id), cleanedData);
         showToast('Agendamento atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'physioAppointments'), data);
+        await addDoc(collection(db, 'physioAppointments'), cleanedData);
         showToast('Agendamento realizado com sucesso');
       }
     } catch (err) {
@@ -8814,11 +9220,12 @@ export default function App() {
   const handleSaveNursingPatient = async (data: Omit<NursingPatient, 'id'>, id?: string) => {
     try {
       const existing = nursingPatients.find(p => p.elderlyId === id || p.id === id);
+      const cleanedData = cleanData(data);
       if (existing) {
-        await updateDoc(doc(db, 'nursingPatients', existing.id), { ...data, elderlyId: id });
+        await updateDoc(doc(db, 'nursingPatients', existing.id), { ...cleanedData, elderlyId: id });
         showToast('Paciente atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'nursingPatients'), { ...data, elderlyId: id });
+        await addDoc(collection(db, 'nursingPatients'), { ...cleanedData, elderlyId: id });
         showToast('Paciente cadastrado com sucesso');
       }
     } catch (err) {
@@ -8869,11 +9276,12 @@ export default function App() {
 
   const handleSaveMedication = async (data: Omit<Medication, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'medications', id), data);
+        await updateDoc(doc(db, 'medications', id), cleanedData);
         showToast('Medicação atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'medications'), data);
+        await addDoc(collection(db, 'medications'), cleanedData);
         showToast('Medicação cadastrada com sucesso');
       }
     } catch (err) {
@@ -8884,7 +9292,8 @@ export default function App() {
 
   const handleSaveMedicationAdministration = async (data: Omit<MedicationAdministration, 'id'>) => {
     try {
-      await addDoc(collection(db, 'medicationAdministrations'), data);
+      const cleanedData = cleanData(data);
+      await addDoc(collection(db, 'medicationAdministrations'), cleanedData);
       showToast('Administração registrada com sucesso');
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'medicationAdministrations');
@@ -8894,11 +9303,12 @@ export default function App() {
 
   const handleSaveVitalSigns = async (data: Omit<VitalSigns, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'vitalSigns', id), data);
+        await updateDoc(doc(db, 'vitalSigns', id), cleanedData);
         showToast('Sinais vitais atualizados com sucesso');
       } else {
-        await addDoc(collection(db, 'vitalSigns'), data);
+        await addDoc(collection(db, 'vitalSigns'), cleanedData);
         showToast('Sinais vitais registrados com sucesso');
       }
     } catch (err) {
@@ -8909,11 +9319,12 @@ export default function App() {
 
   const handleSaveDressingRecord = async (data: Omit<DressingRecord, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'dressingRecords', id), data);
+        await updateDoc(doc(db, 'dressingRecords', id), cleanedData);
         showToast('Curativo atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'dressingRecords'), data);
+        await addDoc(collection(db, 'dressingRecords'), cleanedData);
         showToast('Curativo registrado com sucesso');
       }
     } catch (err) {
@@ -8924,11 +9335,12 @@ export default function App() {
 
   const handleSaveNursingEvolution = async (data: Omit<NursingEvolution, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'nursingEvolutions', id), data);
+        await updateDoc(doc(db, 'nursingEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'nursingEvolutions'), data);
+        await addDoc(collection(db, 'nursingEvolutions'), cleanedData);
         showToast('Evolução registrada com sucesso');
       }
     } catch (err) {
@@ -8939,11 +9351,12 @@ export default function App() {
 
   const handleSaveIncidentRecord = async (data: Omit<IncidentRecord, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'incidentRecords', id), data);
+        await updateDoc(doc(db, 'incidentRecords', id), cleanedData);
         showToast('Intercorrência atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'incidentRecords'), data);
+        await addDoc(collection(db, 'incidentRecords'), cleanedData);
         showToast('Intercorrência registrada com sucesso');
       }
     } catch (err) {
@@ -8954,11 +9367,12 @@ export default function App() {
 
   const handleSaveShiftSchedule = async (data: Omit<ShiftSchedule, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'shiftSchedules', id), data);
+        await updateDoc(doc(db, 'shiftSchedules', id), cleanedData);
         showToast('Plantão atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'shiftSchedules'), data);
+        await addDoc(collection(db, 'shiftSchedules'), cleanedData);
         showToast('Plantão salvo com sucesso');
       }
     } catch (err) {
@@ -8969,11 +9383,12 @@ export default function App() {
 
   const handleSaveStaffMember = async (data: Omit<StaffMember, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'users', id), data);
+        await updateDoc(doc(db, 'users', id), cleanedData);
         showToast('Funcionário atualizado!', 'success');
       } else {
-        await addDoc(collection(db, 'users'), data);
+        await addDoc(collection(db, 'users'), cleanedData);
         showToast('Funcionário registrado!', 'success');
       }
     } catch (err) {
@@ -8984,11 +9399,12 @@ export default function App() {
 
   const handleSaveAVDRecord = async (data: Omit<AVDRecord, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'avdRecords', id), data);
+        await updateDoc(doc(db, 'avdRecords', id), cleanedData);
         showToast('AVD atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'avdRecords'), data);
+        await addDoc(collection(db, 'avdRecords'), cleanedData);
         showToast('AVD registrada com sucesso');
       }
     } catch (err) {
@@ -8999,11 +9415,12 @@ export default function App() {
 
   const handleSaveDiaperChangeRecord = async (data: Omit<DiaperChangeRecord, 'id'>, id?: string) => {
     try {
+      const cleanedData = cleanData(data);
       if (id) {
-        await updateDoc(doc(db, 'diaperChangeRecords', id), data);
+        await updateDoc(doc(db, 'diaperChangeRecords', id), cleanedData);
         showToast('Troca de fralda atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'diaperChangeRecords'), data);
+        await addDoc(collection(db, 'diaperChangeRecords'), cleanedData);
         showToast('Troca de fralda registrada com sucesso');
       }
     } catch (err) {
@@ -9066,11 +9483,14 @@ export default function App() {
   const handleSavePsychPatient = async (data: Omit<PsychPatient, 'id'>, id?: string) => {
     try {
       const existing = psychPatients.find(p => p.elderlyId === id || p.id === id);
+      
+      const cleanedData = cleanData(data);
+
       if (existing) {
-        await updateDoc(doc(db, 'psychPatients', existing.id), { ...data, elderlyId: id });
+        await updateDoc(doc(db, 'psychPatients', existing.id), { ...cleanedData, elderlyId: id });
         showToast('Idoso atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'psychPatients'), { ...data, elderlyId: id });
+        await addDoc(collection(db, 'psychPatients'), { ...cleanedData, elderlyId: id });
         showToast('Idoso cadastrado com sucesso');
       }
     } catch (err) {
@@ -9081,12 +9501,13 @@ export default function App() {
 
   const handleSavePsychInitialAssessment = async (data: Omit<PsychInitialAssessment, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychInitialAssessments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychInitialAssessments', id), cleanedData);
         showToast('Avaliação inicial atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychInitialAssessments'), data);
+        await addDoc(collection(db, 'psychInitialAssessments'), cleanedData);
         showToast('Avaliação inicial salva com sucesso');
       }
     } catch (err) {
@@ -9097,12 +9518,13 @@ export default function App() {
 
   const handleSavePsychEvolution = async (data: Omit<PsychEvolution, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychEvolutions', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychEvolutions'), data);
+        await addDoc(collection(db, 'psychEvolutions'), cleanedData);
         showToast('Evolução registrada com sucesso');
       }
     } catch (err) {
@@ -9113,12 +9535,13 @@ export default function App() {
 
   const handleSavePsychAppointment = async (data: Omit<PsychAppointment, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychAppointments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychAppointments', id), cleanedData);
         showToast('Atendimento atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'psychAppointments'), data);
+        await addDoc(collection(db, 'psychAppointments'), cleanedData);
         showToast('Atendimento registrado com sucesso');
       }
     } catch (err) {
@@ -9129,12 +9552,13 @@ export default function App() {
 
   const handleSavePsychEmotionalMonitoring = async (data: Omit<PsychEmotionalMonitoring, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychEmotionalMonitorings', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychEmotionalMonitorings', id), cleanedData);
         showToast('Monitoramento emocional atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'psychEmotionalMonitorings'), data);
+        await addDoc(collection(db, 'psychEmotionalMonitorings'), cleanedData);
         showToast('Monitoramento emocional registrado com sucesso');
       }
     } catch (err) {
@@ -9145,12 +9569,13 @@ export default function App() {
 
   const handleSavePsychFamilyBond = async (data: Omit<PsychFamilyBond, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychFamilyBonds', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychFamilyBonds', id), cleanedData);
         showToast('Vínculo familiar atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'psychFamilyBonds'), data);
+        await addDoc(collection(db, 'psychFamilyBonds'), cleanedData);
         showToast('Vínculo familiar registrado com sucesso');
       }
     } catch (err) {
@@ -9161,12 +9586,13 @@ export default function App() {
 
   const handleSavePsychActivity = async (data: Omit<PsychActivity, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychActivities', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychActivities', id), cleanedData);
         showToast('Atividade atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychActivities'), data);
+        await addDoc(collection(db, 'psychActivities'), cleanedData);
         showToast('Atividade registrada com sucesso');
       }
     } catch (err) {
@@ -9177,12 +9603,13 @@ export default function App() {
 
   const handleSavePsychCognitionAssessment = async (data: Omit<PsychCognitionAssessment, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychCognitionAssessments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychCognitionAssessments', id), cleanedData);
         showToast('Avaliação cognitiva atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychCognitionAssessments'), data);
+        await addDoc(collection(db, 'psychCognitionAssessments'), cleanedData);
         showToast('Avaliação cognitiva registrada com sucesso');
       }
     } catch (err) {
@@ -9193,12 +9620,13 @@ export default function App() {
 
   const handleSavePsychInterventionPlan = async (data: Omit<PsychInterventionPlan, 'id'> & { id?: string }) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'psychInterventionPlans', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'psychInterventionPlans', id), cleanedData);
         showToast('Plano de intervenção atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'psychInterventionPlans'), data);
+        await addDoc(collection(db, 'psychInterventionPlans'), cleanedData);
         showToast('Plano de intervenção registrado com sucesso');
       }
     } catch (err) {
@@ -9212,12 +9640,15 @@ export default function App() {
     try {
       const id = data.id;
       const existing = pedagogyPatients.find(p => p.elderlyId === id || p.id === id);
+      
+      const { id: _, ...rest } = data;
+      const cleanedData = cleanData(rest);
+
       if (existing) {
-        const { id: _, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyPatients', existing.id), { ...rest, elderlyId: id });
+        await updateDoc(doc(db, 'pedagogyPatients', existing.id), { ...cleanedData, elderlyId: id });
         showToast('Idoso atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyPatients'), { ...data, elderlyId: id, createdAt: new Date().toISOString() });
+        await addDoc(collection(db, 'pedagogyPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
         showToast('Idoso cadastrado com sucesso');
       }
     } catch (err) {
@@ -9228,12 +9659,13 @@ export default function App() {
 
   const handleSavePedagogyAssessment = async (data: Partial<PedagogyInitialAssessment>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyInitialAssessments', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyInitialAssessments', id), cleanedData);
         showToast('Avaliação inicial atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyInitialAssessments'), data);
+        await addDoc(collection(db, 'pedagogyInitialAssessments'), cleanedData);
         showToast('Avaliação inicial salva com sucesso');
       }
     } catch (err) {
@@ -9244,12 +9676,13 @@ export default function App() {
 
   const handleSavePedagogyEvolution = async (data: Partial<PedagogyEvolution>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyEvolutions', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyEvolutions'), data);
+        await addDoc(collection(db, 'pedagogyEvolutions'), cleanedData);
         showToast('Evolução registrada com sucesso');
       }
     } catch (err) {
@@ -9260,12 +9693,13 @@ export default function App() {
 
   const handleSavePedagogyActivity = async (data: Partial<PedagogyActivity>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyActivities', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyActivities', id), cleanedData);
         showToast('Atividade atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyActivities'), data);
+        await addDoc(collection(db, 'pedagogyActivities'), cleanedData);
         showToast('Atividade registrada com sucesso');
       }
     } catch (err) {
@@ -9276,12 +9710,13 @@ export default function App() {
 
   const handleSavePedagogyStimulation = async (data: Partial<PedagogyStimulationTracking>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyStimulationTrackings', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyStimulationTrackings', id), cleanedData);
         showToast('Estimulação atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyStimulationTrackings'), data);
+        await addDoc(collection(db, 'pedagogyStimulationTrackings'), cleanedData);
         showToast('Estimulação registrada com sucesso');
       }
     } catch (err) {
@@ -9292,12 +9727,13 @@ export default function App() {
 
   const handleSavePedagogySocial = async (data: Partial<PedagogySocialParticipation>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogySocialParticipations', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogySocialParticipations', id), cleanedData);
         showToast('Participação social atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogySocialParticipations'), data);
+        await addDoc(collection(db, 'pedagogySocialParticipations'), cleanedData);
         showToast('Participação social registrada com sucesso');
       }
     } catch (err) {
@@ -9308,12 +9744,13 @@ export default function App() {
 
   const handleSavePedagogyPlan = async (data: Partial<PedagogyIndividualPlan>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyIndividualPlans', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyIndividualPlans', id), cleanedData);
         showToast('Plano pedagógico atualizado com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyIndividualPlans'), data);
+        await addDoc(collection(db, 'pedagogyIndividualPlans'), cleanedData);
         showToast('Plano pedagógico registrado com sucesso');
       }
     } catch (err) {
@@ -9324,11 +9761,12 @@ export default function App() {
 
   const handleSavePedagogyLifeHistory = async (data: Partial<PedagogyLifeHistory>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pedagogyLifeHistories', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pedagogyLifeHistories', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'pedagogyLifeHistories'), data);
+        await addDoc(collection(db, 'pedagogyLifeHistories'), cleanedData);
       }
       showToast('História de vida salva com sucesso');
     } catch (err) {
@@ -9342,11 +9780,14 @@ export default function App() {
     try {
       const id = data.id;
       const existing = socialPatients.find(p => p.elderlyId === id || p.id === id);
+      
+      const { id: _, ...rest } = data;
+      const cleanedData = cleanData(rest);
+
       if (existing) {
-        const { id: _, ...rest } = data;
-        await updateDoc(doc(db, 'socialPatients', existing.id), { ...rest, elderlyId: id });
+        await updateDoc(doc(db, 'socialPatients', existing.id), { ...cleanedData, elderlyId: id });
       } else {
-        await addDoc(collection(db, 'socialPatients'), { ...data, elderlyId: id, createdAt: new Date().toISOString() });
+        await addDoc(collection(db, 'socialPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
       }
       showToast('Perfil social salvo com sucesso');
     } catch (err) {
@@ -9357,11 +9798,12 @@ export default function App() {
 
   const handleSaveSocialPIA = async (data: Partial<PIA>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'pias', id), { ...rest, updatedAt: new Date().toISOString() });
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'pias', id), { ...cleanedData, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'pias'), { ...data, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'pias'), { ...cleanedData, updatedAt: new Date().toISOString() });
       }
       showToast('PIA salvo com sucesso');
     } catch (err) {
@@ -9372,11 +9814,12 @@ export default function App() {
 
   const handleSaveSocialFamilyTie = async (data: Partial<SocialFamilyTie>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialFamilyTies', id), { ...rest, updatedAt: new Date().toISOString() });
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialFamilyTies', id), { ...cleanedData, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'socialFamilyTies'), { ...data, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'socialFamilyTies'), { ...cleanedData, updatedAt: new Date().toISOString() });
       }
       showToast('Vínculo familiar salvo com sucesso');
     } catch (err) {
@@ -9387,11 +9830,12 @@ export default function App() {
 
   const handleSaveSocialDocumentation = async (data: Partial<SocialDocumentation>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialDocumentations', id), { ...rest, updatedAt: new Date().toISOString() });
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialDocumentations', id), { ...cleanedData, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'socialDocumentations'), { ...data, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'socialDocumentations'), { ...cleanedData, updatedAt: new Date().toISOString() });
       }
       showToast('Documentação salva com sucesso');
     } catch (err) {
@@ -9402,11 +9846,12 @@ export default function App() {
 
   const handleSaveSocialLegalSituation = async (data: Partial<SocialLegalSituation>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialLegalSituations', id), { ...rest, updatedAt: new Date().toISOString() });
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialLegalSituations', id), { ...cleanedData, updatedAt: new Date().toISOString() });
       } else {
-        await addDoc(collection(db, 'socialLegalSituations'), { ...data, updatedAt: new Date().toISOString() });
+        await addDoc(collection(db, 'socialLegalSituations'), { ...cleanedData, updatedAt: new Date().toISOString() });
       }
       showToast('Situação jurídica salva com sucesso');
     } catch (err) {
@@ -9417,11 +9862,12 @@ export default function App() {
 
   const handleSaveSocialStudy = async (data: Partial<SocialStudy>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialStudies', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialStudies', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'socialStudies'), data);
+        await addDoc(collection(db, 'socialStudies'), cleanedData);
       }
       showToast('Estudo social salvo com sucesso');
     } catch (err) {
@@ -9432,11 +9878,12 @@ export default function App() {
 
   const handleSaveSocialEvolution = async (data: Partial<SocialEvolution>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialEvolutions', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialEvolutions', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'socialEvolutions'), data);
+        await addDoc(collection(db, 'socialEvolutions'), cleanedData);
       }
       showToast('Evolução social salva com sucesso');
     } catch (err) {
@@ -9447,11 +9894,12 @@ export default function App() {
 
   const handleSaveSocialReferral = async (data: Partial<SocialReferral>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialReferrals', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialReferrals', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'socialReferrals'), data);
+        await addDoc(collection(db, 'socialReferrals'), cleanedData);
       }
       showToast('Encaminhamento salvo com sucesso');
     } catch (err) {
@@ -9462,11 +9910,12 @@ export default function App() {
 
   const handleSaveSocialFamilyVisit = async (data: Partial<SocialFamilyVisit>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialFamilyVisits', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialFamilyVisits', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'socialFamilyVisits'), data);
+        await addDoc(collection(db, 'socialFamilyVisits'), cleanedData);
       }
       showToast('Visita familiar salva com sucesso');
     } catch (err) {
@@ -9477,11 +9926,12 @@ export default function App() {
 
   const handleSaveSocialRiskSituation = async (data: Partial<SocialRiskSituation>) => {
     try {
-      if (data.id) {
-        const { id, ...rest } = data;
-        await updateDoc(doc(db, 'socialRiskSituations', id), rest);
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'socialRiskSituations', id), cleanedData);
       } else {
-        await addDoc(collection(db, 'socialRiskSituations'), data);
+        await addDoc(collection(db, 'socialRiskSituations'), cleanedData);
       }
       showToast('Situação de risco salva com sucesso');
     } catch (err) {
@@ -9532,6 +9982,7 @@ export default function App() {
           vitalSigns={vitalSigns}
           workshops={workshops}
           socialFamilyVisits={socialFamilyVisits}
+          pias={pias}
           onNavigate={(tab) => setActiveTab(tab)}
           diaperRawProductions={diaperRawProductions}
           diaperFinalPackings={diaperFinalPackings}
@@ -9545,6 +9996,7 @@ export default function App() {
           events={calendarEvents}
           volunteers={volunteers}
           caregivers={caregivers}
+          adminUsers={adminUsers}
           onNavigate={(tab) => setActiveTab(tab)}
           showToast={showToast}
         />
@@ -9784,7 +10236,43 @@ export default function App() {
         />
       );
       case 'donors': return <DonorsSection donors={donors} />;
-      case 'diaperDonations': return <DiaperDonationSection donations={diaperDonations} stock={diaperStock} user={user} />;
+      case 'diaperDonations': return (
+        <DiaperDonationSection 
+          donations={diaperDonations} 
+          stock={diaperStock} 
+          user={user} 
+          communityElderly={communityElderly}
+          elderly={elderly}
+          socialPatients={socialPatientsList}
+          onNavigate={setActiveTab}
+          onAddCommunityElderly={onSaveCommunityElderly}
+          onFollowBeneficiary={async (beneficiary) => {
+            try {
+              // Promote to Social Work Patient if not exists
+              const socialExists = socialPatientsList.some(p => p.name === beneficiary.name);
+              if (!socialExists) {
+                await handleSaveSocialPatient({
+                  name: beneficiary.name,
+                  birthDate: beneficiary.birthDate || '',
+                  naturalness: '',
+                  maritalStatus: 'SOLTEIRO',
+                  schooling: '',
+                  previousProfession: '',
+                  income: 0,
+                  benefits: [],
+                  benefitStatus: 'NAO_POSSUI',
+                  createdAt: new Date().toISOString()
+                });
+                showToast(`Beneficiário ${beneficiary.name} agora está sendo acompanhado pelo Serviço Social.`, 'success');
+              } else {
+                showToast(`Beneficiário ${beneficiary.name} já possui acompanhamento.`, 'success');
+              }
+            } catch (err) {
+              showToast('Erro ao iniciar acompanhamento', 'error');
+            }
+          }}
+        />
+      );
       case 'diaperProduction': return (
         <DiaperProductionSection 
           user={user}
@@ -9970,6 +10458,8 @@ export default function App() {
         user={user} 
         elderly={elderly}
         onCommandParsed={handleSmartCommand}
+        isVisible={showAIAssistant}
+        setIsVisible={setShowAIAssistant}
       />
 
       {isProfileOpen && (
@@ -9981,6 +10471,8 @@ export default function App() {
           onUpdate={(updatedUser) => setUser(updatedUser)}
           showToast={showToast}
           showConfirm={showConfirm}
+          showAIAssistant={showAIAssistant}
+          onToggleAIAssistant={toggleAIAssistant}
         />
       )}
 

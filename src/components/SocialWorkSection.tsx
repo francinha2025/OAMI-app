@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Heart, FileText, 
   Scale, BookOpen, ClipboardList, Share2,
@@ -58,6 +58,9 @@ interface SocialWorkSectionProps {
   onSaveRiskSituation: (data: Partial<SocialRiskSituation>) => Promise<void>;
   onSavePIA: (data: Partial<PIA>) => Promise<void>;
   onSavePhotos: (photos: string[], patientId: string, patientName: string, activityType: string, description?: string) => Promise<void>;
+  onDeleteRecord: (collectionName: string, id: string) => Promise<void>;
+  onDeletePatient: (id: string) => Promise<void>;
+  onUpdateProfile?: (data: Partial<UserType>) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
@@ -120,12 +123,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   onSaveRiskSituation,
   onSavePIA,
   onSavePhotos,
+  onDeleteRecord,
+  onDeletePatient,
+  onUpdateProfile,
   showToast,
   theme,
   setTheme,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const saved = localStorage.getItem('oami-social-tab');
+    return (saved as TabType) || 'dashboard';
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<string>('');
@@ -172,6 +181,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     setIsModalOpen(true);
     setSelectedPatient(null);
   };
+
+  useEffect(() => {
+    localStorage.setItem('oami-social-tab', activeTab);
+  }, [activeTab]);
 
   const handleDigitize = async (text: string) => {
     const type = modalType || activeTab;
@@ -572,8 +585,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 <input
                   type="number"
                   className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
-                  value={formData.income || ''}
-                  onChange={(e) => setFormData({ ...formData, income: parseFloat(e.target.value) })}
+                  value={formData.income === undefined || isNaN(formData.income) ? '' : formData.income}
+                  onChange={(e) => setFormData({ ...formData, income: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                 />
               </div>
               <div>
@@ -1408,7 +1421,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">CPF</th>
               <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">SUS</th>
               <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Certidão</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Residência</th>
+              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1433,6 +1446,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <td className="px-6 py-4">{getStatusBadge(doc.sus)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.birthCertificate)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.addressProof)}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => onDeleteRecord('socialDocumentations', doc.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -1476,6 +1498,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     Risco Abandono
                   </span>
                 )}
+                <button
+                  onClick={() => onDeleteRecord('socialFamilyTies', tie.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors ml-2"
+                  title="Excluir"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
 
               <div className="space-y-4">
@@ -1527,12 +1556,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <p className="text-sm text-gray-500">Status: {legal.situationStatus}</p>
                   </div>
                 </div>
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-bold uppercase",
-                  legal.isInterdicted ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-                )}>
-                  {legal.isInterdicted ? 'Interditado' : 'Não Interditado'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                    legal.isInterdicted ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                  )}>
+                    {legal.isInterdicted ? 'Interditado' : 'Não Interditado'}
+                  </span>
+                  <button
+                    onClick={() => onDeleteRecord('socialLegalSituations', legal.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1776,9 +1814,24 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                 </div>
 
-                <button className="w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-black hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors uppercase tracking-widest">
-                  Ver Prontuário Social
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setSelectedPatient(patient)}
+                    className="flex-1 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-black hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors uppercase tracking-widest"
+                  >
+                    Ver Prontuário Social
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeletePatient(patient.id);
+                    }}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))}
@@ -1815,9 +1868,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <p className="text-sm text-gray-500 dark:text-gray-400">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
-                <button className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                  <Download className="w-5 h-5 text-gray-400" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                    <Download className="w-5 h-5 text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteRecord('socialStudies', study.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1878,9 +1940,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
                     </div>
                   </div>
-                  <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase">
-                    {evolution.serviceType}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase">
+                      {evolution.serviceType}
+                    </span>
+                    <button
+                      onClick={() => onDeleteRecord('socialEvolutions', evolution.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-13">
                   <div>
@@ -1930,13 +2001,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     referral.status === 'EM_ANDAMENTO' ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-400"
                   )} />
                 </div>
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                  referral.status === 'CONCLUIDO' ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" :
-                  referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
-                )}>
-                  {safeReplace(referral.status, '_', ' ') || 'PENDENTE'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
+                    referral.status === 'CONCLUIDO' ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" :
+                    referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                  )}>
+                    {safeReplace(referral.status, '_', ' ') || 'PENDENTE'}
+                  </span>
+                  <button
+                    onClick={() => onDeleteRecord('socialReferrals', referral.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
               
               <h4 className="font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-tight">{referral.destination}</h4>
@@ -1978,7 +2058,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Idoso</th>
               <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Visitante</th>
               <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Parentesco</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Observações</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1991,6 +2071,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold">{visit.visitorName}</td>
                   <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{visit.kinship}</td>
                   <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">{visit.observations}</td>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={() => onDeleteRecord('socialFamilyVisits', visit.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -2029,14 +2118,23 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold uppercase",
-                    risk.severity === 'ALTA' ? "bg-red-100 text-red-700" :
-                    risk.severity === 'MEDIA' ? "bg-orange-100 text-orange-700" :
-                    "bg-blue-100 text-blue-700"
-                  )}>
-                    Gravidade {risk.severity}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                      risk.severity === 'ALTA' ? "bg-red-100 text-red-700" :
+                      risk.severity === 'MEDIA' ? "bg-orange-100 text-orange-700" :
+                      "bg-blue-100 text-blue-700"
+                    )}>
+                      Gravidade {risk.severity}
+                    </span>
+                    <button
+                      onClick={() => onDeleteRecord('socialRisks', risk.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                   <span className="text-xs text-gray-400">{safeFormat(risk.date, 'dd/MM/yyyy')}</span>
                 </div>
               </div>
@@ -2095,6 +2193,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                   >
                     <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteRecord('socialPIAs', pia.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -2158,14 +2263,23 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {patients.map((patient) => (
           <div key={patient.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
-                <Receipt className="w-6 h-6 text-green-600" />
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                  <Receipt className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900">{patient.name}</h4>
+                  <p className="text-xs text-gray-500">Renda: R$ {Number(patient.income || 0).toLocaleString()}</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-gray-900">{patient.name}</h4>
-                <p className="text-xs text-gray-500">Renda: R$ {Number(patient.income || 0).toLocaleString()}</p>
-              </div>
+              <button
+                onClick={() => onDeletePatient(patient.id)}
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                title="Excluir Idoso"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
             </div>
 
             <div className="space-y-3">

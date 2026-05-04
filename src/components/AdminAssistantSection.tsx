@@ -30,6 +30,7 @@ interface AdminAssistantSectionProps {
   events: CalendarEvent[];
   volunteers: Volunteer[];
   caregivers: Caregiver[];
+  adminUsers: User[];
   onNavigate: (tab: string) => void;
   showToast: (message: string, type?: 'success' | 'error') => void;
 }
@@ -41,6 +42,7 @@ export const AdminAssistantSection: React.FC<AdminAssistantSectionProps> = ({
   events,
   volunteers,
   caregivers,
+  adminUsers,
   onNavigate,
   showToast
 }) => {
@@ -50,7 +52,7 @@ export const AdminAssistantSection: React.FC<AdminAssistantSectionProps> = ({
     { label: 'Total Idosos', value: (elderly || []).length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Eventos/Mes', value: (events || []).length, icon: Calendar, color: 'text-purple-600', bg: 'bg-purple-50' },
     { label: 'Voluntários', value: (volunteers || []).length, icon: Briefcase, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Profissionais', value: 12, icon: Settings, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Profissionais', value: (caregivers || []).length + (volunteers || []).length + (adminUsers || []).filter(u => u.id !== 'system').length, icon: Settings, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   const quickActions = [

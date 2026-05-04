@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, ClipboardList, LineChart, 
   Dumbbell, Calendar, FileText, Settings, 
@@ -65,13 +65,17 @@ export const PhysioSection = ({
   onSaveEvolution,
   onSaveExercise,
   onSaveAppointment,
+  onDeleteRecord,
   onSavePhotos,
   theme,
   setTheme,
   onLogout,
   onUpdateProfile
 }: PhysioSectionProps) => {
-  const [activeSubTab, setActiveSubTab] = useState('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    const saved = localStorage.getItem('oami-physio-tab');
+    return saved || 'dashboard';
+  });
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
@@ -91,6 +95,10 @@ export const PhysioSection = ({
       (p.diagnosis || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [patients, searchQuery]);
+
+  useEffect(() => {
+    localStorage.setItem('oami-physio-tab', activeSubTab);
+  }, [activeSubTab]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

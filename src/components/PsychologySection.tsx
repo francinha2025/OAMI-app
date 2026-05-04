@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Brain, ClipboardList, 
   MessageSquare, Heart, Users2, Puzzle, Activity, 
@@ -69,7 +69,10 @@ type PsychTab =
   | 'alerts' | 'reports' | 'settings';
 
 export const PsychologySection = (props: PsychologySectionProps) => {
-  const [activeTab, setActiveTab] = useState<PsychTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<PsychTab>(() => {
+    const saved = localStorage.getItem('oami-psychology-tab');
+    return (saved as PsychTab) || 'dashboard';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({});
@@ -78,6 +81,10 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   const [modalType, setModalType] = useState<'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' | null>(null);
   const [editingData, setEditingData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('oami-psychology-tab', activeTab);
+  }, [activeTab]);
 
   const filteredPatients = useMemo(() => {
     return (props.patients || []).filter(p => 
@@ -349,6 +356,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onSelect={setSelectedPatientId}
                 onAdd={() => { setModalType('patient'); setIsModalOpen(true); }}
                 onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
+                onDelete={(id: string) => setDeleteConfirm({ id, type: 'patient' })}
               />
             )}
             {activeTab === 'initial' && (
@@ -540,7 +548,7 @@ const StatCard = ({ icon, label, value, color, alert }: { icon: React.ReactNode,
   </div>
 );
 
-const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, onEdit }: any) => (
+const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, onEdit, onDelete }: any) => (
   <div className="space-y-6">
     <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
       <div className="relative w-full md:w-96">
@@ -576,8 +584,11 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, 
               </div>
             </div>
             <div className="flex gap-1">
-              <button onClick={() => onEdit(patient)} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); onEdit(patient); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">
                 <Edit2 size={16} />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onDelete(patient.id); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors">
+                <Trash2 size={16} />
               </button>
             </div>
           </div>
@@ -1251,7 +1262,12 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
                 <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} />
-                <Input label="Idade" type="number" value={formData.age?.toString()} onChange={(v) => setFormData({ ...formData, age: v ? parseInt(v) : undefined })} />
+                <Input 
+                  label="Idade" 
+                  type="number" 
+                  value={formData.age === undefined || isNaN(formData.age) ? '' : formData.age.toString()} 
+                  onChange={(v) => setFormData({ ...formData, age: v === '' ? 0 : parseInt(v) })} 
+                />
                 <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} />
                 <Input label="Data de Entrada" type="date" value={formData.entryDate} onChange={(v) => setFormData({ ...formData, entryDate: v })} />
                 <Input label="Escolaridade" value={formData.schooling} onChange={(v) => setFormData({ ...formData, schooling: v })} />

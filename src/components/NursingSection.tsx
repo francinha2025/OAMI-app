@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Pill, Activity, 
   Bandage, ClipboardList, AlertTriangle, Calendar, 
@@ -77,7 +77,10 @@ export const NursingSection = (props: NursingSectionProps) => {
     dressings, evolutions, incidents, shifts, 
     users, professionals, avds, diaperChanges 
   } = props;
-  const [activeTab, setActiveTab] = useState<NursingTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NursingTab>(() => {
+    const saved = localStorage.getItem('oami-nursing-tab');
+    return (saved as NursingTab) || 'dashboard';
+  });
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -85,6 +88,10 @@ export const NursingSection = (props: NursingSectionProps) => {
   const [modalType, setModalType] = useState<'patient' | 'medication' | 'vital' | 'dressing' | 'evolution' | 'incident' | 'shift' | 'avd' | 'diaper' | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'patient' | 'evolution' | 'incident' | 'medication' | 'vital' | 'dressing' | 'shift' | 'avd' | 'diaper' } | null>(null);
   const [editingData, setEditingData] = useState<any | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('oami-nursing-tab', activeTab);
+  }, [activeTab]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -388,7 +395,7 @@ export const NursingSection = (props: NursingSectionProps) => {
           >
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'settings' && renderSettings()}
-            {activeTab === 'patients' && !selectedPatientId && <PatientsView patients={filteredPatients} onAdd={() => { setModalType('patient'); setIsModalOpen(true); }} onSelect={setSelectedPatientId} />}
+            {activeTab === 'patients' && !selectedPatientId && <PatientsView patients={filteredPatients} onAdd={() => { setModalType('patient'); setIsModalOpen(true); }} onSelect={setSelectedPatientId} onDelete={(id) => setDeleteConfirm({ id, type: 'patient' })} />}
             {activeTab === 'patients' && selectedPatientId && selectedPatient && (
               <PatientDetailView 
                 patient={selectedPatient} 
@@ -2312,7 +2319,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   </button>
 );
 
-const PatientsView = ({ patients, onAdd, onSelect }: { patients: NursingPatient[], onAdd: () => void, onSelect: (id: string) => void }) => (
+const PatientsView = ({ patients, onAdd, onSelect, onDelete }: { patients: NursingPatient[], onAdd: () => void, onSelect: (id: string) => void, onDelete?: (id: string) => void }) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <h2 className="text-2xl font-black text-gray-800 dark:text-white">Pacientes sob Cuidado</h2>
@@ -2323,7 +2330,7 @@ const PatientsView = ({ patients, onAdd, onSelect }: { patients: NursingPatient[
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
       {(patients || []).map(patient => (
-        <div key={patient.id} onClick={() => onSelect(patient.id)} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all cursor-pointer group">
+        <div key={patient.id} onClick={() => onSelect(patient.id)} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all cursor-pointer group relative">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 font-bold text-xl overflow-hidden">
               {patient.photoUrl ? (
@@ -2332,8 +2339,21 @@ const PatientsView = ({ patients, onAdd, onSelect }: { patients: NursingPatient[
                 patient.name.charAt(0)
               )}
             </div>
-            <div>
-              <h3 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors">{patient.name}</h3>
+            <div className="flex-1">
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors">{patient.name}</h3>
+                {onDelete && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(patient.id);
+                    }}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-gray-500">{patient.age} anos • {patient.diagnosis}</p>
             </div>
           </div>

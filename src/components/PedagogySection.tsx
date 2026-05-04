@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Brain, ClipboardList, 
   Palette, Music, Gamepad2, BookOpen, Users2,
@@ -97,21 +97,31 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   onSavePlan,
   onSaveLifeHistory,
   onSavePhotos,
+  onDeleteRecord,
+  onDeletePatient,
   showToast,
   theme,
   setTheme,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const saved = localStorage.getItem('oami-pedagogy-tab');
+    return (saved as TabType) || 'dashboard';
+  });
   const [residentSubTab, setResidentSubTab] = useState<'profile' | 'history' | 'assessment' | 'plan'>('profile');
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [modalType, setModalType] = useState<string>('');
   const [selectedPatient, setSelectedPatient] = useState<PedagogyPatient | null>(null);
   const [formData, setFormData] = useState<any>({});
   const [editingData, setEditingData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('oami-pedagogy-tab', activeTab);
+  }, [activeTab]);
 
   const onClose = () => setIsModalOpen(false);
 
@@ -167,6 +177,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
       const type = modalType || activeTab;
       const { photos, ...data } = formData;
@@ -216,8 +227,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       setModalType('');
       setFormData({});
       setEditingData(null);
+      showToast('Registro salvo com sucesso!');
     } catch (err) {
       console.error(err);
+      showToast('Erro ao salvar registro. Verifique os dados.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -261,8 +276,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <input
                   type="number"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                  value={formData.age || ''}
-                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) })}
+                  value={formData.age === undefined || isNaN(formData.age) ? '' : formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                 />
               </div>
               <div>
@@ -349,8 +364,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Registro')}
               </button>
             </div>
           </form>
@@ -412,8 +432,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Registro')}
               </button>
             </div>
           </form>
@@ -527,8 +552,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-none hover:bg-purple-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Registro'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-purple-200 dark:shadow-none hover:bg-purple-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Registro')}
               </button>
             </div>
           </form>
@@ -628,8 +658,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-pink-600 text-white rounded-2xl font-bold shadow-lg shadow-pink-200 dark:shadow-none hover:bg-pink-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Atividade'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-pink-600 text-white rounded-2xl font-bold shadow-lg shadow-pink-200 dark:shadow-none hover:bg-pink-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Atividade')}
               </button>
             </div>
           </form>
@@ -690,8 +725,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Estimulação'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Estimulação')}
               </button>
             </div>
           </form>
@@ -771,8 +811,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={onClose} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Registro Social'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Registro Social')}
               </button>
             </div>
           </form>
@@ -835,8 +880,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 md:py-4 bg-gray-50 dark:bg-gray-800 text-gray-500 rounded-2xl font-bold hover:bg-gray-100 transition-all">
                 Cancelar
               </button>
-              <button type="submit" className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">
-                {editingData ? 'Salvar Edição' : 'Salvar Plano'}
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="flex-[2] py-3 md:py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                {isLoading ? 'Salvando...' : (editingData ? 'Salvar Edição' : 'Salvar Plano')}
               </button>
             </div>
           </form>
@@ -1091,19 +1141,43 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </h3>
           <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={(socialParticipations || []).slice(-7)}>
-                <defs>
-                  <linearGradient id="colorParticipation" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="date" tickFormatter={(str) => format(parseISO(str), 'dd/MM')} />
-                <YAxis />
-                <Tooltip />
-                <Area type="monotone" dataKey="interactionLevel" stroke="#3b82f6" fillOpacity={1} fill="url(#colorParticipation)" />
-              </AreaChart>
+                <AreaChart data={(socialParticipations || []).slice(-7).map(s => ({
+                  ...s,
+                  interactionValue: s.interactionLevel === 'ALTO' ? 3 : s.interactionLevel === 'MEDIO' ? 2 : 1
+                }))}>
+                  <defs>
+                    <linearGradient id="colorParticipation" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(str) => {
+                      try {
+                        return format(parseISO(str), 'dd/MM');
+                      } catch (e) {
+                        return '--/--';
+                      }
+                    }}
+                    tick={{fill: '#64748b', fontSize: 10, fontWeight: 'bold'}}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    domain={[0, 3]} 
+                    ticks={[1, 2, 3]}
+                    tickFormatter={(val) => val === 3 ? 'Alta' : val === 2 ? 'Média' : 'Baixa'}
+                    tick={{fill: '#64748b', fontSize: 10, fontWeight: 'bold'}}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Area type="monotone" dataKey="interactionValue" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorParticipation)" />
+                </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -1209,21 +1283,23 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <div className="p-8 bg-gradient-to-r from-blue-700 to-blue-800 text-white shadow-lg">
               <div className="flex items-center gap-6">
                 <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-4 border-white/30 overflow-hidden shadow-inner">
-                  {selectedPatient.photoUrl ? (
+                  {selectedPatient?.photoUrl ? (
                     <img src={selectedPatient.photoUrl} alt={selectedPatient.name} className="w-full h-full object-cover" />
                   ) : (
                     <UserIcon className="w-12 h-12 text-white" />
                   )}
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black">{selectedPatient.name}</h2>
-                  <p className="text-blue-50 font-bold mt-1">{selectedPatient.age} anos • {selectedPatient.schooling}</p>
+                  <h2 className="text-3xl font-black">{selectedPatient?.name || 'N/A'}</h2>
+                  <p className="text-blue-50 font-bold mt-1">
+                    {selectedPatient?.age ? `${selectedPatient.age} anos` : 'Idade não informada'} • {selectedPatient?.schooling || 'Escolaridade não informada'}
+                  </p>
                   <div className="flex gap-2 mt-4">
                     <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-black uppercase tracking-wider border border-white/20">
-                      Cognitivo: {selectedPatient.cognitiveLevel}
+                      Cognitivo: {selectedPatient?.cognitiveLevel || 'N/A'}
                     </span>
                     <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-black uppercase tracking-wider border border-white/20">
-                      {safeReplace(selectedPatient.literacyLevel, '_', ' ')}
+                      {safeReplace(selectedPatient?.literacyLevel || '', '_', ' ')}
                     </span>
                   </div>
                 </div>
@@ -1280,9 +1356,9 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   </div>
                   <div>
                     <h4 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-3">Limitações Cognitivas</h4>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                      <p className="text-gray-900 dark:text-gray-200 font-bold leading-relaxed">{selectedPatient.cognitiveLimitations || 'Nenhuma limitação registrada.'}</p>
-                    </div>
+                      <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <p className="text-gray-900 dark:text-gray-200 font-bold leading-relaxed">{selectedPatient?.cognitiveLimitations || 'Nenhuma limitação registrada.'}</p>
+                      </div>
                     <button 
                       onClick={() => { openModal('patient', selectedPatient); setSelectedPatient(null); }}
                       className="mt-6 flex items-center gap-2 text-gray-900 dark:text-white hover:text-blue-700 font-black text-sm"
@@ -1303,22 +1379,31 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                           <Lightbulb className="w-4 h-4" />
                           Principais Lembranças
                         </h5>
-                        <p className="text-gray-900 dark:text-white leading-relaxed italic font-bold">"{history.memories}"</p>
+                        <p className="text-gray-900 dark:text-white leading-relaxed italic font-bold">"{history.memories || 'Sem memórias registradas.'}"</p>
                       </div>
                       <div>
                         <h5 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider mb-4 flex items-center gap-2">
                           <FileText className="w-4 h-4" />
                           Histórias Marcantes
                         </h5>
-                        <p className="text-gray-900 dark:text-white leading-relaxed font-bold">{history.stories}</p>
+                        <p className="text-gray-900 dark:text-white leading-relaxed font-bold">{history.stories || 'Sem histórias registradas.'}</p>
                       </div>
-                      <button 
-                        onClick={() => openModal('history', history)}
-                        className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-bold text-sm"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                        Editar História
-                      </button>
+                      <div className="flex gap-4">
+                        <button 
+                          onClick={() => openModal('history', history)}
+                          className="flex items-center gap-2 text-orange-600 hover:text-orange-700 font-bold text-sm"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Editar História
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm({ id: history.id, type: 'history' })}
+                          className="flex items-center gap-2 text-red-600 hover:text-red-700 font-bold text-sm"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Excluir História
+                        </button>
+                      </div>
                     </div>
 
                     <div className="relative pl-8 border-l-2 border-black">
@@ -1361,13 +1446,22 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       <h5 className="text-sm font-bold text-gray-400 uppercase mb-3">Observações da Avaliação</h5>
                       <p className="text-gray-600 dark:text-gray-300">{assessment.observations || 'Sem observações adicionais.'}</p>
                     </div>
-                    <button 
-                      onClick={() => openModal('assessment', assessment)}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Refazer Avaliação
-                    </button>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => openModal('assessment', assessment)}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Refazer Avaliação
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: assessment.id, type: 'assessment' })}
+                        className="flex items-center gap-2 text-red-600 hover:text-red-700 font-bold text-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir Avaliação
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -1389,11 +1483,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div>
                         <h5 className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Objetivos Pedagógicos</h5>
-                        <p className="text-gray-600 leading-relaxed">{plan.objectives}</p>
+                        <p className="text-gray-900 dark:text-gray-200 leading-relaxed font-bold italic">"{plan.objectives || 'Sem objetivos definidos.'}"</p>
                       </div>
                       <div>
                         <h5 className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">Estratégias</h5>
-                        <p className="text-gray-600 leading-relaxed">{plan.strategies}</p>
+                        <p className="text-gray-900 dark:text-gray-200 leading-relaxed font-bold">"{plan.strategies || 'Sem estratégias definidas.'}"</p>
                       </div>
                     </div>
                     <div>
@@ -1406,13 +1500,22 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                         ))}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => openModal('plan', plan)}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Atualizar Plano
-                    </button>
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => openModal('plan', plan)}
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                        Atualizar Plano
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: plan.id, type: 'plan' })}
+                        className="flex items-center gap-2 text-red-600 hover:text-red-700 font-bold text-sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir Plano
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -1532,7 +1635,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderActivitiesTab = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-gray-900 dark:text-white">Oficinas & Atividades</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white">Oficinas & Atividades Pedagógicas</h3>
         <button
           onClick={() => openModal('activity')}
           className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors"
@@ -1682,6 +1785,37 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="mt-8 space-y-4">
+            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Estimulações</h5>
+            <div className="space-y-3">
+              {(stimulationTrackings || []).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((stim) => {
+                const patient = (patients || []).find(p => p.id === stim.patientId);
+                return (
+                  <div key={stim.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-black text-gray-900">{patient?.name}</p>
+                      <p className="text-xs text-gray-500">{format(parseISO(stim.date), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <button 
+                        onClick={() => openModal('stimulation', stim)}
+                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: stim.id, type: 'stimulation' })}
+                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
@@ -1725,6 +1859,37 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <span className="text-xs font-bold text-gray-500">Baixa</span>
             </div>
           </div>
+
+          <div className="mt-8 space-y-4">
+            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Participações</h5>
+            <div className="space-y-3">
+              {(socialParticipations || []).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((soc) => {
+                const patient = (patients || []).find(p => p.id === soc.patientId);
+                return (
+                  <div key={soc.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-black text-gray-900">{patient?.name}</p>
+                      <p className="text-xs text-gray-500">{format(parseISO(soc.date), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <button 
+                        onClick={() => openModal('social', soc)}
+                        className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: soc.id, type: 'social' })}
+                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1736,7 +1901,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         {[
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'residents', label: 'Residentes', icon: Users },
-          { id: 'activities', label: 'Oficinas', icon: Palette },
+          { id: 'activities', label: 'Oficinas & Atividades', icon: Palette },
           { id: 'monitoring', label: 'Monitoramento', icon: TrendingUp },
           { id: 'reports', label: 'Relatórios', icon: FileText },
           { id: 'settings', label: 'Configurações', icon: Settings },
@@ -1822,6 +1987,59 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white dark:bg-gray-900 p-8 rounded-3xl max-w-md w-full shadow-2xl border border-gray-100 dark:border-gray-800"
+          >
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mb-6">
+              <Trash2 size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">Excluir Registro?</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-8 font-medium">Esta ação não pode ser desfeita. O registro será removido permanentemente.</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-6 py-3 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 font-bold rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    const collections: Record<string, string> = {
+                      patient: 'pedagogyPatients',
+                      assessment: 'pedagogyInitialAssessments',
+                      evolution: 'pedagogyEvolutions',
+                      activity: 'pedagogyActivities',
+                      stimulation: 'pedagogyStimulationTrackings',
+                      social: 'pedagogySocialParticipations',
+                      plan: 'pedagogyIndividualPlans',
+                      history: 'pedagogyLifeHistories',
+                      resident: 'pedagogyPatients'
+                    };
+                    
+                    const collectionName = collections[deleteConfirm.type];
+                    if (collectionName) {
+                      await onDeleteRecord(collectionName, deleteConfirm.id);
+                    }
+                    setDeleteConfirm(null);
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transition-all"
+              >
+                Excluir
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Modal */}
       {isModalOpen && (

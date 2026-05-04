@@ -47,11 +47,13 @@ export interface Donor {
 export interface DiaperDonation {
   id: string;
   beneficiaryName: string;
+  beneficiaryId?: string;
   date: string;
   quantity: number;
   size: 'TAMANHO_UNICO';
   observations?: string;
   registeredBy: string;
+  createdAt?: string;
 }
 
 export interface DiaperStock {

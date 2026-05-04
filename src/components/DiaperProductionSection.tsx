@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Package, 
@@ -74,7 +74,14 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   goals,
   showToast
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const saved = localStorage.getItem('oami-diaper-tab');
+    return (saved as TabType) || 'dashboard';
+  });
+  useEffect(() => {
+    localStorage.setItem('oami-diaper-tab', activeTab);
+  }, [activeTab]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -172,11 +179,9 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     e.preventDefault();
     setLoading(true);
     try {
-      if (parseInt(rawForm.quantity) <= 0) throw new Error('Quantidade deve ser superior a zero');
-      
       const payload = {
         ...rawForm,
-        quantity: parseInt(rawForm.quantity),
+        quantity: parseInt(rawForm.quantity) || 0,
         createdAt: new Date().toISOString()
       };
       
@@ -195,16 +200,14 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     e.preventDefault();
     setLoading(true);
     try {
-      const inVal = parseInt(wipForm.quantityIn);
-      const outVal = parseInt(wipForm.quantityOut);
-      if (outVal > inVal) throw new Error('Quantidade de saída não pode ser maior que a entrada');
-      if (inVal - outVal > 0 && !wipForm.wasteReason) throw new Error('Motivo da perda é obrigatório quando há descarte');
+      const inVal = parseInt(wipForm.quantityIn) || 0;
+      const outVal = parseInt(wipForm.quantityOut) || 0;
 
       const payload = {
         ...wipForm,
         quantityIn: inVal,
         quantityOut: outVal,
-        wasteAmount: inVal - outVal,
+        wasteAmount: Math.max(0, inVal - outVal),
         createdAt: new Date().toISOString()
       };
 
@@ -225,7 +228,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     try {
       const payload = {
         ...finalForm,
-        quantityPackaged: parseInt(finalForm.quantityPackaged),
+        quantityPackaged: parseInt(finalForm.quantityPackaged) || 0,
         createdAt: new Date().toISOString()
       };
 
@@ -246,7 +249,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     try {
       const payload = {
         ...goalForm,
-        targetQuantity: parseInt(goalForm.targetQuantity),
+        targetQuantity: parseInt(goalForm.targetQuantity) || 0,
         updatedAt: new Date().toISOString()
       };
 
@@ -698,8 +701,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                 <label className="text-xs font-bold text-gray-400 uppercase">Data da Atividade</label>
                 <input 
                   type="date"
-                  max={format(new Date(), 'yyyy-MM-dd')}
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 font-bold"
                   value={rawForm.date}
                   onChange={e => setRawForm({...rawForm, date: e.target.value})}
                 />
