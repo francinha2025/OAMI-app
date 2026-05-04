@@ -1222,6 +1222,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
     </div>
   );
 
+  // Auxiliar para formatação de data segura
+  const safeDateFormat = (dateStr: string | null | undefined, formatStr: string = 'dd/MM/yyyy') => {
+    if (!dateStr) return '--/--';
+    try {
+      const parsed = parseISO(dateStr);
+      if (isNaN(parsed.getTime())) return '--/--';
+      return format(parsed, formatStr);
+    } catch (e) {
+      return '--/--';
+    }
+  };
+
   const renderDashboard = () => (
     <div className="space-y-6">
       {/* Stats Grid */}
@@ -1375,7 +1387,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-900 dark:text-white truncate">{patient?.name || 'Desconhecido'}</p>
-                    <p className="text-xs text-gray-500 truncate">{ev.activityTitle} • {ev.date ? format(parseISO(ev.date), 'dd/MM') : ''}</p>
+                    <p className="text-xs text-gray-500 truncate">{ev.activityTitle} • {safeDateFormat(ev.date, 'dd/MM')}</p>
                   </div>
                   <div className={cn(
                     "px-2 py-1 rounded-md text-[10px] font-black",
@@ -1435,6 +1447,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       const assessment = (assessments || []).find(a => a.patientId === selectedPatient.id);
       const plan = (individualPlans || []).find(p => p.patientId === selectedPatient.id);
 
+      const subTabs = [
+        { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
+        { id: 'history', label: 'História de Vida', icon: History },
+        { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
+        { id: 'plan', label: 'Plano (PPI)', icon: Target },
+      ];
+
       return (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -1481,35 +1500,25 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               </div>
             </div>
 
-                  <div className="flex border-b border-gray-200 dark:border-gray-800 px-8 bg-gray-50/50 dark:bg-gray-900/50 overflow-x-auto">
-            {(Array.isArray([
-              { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
-              { id: 'history', label: 'História de Vida', icon: History },
-              { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
-              { id: 'plan', label: 'Plano (PPI)', icon: Target },
-            ]) ? [
-              { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
-              { id: 'history', label: 'História de Vida', icon: History },
-              { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
-              { id: 'plan', label: 'Plano (PPI)', icon: Target },
-            ] : []).map((sub) => {
-              const Icon = sub.icon;
-              return (
-              <button
-                key={sub.id}
-                onClick={() => setResidentSubTab(sub.id as any)}
-                className={cn(
-                  "flex items-center gap-2 px-6 py-4 text-sm font-black transition-all border-b-2 whitespace-nowrap",
-                  residentSubTab === sub.id 
-                    ? "border-blue-600 text-blue-900 dark:text-blue-400 bg-white dark:bg-gray-900" 
-                    : "border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                )}
-              >
-                  <Icon className="w-4 h-4" />
-                  {sub.label}
-                </button>
-              );
-            })}
+            <div className="flex border-b border-gray-200 dark:border-gray-800 px-8 bg-gray-50/50 dark:bg-gray-900/50 overflow-x-auto">
+              {subTabs.map((sub) => {
+                const Icon = sub.icon;
+                return (
+                  <button
+                    key={sub.id}
+                    onClick={() => setResidentSubTab(sub.id as any)}
+                    className={cn(
+                      "flex items-center gap-2 px-6 py-4 text-sm font-black transition-all border-b-2 whitespace-nowrap",
+                      residentSubTab === sub.id 
+                        ? "border-blue-600 text-blue-900 dark:text-blue-400 bg-white dark:bg-gray-900" 
+                        : "border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {sub.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="p-8">
@@ -1846,7 +1855,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div>
                       <h5 className="font-black text-gray-900 dark:text-white">{activity.title}</h5>
                       <p className="text-sm text-gray-900 dark:text-gray-400 font-black">
-                        {format(parseISO(activity.date), 'dd/MM/yyyy')} às {activity.time}
+                        {safeDateFormat(activity.date)} às {activity.time}
                       </p>
                     </div>
                   </div>
@@ -1898,7 +1907,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <div>
                       <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
                       <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">
-                        {evolution.activityTitle} • {evolution.date ? format(parseISO(evolution.date), 'dd/MM') : ''}{evolution.time ? ` às ${evolution.time}` : ''}
+                        {evolution.activityTitle} • {safeDateFormat(evolution.date, 'dd/MM')}{evolution.time ? ` às ${evolution.time}` : ''}
                       </p>
                     </div>
                 </div>
@@ -1909,7 +1918,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   )}>
                     {evolution.participation}
                   </span>
-                  <p className="text-[10px] text-gray-900 dark:text-gray-400 mt-1 font-black">{format(parseISO(evolution.date), 'dd/MM HH:mm')}</p>
+                  <p className="text-[10px] text-gray-900 dark:text-gray-400 mt-1 font-black">{safeDateFormat(evolution.date, 'dd/MM HH:mm')}</p>
                 </div>
                 <div className="flex gap-1 ml-4">
                   <button 
@@ -1985,7 +1994,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <div key={stim.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{format(parseISO(stim.date), 'dd/MM/yyyy')}{stim.time ? ` às ${stim.time}` : ''}</p>
+                      <p className="text-xs text-gray-500">{safeDateFormat(stim.date)}{stim.time ? ` às ${stim.time}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2">
                        <button 
@@ -2063,7 +2072,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   <div key={soc.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{format(parseISO(soc.date), 'dd/MM/yyyy')}{soc.time ? ` às ${soc.time}` : ''}</p>
+                      <p className="text-xs text-gray-500">{safeDateFormat(soc.date)}{soc.time ? ` às ${soc.time}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2">
                        <button 
