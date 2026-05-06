@@ -1138,7 +1138,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
                         "transition-transform group-hover:scale-110",
                         activeTab === item.id ? "text-white" : "text-gray-400 group-hover:text-green-600"
                       )} />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate" translate="no">{item.label}</span>
                     </button>
                   ))}
                 </div>
@@ -2338,7 +2338,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                       isEditModalOpen ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"
                     )}
                   >
-                    {loading ? 'Salvando...' : isEditModalOpen ? 'Salvar Alterações' : 'Cadastrar Acolhido'}
+                    <span translate="no">{loading ? 'Salvando...' : isEditModalOpen ? 'Salvar Alterações' : 'Cadastrar Acolhido'}</span>
                   </button>
                 </div>
               </form>
@@ -2348,7 +2348,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
       </AnimatePresence>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Acompanhamento de Idosos</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white" translate="no">Acompanhamento de Idosos</h2>
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
@@ -2366,7 +2366,7 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all shadow-md"
             >
               <Plus size={18} />
-              Novo Acolhido
+              <span translate="no">Novo Acolhido</span>
             </button>
             <button 
               onClick={generateElderlyListPDF}

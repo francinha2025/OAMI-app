@@ -110,7 +110,7 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
     <div className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-gray-400 group-hover:text-green-600")}>
       <Icon size={18} />
     </div>
-    {label}
+    <span translate="no">{label}</span>
   </button>
 );
 
@@ -1779,7 +1779,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderActivitiesTab = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-gray-900 dark:text-white">Oficinas & Atividades Pedagógicas</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white" translate="no">Oficinas & Atividades Pedagógicas</h3>
         <button
           onClick={() => openModal('activity')}
           className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors"
@@ -1898,7 +1898,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderMonitoring = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-gray-900 dark:text-white">Acompanhamento de Progresso</h3>
+        <h3 className="text-xl font-black text-gray-900 dark:text-white" translate="no">Acompanhamento de Progresso</h3>
         <div className="flex gap-2">
           <button
             onClick={() => openModal('stimulation')}
@@ -2296,7 +2296,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 md:p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-gray-900 rounded-[32px] md:rounded-[40px] w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden shadow-2xl border border-transparent dark:border-gray-800 transition-all flex flex-col">
             <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-white dark:bg-gray-900 sticky top-0 z-10">
-              <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2" translate="no">
                 {modalTitles[modalType || activeTab] || 'Novo Registro Pedagógico'}
                 {isExtracting && (
                   <span className="flex items-center gap-1 text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full animate-pulse">
