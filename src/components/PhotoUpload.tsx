@@ -12,11 +12,12 @@ interface PhotoUploadProps {
 }
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({ 
-  photos, 
+  photos: propPhotos, 
   onChange, 
   label = "Fotos da Atividade / Registro",
   maxPhotos = 5
 }) => {
+  const photos = propPhotos || [];
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

@@ -584,13 +584,13 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onAddAVD={() => { setModalType('avd'); setIsModalOpen(true); }}
                 onAddDiaper={() => { setModalType('diaper'); setIsModalOpen(true); }}
                 onAddDressing={() => { setModalType('dressing'); setIsModalOpen(true); }}
-                onEditPatient={(p) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); setSelectedPatientId(null); }}
+                onEditPatient={(p) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
                 onDeletePatient={(id) => setDeleteConfirm({ id, type: 'patient' })}
-                onEditMedication={(m) => { setEditingData(m); setModalType('medication'); setIsModalOpen(true); setSelectedPatientId(null); }}
+                onEditMedication={(m) => { setEditingData(m); setModalType('medication'); setIsModalOpen(true); }}
                 onDeleteMedication={(id) => setDeleteConfirm({ id, type: 'medication' })}
-                onEditVital={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); setSelectedPatientId(null); }}
+                onEditVital={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); }}
                 onDeleteVital={(id) => setDeleteConfirm({ id, type: 'vital' })}
-                onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); setSelectedPatientId(null); }}
+                onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDeleteEvolution={(id) => setDeleteConfirm({ id, type: 'evolution' })}
               />
             )}
@@ -1091,6 +1091,7 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
     status: 'PENDENTE',
     photos: [],
     patientId: initialPatientId || '',
+    content: '',
     woundType: '',
     location: '',
     aspect: '',
@@ -1142,10 +1143,10 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
       switch (type) {
         case 'patient': await onSavePatient(data, id); break;
         case 'medication': await onSaveMedication({ ...data, registeredBy: user.name }, id); break;
-        case 'vital': await onSaveVitalSigns(data, id); break;
-        case 'dressing': await onSaveDressing(data, id); break;
-        case 'evolution': await onSaveEvolution(data, id); break;
-        case 'incident': await onSaveIncident(data, id); break;
+        case 'vital': await onSaveVitalSigns({ ...data, registeredBy: user.name }, id); break;
+        case 'dressing': await onSaveDressing({ ...data, registeredBy: user.name }, id); break;
+        case 'evolution': await onSaveEvolution({ ...data, registeredBy: data.registeredBy || user.name }, id); break;
+        case 'incident': await onSaveIncident({ ...data, registeredBy: user.name }, id); break;
         case 'shift': await onSaveShift(data, id); break;
         case 'avd': await onSaveAVD(data, id); break;
         case 'diaper': await onSaveDiaperChange(data, id); break;
@@ -1520,7 +1521,10 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
 
           {type === 'evolution' && (
             <div className="space-y-8">
-              <Input label="Data da Evolução" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <Input label="Data da Evolução" type="date" value={formData.date} onChange={(v) => setFormData({ ...formData, date: v })} />
+                <Input label="Hora" type="time" value={formData.time} onChange={(v) => setFormData({ ...formData, time: v })} />
+              </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-gray-400 uppercase ml-1">Evolução</label>
