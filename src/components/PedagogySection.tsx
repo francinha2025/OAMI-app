@@ -1450,6 +1450,21 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     <p className="text-sm text-gray-900 dark:text-gray-400 font-black">
                       {activity.time} • {(activity.participants || []).length} participantes
                     </p>
+                    {(activity.participants || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {activity.participants.slice(0, 3).map(pId => {
+                          const p = (patients || []).find(pat => pat.id === pId);
+                          return (
+                            <span key={pId} className="px-1.5 py-0.5 bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded text-[9px] font-bold border border-gray-100 dark:border-gray-600">
+                              {p?.name?.split(' ')[0]}
+                            </span>
+                          );
+                        })}
+                        {activity.participants.length > 3 && (
+                          <span className="text-[9px] font-bold text-gray-400">+{activity.participants.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button className="text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold text-sm">Ver Detalhes</button>
@@ -1820,6 +1835,23 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   </span>
                 </div>
                 <p className="text-sm text-gray-900 dark:text-gray-300 mb-4 font-black leading-relaxed">{activity.description}</p>
+                
+                {(activity.participants || []).length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Participantes:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {activity.participants.map(pId => {
+                        const p = (patients || []).find(pat => pat.id === pId);
+                        return (
+                          <span key={pId} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md text-[10px] font-bold border border-gray-200 dark:border-gray-700">
+                            {p?.name || 'Idoso não encontrado'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <button 
                     onClick={() => openModal('evolution', { activityTitle: activity.title })}

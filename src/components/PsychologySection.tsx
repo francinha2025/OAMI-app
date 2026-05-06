@@ -158,6 +158,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               {props.patients.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
+              <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
             </select>
           </div>
         </div>
@@ -730,6 +731,7 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete,
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -737,12 +739,16 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete,
       </button>
     </div>
     <div className="space-y-4">
-      {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment) => {
+      {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === a.patientId);
+        const displayName = a.patientId === 'OUTRO' 
+          ? `${a.targetName || 'Outro'} (${a.targetType?.replace('_', ' ') || 'Comunidade'})`
+          : patient?.name;
+
         return (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-2">
-              <h4 className="font-bold text-blue-600">{patient?.name}</h4>
+              <h4 className="font-bold text-blue-600">{displayName}</h4>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{a.date}</span>
                 <div className="flex gap-1">
@@ -791,6 +797,7 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, 
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -800,12 +807,16 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, 
     <div className="space-y-6">
       {(evolutions || []).filter((e: any) => !filter || e.patientId === filter).map((e: PsychEvolution) => {
         const patient = (patients || []).find((p: any) => p.id === e.patientId);
+        const displayName = e.patientId === 'OUTRO' 
+          ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
+          : patient?.name;
+
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
             <div className="absolute left-[-4px] top-0 w-2 h-2 rounded-full bg-blue-600" />
             <div className="flex justify-between items-start mb-2">
               <div>
-                <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
+                <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
                 <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
               </div>
               <div className="flex gap-2">
@@ -838,6 +849,7 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, fil
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -856,11 +868,15 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, fil
           </tr>
         </thead>
         <tbody className="text-sm">
-          {(appointments || []).filter((app: any) => !filter || app.patientId === filter).map((app: PsychAppointment) => {
+          {(appointments || []).filter((app: any) => !filter || app.patientId === filter).map((app: PsychAppointment & { targetName?: string, targetType?: string }) => {
             const patient = (patients || []).find((p: any) => p.id === app.patientId);
+            const displayName = app.patientId === 'OUTRO' 
+              ? `${app.targetName || 'Outro'} (${app.targetType?.replace('_', ' ') || 'Comunidade'})`
+              : patient?.name;
+
             return (
               <tr key={app.id} className="border-t border-gray-50 dark:border-gray-800">
-                <td className="py-4 font-bold">{patient?.name}</td>
+                <td className="py-4 font-bold">{displayName}</td>
                 <td className="py-4 text-gray-500">{app.date} {app.time}</td>
                 <td className="py-4">
                   <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-lg text-[10px] font-bold uppercase">
@@ -905,6 +921,7 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, 
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -912,8 +929,12 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, 
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(monitorings || []).filter((m: any) => !filter || m.patientId === filter).map((m: PsychEmotionalMonitoring) => {
+      {(monitorings || []).filter((m: any) => !filter || m.patientId === filter).map((m: PsychEmotionalMonitoring & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === m.patientId);
+        const displayName = m.patientId === 'OUTRO' 
+          ? `${m.targetName || 'Outro'} (${m.targetType?.replace('_', ' ') || 'Comunidade'})`
+          : patient?.name;
+
         return (
           <div key={m.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-start mb-4">
@@ -926,7 +947,7 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, 
                   {m.wellBeing === 'FELIZ' ? <Smile size={20} /> : m.wellBeing === 'NEUTRO' ? <Meh size={20} /> : <Frown size={20} />}
                 </div>
                 <div>
-                  <h4 className="font-bold">{patient?.name}</h4>
+                  <h4 className="font-bold">{displayName}</h4>
                   <p className="text-xs text-gray-500">{m.date}</p>
                 </div>
               </div>
@@ -982,6 +1003,7 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -989,8 +1011,12 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
       </button>
     </div>
     <div className="space-y-4">
-      {(bonds || []).filter((b: any) => !filter || b.patientId === filter).map((b: PsychFamilyBond) => {
+      {(bonds || []).filter((b: any) => !filter || b.patientId === filter).map((b: PsychFamilyBond & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === b.patientId);
+        const displayName = b.patientId === 'OUTRO' 
+          ? `${b.targetName || 'Outro'} (${b.targetType?.replace('_', ' ') || 'Comunidade'})`
+          : patient?.name;
+
         return (
           <div key={b.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-start gap-4">
             <div className={cn(
@@ -1001,7 +1027,7 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start mb-1">
-                <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
+                <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400">{b.date}</span>
                   <div className="flex gap-1">
@@ -1037,6 +1063,7 @@ const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter,
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -1090,6 +1117,7 @@ const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter,
           {(patients || []).map((p: any) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
+          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -1109,11 +1137,15 @@ const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter,
           </tr>
         </thead>
         <tbody className="text-sm">
-          {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychCognitionAssessment) => {
+          {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychCognitionAssessment & { targetName?: string, targetType?: string }) => {
             const patient = (patients || []).find((p: any) => p.id === a.patientId);
+            const displayName = a.patientId === 'OUTRO' 
+              ? `${a.targetName || 'Outro'} (${a.targetType?.replace('_', ' ') || 'Comunidade'})`
+              : patient?.name;
+
             return (
               <tr key={a.id} className="border-t border-gray-50 dark:border-gray-800">
-                <td className="py-4 font-bold">{patient?.name}</td>
+                <td className="py-4 font-bold">{displayName}</td>
                 <td className="py-4 text-gray-500">{a.date}</td>
                 <td className="py-4">
                   <CognitionBadge status={a.memory} />
@@ -1314,7 +1346,10 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
     }
   };
 
-  if (!isOpen) return null;
+  const patientOptions = useMemo(() => [
+    ...(patients || []).map((p: any) => ({ value: p.id, label: p.name })),
+    { value: 'OUTRO', label: 'OUTRO (Comunidade / Cuidador)' }
+  ], [patients]);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4">
@@ -1394,7 +1429,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
             {type === 'initial' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                
+                {formData.patientId === 'OUTRO' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
+                    <Select 
+                      label="Tipo de Público" 
+                      value={formData.targetType} 
+                      options={[
+                        { value: 'IDOSO_COMUNIDADE', label: 'Idoso da Comunidade' },
+                        { value: 'CUIDADOR_INSTITUICAO', label: 'Cuidador da Instituição' },
+                        { value: 'CUIDADOR_COMUNIDADE', label: 'Cuidador da Comunidade' }
+                      ]} 
+                      onChange={(v) => setFormData({ ...formData, targetType: v })} 
+                    />
+                    <Input label="Nome / Identificação" value={formData.targetName} onChange={(v) => setFormData({ ...formData, targetName: v })} />
+                  </div>
+                )}
+
                 <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                 <div className="grid grid-cols-2 gap-6">
                   <Input label="Estado Emocional" value={formData.emotionalState} onChange={(v) => setFormData({ ...formData, emotionalState: v })} />
@@ -1421,7 +1473,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
             {type === 'evolution' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                
+                {formData.patientId === 'OUTRO' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
+                    <Select 
+                      label="Tipo de Público" 
+                      value={formData.targetType} 
+                      options={[
+                        { value: 'IDOSO_COMUNIDADE', label: 'Idoso da Comunidade' },
+                        { value: 'CUIDADOR_INSTITUICAO', label: 'Cuidador da Instituição' },
+                        { value: 'CUIDADOR_COMUNIDADE', label: 'Cuidador da Comunidade' }
+                      ]} 
+                      onChange={(v) => setFormData({ ...formData, targetType: v })} 
+                    />
+                    <Input label="Nome / Identificação" value={formData.targetName} onChange={(v) => setFormData({ ...formData, targetName: v })} />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-6">
                   <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                   <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
@@ -1479,7 +1548,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
             {type === 'appointment' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                
+                {formData.patientId === 'OUTRO' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
+                    <Select 
+                      label="Tipo de Público" 
+                      value={formData.targetType} 
+                      options={[
+                        { value: 'IDOSO_COMUNIDADE', label: 'Idoso da Comunidade' },
+                        { value: 'CUIDADOR_INSTITUICAO', label: 'Cuidador da Instituição' },
+                        { value: 'CUIDADOR_COMUNIDADE', label: 'Cuidador da Comunidade' }
+                      ]} 
+                      onChange={(v) => setFormData({ ...formData, targetType: v })} 
+                    />
+                    <Input label="Nome / Identificação" value={formData.targetName} onChange={(v) => setFormData({ ...formData, targetName: v })} />
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-6">
                   <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                   <Input label="Hora" value={formData.time} type="time" onChange={(v) => setFormData({ ...formData, time: v })} />
@@ -1505,7 +1591,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
             {type === 'emotion' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patients.map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                
+                {formData.patientId === 'OUTRO' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
+                    <Select 
+                      label="Tipo de Público" 
+                      value={formData.targetType} 
+                      options={[
+                        { value: 'IDOSO_COMUNIDADE', label: 'Idoso da Comunidade' },
+                        { value: 'CUIDADOR_INSTITUICAO', label: 'Cuidador da Instituição' },
+                        { value: 'CUIDADOR_COMUNIDADE', label: 'Cuidador da Comunidade' }
+                      ]} 
+                      onChange={(v) => setFormData({ ...formData, targetType: v })} 
+                    />
+                    <Input label="Nome / Identificação" value={formData.targetName} onChange={(v) => setFormData({ ...formData, targetName: v })} />
+                  </div>
+                )}
+
                 <Input label="Data" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <Select label="Tristeza" value={formData.sadness} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, sadness: v })} />
@@ -1531,7 +1634,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
 
             {type === 'family' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                
+                {formData.patientId === 'OUTRO' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
+                    <Select 
+                      label="Tipo de Público" 
+                      value={formData.targetType} 
+                      options={[
+                        { value: 'IDOSO_COMUNIDADE', label: 'Idoso da Comunidade' },
+                        { value: 'CUIDADOR_INSTITUICAO', label: 'Cuidador da Instituição' },
+                        { value: 'CUIDADOR_COMUNIDADE', label: 'Cuidador da Comunidade' }
+                      ]} 
+                      onChange={(v) => setFormData({ ...formData, targetType: v })} 
+                    />
+                    <Input label="Nome / Identificação" value={formData.targetName} onChange={(v) => setFormData({ ...formData, targetName: v })} />
+                  </div>
+                )}
+
                 <Input label="Data do Registro" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                 <div className="flex items-center gap-3">
                   <input 

@@ -540,6 +540,8 @@ export interface PsychPatient {
 export interface PsychInitialAssessment {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   emotionalState: string;
   cognition: 'ORIENTADO' | 'DESORIENTADO';
@@ -552,6 +554,8 @@ export interface PsychInitialAssessment {
 export interface PsychEvolution {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   time: string;
   observation: string;
@@ -563,6 +567,8 @@ export interface PsychEvolution {
 export interface PsychAppointment {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   time: string;
   type: 'INDIVIDUAL' | 'GRUPO' | 'RODA_CONVERSA';
@@ -574,6 +580,8 @@ export interface PsychAppointment {
 export interface PsychEmotionalMonitoring {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   sadness: 'LEVE' | 'MODERADO' | 'INTENSO' | 'NENHUM';
   anxiety: 'LEVE' | 'MODERADO' | 'INTENSO' | 'NENHUM';
@@ -587,6 +595,8 @@ export interface PsychEmotionalMonitoring {
 export interface PsychFamilyBond {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   receivesVisits: boolean;
   frequency: string;
@@ -609,6 +619,8 @@ export interface PsychActivity {
 export interface PsychCognitionAssessment {
   id: string;
   patientId: string;
+  targetName?: string;
+  targetType?: string;
   date: string;
   memory: 'PRESERVADO' | 'COMPROMETIDO';
   attention: 'PRESERVADO' | 'COMPROMETIDO';
