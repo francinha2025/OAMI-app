@@ -691,6 +691,58 @@
         "registeredBy": { "type": "string" }
       },
       "required": ["patientId", "date", "type", "description", "severity", "status", "registeredBy"]
+    },
+    "NutritionPatient": {
+      "title": "NutritionPatient",
+      "description": "Elderly patient for nutrition tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "age": { "type": "integer" },
+        "photoUrl": { "type": "string" },
+        "elderlyId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "age", "createdAt"]
+    },
+    "NutritionEvolution": {
+      "title": "NutritionEvolution",
+      "description": "Nutritional evolution record",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "content", "registeredBy"]
+    },
+    "NutritionAnthropometry": {
+      "title": "NutritionAnthropometry",
+      "description": "Nutritional anthropometry data",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "weight": { "type": "number" },
+        "height": { "type": "number" },
+        "imc": { "type": "number" },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "weight", "height", "imc", "registeredBy"]
+    },
+    "NutritionMealPlan": {
+      "title": "NutritionMealPlan",
+      "description": "Elderly meal plan",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "meals": { "type": "array", "items": { "type": "object" } },
+        "registeredBy": { "type": "string" }
+      },
+      "required": ["patientId", "date", "title", "meals", "registeredBy"]
     }
   },
   "firestore": {
@@ -739,6 +791,10 @@
     "socialReferrals": { "schema": "SocialReferral", "description": "Social work referrals" },
     "socialFamilyVisits": { "schema": "SocialFamilyVisit", "description": "Social work family visits" },
     "socialRiskSituations": { "schema": "SocialRiskSituation", "description": "Social work risk situations" },
+    "nutritionPatients": { "schema": "NutritionPatient", "description": "Nutrition patients" },
+    "nutritionEvolutions": { "schema": "NutritionEvolution", "description": "Nutrition evolutions" },
+    "nutritionAnthropometries": { "schema": "NutritionAnthropometry", "description": "Nutrition anthropometry data" },
+    "nutritionMealPlans": { "schema": "NutritionMealPlan", "description": "Nutrition meal plans" },
     "users": { "schema": "StaffMember", "description": "Support staff records" }
   }
 }

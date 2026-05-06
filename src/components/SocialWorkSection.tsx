@@ -142,6 +142,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<SocialPatient | null>(null);
   const [formData, setFormData] = useState<any>({});
   const [isExtracting, setIsExtracting] = useState(false);
+  const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [familyPatientFilter, setFamilyPatientFilter] = useState('');
+  const [docsPatientFilter, setDocsPatientFilter] = useState('');
+  const [legalPatientFilter, setLegalPatientFilter] = useState('');
+  const [studyPatientFilter, setStudyPatientFilter] = useState('');
+  const [referralPatientFilter, setReferralPatientFilter] = useState('');
+  const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [visitPatientFilter, setVisitPatientFilter] = useState('');
+  const [riskPatientFilter, setRiskPatientFilter] = useState('');
+  const [piaPatientFilter, setPiaPatientFilter] = useState('');
 
   // Dashboard Stats
   const stats = useMemo(() => {
@@ -1458,7 +1468,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderDocumentation = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Documentação</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Documentação</h3>
+          <select
+            value={docsPatientFilter}
+            onChange={(e) => setDocsPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('docs')}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
@@ -1472,16 +1494,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         <table className="w-full text-left">
           <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
             <tr>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Idoso</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">RG</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">CPF</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">SUS</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase">Certidão</th>
-              <th className="px-6 py-4 text-sm font-black text-gray-500 dark:text-gray-400 uppercase text-right">Ações</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Idoso</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">RG</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">CPF</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">SUS</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Certidão</th>
+              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {documentations.map((doc) => {
+            {(documentations || []).filter(d => !docsPatientFilter || d.patientId === docsPatientFilter).map((doc) => {
               const patient = (patients || []).find(p => p.id === doc.patientId);
               const getStatusBadge = (status: string) => (
                 <span className={cn(
@@ -1496,20 +1518,28 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
               return (
                 <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white">{patient?.name}</td>
+                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white capitalize">{patient?.name}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.rg)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.cpf)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.sus)}</td>
                   <td className="px-6 py-4">{getStatusBadge(doc.birthCertificate)}</td>
-                  <td className="px-6 py-4">{getStatusBadge(doc.addressProof)}</td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => onDeleteRecord('socialDocumentations', doc.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openModal('docs', doc)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteRecord('socialDocumentations', doc.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -1523,10 +1553,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderFamilyTies = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-gray-900 dark:text-white">Vínculo Familiar</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-black text-gray-900 dark:text-white">Vínculo Familiar</h3>
+          <select
+            value={familyPatientFilter}
+            onChange={(e) => setFamilyPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('family')}
-          className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors shadow-lg shadow-pink-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Novo Vínculo
@@ -1534,10 +1576,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {familyTies.map((tie) => {
+        {(familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).map((tie) => {
           const patient = (patients || []).find(p => p.id === tie.patientId);
           return (
-            <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
@@ -1548,31 +1590,40 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
                   </div>
                 </div>
-                {tie.abandonmentRisk && (
-                  <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full text-xs font-black uppercase flex items-center gap-1 border border-red-200 dark:border-red-800">
-                    <AlertTriangle className="w-3 h-3" />
-                    Risco Abandono
-                  </span>
-                )}
-                <button
-                  onClick={() => onDeleteRecord('socialFamilyTies', tie.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors ml-2"
-                  title="Excluir"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {tie.abandonmentRisk && (
+                    <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full text-xs font-black uppercase flex items-center gap-1 border border-red-200 dark:border-red-800">
+                      <AlertTriangle className="w-3 h-3" />
+                      Risco
+                    </span>
+                  )}
+                  <button
+                    onClick={() => openModal('family', tie)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteRecord('socialFamilyTies', tie.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-4">
                 {(tie.members || []).map((member) => (
                   <div key={member.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
                     <div>
-                      <p className="text-sm font-black text-gray-900 dark:text-white">{member.name} ({member.kinship})</p>
+                      <p className="text-sm font-black text-gray-900 dark:text-white capitalize">{member.name} ({member.kinship})</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 font-bold">{member.phone}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-black text-gray-400 uppercase">Visitas</p>
-                      <p className="text-xs font-black text-gray-700 dark:text-gray-300">{member.visitFrequency}</p>
+                      <p className="text-xs font-black text-gray-700 dark:text-gray-300 capitalize">{member.visitFrequency?.toLowerCase()}</p>
                     </div>
                   </div>
                 ))}
@@ -1587,10 +1638,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderLegalSituation = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Situação Legal</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Situação Legal</h3>
+          <select
+            value={legalPatientFilter}
+            onChange={(e) => setLegalPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('legal')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Nova Situação
@@ -1598,27 +1661,34 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {legalSituations.map((legal) => {
+        {(legalSituations || []).filter(l => !legalPatientFilter || l.patientId === legalPatientFilter).map((legal) => {
           const patient = (patients || []).find(p => p.id === legal.patientId);
           return (
-            <div key={legal.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <div key={legal.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center">
                     <Scale className="w-6 h-6 text-purple-500" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500">Status: {legal.situationStatus}</p>
+                    <h4 className="font-bold text-gray-900 dark:text-white capitalize tracking-tight">{patient?.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">Status: {legal.situationStatus}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold uppercase",
-                    legal.isInterdicted ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase border",
+                    legal.isInterdicted ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800" : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800"
                   )}>
                     {legal.isInterdicted ? 'Interditado' : 'Não Interditado'}
                   </span>
+                  <button
+                    onClick={() => openModal('legal', legal)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
                   <button
                     onClick={() => onDeleteRecord('socialLegalSituations', legal.id)}
                     className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -1630,13 +1700,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="p-3 bg-gray-50 rounded-xl">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Curador</p>
-                  <p className="font-bold text-gray-700">{legal.curatorName || 'Não possui'}</p>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Curador</p>
+                  <p className="font-black text-gray-700 dark:text-gray-300 capitalize">{legal.curatorName || 'Não possui'}</p>
                 </div>
-                <div className="p-3 bg-gray-50 rounded-xl">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Processo</p>
-                  <p className="font-bold text-gray-700">{legal.processNumber || 'N/A'}</p>
+                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Processo</p>
+                  <p className="font-black text-gray-700 dark:text-gray-300">{legal.processNumber || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -1899,10 +1969,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderSocialStudy = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Estudo Social</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Estudo Social</h3>
+          <select
+            value={studyPatientFilter}
+            onChange={(e) => setStudyPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('study')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Novo Estudo
@@ -1910,7 +1992,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="space-y-6">
-        {socialStudies.map((study) => {
+        {(socialStudies || []).filter(s => !studyPatientFilter || s.patientId === studyPatientFilter).map((study) => {
           const patient = (patients || []).find(p => p.id === study.patientId);
           return (
             <div key={study.id} className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:shadow-md">
@@ -1920,11 +2002,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <BookOpen className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight capitalize">{patient?.name}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold mt-0.5">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => openModal('study', study)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
                   <button className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
                     <Download className="w-5 h-5 text-gray-400" />
                   </button>
@@ -1970,7 +2059,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderEvolution = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Evolução Social</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Evolução Social</h3>
+          <select
+            value={evolutionPatientFilter}
+            onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('evolution')}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
@@ -1982,7 +2083,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {evolutions.map((evolution) => {
+          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).map((evolution) => {
             const patient = (patients || []).find(p => p.id === evolution.patientId);
             return (
               <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -2000,6 +2101,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase">
                       {evolution.serviceType}
                     </span>
+                    <button
+                      onClick={() => openModal('evolution', evolution)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
                     <button
                       onClick={() => onDeleteRecord('socialEvolutions', evolution.id)}
                       className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -2030,10 +2138,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderReferrals = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Encaminhamentos</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Encaminhamentos</h3>
+          <select
+            value={referralPatientFilter}
+            onChange={(e) => setReferralPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('referrals')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Novo Encaminhamento
@@ -2041,7 +2161,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {referrals.map((referral) => {
+        {(referrals || []).filter(r => !referralPatientFilter || r.patientId === referralPatientFilter).map((referral) => {
           const patient = (patients || []).find(p => p.id === referral.patientId);
           return (
             <div key={referral.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col hover:shadow-md transition-all">
@@ -2059,12 +2179,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                    referral.status === 'CONCLUIDO' ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" :
-                    referral.status === 'EM_ANDAMENTO' ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase border",
+                    referral.status === 'CONCLUIDO' ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800" :
+                    referral.status === 'EM_ANDAMENTO' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-800" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800"
                   )}>
                     {safeReplace(referral.status, '_', ' ') || 'PENDENTE'}
                   </span>
+                  <button
+                    onClick={() => openModal('referrals', referral)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
                   <button
                     onClick={() => onDeleteRecord('socialReferrals', referral.id)}
                     className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -2076,15 +2203,20 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               
               <h4 className="font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-tight">{referral.destination}</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-medium">{patient?.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-black capitalize">{patient?.name}</p>
               
-              <div className="flex-1 bg-gray-50 dark:bg-gray-800 p-4 rounded-xl mb-4 border border-gray-100 dark:border-gray-700">
-                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3 font-medium">{referral.description}</p>
+              <div className="flex-1 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl mb-4 border border-gray-100 dark:border-gray-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3 font-medium leading-relaxed">{referral.description}</p>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500">
-                <span className="font-bold">{safeFormat(referral.date, 'dd/MM/yyyy')}</span>
-                <button className="text-blue-600 dark:text-blue-400 font-black hover:underline">Ver Detalhes</button>
+              <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 pt-3 mt-auto">
+                <span className="font-black uppercase tracking-widest">{safeFormat(referral.date, 'dd/MM/yyyy')}</span>
+                <button 
+                  onClick={() => openModal('referrals', referral)}
+                  className="text-blue-600 dark:text-blue-400 font-black hover:underline uppercase tracking-tighter"
+                >
+                  Ver Detalhes
+                </button>
               </div>
             </div>
           );
@@ -2096,17 +2228,29 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderVisits = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Visitas</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Visitas</h3>
+          <select
+            value={visitPatientFilter}
+            onChange={(e) => setVisitPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('visits')}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Registrar Visita
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
         <table className="w-full text-left">
           <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
             <tr>
@@ -2118,23 +2262,31 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {familyVisits.map((visit) => {
+            {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).map((visit) => {
               const patient = (patients || []).find(p => p.id === visit.patientId);
               return (
                 <tr key={visit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">{safeFormat(visit.date, 'dd/MM/yyyy')}</td>
-                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold">{visit.visitorName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{visit.kinship}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 max-w-xs truncate">{visit.observations}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold tracking-tighter">{safeFormat(visit.date, 'dd/MM/yyyy')}</td>
+                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight capitalize">{patient?.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold capitalize">{visit.visitorName}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">{visit.kinship}</td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => onDeleteRecord('socialFamilyVisits', visit.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                      title="Excluir"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openModal('visits', visit)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteRecord('socialFamilyVisits', visit.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -2148,10 +2300,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderRiskSituations = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Situações de Risco</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Situações de Risco</h3>
+          <select
+            value={riskPatientFilter}
+            onChange={(e) => setRiskPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('risk')}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Registrar Risco
@@ -2159,30 +2323,37 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="space-y-4">
-        {riskSituations.map((risk) => {
+        {(riskSituations || []).filter(r => !riskPatientFilter || r.patientId === riskPatientFilter).map((risk) => {
           const patient = (patients || []).find(p => p.id === risk.patientId);
           return (
-            <div key={risk.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div key={risk.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-red-50 rounded-xl">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-xl">
+                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900">{patient?.name}</h4>
-                    <p className="text-sm font-bold text-red-600 uppercase tracking-wider">{risk.type}</p>
+                    <h4 className="font-bold text-gray-900 dark:text-white capitalize text-lg">{patient?.name}</h4>
+                    <p className="text-sm font-black text-red-600 dark:text-red-400 uppercase tracking-widest">{risk.type}</p>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">
                     <span className={cn(
-                      "px-3 py-1 rounded-full text-xs font-bold uppercase",
-                      risk.severity === 'ALTA' ? "bg-red-100 text-red-700" :
-                      risk.severity === 'MEDIA' ? "bg-orange-100 text-orange-700" :
-                      "bg-blue-100 text-blue-700"
+                      "px-3 py-1 rounded-full text-xs font-black uppercase border",
+                      risk.severity === 'ALTA' ? "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800" :
+                      risk.severity === 'MEDIA' ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-800" :
+                      "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-800"
                     )}>
                       Gravidade {risk.severity}
                     </span>
+                    <button
+                      onClick={() => openModal('risk', risk)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
                     <button
                       onClick={() => onDeleteRecord('socialRisks', risk.id)}
                       className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -2191,13 +2362,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
-                  <span className="text-xs text-gray-400">{safeFormat(risk.date, 'dd/MM/yyyy')}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest">{safeFormat(risk.date, 'dd/MM/yyyy')}</span>
                 </div>
               </div>
-              <p className="text-gray-700 bg-gray-50 p-4 rounded-xl border border-gray-100">{risk.description}</p>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">Status: <span className="font-bold text-gray-700">{safeReplace(risk.status, '_', ' ') || 'EM_ANALISE'}</span></span>
-                <button className="text-blue-600 text-sm font-bold hover:underline">Atualizar Acompanhamento</button>
+              <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 font-medium leading-relaxed">{risk.description}</p>
+              <div className="mt-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-700 pt-3">
+                <span className="text-xs font-black text-gray-400 uppercase tracking-tighter">Status: <span className="text-gray-700 dark:text-gray-300">{safeReplace(risk.status, '_', ' ') || 'EM ANÁLISE'}</span></span>
+                <button 
+                  onClick={() => openModal('risk', risk)}
+                  className="text-blue-600 dark:text-blue-400 text-sm font-black hover:underline uppercase tracking-tighter"
+                >
+                  Atualizar Acompanhamento
+                </button>
               </div>
             </div>
           );
@@ -2209,10 +2385,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderPIA = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Plano Individual de Atendimento (PIA)</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Plano Individual de Atendimento (PIA)</h3>
+          <select
+            value={piaPatientFilter}
+            onChange={(e) => setPiaPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => openModal('pia')}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-100 dark:shadow-none font-bold"
         >
           <Plus className="w-5 h-5" />
           Novo PIA
@@ -2220,33 +2408,33 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-6">
-        {(pias || []).map((pia) => {
+        {(pias || []).filter(p => !piaPatientFilter || p.elderlyId === piaPatientFilter).map((pia) => {
           if (!pia || !pia.id) return null;
           const patient = (patients || []).find(p => p.id === pia.elderlyId);
           return (
-            <div key={pia.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <div key={pia.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
-                    <ClipboardList className="w-6 h-6 text-green-600" />
+                  <div className="w-12 h-12 rounded-xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+                    <ClipboardList className="w-6 h-6 text-green-600 dark:text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white text-lg">{patient?.name || 'Idoso não encontrado'}</h4>
-                    <p className="text-sm text-gray-500">Data: {safeFormat(pia.date, 'dd/MM/yyyy')}</p>
+                    <h4 className="font-black text-gray-900 dark:text-white text-lg capitalize">{patient?.name || 'Idoso não encontrado'}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold mt-0.5">Data: {safeFormat(pia.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={cn(
-                    "px-3 py-1 rounded-full text-xs font-bold uppercase",
-                    pia.status === 'CONCLUIDO' ? "bg-green-100 text-green-700" :
-                    pia.status === 'EM_ANDAMENTO' ? "bg-blue-100 text-blue-700" :
-                    "bg-orange-100 text-orange-700"
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase border",
+                    pia.status === 'CONCLUIDO' ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800" :
+                    pia.status === 'EM_ANDAMENTO' ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-800" :
+                    "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-800"
                   )}>
                     {safeReplace(pia.status, '_', ' ') || 'EM_ANDAMENTO'}
                   </span>
                   <button 
                     onClick={() => openModal('pia', pia)}
-                    className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
                   >
                     <Edit2 className="w-5 h-5" />
                   </button>
@@ -2261,46 +2449,46 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-2">Situação Financeira</p>
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-2 tracking-widest">Situação Financeira</p>
                   <div className="space-y-1">
                     <p className="text-sm flex items-center justify-between">
-                      <span>BPC:</span>
-                      <span className="font-bold">{pia.hasBPC ? 'Sim' : 'Não'}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-bold">BPC:</span>
+                      <span className="font-black text-gray-900 dark:text-white uppercase text-[10px]">{pia.hasBPC ? 'Sim' : 'Não'}</span>
                     </p>
                     <p className="text-sm flex items-center justify-between">
-                      <span>Aposentadoria:</span>
-                      <span className="font-bold">{pia.hasPension ? 'Sim' : 'Não'}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-bold">Aposentadoria:</span>
+                      <span className="font-black text-gray-900 dark:text-white uppercase text-[10px]">{pia.hasPension ? 'Sim' : 'Não'}</span>
                     </p>
                     <p className="text-sm flex items-center justify-between">
-                      <span>Renda:</span>
-                      <span className="font-bold">R$ {Number(pia.monthlyIncome || 0).toLocaleString('pt-BR')}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-bold">Renda:</span>
+                      <span className="font-black text-gray-900 dark:text-white">R$ {Number(pia.monthlyIncome || 0).toLocaleString('pt-BR')}</span>
                     </p>
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-2">Vínculo Familiar</p>
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-2 tracking-widest">Vínculo Familiar</p>
                   <div className="space-y-1">
                     <p className="text-sm flex items-center justify-between">
-                      <span>Envolvimento:</span>
-                      <span className="font-bold">{pia.familyInvolvement || 'MÉDIO'}</span>
+                      <span className="text-gray-500 dark:text-gray-400 font-bold">Envolvimento:</span>
+                      <span className="font-black text-gray-900 dark:text-white uppercase text-[10px]">{pia.familyInvolvement || 'MÉDIO'}</span>
                     </p>
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-2">Responsável</p>
-                  <p className="text-sm font-bold text-gray-700">{pia.responsible || 'Coordenadora'}</p>
+                <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-2 tracking-widest">Responsável</p>
+                  <p className="text-sm font-black text-gray-700 dark:text-gray-300 capitalize">{pia.responsible || 'Coordenadora'}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <h5 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Objetivos</h5>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.objectives || 'Sem objetivos descritos'}</p>
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <h5 className="text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Objetivos</h5>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{pia.objectives || 'Sem objetivos descritos'}</p>
                 </div>
-                <div>
-                  <h5 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Ações</h5>
-                  <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">{pia.actions || 'Sem ações propostas'}</p>
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700">
+                  <h5 className="text-xs font-black text-gray-400 uppercase mb-2 tracking-widest">Ações</h5>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{pia.actions || 'Sem ações propostas'}</p>
                 </div>
               </div>
             </div>
@@ -2399,7 +2587,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const renderReports = () => {
     const prepareReportData = () => {
       if ((patients || []).length === 0) return null;
-      return (patients || []).map(p => {
+      
+      let filtered = (patients || []);
+      if (reportsPatientFilter) {
+        filtered = filtered.filter(p => p.id === reportsPatientFilter);
+      }
+
+      return filtered.map(p => {
         const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
         const patientReferrals = (referrals || []).filter(r => r.patientId === p.id);
         return [
@@ -2416,9 +2610,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       const data = prepareReportData();
       if (!data) return;
 
+      const subtitle = `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+
       await generateModernPDF({
         title,
-        subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
+        subtitle,
         columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
         data,
         fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
@@ -2429,9 +2625,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       const data = prepareReportData();
       if (!data) return;
 
+      const subtitle = `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+
       await generateModernWord({
         title,
-        subtitle: `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}`,
+        subtitle,
         columns: ['Paciente', 'Idade', 'Evoluções', 'Encaminhamentos', 'Status'],
         data,
         fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
@@ -2440,7 +2638,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
     return (
       <div className="space-y-6">
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Gerar Relatórios</h3>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-tighter">Gerar Relatórios</h3>
+          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+            <Filter size={16} className="text-gray-400 ml-2" />
+            <select 
+              value={reportsPatientFilter}
+              onChange={(e) => setReportsPatientFilter(e.target.value)}
+              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
+            >
+              <option value="">Todos os Idosos (Geral)</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
             { title: 'Relatório Social Individual', desc: 'Perfil completo, histórico e evolução do idoso.', icon: FileText, color: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },

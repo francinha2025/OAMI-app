@@ -13,6 +13,7 @@ import {
   BookOpen, 
   Activity, 
   Shield, 
+  Utensils,
   Image as ImageIcon,
   DollarSign,
   Info,
@@ -102,7 +103,7 @@ import {
 } from 'recharts';
 import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -116,6 +117,7 @@ import { NursingSection } from './components/NursingSection';
 import { PsychologySection } from './components/PsychologySection';
 import { PedagogySection } from './components/PedagogySection';
 import { SocialWorkSection } from './components/SocialWorkSection';
+import { NutritionSection } from './components/NutritionSection';
 import { DiaperProductionSection } from './components/DiaperProductionSection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { GlobalGallery } from './components/GlobalGallery';
@@ -1030,6 +1032,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'psychology', label: 'Psicologia', icon: Brain, roles: ['PSICOLOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'nutrition', label: 'Nutrição', icon: Utensils, roles: ['NUTRICIONISTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'PROJETISTA', 'PRESIDENTE'] },
       ]
     },
@@ -8371,8 +8374,31 @@ export default function App() {
   const [socialFamilyVisits, setSocialFamilyVisits] = useState<SocialFamilyVisit[]>([]);
   const [socialRiskSituations, setSocialRiskSituations] = useState<SocialRiskSituation[]>([]);
 
+  // Nutrition states
+  const [nutritionPatients, setNutritionPatients] = useState<NutritionPatient[]>([]);
+  const [nutritionEvolutions, setNutritionEvolutions] = useState<NutritionEvolution[]>([]);
+  const [nutritionAnthropometries, setNutritionAnthropometries] = useState<NutritionAnthropometry[]>([]);
+  const [nutritionMealPlans, setNutritionMealPlans] = useState<NutritionMealPlan[]>([]);
+
   // Diaper States
   const [diaperBeneficiaries, setDiaperBeneficiaries] = useState<DiaperBeneficiary[]>([]);
+
+  const nutritionPatientsList = useMemo(() => {
+    return (elderly || []).map(e => {
+      const p = (nutritionPatients || []).find(pp => pp.elderlyId === e.id);
+      return {
+        ...p,
+        id: e.id,
+        elderlyId: e.id,
+        name: e.name,
+        age: e.age,
+        photoUrl: e.photoUrl || p?.photoUrl,
+        phone: p?.phone || e.phone || 'Não informado',
+        observations: p?.observations || '',
+        createdAt: p?.createdAt || e.entryDate
+      } as NutritionPatient;
+    });
+  }, [elderly, nutritionPatients]);
 
   const physioPatientsList = useMemo(() => {
     return (elderly || []).map(e => {
@@ -8680,6 +8706,10 @@ export default function App() {
     let unsubSocialReferrals = () => {};
     let unsubSocialFamilyVisits = () => {};
     let unsubSocialRiskSituations = () => {};
+    let unsubNutritionPatients = () => {};
+    let unsubNutritionEvolutions = () => {};
+    let unsubNutritionAnthropometries = () => {};
+    let unsubNutritionMealPlans = () => {};
 
     if (!isAuthReady || !user) return;
 
@@ -9048,6 +9078,27 @@ export default function App() {
     }
 
 
+    // Nutrition Listeners
+    if (activeTab === 'nutrition' || activeTab === 'professional' || activeTab === 'dashboard') {
+      if (['PRESIDENTE', 'COORDENADORA', 'NUTRICIONISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+        unsubNutritionPatients = onSnapshot(query(collection(db, 'nutritionPatients'), orderBy('name'), limit(100)), (snapshot) => {
+          setNutritionPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionPatient)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionPatients'));
+
+        unsubNutritionEvolutions = onSnapshot(query(collection(db, 'nutritionEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
+          setNutritionEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionEvolution)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionEvolutions'));
+
+        unsubNutritionAnthropometries = onSnapshot(query(collection(db, 'nutritionAnthropometries'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+          setNutritionAnthropometries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionAnthropometry)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionAnthropometries'));
+
+        unsubNutritionMealPlans = onSnapshot(query(collection(db, 'nutritionMealPlans'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+          setNutritionMealPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionMealPlan)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionMealPlans'));
+      }
+    }
+
     // Listen to Professionals
     if (user && (['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com')) {
       const qProfessionals = query(collection(db, 'professionals'), orderBy('name'), limit(100));
@@ -9116,6 +9167,10 @@ export default function App() {
       unsubWIP();
       unsubFinal();
       unsubGoals();
+      unsubNutritionPatients();
+      unsubNutritionEvolutions();
+      unsubNutritionAnthropometries();
+      unsubNutritionMealPlans();
     };
   }, [isAuthReady, user?.id, user?.role, activeTab]);
 
@@ -10060,6 +10115,87 @@ export default function App() {
     }
   };
 
+  // Nutrition Handlers
+  const handleSaveNutritionPatient = async (data: Partial<NutritionPatient>) => {
+    try {
+      const id = data.id;
+      const existing = nutritionPatients.find(p => p.elderlyId === id || p.id === id);
+      const { id: _, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (existing) {
+        await updateDoc(doc(db, 'nutritionPatients', existing.id), { ...cleanedData, elderlyId: id });
+        showToast('Perfil nutricional atualizado');
+      } else {
+        await addDoc(collection(db, 'nutritionPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
+        showToast('Perfil nutricional cadastrado');
+      }
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'nutritionPatients');
+      showToast('Erro ao salvar perfil nutricional', 'error');
+    }
+  };
+
+  const handleSaveNutritionEvolution = async (data: Partial<NutritionEvolution>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'nutritionEvolutions', id), cleanedData);
+        showToast('Evolução nutricional atualizada');
+      } else {
+        await addDoc(collection(db, 'nutritionEvolutions'), cleanedData);
+        showToast('Evolução nutricional registrada');
+      }
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'nutritionEvolutions');
+      showToast('Erro ao salvar evolução', 'error');
+    }
+  };
+
+  const handleSaveNutritionAnthropometry = async (data: Partial<NutritionAnthropometry>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'nutritionAnthropometries', id), cleanedData);
+        showToast('Antropometria atualizada');
+      } else {
+        await addDoc(collection(db, 'nutritionAnthropometries'), cleanedData);
+        showToast('Antropometria registrada');
+      }
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'nutritionAnthropometries');
+      showToast('Erro ao salvar antropometria', 'error');
+    }
+  };
+
+  const handleSaveNutritionMealPlan = async (data: Partial<NutritionMealPlan>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'nutritionMealPlans', id), cleanedData);
+        showToast('Plano alimentar atualizado');
+      } else {
+        await addDoc(collection(db, 'nutritionMealPlans'), cleanedData);
+        showToast('Plano alimentar salvo');
+      }
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'nutritionMealPlans');
+      showToast('Erro ao salvar plano alimentar', 'error');
+    }
+  };
+
+  const handleDeleteNutritionRecord = async (collectionName: string, id: string) => {
+    try {
+      await deleteDoc(doc(db, collectionName, id));
+      showToast('Registro removido');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, collectionName);
+      showToast('Erro ao remover registro', 'error');
+    }
+  };
+
   if (!isAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-green-50">
@@ -10267,6 +10403,26 @@ export default function App() {
           onDeleteRecord={handleDeleteSocialRecord}
           onDeletePatient={handleDeleteSocialPatient}
           showToast={showToast}
+          onSavePhotos={savePhotosToGallery}
+          onUpdateProfile={handleUpdateProfile}
+          theme={theme}
+          setTheme={setTheme}
+          onLogout={handleLogout}
+        />
+      );
+      case 'nutrition': return (
+        <NutritionSection 
+          user={user}
+          patients={nutritionPatientsList}
+          evolutions={nutritionEvolutions}
+          anthropometries={nutritionAnthropometries}
+          mealPlans={nutritionMealPlans}
+          showToast={showToast}
+          onSavePatient={handleSaveNutritionPatient}
+          onSaveEvolution={handleSaveNutritionEvolution}
+          onSaveAnthropometry={handleSaveNutritionAnthropometry}
+          onSaveMealPlan={handleSaveNutritionMealPlan}
+          onDeleteRecord={handleDeleteNutritionRecord}
           onSavePhotos={savePhotosToGallery}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}

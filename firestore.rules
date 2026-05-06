@@ -444,6 +444,12 @@ service cloud.firestore {
         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'ASSISTENTE_SOCIAL';
     }
 
+    function isNutritionist() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'NUTRICIONISTA';
+    }
+
     function hasRole(role) {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
@@ -911,6 +917,26 @@ service cloud.firestore {
     match /socialRiskSituations/{riskId} {
       allow read: if isAuthenticated();
       allow write: if isSocialWorker() || isCoordinator() || isAdmin();
+    }
+
+    match /nutritionPatients/{patientId} {
+      allow read: if isAuthenticated();
+      allow write: if isNutritionist() || isCoordinator() || isAdmin();
+    }
+
+    match /nutritionEvolutions/{evolutionId} {
+      allow read: if isAuthenticated();
+      allow write: if isNutritionist() || isCoordinator() || isAdmin();
+    }
+
+    match /nutritionAnthropometries/{anthropometryId} {
+      allow read: if isAuthenticated();
+      allow write: if isNutritionist() || isCoordinator() || isAdmin();
+    }
+
+    match /nutritionMealPlans/{mealPlanId} {
+      allow read: if isAuthenticated();
+      allow write: if isNutritionist() || isCoordinator() || isAdmin();
     }
 
     // Default deny

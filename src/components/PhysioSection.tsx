@@ -84,6 +84,9 @@ export const PhysioSection = ({
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<PhysioPatient | null>(null);
   const [editingData, setEditingData] = useState<any>(null);
+  const [isDetailView, setIsDetailView] = useState(false);
+  const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [assessmentPatientFilter, setAssessmentPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'assessment' | 'evolution' | 'exercise' | 'appointment' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [reportPatientId, setReportPatientId] = useState('');
@@ -549,10 +552,22 @@ export const PhysioSection = ({
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Ficha de Avaliação</h2>
-                  <p className="text-gray-500 dark:text-gray-400">Avaliação física e funcional completa</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-gray-500 dark:text-gray-400">Avaliação física e funcional completa</p>
+                    <select
+                      value={assessmentPatientFilter}
+                      onChange={(e) => setAssessmentPatientFilter(e.target.value)}
+                      className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                    >
+                      <option value="">Filtrar p/ Idoso</option>
+                      {(patients || []).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button 
-                  onClick={() => setIsAssessmentModalOpen(true)}
+                  onClick={() => { setEditingData(null); setIsDetailView(false); setIsAssessmentModalOpen(true); }}
                   className="bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all flex items-center gap-2"
                 >
                   <Plus size={20} />
@@ -560,58 +575,80 @@ export const PhysioSection = ({
                 </button>
               </div>
 
-              <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
-                      <th className="p-6">Paciente</th>
-                      <th className="p-6">Data</th>
-                      <th className="p-6">Escala de Dor</th>
-                      <th className="p-6">Risco de Queda</th>
-                      <th className="p-6 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                    {(assessments || []).map((a) => {
-                      const patient = (patients || []).find(p => p.id === a.patientId);
-                      return (
-                        <tr key={a.id} className="text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                          <td className="p-6 font-bold text-gray-800 dark:text-white">{patient?.name || 'N/A'}</td>
-                          <td className="p-6">{format(parseISO(a.date), 'dd/MM/yyyy')}</td>
-                          <td className="p-6">
-                            <span className={cn(
-                              "px-2 py-1 rounded-full text-[10px] font-bold",
-                              a.painScale >= 7 ? "bg-red-100 text-red-600" : a.painScale >= 4 ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-600"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(assessments || []).filter(a => !assessmentPatientFilter || a.patientId === assessmentPatientFilter).map((a) => {
+                  const patient = (patients || []).find(p => p.id === a.patientId);
+                  return (
+                    <div 
+                      key={a.id} 
+                      className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900/30 transition-all group cursor-pointer"
+                      onClick={() => { setEditingData(a); setIsDetailView(true); setIsAssessmentModalOpen(true); }}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400">
+                            <ClipboardList size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors line-clamp-1">{patient?.name || 'N/A'}</h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(a.date), 'dd/MM/yyyy')}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                          <button onClick={() => { setEditingData(a); setIsDetailView(true); setIsAssessmentModalOpen(true); }} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+                            <FileText size={18} />
+                          </button>
+                          <button onClick={() => { setEditingData(a); setIsDetailView(false); setIsAssessmentModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
+                            <Edit2 size={18} />
+                          </button>
+                          <button onClick={() => setDeleteConfirm({ id: a.id, type: 'assessment' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Escala de Dor</p>
+                          <div className="flex items-center gap-2">
+                             <span className={cn(
+                              "text-sm font-bold",
+                              a.painScale >= 7 ? "text-red-600" : a.painScale >= 4 ? "text-orange-600" : "text-green-600"
                             )}>
                               {a.painScale}/10
                             </span>
-                          </td>
-                          <td className="p-6">
-                            <span className={cn(
-                              "px-2 py-1 rounded-full text-[10px] font-bold uppercase",
-                              a.fallRisk === 'ALTO' ? "bg-red-100 text-red-600" : a.fallRisk === 'MEDIO' ? "bg-orange-100 text-orange-600" : "bg-green-100 text-green-600"
-                            )}>
-                              {a.fallRisk || 'N/A'}
-                            </span>
-                          </td>
-                          <td className="p-6 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => { setEditingData(a); setIsAssessmentModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
-                                <Edit2 size={16} />
-                              </button>
-                              <button onClick={() => setDeleteConfirm({ id: a.id, type: 'assessment' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                                <Trash2 size={16} />
-                              </button>
-                              <button className="p-2 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800/20 rounded-lg transition-colors">
-                                <FileText size={16} />
-                              </button>
+                            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all",
+                                  a.painScale >= 7 ? "bg-red-600" : a.painScale >= 4 ? "bg-orange-600" : "bg-green-600"
+                                )}
+                                style={{ width: `${a.painScale * 10}%` }}
+                              />
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Risco de Queda</p>
+                          <span className={cn(
+                            "text-xs font-bold uppercase",
+                            a.fallRisk === 'ALTO' ? "text-red-600" : a.fallRisk === 'MEDIO' ? "text-orange-600" : "text-green-600"
+                          )}>
+                            {a.fallRisk || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {(assessments || []).length === 0 && (
+                  <div className="col-span-full py-20 text-center space-y-4 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800">
+                    <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto text-gray-300 dark:text-gray-700">
+                      <ClipboardList size={40} />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 italic">Nenhuma avaliação encontrada.</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -627,7 +664,19 @@ export const PhysioSection = ({
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Evolução do Paciente</h2>
-                  <p className="text-gray-500 dark:text-gray-400">Registro diário de sessões e progresso</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-gray-500 dark:text-gray-400">Registro diário de sessões e progresso</p>
+                    <select
+                      value={evolutionPatientFilter}
+                      onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+                      className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                    >
+                      <option value="">Filtrar p/ Idoso</option>
+                      {(patients || []).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <button 
                   onClick={() => setIsEvolutionModalOpen(true)}
@@ -639,7 +688,7 @@ export const PhysioSection = ({
               </div>
 
               <div className="space-y-4">
-                {evolutions.map((e) => {
+                {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).map((e) => {
                   const patient = (patients || []).find(p => p.id === e.patientId);
                   return (
                     <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
@@ -657,7 +706,14 @@ export const PhysioSection = ({
                           <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={() => setDeleteConfirm({ id: e.id, type: 'evolution' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
+                          <button 
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setDeleteConfirm({ id: e.id, type: 'evolution' });
+                            }} 
+                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                            title="Excluir Evolução"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -1040,22 +1096,48 @@ export const PhysioSection = ({
               onClick={e => e.stopPropagation()}
             >
               <div className="p-5 md:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-green-600 text-white sticky top-0 z-10 shrink-0">
-                <h3 className="text-xl md:text-2xl font-black">{editingData ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
-                <button onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
-                  <X size={20} />
-                </button>
+                <h3 className="text-xl md:text-2xl font-black">{isDetailView ? 'Detalhes da Avaliação' : (editingData ? 'Editar Avaliação' : 'Nova Avaliação')}</h3>
+                <div className="flex items-center gap-2">
+                  {isDetailView && (
+                    <>
+                      <button 
+                        onClick={() => setIsDetailView(false)} 
+                        className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors"
+                        title="Editar"
+                      >
+                        <Edit2 size={20} />
+                      </button>
+                      <button 
+                        onClick={() => { 
+                          setDeleteConfirm({ id: editingData?.id || '', type: 'assessment' }); 
+                          setIsAssessmentModalOpen(false); 
+                        }} 
+                        className="p-3 bg-red-500/20 rounded-2xl hover:bg-red-500/40 transition-colors text-red-100"
+                        title="Excluir"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </>
+                  )}
+                  <button onClick={() => { setIsAssessmentModalOpen(false); setEditingData(null); setIsDetailView(false); }} className="p-3 bg-white/20 rounded-2xl hover:bg-white/30 transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <AssessmentForm 
                   patients={patients}
                   initialData={editingData}
+                  isDetailView={isDetailView}
                   onSave={async (data) => {
                     await onSaveAssessment(data, editingData?.id);
-                    setIsAssessmentModalOpen(false);
-                    setEditingData(null);
+                    // Stay open and switch to detail view
+                    setIsDetailView(true);
                   }}
-                  onCancel={() => { setIsAssessmentModalOpen(false); setEditingData(null); }}
+                  onCancel={() => { setIsAssessmentModalOpen(false); setEditingData(null); setIsDetailView(false); }}
                   onSavePhotos={onSavePhotos}
+                  onDeleteRecord={onDeleteRecord}
+                  onEdit={() => setIsDetailView(false)}
                 />
               </div>
             </motion.div>
@@ -1151,6 +1233,54 @@ export const PhysioSection = ({
                   }}
                   onCancel={() => { setIsAppointmentModalOpen(false); setEditingData(null); }}
                 />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-sm w-full text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto text-red-600 dark:text-red-400">
+                <Trash2 size={40} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Confirmar Exclusão</h3>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">Deseja realmente excluir este registro? Esta ação não pode ser desfeita.</p>
+              </div>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3 font-bold text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (deleteConfirm.type === 'patient') {
+                      await onDeletePatient(deleteConfirm.id);
+                    } else {
+                      const collections = {
+                        assessment: 'physioAssessments',
+                        evolution: 'physioEvolutions',
+                        exercise: 'physioExercises',
+                        appointment: 'physioAppointments'
+                      };
+                      await onDeleteRecord(collections[deleteConfirm.type], deleteConfirm.id);
+                    }
+                    setDeleteConfirm(null);
+                  }}
+                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-2xl shadow-lg hover:bg-red-700 transition-all"
+                >
+                  Confirmar
+                </button>
               </div>
             </motion.div>
           </div>
@@ -1318,7 +1448,236 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
   );
 };
 
-const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAssessment, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any, initialData?: PhysioAssessment | null }) => {
+const AssessmentDetail = ({ 
+  assessment, 
+  patient, 
+  onEdit, 
+  onDelete, 
+  onCancel 
+}: { 
+  assessment: Omit<PhysioAssessment, 'id'> & { id?: string }, 
+  patient: PhysioPatient | undefined, 
+  onEdit: () => void, 
+  onDelete: () => void,
+  onCancel: () => void
+}) => {
+  return (
+    <div className="space-y-8 p-1">
+      {/* Header com Nome do Paciente */}
+      <div className="flex items-center justify-between gap-4 bg-white dark:bg-gray-900 sticky top-0 z-10 py-2">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center border border-green-100 dark:border-green-800">
+            <UserCircle size={32} className="text-green-600 dark:text-green-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name || 'Paciente não encontrado'}</h2>
+            <p className="text-sm text-gray-500 font-bold flex items-center gap-2">
+              <Calendar size={14} />
+              Avaliação em {format(parseISO(assessment.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={onEdit}
+            className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-100 transition-colors border border-blue-100 dark:border-blue-800"
+            title="Editar Avaliação"
+          >
+            <Edit2 size={20} />
+          </button>
+          <button 
+            onClick={onDelete}
+            className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 transition-colors border border-red-100 dark:border-red-800"
+            title="Excluir Avaliação"
+          >
+            <Trash2 size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Identificação e Queixa */}
+        <div className="bg-gray-50 dark:bg-gray-800/40 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 space-y-4">
+          <h4 className="text-[10px] font-black text-green-600 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Info size={12} />
+            Dados Iniciais
+          </h4>
+          <div>
+            <p className="text-xs font-black text-gray-400 uppercase mb-1">Queixa Principal</p>
+            <p className="text-gray-800 dark:text-gray-200 font-bold leading-relaxed">{assessment.complaint || 'Nenhuma queixa registrada'}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-black text-gray-400 uppercase mb-1">Risco de Queda</p>
+              <span className={cn(
+                "px-3 py-1 rounded-full text-[10px] font-black uppercase inline-block",
+                assessment.fallRisk === 'ALTO' ? "bg-red-100 text-red-700" :
+                assessment.fallRisk === 'MEDIO' ? "bg-orange-100 text-orange-700" :
+                "bg-green-100 text-green-700"
+              )}>
+                {assessment.fallRisk}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-400 uppercase mb-1">Escala de Dor</p>
+              <div className="flex items-center gap-2 text-red-600 font-black">
+                <Activity size={14} />
+                <span>{assessment.painScale}/10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sinais Vitais */}
+        <div className="bg-gray-50 dark:bg-gray-800/40 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 space-y-4">
+          <h4 className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Activity size={12} />
+            Sinais Vitais
+          </h4>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+              <p className="text-[10px] font-black text-gray-400 uppercase">FC</p>
+              <p className="text-lg font-black text-gray-900 dark:text-white">{assessment.vitals?.heartRate || '--'} <span className="text-[10px] opacity-40">bpm</span></p>
+            </div>
+            <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+              <p className="text-[10px] font-black text-gray-400 uppercase">FR</p>
+              <p className="text-lg font-black text-gray-900 dark:text-white">{assessment.vitals?.respRate || '--'} <span className="text-[10px] opacity-40">irpm</span></p>
+            </div>
+            <div className="text-center p-3 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+              <p className="text-[10px] font-black text-gray-400 uppercase">P.A</p>
+              <p className="text-lg font-black text-gray-900 dark:text-white">{assessment.vitals?.bloodPressure || '--/--'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Histórico e Diagnóstico */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 shadow-sm">
+            <h5 className="text-xs font-black text-blue-600 uppercase mb-4 tracking-widest flex items-center gap-2">
+              <ClipboardList size={14} />
+              Histórico (HDA/HPP)
+            </h5>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Doença Atual</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{assessment.hda || 'Sem registro'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Patológico Pregresso</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{assessment.hpp || 'Sem registro'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 shadow-sm">
+            <h5 className="text-xs font-black text-orange-600 uppercase mb-4 tracking-widest flex items-center gap-2">
+              <AlertCircle size={14} />
+              Diagnóstico
+            </h5>
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Médico</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed italic">{assessment.medicalDiagnosis || 'Aguardando diagnóstico'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Cinético-Funcional</p>
+                <p className="text-sm text-gray-900 dark:text-white font-black leading-relaxed">{assessment.functionalDiagnosis || 'Não avaliado'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Avaliação Física */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 shadow-sm">
+          <h5 className="text-xs font-black text-purple-600 uppercase mb-4 tracking-widest flex items-center gap-2">
+            <Stethoscope size={14} />
+            Exame Físico & Testes
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Inspeção/Palpação</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{assessment.inspectionPalpation || 'Nenhuma observação'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Testes Específicos</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 font-medium leading-relaxed">{assessment.specificTests || 'Sem testes realizados'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Conduta */}
+        <div className="bg-indigo-50 dark:bg-indigo-900/10 p-8 rounded-[40px] border border-indigo-100 dark:border-indigo-900/20 space-y-6">
+          <h5 className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+            <Target size={16} />
+            Plano de Conduta
+          </h5>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+              <p className="text-[10px] font-black text-indigo-400 uppercase mb-2">Objetivos Terapêuticos</p>
+              <p className="text-sm text-indigo-900 dark:text-indigo-200 font-black leading-relaxed">{assessment.treatmentObjectives || 'Sem objetivos definidos'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-indigo-400 uppercase mb-2">Plano de Tratamento</p>
+              <p className="text-sm text-indigo-800 dark:text-indigo-300 font-medium leading-relaxed">{assessment.treatmentPlan || 'Sem plano traçado'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Fotos */}
+        {assessment.photos && assessment.photos.length > 0 && (
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 shadow-sm">
+            <h5 className="text-xs font-black text-gray-400 uppercase mb-4 tracking-widest flex items-center gap-2">
+              <Camera size={14} />
+              Galeria de Fotos
+            </h5>
+            <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
+              {assessment.photos.map((photo, i) => (
+                <img 
+                  key={i} 
+                  src={photo} 
+                  alt={`Avaliação ${i}`} 
+                  className="w-32 h-32 object-cover rounded-2xl border border-gray-100 dark:border-gray-800 flex-shrink-0" 
+                  referrerPolicy="no-referrer"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="pt-4">
+        <button 
+          onClick={onCancel}
+          className="w-full py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors border border-gray-100 dark:border-gray-800"
+        >
+          Voltar para Lista
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const AssessmentForm = ({ 
+  patients, 
+  onSave, 
+  onCancel, 
+  onSavePhotos, 
+  onDeleteRecord,
+  initialData, 
+  isDetailView,
+  onEdit 
+}: { 
+  patients: PhysioPatient[], 
+  onSave: (data: Omit<PhysioAssessment, 'id'>) => Promise<void>, 
+  onCancel: () => void, 
+  onSavePhotos: any, 
+  onDeleteRecord?: (col: string, id: string) => Promise<void>,
+  initialData?: PhysioAssessment | null, 
+  isDetailView?: boolean,
+  onEdit?: () => void
+}) => {
   const [formData, setFormData] = useState<Omit<PhysioAssessment, 'id'> & { photos: string[] }>({
     patientId: initialData?.patientId || '',
     date: initialData?.date || new Date().toISOString(),
@@ -1384,6 +1743,24 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
     }
   };
 
+  if (isDetailView && initialData) {
+    const patient = (patients || []).find(p => p.id === formData.patientId);
+    return (
+      <AssessmentDetail 
+        assessment={formData} 
+        patient={patient}
+        onEdit={onEdit || (() => {})}
+        onDelete={() => {
+          if (initialData.id && onDeleteRecord) {
+            onDeleteRecord('physioAssessments', initialData.id);
+            onCancel();
+          }
+        }}
+        onCancel={onCancel}
+      />
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* 1. Identificação */}
@@ -1398,7 +1775,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
             <select 
               value={formData.patientId}
               onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
             >
               <option value="">Selecionar Paciente...</option>
               {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1410,7 +1788,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
               type="date" 
               value={formData.date.split('T')[0]}
               onChange={e => setFormData({ ...formData, date: new Date(e.target.value).toISOString() })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
             />
           </div>
         </div>
@@ -1426,12 +1805,13 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Queixa Principal</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, complaint: (prev.complaint || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, complaint: (prev.complaint || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.complaint}
               onChange={e => setFormData({ ...formData, complaint: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-20 text-gray-800 dark:text-white resize-none disabled:opacity-75"
               placeholder="Descreva a queixa principal do paciente..."
             />
           </div>
@@ -1440,24 +1820,26 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">HDA (História da Doença Atual)</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hda: (prev.hda || '') + ' ' + t }))} />
+                {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hda: (prev.hda || '') + ' ' + t }))} />}
               </div>
               <textarea 
                 value={formData.hda}
                 onChange={e => setFormData({ ...formData, hda: e.target.value })}
-                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+                disabled={isDetailView}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
                 placeholder="Relato sobre o quadro atual..."
               />
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">HPP (História Patológica Pregressa)</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hpp: (prev.hpp || '') + ' ' + t }))} />
+                {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, hpp: (prev.hpp || '') + ' ' + t }))} />}
               </div>
               <textarea 
                 value={formData.hpp}
                 onChange={e => setFormData({ ...formData, hpp: e.target.value })}
-                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+                disabled={isDetailView}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
                 placeholder="Comorbidades, cirurgias anteriores..."
               />
             </div>
@@ -1505,7 +1887,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
               type="number"
               value={formData.vitals?.heartRate || ''}
               onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, heartRate: parseInt(e.target.value) } })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
               placeholder="Ex: 75"
             />
           </div>
@@ -1515,7 +1898,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
               type="number"
               value={formData.vitals?.respRate || ''}
               onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, respRate: parseInt(e.target.value) } })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
               placeholder="Ex: 14"
             />
           </div>
@@ -1525,7 +1909,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
               type="text"
               value={formData.vitals?.bloodPressure || ''}
               onChange={e => setFormData({ ...formData, vitals: { ...formData.vitals, bloodPressure: e.target.value } })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
               placeholder="Ex: 120x80"
             />
           </div>
@@ -1542,12 +1927,13 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Inspeção e Palpação</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, inspectionPalpation: (prev.inspectionPalpation || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, inspectionPalpation: (prev.inspectionPalpation || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.inspectionPalpation}
               onChange={e => setFormData({ ...formData, inspectionPalpation: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
               placeholder="Postura, trofismo, edemas, tônus, crepitações..."
             />
           </div>
@@ -1562,7 +1948,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
                   max="10"
                   value={formData.painScale}
                   onChange={e => setFormData({ ...formData, painScale: parseInt(e.target.value) })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                  disabled={isDetailView}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600 disabled:opacity-50"
                 />
                 <div className="flex justify-between text-[10px] font-bold text-gray-400">
                   <span>Sem Dor</span>
@@ -1576,7 +1963,8 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
               <select 
                 value={formData.fallRisk}
                 onChange={e => setFormData({ ...formData, fallRisk: e.target.value as any })}
-                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+                disabled={isDetailView}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
               >
                 <option value="BAIXO">Baixo</option>
                 <option value="MEDIO">Médio</option>
@@ -1589,24 +1977,26 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Testes Físicos / Específicos</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, specificTests: (prev.specificTests || '') + ' ' + t }))} />
+                {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, specificTests: (prev.specificTests || '') + ' ' + t }))} />}
               </div>
               <textarea 
                 value={formData.specificTests}
                 onChange={e => setFormData({ ...formData, specificTests: e.target.value })}
-                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                disabled={isDetailView}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
                 placeholder="Testes de equilíbrio, força, marcha..."
               />
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Limitação de Movimento</label>
-                <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, motionLimitation: (prev.motionLimitation || '') + ' ' + t }))} />
+                {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, motionLimitation: (prev.motionLimitation || '') + ' ' + t }))} />}
               </div>
               <textarea 
                 value={formData.motionLimitation}
                 onChange={e => setFormData({ ...formData, motionLimitation: e.target.value })}
-                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+                disabled={isDetailView}
+                className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
                 placeholder="Restrições articulares identificadas..."
               />
             </div>
@@ -1624,24 +2014,26 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Diagnóstico Médico</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, medicalDiagnosis: (prev.medicalDiagnosis || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, medicalDiagnosis: (prev.medicalDiagnosis || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.medicalDiagnosis}
               onChange={e => setFormData({ ...formData, medicalDiagnosis: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
               placeholder="Ex: AVE não especificado..."
             />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Diagnóstico Cinético Funcional</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, functionalDiagnosis: (prev.functionalDiagnosis || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, functionalDiagnosis: (prev.functionalDiagnosis || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.functionalDiagnosis}
               onChange={e => setFormData({ ...formData, functionalDiagnosis: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
               placeholder="Limitações funcionais, déficits de equilíbrio..."
             />
           </div>
@@ -1658,24 +2050,26 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Objetivos do Tratamento</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentObjectives: (prev.treatmentObjectives || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentObjectives: (prev.treatmentObjectives || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.treatmentObjectives}
               onChange={e => setFormData({ ...formData, treatmentObjectives: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
               placeholder="Ganho de força, resistência, capacidade funcional..."
             />
           </div>
           <div className="space-y-2">
             <div className="flex justify-between items-center ml-1">
               <label className="text-xs font-bold text-gray-400 uppercase">Plano de Tratamento</label>
-              <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentPlan: (prev.treatmentPlan || '') + ' ' + t }))} />
+              {!isDetailView && <VoiceTranscriptionButton onTranscribe={(t) => setFormData(prev => ({ ...prev, treatmentPlan: (prev.treatmentPlan || '') + ' ' + t }))} />}
             </div>
             <textarea 
               value={formData.treatmentPlan}
               onChange={e => setFormData({ ...formData, treatmentPlan: e.target.value })}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm"
+              disabled={isDetailView}
+              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-32 text-gray-800 dark:text-white resize-none text-sm disabled:opacity-75"
               placeholder="Cinesioterapia, treino de equilíbrio, treino de marcha..."
             />
           </div>
@@ -1686,19 +2080,23 @@ const AssessmentForm = ({ patients, onSave, onCancel, onSavePhotos, initialData 
       <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-6">
         <div className="flex justify-between items-center">
           <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
-          <DigitizeButton onDigitize={handleDigitize} />
+          {!isDetailView && <DigitizeButton onDigitize={handleDigitize} />}
         </div>
-        <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} />
+        <PhotoUpload photos={formData.photos} onChange={photos => setFormData({ ...formData, photos })} disabled={isDetailView} />
       </div>
 
       <div className="flex gap-4 pt-4">
-        <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">Cancelar</button>
-        <button 
-          type="submit"
-          className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all transform hover:-translate-y-1"
-        >
-          {initialData ? 'Atualizar Avaliação' : 'Salvar Avaliação'}
+        <button type="button" onClick={onCancel} className="flex-1 py-4 text-gray-500 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">
+          {isDetailView ? 'Voltar' : 'Cancelar'}
         </button>
+        {!isDetailView && (
+          <button 
+            type="submit"
+            className="flex-[2] bg-green-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-green-700 transition-all transform hover:-translate-y-1"
+          >
+            {initialData ? 'Atualizar Avaliação' : 'Salvar Avaliação'}
+          </button>
+        )}
       </div>
     </form>
   );

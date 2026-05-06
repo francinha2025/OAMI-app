@@ -6,6 +6,9 @@ type State = {
 };
 
 export default class ErrorBoundary extends React.Component<any, State> {
+  public state: State;
+  public props: any;
+
   constructor(props: any) {
     super(props);
     this.state = { hasError: false, error: null };

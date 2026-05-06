@@ -162,10 +162,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [modalType, setModalType] = useState<string>('');
   const [selectedPatient, setSelectedPatient] = useState<PedagogyPatient | null>(null);
+  const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [stimulationPatientFilter, setStimulationPatientFilter] = useState('');
+  const [socialPatientFilter, setSocialPatientFilter] = useState('');
   const [formData, setFormData] = useState<any>({});
   const [editingData, setEditingData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [reportsPatientFilter, setReportsPatientFilter] = useState('');
 
   useEffect(() => {
     localStorage.setItem('oami-pedagogy-tab', activeTab);
@@ -1842,9 +1846,21 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         </div>
 
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Evoluções Recentes</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Evoluções Recentes</h4>
+            <select
+              value={evolutionPatientFilter}
+              onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+              className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Filtrar p/ Idoso</option>
+              {(patients || []).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
         <div className="space-y-3">
-          {(evolutions || []).slice().sort((a, b) => {
+          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).slice().sort((a, b) => {
             const dateDiff = b.date.localeCompare(a.date);
             if (dateDiff !== 0) return dateDiff;
             return (b.time || '').localeCompare(a.time || '');
@@ -1898,7 +1914,29 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderMonitoring = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-gray-900 dark:text-white" translate="no">Acompanhamento de Progresso</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-black text-gray-900 dark:text-white" translate="no">Acompanhamento de Progresso</h3>
+          <select
+            value={stimulationPatientFilter}
+            onChange={(e) => setStimulationPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso (Estimulação)</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <select
+            value={socialPatientFilter}
+            onChange={(e) => setSocialPatientFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 min-w-[200px]"
+          >
+            <option value="">Filtrar p/ Idoso (Interação)</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => openModal('stimulation')}
@@ -1934,37 +1972,39 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </div>
 
           <div className="mt-8 space-y-4">
-            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Estimulações</h5>
+            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Histórico de Estimulação</h5>
             <div className="space-y-3">
-              {(stimulationTrackings || []).slice().sort((a, b) => {
-                const dateDiff = b.date.localeCompare(a.date);
-                if (dateDiff !== 0) return dateDiff;
-                return (b.time || '').localeCompare(a.time || '');
-              }).slice(0, 5).map((stim) => {
-                const patient = (patients || []).find(p => p.id === stim.patientId);
-                return (
-                  <div key={stim.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{safeDateFormat(stim.date)}{stim.time ? ` às ${stim.time}` : ''}</p>
+              {(stimulationTrackings || [])
+                .filter(stim => !stimulationPatientFilter || stim.patientId === stimulationPatientFilter)
+                .slice().sort((a, b) => {
+                  const dateDiff = b.date.localeCompare(a.date);
+                  if (dateDiff !== 0) return dateDiff;
+                  return (b.time || '').localeCompare(a.time || '');
+                }).map((stim) => {
+                  const patient = (patients || []).find(p => p.id === stim.patientId);
+                  return (
+                    <div key={stim.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800/50 flex items-center justify-between group hover:shadow-md transition-all">
+                      <div>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                        <p className="text-xs text-gray-500">{safeDateFormat(stim.date)}{stim.time ? ` às ${stim.time}` : ''} • Cognição: {Math.round(((stim.memoryScore || 0) + (stim.attentionScore || 0) + (stim.reasoningScore || 0) + (stim.languageScore || 0)) / 4)}/10</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <button 
+                          onClick={() => openModal('stimulation', stim)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm({ id: stim.id, type: 'stimulation' })}
+                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                       <button 
-                        onClick={() => openModal('stimulation', stim)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setDeleteConfirm({ id: stim.id, type: 'stimulation' })}
-                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
@@ -2012,37 +2052,42 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </div>
 
           <div className="mt-8 space-y-4">
-            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Últimas Participações</h5>
+            <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Histórico de Participações</h5>
             <div className="space-y-3">
-              {(socialParticipations || []).slice().sort((a, b) => {
-                const dateDiff = b.date.localeCompare(a.date);
-                if (dateDiff !== 0) return dateDiff;
-                return (b.time || '').localeCompare(a.time || '');
-              }).slice(0, 5).map((soc) => {
-                const patient = (patients || []).find(p => p.id === soc.patientId);
-                return (
-                  <div key={soc.id} className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-black text-gray-900">{patient?.name}</p>
-                      <p className="text-xs text-gray-500">{safeDateFormat(soc.date)}{soc.time ? ` às ${soc.time}` : ''}</p>
+              {(socialParticipations || [])
+                .filter(soc => !socialPatientFilter || soc.patientId === socialPatientFilter)
+                .slice().sort((a, b) => {
+                  const dateDiff = b.date.localeCompare(a.date);
+                  if (dateDiff !== 0) return dateDiff;
+                  return (b.time || '').localeCompare(a.time || '');
+                }).map((soc) => {
+                  const patient = (patients || []).find(p => p.id === soc.patientId);
+                  return (
+                    <div key={soc.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800/50 flex items-center justify-between group hover:shadow-md transition-all">
+                      <div>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                        <p className="text-xs text-gray-500">{safeDateFormat(soc.date)}{soc.time ? ` às ${soc.time}` : ''} • Interação: <span className={cn(
+                          "font-bold",
+                          soc.interactionLevel === 'ALTO' ? "text-green-600" : soc.interactionLevel === 'MEDIO' ? "text-yellow-600" : "text-red-600"
+                        )}>{soc.interactionLevel}</span></p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <button 
+                          onClick={() => openModal('social', soc)}
+                          className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm({ id: soc.id, type: 'social' })}
+                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                       <button 
-                        onClick={() => openModal('social', soc)}
-                        className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setDeleteConfirm({ id: soc.id, type: 'social' })}
-                        className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
@@ -2184,53 +2229,134 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             {activeTab === 'activities' && renderActivitiesTab()}
             {activeTab === 'monitoring' && renderMonitoring()}
             {activeTab === 'reports' && (
-              <div className="bg-white dark:bg-gray-900 p-12 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 text-center">
-                <FileText className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Módulo de Relatórios</h3>
-                <p className="text-gray-500 max-w-md mx-auto">
-                  Gere relatórios pedagógicos completos, acompanhamento de evolução cognitiva e participação social em PDF.
-                </p>
-                <div className="flex gap-4 mt-6">
-                  <button 
-                    onClick={async () => {
-                      if ((patients || []).length === 0) return;
-                      const data = (patients || []).map(p => {
-                        const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
-                        return [p.name, p.age, patientEvolutions.length, p.status];
-                      });
-                      await generateModernPDF({
-                        title: 'Relatório Pedagógico Geral',
-                        subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
-                        columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
-                        data,
-                        fileName: 'relatorio_pedagogico_geral'
-                      });
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100"
-                  >
-                    <Download className="w-5 h-5" />
-                    GERAR PDF
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if ((patients || []).length === 0) return;
-                      const data = (patients || []).map(p => {
-                        const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
-                        return [p.name, p.age, patientEvolutions.length, p.status];
-                      });
-                      await generateModernWord({
-                        title: 'Relatório Pedagógico Geral',
-                        subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
-                        columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
-                        data,
-                        fileName: 'relatorio_pedagogico_geral'
-                      });
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-100"
-                  >
-                    <FileText className="w-5 h-5" />
-                    GERAR WORD
-                  </button>
+              <div className="space-y-6">
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar por nome do idoso..." 
+                      className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="w-full md:w-64 relative">
+                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <select 
+                      className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium appearance-none"
+                      value={evolutionPatientFilter}
+                      onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+                    >
+                      <option value="">Todos os Idosos</option>
+                      {patients.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-900 p-8 md:p-12 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 text-center shadow-sm">
+                  <FileText className="w-16 h-16 mx-auto mb-6 text-blue-500/20" />
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 uppercase tracking-tighter">Módulo de Relatórios</h3>
+                  <p className="text-gray-500 max-w-md mx-auto font-medium mb-8">
+                    Gere relatórios pedagógicos detalhados para os idosos selecionados.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
+                    <button 
+                      onClick={async () => {
+                        const targets = patients.filter(p => 
+                          p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                          (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                        );
+                        if (targets.length === 0) {
+                          showToast('Nenhum idoso encontrado para os filtros selecionados', 'error');
+                          return;
+                        }
+                        
+                        const data = targets.map(p => {
+                          const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
+                          return [p.name, p.age, patientEvolutions.length, p.status];
+                        });
+                        
+                        await generateModernPDF({
+                          title: 'Relatório Pedagógico',
+                          subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
+                          columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
+                          data,
+                          fileName: 'relatorio_pedagogico'
+                        });
+                      }}
+                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-100 dark:shadow-none"
+                    >
+                      <Download className="w-5 h-5" />
+                      Exportar PDF
+                    </button>
+                    
+                    <button 
+                      onClick={async () => {
+                        const targets = patients.filter(p => 
+                          p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                          (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                        );
+                        if (targets.length === 0) {
+                          showToast('Nenhum idoso encontrado para os filtros selecionados', 'error');
+                          return;
+                        }
+                        
+                        const data = targets.map(p => {
+                          const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
+                          return [p.name, p.age, patientEvolutions.length, p.status];
+                        });
+                        
+                        await generateModernWord({
+                          title: 'Relatório Pedagógico',
+                          subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
+                          columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
+                          data,
+                          fileName: 'relatorio_pedagogico'
+                        });
+                      }}
+                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all font-black uppercase tracking-widest text-xs shadow-xl shadow-green-100 dark:shadow-none"
+                    >
+                      <FileText className="w-5 h-5" />
+                      Exportar Word
+                    </button>
+                  </div>
+
+                  <div className="mt-12 text-left">
+                    <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Itens Inclusos na Seleção ({
+                      patients.filter(p => 
+                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                      ).length
+                    })</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {patients.filter(p => 
+                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                      ).slice(0, 12).map(p => (
+                        <div key={p.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800">
+                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600 font-black">
+                            {p.name.charAt(0)}
+                          </div>
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate">{p.name}</span>
+                        </div>
+                      ))}
+                      {patients.filter(p => 
+                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                      ).length > 12 && (
+                        <div className="flex items-center justify-center p-2 text-xs font-bold text-gray-400 italic">
+                          + {patients.filter(p => 
+                            p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                            (!evolutionPatientFilter || p.id === evolutionPatientFilter)
+                          ).length - 12} idosos
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

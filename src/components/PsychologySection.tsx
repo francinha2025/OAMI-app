@@ -80,6 +80,14 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   const [isExtracting, setIsExtracting] = useState(false);
   const [modalType, setModalType] = useState<'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' | null>(null);
   const [editingData, setEditingData] = useState<any>(null);
+  const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [initialPatientFilter, setInitialPatientFilter] = useState('');
+  const [appointmentPatientFilter, setAppointmentPatientFilter] = useState('');
+  const [emotionPatientFilter, setEmotionPatientFilter] = useState('');
+  const [familyPatientFilter, setFamilyPatientFilter] = useState('');
+  const [activityPatientFilter, setActivityPatientFilter] = useState('');
+  const [cognitionPatientFilter, setCognitionPatientFilter] = useState('');
+  const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
 
   useEffect(() => {
@@ -96,6 +104,89 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     (props.patients || []).find(p => p.id === selectedPatientId), 
     [props.patients, selectedPatientId]
   );
+
+  const renderReports = () => {
+    const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
+      if ((props.patients || []).length === 0) return;
+
+      let filteredPatients = (props.patients || []);
+      if (reportsPatientFilter) {
+        filteredPatients = filteredPatients.filter(p => p.id === reportsPatientFilter);
+      }
+
+      const data = filteredPatients.map((p: any) => {
+        const patientEvolutions = (props.evolutions || []).filter((e: any) => e.patientId === p.id);
+        return [
+          p.name,
+          p.age,
+          patientEvolutions.length,
+          patientEvolutions[0]?.intervention || 'Sem intervenção recente'
+        ];
+      });
+
+      if (formatType === 'pdf') {
+        await generateModernPDF({
+          title,
+          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
+          columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
+          data,
+          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
+        });
+      } else {
+        await generateModernWord({
+          title,
+          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
+          columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
+          data,
+          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
+        });
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Relatórios de Psicologia</h2>
+          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+            <Filter size={16} className="text-gray-400 ml-2" />
+            <select 
+              value={reportsPatientFilter}
+              onChange={(e) => setReportsPatientFilter(e.target.value)}
+              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
+            >
+              <option value="">Todos os Idosos (Geral)</option>
+              {props.patients.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <ReportCard 
+            title="Relatório Psicológico" 
+            description="Gere um relatório detalhado do estado emocional do idoso." 
+            icon={<FileText className="text-blue-600" />} 
+            onDownloadPDF={() => downloadReport('Relatório Psicológico Geral', 'pdf')}
+            onDownloadWord={() => downloadReport('Relatório Psicológico Geral', 'word')}
+          />
+          <ReportCard 
+            title="Evolução Semestral" 
+            description="Resumo das evoluções e intervenções dos últimos 6 meses." 
+            icon={<TrendingUp className="text-green-600" />} 
+            onDownloadPDF={() => downloadReport('Evolução Semestral', 'pdf')}
+            onDownloadWord={() => downloadReport('Evolução Semestral', 'word')}
+          />
+          <ReportCard 
+            title="Parecer Técnico" 
+            description="Documento oficial para fins jurídicos ou familiares." 
+            icon={<ClipboardList className="text-purple-600" />} 
+            onDownloadPDF={() => downloadReport('Parecer Técnico', 'pdf')}
+            onDownloadWord={() => downloadReport('Parecer Técnico', 'word')}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const stats = useMemo(() => {
     const patientsList = props.patients || [];
@@ -363,6 +454,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <InitialAssessmentView 
                 patients={props.patients}
                 assessments={props.initialAssessments}
+                filter={initialPatientFilter}
+                setFilter={setInitialPatientFilter}
                 onAdd={() => { setModalType('initial'); setIsModalOpen(true); }}
                 onEdit={(a: any) => { setEditingData(a); setModalType('initial'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'initial' })}
@@ -372,6 +465,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <EvolutionView 
                 patients={props.patients}
                 evolutions={props.evolutions}
+                filter={evolutionPatientFilter}
+                setFilter={setEvolutionPatientFilter}
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
                 onEdit={(e: any) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
@@ -381,6 +476,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <AppointmentsView 
                 patients={props.patients}
                 appointments={props.appointments}
+                filter={appointmentPatientFilter}
+                setFilter={setAppointmentPatientFilter}
                 onAdd={() => { setModalType('appointment'); setIsModalOpen(true); }}
                 onEdit={(a: any) => { setEditingData(a); setModalType('appointment'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'appointment' })}
@@ -390,6 +487,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <EmotionsView 
                 patients={props.patients}
                 monitorings={props.emotionalMonitorings}
+                filter={emotionPatientFilter}
+                setFilter={setEmotionPatientFilter}
                 onAdd={() => { setModalType('emotion'); setIsModalOpen(true); }}
                 onEdit={(e: any) => { setEditingData(e); setModalType('emotion'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'emotion' })}
@@ -399,6 +498,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <FamilyView 
                 patients={props.patients}
                 bonds={props.familyBonds}
+                filter={familyPatientFilter}
+                setFilter={setFamilyPatientFilter}
                 onAdd={() => { setModalType('family'); setIsModalOpen(true); }}
                 onEdit={(f: any) => { setEditingData(f); setModalType('family'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'family' })}
@@ -408,6 +509,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <ActivitiesView 
                 patients={props.patients}
                 activities={props.activities}
+                filter={activityPatientFilter}
+                setFilter={setActivityPatientFilter}
                 onAdd={() => { setModalType('activity'); setIsModalOpen(true); }}
                 onEdit={(a: any) => { setEditingData(a); setModalType('activity'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'activity' })}
@@ -417,6 +520,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               <CognitionView 
                 patients={props.patients}
                 assessments={props.cognitionAssessments}
+                filter={cognitionPatientFilter}
+                setFilter={setCognitionPatientFilter}
                 onAdd={() => { setModalType('cognition'); setIsModalOpen(true); }}
                 onEdit={(c: any) => { setEditingData(c); setModalType('cognition'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'cognition' })}
@@ -429,12 +534,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 bonds={props.familyBonds}
               />
             )}
-            {activeTab === 'reports' && (
-              <ReportsView 
-                patients={props.patients}
-                evolutions={props.evolutions}
-              />
-            )}
+            {activeTab === 'reports' && renderReports()}
             {activeTab === 'settings' && (
               <SettingsView 
                 user={props.user}
@@ -512,6 +612,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     </div>
   );
 };
+
 
 const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string }> = ({ active, onClick, icon: Icon, label }) => (
   <button
@@ -615,16 +716,28 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, 
   </div>
 );
 
-const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete }: any) => (
+const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold">Avaliações Iniciais</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Avaliações Iniciais</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Nova Avaliação
       </button>
     </div>
     <div className="space-y-4">
-      {(assessments || []).map((a: PsychInitialAssessment) => {
+      {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment) => {
         const patient = (patients || []).find((p: any) => p.id === a.patientId);
         return (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
@@ -664,16 +777,28 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete 
   </div>
 );
 
-const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete }: any) => (
+const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold">Evoluções Psicológicas</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Evoluções Psicológicas</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Nova Evolução
       </button>
     </div>
     <div className="space-y-6">
-      {(evolutions || []).map((e: PsychEvolution) => {
+      {(evolutions || []).filter((e: any) => !filter || e.patientId === filter).map((e: PsychEvolution) => {
         const patient = (patients || []).find((p: any) => p.id === e.patientId);
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
@@ -699,10 +824,22 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete }: any) =
   </div>
 );
 
-const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete }: any) => (
+const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold">Atendimentos</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Atendimentos</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Novo Atendimento
       </button>
@@ -719,7 +856,7 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete }: a
           </tr>
         </thead>
         <tbody className="text-sm">
-          {(appointments || []).map((app: PsychAppointment) => {
+          {(appointments || []).filter((app: any) => !filter || app.patientId === filter).map((app: PsychAppointment) => {
             const patient = (patients || []).find((p: any) => p.id === app.patientId);
             return (
               <tr key={app.id} className="border-t border-gray-50 dark:border-gray-800">
@@ -754,16 +891,28 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete }: a
   </div>
 );
 
-const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete }: any) => (
+const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
-      <h3 className="text-lg font-bold">Monitoramento Emocional</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Monitoramento Emocional</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Registrar Emoção
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(monitorings || []).map((m: PsychEmotionalMonitoring) => {
+      {(monitorings || []).filter((m: any) => !filter || m.patientId === filter).map((m: PsychEmotionalMonitoring) => {
         const patient = (patients || []).find((p: any) => p.id === m.patientId);
         return (
           <div key={m.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
@@ -819,16 +968,28 @@ const EmotionIndicator = ({ label, level }: { label: string, level: string }) =>
   </div>
 );
 
-const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete }: any) => (
+const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold">Vínculo Familiar</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Vínculo Familiar</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Registrar Contato
       </button>
     </div>
     <div className="space-y-4">
-      {(bonds || []).map((b: PsychFamilyBond) => {
+      {(bonds || []).filter((b: any) => !filter || b.patientId === filter).map((b: PsychFamilyBond) => {
         const patient = (patients || []).find((p: any) => p.id === b.patientId);
         return (
           <div key={b.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-start gap-4">
@@ -862,16 +1023,28 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete }: any) => (
   </div>
 );
 
-const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete }: any) => (
+const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
-      <h3 className="text-lg font-bold">Atividades Psicossociais</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Atividades Psicossociais</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Nova Atividade
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(activities || []).map((act: PsychActivity) => (
+      {(activities || []).filter((act: any) => !filter || (act.participants || []).includes(filter)).map((act: PsychActivity) => (
         <div key={act.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
           <div className="flex justify-between items-start mb-4">
             <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold uppercase">
@@ -903,10 +1076,22 @@ const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete }: any) 
   </div>
 );
 
-const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete }: any) => (
+const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-lg font-bold">Avaliação Cognitiva</h3>
+      <div className="flex items-center gap-4">
+        <h3 className="text-lg font-bold">Avaliação Cognitiva</h3>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Filtrar p/ Idoso</option>
+          {(patients || []).map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
         <Plus size={18} /> Nova Avaliação
       </button>
@@ -924,7 +1109,7 @@ const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete }: any) 
           </tr>
         </thead>
         <tbody className="text-sm">
-          {(assessments || []).map((a: PsychCognitionAssessment) => {
+          {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychCognitionAssessment) => {
             const patient = (patients || []).find((p: any) => p.id === a.patientId);
             return (
               <tr key={a.id} className="border-t border-gray-50 dark:border-gray-800">
@@ -1018,90 +1203,6 @@ const AlertsView = ({ patients, monitorings, bonds }: any) => {
     </div>
   );
 };
-
-const ReportsView = ({ patients, evolutions }: any) => {
-  const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
-    if ((patients || []).length === 0) return;
-
-    const data = (patients || []).map((p: any) => {
-      const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === p.id);
-      return [
-        p.name,
-        p.age,
-        patientEvolutions.length,
-        patientEvolutions[0]?.intervention || 'Sem intervenção recente'
-      ];
-    });
-
-    if (formatType === 'pdf') {
-      await generateModernPDF({
-        title,
-        subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
-        columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
-        data,
-        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-      });
-    } else {
-      await generateModernWord({
-        title,
-        subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}`,
-        columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
-        data,
-        fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-      });
-    }
-  };
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <ReportCard 
-        title="Relatório Psicológico" 
-        description="Gere um relatório detalhado do estado emocional do idoso." 
-        icon={<FileText className="text-blue-600" />} 
-        onDownloadPDF={() => downloadReport('Relatório Psicológico Geral', 'pdf')}
-        onDownloadWord={() => downloadReport('Relatório Psicológico Geral', 'word')}
-      />
-      <ReportCard 
-        title="Evolução Semestral" 
-        description="Resumo das evoluções e intervenções dos últimos 6 meses." 
-        icon={<TrendingUp className="text-green-600" />} 
-        onDownloadPDF={() => downloadReport('Evolução Semestral', 'pdf')}
-        onDownloadWord={() => downloadReport('Evolução Semestral', 'word')}
-      />
-      <ReportCard 
-        title="Parecer Técnico" 
-        description="Documento oficial para fins jurídicos ou familiares." 
-        icon={<ClipboardList className="text-purple-600" />} 
-        onDownloadPDF={() => downloadReport('Parecer Técnico', 'pdf')}
-        onDownloadWord={() => downloadReport('Parecer Técnico', 'word')}
-      />
-    </div>
-  );
-};
-
-const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }: { title: string, description: string, icon: React.ReactNode, onDownloadPDF: () => void, onDownloadWord: () => void }) => (
-  <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all">
-    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl w-fit mb-4">
-      {icon}
-    </div>
-    <h4 className="font-bold mb-2">{title}</h4>
-    <p className="text-sm text-gray-500 mb-6">{description}</p>
-    <div className="flex gap-2">
-      <button 
-        onClick={onDownloadPDF}
-        className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
-      >
-        <Download size={16} /> PDF
-      </button>
-      <button 
-        onClick={onDownloadWord}
-        className="flex-1 py-2 bg-green-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
-      >
-        <FileText size={16} /> WORD
-      </button>
-    </div>
-  </div>
-);
 
 const SettingsView = ({ user, theme, setTheme, onLogout }: any) => (
   <div className="max-w-2xl space-y-6">
@@ -1670,3 +1771,27 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }: any) 
     </div>
   );
 };
+
+const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }: { title: string, description: string, icon: React.ReactNode, onDownloadPDF: () => void, onDownloadWord: () => void }) => (
+  <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all">
+    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl w-fit mb-4">
+      {icon}
+    </div>
+    <h4 className="font-bold mb-2">{title}</h4>
+    <p className="text-sm text-gray-500 mb-6">{description}</p>
+    <div className="flex gap-2">
+      <button 
+        onClick={onDownloadPDF}
+        className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+      >
+        <Download size={16} /> PDF
+      </button>
+      <button 
+        onClick={onDownloadWord}
+        className="flex-1 py-2 bg-green-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+      >
+        <FileText size={16} /> WORD
+      </button>
+    </div>
+  </div>
+);

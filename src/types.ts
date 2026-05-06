@@ -6,6 +6,7 @@ export type Role =
   | 'PEDAGOGA' 
   | 'ENFERMEIRA' 
   | 'FISIOTERAPEUTA'
+  | 'NUTRICIONISTA'
   | 'FABRICANTE_FRALDAS'
   | 'PROJETISTA'
   | 'AUXILIAR_ADMINISTRATIVO';
@@ -849,6 +850,64 @@ export interface SocialRiskSituation {
   description: string;
   severity: 'BAIXA' | 'MEDIA' | 'ALTA';
   status: 'IDENTIFICADO' | 'EM_ACOMPANHAMENTO' | 'RESOLVIDO';
+  registeredBy: string;
+}
+
+export interface NutritionPatient {
+  id: string;
+  elderlyId?: string;
+  name: string;
+  age: number;
+  dietType: 'LIVRE' | 'BRANDA' | 'PASTOSA' | 'LIQUIDA' | 'ENTERAL' | 'DIABETICA' | 'HIPOSSODICA';
+  consistency: 'NORMAL' | 'ESPESSADA' | 'RESTRITA';
+  allergies: string[];
+  intolerances: string[];
+  riskLevel: 'BAIXO' | 'MEDIO' | 'ALTO';
+  photoUrl?: string;
+  createdAt: string;
+}
+
+export interface NutritionEvolution {
+  id: string;
+  patientId: string;
+  date: string;
+  time?: string;
+  acceptance: 'BOA' | 'REGULAR' | 'RUIM';
+  hydrationLevel: 'BOM' | 'MODERADO' | 'BAIXO';
+  weight?: number;
+  height?: number;
+  bmi?: number;
+  observations: string;
+  conduct: string;
+  registeredBy: string;
+  photos?: string[];
+}
+
+export interface NutritionAnthropometry {
+  id: string;
+  patientId: string;
+  date: string;
+  weight: number;
+  height: number;
+  armCircumference?: number;
+  calfCircumference?: number;
+  bmi: number;
+  nutritionalStatus: 'EUTROFICO' | 'DESNUTRIDO' | 'SOBREPESO' | 'OBESO';
+  observations?: string;
+  registeredBy: string;
+}
+
+export interface NutritionMealPlan {
+  id: string;
+  patientId: string;
+  date: string;
+  breakfast: string;
+  morningSnack?: string;
+  lunch: string;
+  afternoonSnack: string;
+  dinner: string;
+  supper?: string;
+  recommendations: string;
   registeredBy: string;
 }
 

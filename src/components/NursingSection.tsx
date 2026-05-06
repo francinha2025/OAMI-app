@@ -86,8 +86,14 @@ export const NursingSection = (props: NursingSectionProps) => {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'patient' | 'medication' | 'vital' | 'dressing' | 'evolution' | 'incident' | 'shift' | 'avd' | 'diaper' | null>(null);
+  const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'patient' | 'evolution' | 'incident' | 'medication' | 'vital' | 'dressing' | 'shift' | 'avd' | 'diaper' } | null>(null);
   const [editingData, setEditingData] = useState<any | null>(null);
+  const [vitalsPatientFilter, setVitalsPatientFilter] = useState('');
+  const [dressingsPatientFilter, setDressingsPatientFilter] = useState('');
+  const [incidentsPatientFilter, setIncidentsPatientFilter] = useState('');
+  const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [medicationsPatientFilter, setMedicationsPatientFilter] = useState('');
 
   useEffect(() => {
     localStorage.setItem('oami-nursing-tab', activeTab);
@@ -138,6 +144,174 @@ export const NursingSection = (props: NursingSectionProps) => {
       alerts: alteredVitals + (incidentRecords || []).filter(i => i.date === today).length
     };
   }, [props.patients, props.administrations, props.dressings, props.incidents, props.vitalSigns]);
+
+  const renderReports = () => {
+    const downloadReport = async (title: string, data: any[], formatType: 'pdf' | 'word') => {
+      const filteredData = reportsPatientFilter 
+        ? data.filter(item => {
+            const patientNameValue = item.Paciente;
+            const selectedPatientName = (props.patients || []).find(p => p.id === reportsPatientFilter)?.name;
+            return patientNameValue === selectedPatientName;
+          })
+        : data;
+
+      if (filteredData.length === 0) {
+        props.showToast('Nenhum dado encontrado para o filtro selecionado', 'error');
+        return;
+      }
+
+      const columns = Object.keys(filteredData[0]);
+      const body = filteredData.map(item => Object.values(item));
+
+      const subtitle = `Relatório de Enfermagem - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+
+      if (formatType === 'pdf') {
+        await generateModernPDF({
+          title,
+          subtitle,
+          columns,
+          data: body,
+          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
+        });
+      } else {
+        await generateModernWord({
+          title,
+          subtitle,
+          columns,
+          data: body,
+          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
+        });
+      }
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Relatórios de Enfermagem</h2>
+          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
+            <Filter size={16} className="text-gray-400 ml-2" />
+            <select 
+              value={reportsPatientFilter}
+              onChange={(e) => setReportsPatientFilter(e.target.value)}
+              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
+            >
+              <option value="">Todos os Idosos (Geral)</option>
+              {props.patients.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ReportCard 
+            title="Evolução Mensal" 
+            description="Resumo de todas as evoluções registradas no mês atual."
+            icon={<ClipboardList className="text-blue-600" />}
+            onDownloadPDF={() => {
+              const data = (props.evolutions || []).map(e => ({
+                Data: e.date,
+                Paciente: (props.patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
+                Conteúdo: e.content,
+                Responsável: e.registeredBy
+              }));
+              downloadReport("Relatório de Evoluções", data, 'pdf');
+            }}
+            onDownloadWord={() => {
+              const data = (props.evolutions || []).map(e => ({
+                Data: e.date,
+                Paciente: (props.patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
+                Conteúdo: e.content,
+                Responsável: e.registeredBy
+              }));
+              downloadReport("Relatório de Evoluções", data, 'word');
+            }}
+          />
+          <ReportCard 
+            title="Histórico de Medicação" 
+            description="Relatório detalhado de administrações e intercorrências."
+            icon={<Pill className="text-amber-600" />}
+            onDownloadPDF={() => {
+              const data = (props.administrations || []).map(a => ({
+                Data: a.date,
+                Hora: a.scheduledTime,
+                Paciente: (props.patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
+                Medicamento: (props.medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
+                Status: a.status
+              }));
+              downloadReport("Histórico de Medicação", data, 'pdf');
+            }}
+            onDownloadWord={() => {
+              const data = (props.administrations || []).map(a => ({
+                Data: a.date,
+                Hora: a.scheduledTime,
+                Paciente: (props.patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
+                Medicamento: (props.medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
+                Status: a.status
+              }));
+              downloadReport("Histórico de Medicação", data, 'word');
+            }}
+          />
+          <ReportCard 
+            title="Sinais Vitais" 
+            description="Relatório de monitoramento de sinais vitais."
+            icon={<Activity className="text-green-600" />}
+            onDownloadPDF={() => {
+              const data = (props.vitalSigns || []).map(v => ({
+                Data: v.date,
+                Hora: v.time,
+                Paciente: (props.patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
+                PA: `${v.systolicBP}/${v.diastolicBP}`,
+                FC: v.heartRate,
+                Temp: v.temperature,
+                Sat: v.saturation
+              }));
+              downloadReport("Relatório de Sinais Vitais", data, 'pdf');
+            }}
+            onDownloadWord={() => {
+              const data = (props.vitalSigns || []).map(v => ({
+                Data: v.date,
+                Hora: v.time,
+                Paciente: (props.patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
+                PA: `${v.systolicBP}/${v.diastolicBP}`,
+                FC: v.heartRate,
+                Temp: v.temperature,
+                Sat: v.saturation
+              }));
+              downloadReport("Relatório de Sinais Vitais", data, 'word');
+            }}
+          />
+          <ReportCard 
+            title="Intercorrências" 
+            description="Resumo de intercorrências registradas."
+            icon={<AlertTriangle className="text-red-600" />}
+            onDownloadPDF={() => {
+              const data = (props.incidents || []).map(i => ({
+                Data: i.date,
+                Hora: i.time,
+                Paciente: (props.patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
+                Tipo: i.type,
+                Descrição: i.description,
+                Conduta: i.conduct
+              }));
+              downloadReport("Relatório de Intercorrências", data, 'pdf');
+            }}
+            onDownloadWord={() => {
+              const data = (props.incidents || []).map(i => ({
+                Data: i.date,
+                Hora: i.time,
+                Paciente: (props.patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
+                Tipo: i.type,
+                Descrição: i.description,
+                Conduta: i.conduct
+              }));
+              downloadReport("Relatório de Intercorrências", data, 'word');
+            }}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const renderSettings = () => (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -428,12 +602,22 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onSaveMedication={props.onSaveMedication}
                 onSaveAdministration={props.onSaveAdministration}
                 onAddMedication={() => { setModalType('medication'); setIsModalOpen(true); }}
+                onDeleteMedication={(id) => setDeleteConfirm({ id, type: 'medication' })}
+                onEditMedication={(m) => {
+                  setEditingData(m);
+                  setModalType('medication');
+                  setIsModalOpen(true);
+                }}
+                filter={medicationsPatientFilter}
+                setFilter={setMedicationsPatientFilter}
               />
             )}
             {activeTab === 'vitals' && (
               <VitalSignsView 
                 patients={props.patients}
                 vitals={props.vitalSigns}
+                filter={vitalsPatientFilter}
+                setFilter={setVitalsPatientFilter}
                 onAdd={() => { setModalType('vital'); setIsModalOpen(true); }}
                 onEdit={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'vital' })}
@@ -443,6 +627,8 @@ export const NursingSection = (props: NursingSectionProps) => {
               <DressingsView 
                 patients={props.patients}
                 dressings={props.dressings}
+                filter={dressingsPatientFilter}
+                setFilter={setDressingsPatientFilter}
                 onAdd={() => { setModalType('dressing'); setIsModalOpen(true); }}
                 onEdit={(d) => { setEditingData(d); setModalType('dressing'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'dressing' })}
@@ -452,6 +638,8 @@ export const NursingSection = (props: NursingSectionProps) => {
               <EvolutionsView 
                 patients={props.patients}
                 evolutions={props.evolutions}
+                filter={evolutionPatientFilter}
+                setFilter={setEvolutionPatientFilter}
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
                 onEdit={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'evolution' })}
@@ -461,6 +649,8 @@ export const NursingSection = (props: NursingSectionProps) => {
               <IncidentsView 
                 patients={props.patients}
                 incidents={props.incidents}
+                filter={incidentsPatientFilter}
+                setFilter={setIncidentsPatientFilter}
                 onAdd={() => { setModalType('incident'); setIsModalOpen(true); }}
                 onEdit={(i) => { setEditingData(i); setModalType('incident'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'incident' })}
@@ -475,16 +665,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onDelete={(id) => setDeleteConfirm({ id, type: 'shift' })}
               />
             )}
-            {activeTab === 'reports' && (
-              <ReportsView 
-                patients={props.patients}
-                evolutions={props.evolutions}
-                administrations={props.administrations}
-                vitalSigns={props.vitalSigns}
-                incidents={props.incidents}
-                medications={props.medications}
-              />
-            )}
+            {activeTab === 'reports' && renderReports()}
             {activeTab === 'settings' && (
               <SettingsView 
                 user={props.user}
@@ -621,7 +802,7 @@ const ShiftView = ({ shifts, users, onAdd, onEdit, onDelete }: {
             <div className="space-y-2">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Enfermagem</p>
               <div className="flex flex-wrap gap-2">
-                {s.professionals.map((p) => (
+                {(s.professionals || []).map((p) => (
                   <span key={p} className="px-2 py-1 bg-gray-50 dark:bg-gray-800 rounded-lg text-[10px] font-bold">
                     {p}
                   </span>
@@ -1442,16 +1623,30 @@ const AVDSelect = ({ label, value, onChange }: { label: string, value?: string, 
   </div>
 );
 
-const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete }: { 
+const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 
   vitals: VitalSigns[], 
   onAdd: () => void,
   onEdit: (v: VitalSigns) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  filter: string,
+  setFilter: (f: string) => void
 }) => (
   <div className="space-y-6 animate-in fade-in duration-500">
     <div className="flex justify-between items-center">
-      <h2 className="text-2xl font-black text-gray-800 dark:text-white">Sinais Vitais</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Sinais Vitais</h2>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Todos os Idosos</option>
+          {(patients || []).map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
         <Plus size={20} />
         Novo Registro
@@ -1474,7 +1669,7 @@ const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete }: {
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-gray-50 dark:divide-gray-800">
-            {(vitals || []).map(v => {
+            {(vitals || []).filter(v => !filter || v.patientId === filter).map(v => {
               const patient = (patients || []).find(p => p.id === v.patientId);
               const isAltered = v.systolicBP > 140 || v.systolicBP < 90 || v.temperature > 37.5 || v.saturation < 92;
               return (
@@ -1519,23 +1714,37 @@ const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete }: {
   </div>
 );
 
-const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete }: { 
+const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 
   dressings: DressingRecord[], 
   onAdd: () => void,
   onEdit: (d: DressingRecord) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  filter: string,
+  setFilter: (f: string) => void
 }) => (
   <div className="space-y-6 animate-in fade-in duration-500">
     <div className="flex justify-between items-center">
-      <h2 className="text-2xl font-black text-gray-800 dark:text-white">Controle de Curativos</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Controle de Curativos</h2>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Todos os Idosos</option>
+          {(patients || []).map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
         <Plus size={20} />
         Novo Curativo
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(dressings || []).map(d => {
+      {(dressings || []).filter(d => !filter || d.patientId === filter).map(d => {
         const patient = (patients || []).find(p => p.id === d.patientId);
         return (
           <div key={d.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4 group">
@@ -1585,23 +1794,37 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete }: {
   </div>
 );
 
-const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete }: { 
+const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 
   evolutions: NursingEvolution[], 
   onAdd: () => void,
   onEdit: (e: NursingEvolution) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  filter: string,
+  setFilter: (f: string) => void
 }) => (
   <div className="space-y-6 animate-in fade-in duration-500">
     <div className="flex justify-between items-center">
-      <h2 className="text-2xl font-black text-gray-800 dark:text-white">Evoluções de Enfermagem</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Evoluções de Enfermagem</h2>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Todos os Idosos</option>
+          {(patients || []).map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
         <Plus size={20} />
         Nova Evolução
       </button>
     </div>
     <div className="space-y-4">
-      {(evolutions || []).map(e => {
+      {(evolutions || []).filter(e => !filter || e.patientId === filter).map(e => {
         const patient = (patients || []).find(p => p.id === e.patientId);
         return (
           <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
@@ -1641,23 +1864,37 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete }: {
   </div>
 );
 
-const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete }: { 
+const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 
   incidents: IncidentRecord[], 
   onAdd: () => void,
   onEdit: (i: IncidentRecord) => void,
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  filter: string,
+  setFilter: (f: string) => void
 }) => (
   <div className="space-y-6 animate-in fade-in duration-500">
     <div className="flex justify-between items-center">
-      <h2 className="text-2xl font-black text-gray-800 dark:text-white">Intercorrências e Alertas</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Intercorrências e Alertas</h2>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+        >
+          <option value="">Todos os Idosos</option>
+          {(patients || []).map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+      </div>
       <button onClick={onAdd} className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-red-700 transition-all">
         <Plus size={20} />
         Registrar Alerta
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(incidents || []).map(i => {
+      {(incidents || []).filter(i => !filter || i.patientId === filter).map(i => {
         const patient = (patients || []).find(p => p.id === i.patientId);
         return (
           <div key={i.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-red-100 dark:border-red-900/30 relative overflow-hidden group">
@@ -2060,17 +2297,23 @@ const PatientDetailView = ({
 );
 }
 
-const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration, onAddMedication }: { 
+const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration, onAddMedication, onDeleteMedication, onEditMedication, filter, setFilter }: { 
   patients: NursingPatient[], 
   medications: Medication[], 
   administrations: MedicationAdministration[],
   onSaveMedication: (data: Omit<Medication, 'id'>, id?: string) => Promise<void>,
   onSaveAdministration: (data: Omit<MedicationAdministration, 'id'>) => Promise<void>,
-  onAddMedication: () => void
+  onAddMedication: () => void,
+  onDeleteMedication?: (id: string) => void,
+  onEditMedication?: (m: Medication) => void,
+  filter: string,
+  setFilter: (f: string) => void
 }) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
-  const dailyAdmins = (administrations || []).filter(a => a.date === selectedDate);
+  const dailyAdmins = (administrations || []).filter(a => 
+    a.date === selectedDate && (!filter || a.patientId === filter)
+  );
   const stats = {
     total: dailyAdmins.length,
     done: dailyAdmins.filter(a => a.status === 'ADMINISTRADO').length,
@@ -2081,7 +2324,19 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Controle de Medicação</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white">Controle de Medicação</h2>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+          >
+            <option value="">Todos os Idosos</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex gap-2">
           <input 
             type="date" 
