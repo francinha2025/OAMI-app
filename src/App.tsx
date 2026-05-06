@@ -100,7 +100,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { cn, safeReplace, cleanData } from './lib/utils';
+import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
@@ -2076,7 +2076,17 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
 
     setLoading(true);
     try {
-      const cleanedData = cleanData(formData);
+      let finalPhotoUrl = formData.photoUrl;
+      // Se a foto for um Base64 muito grande (mais de 100kb), vamos comprimir antes de salvar
+      if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image') && finalPhotoUrl.length > 100000) {
+        try {
+          finalPhotoUrl = await compressImage(finalPhotoUrl);
+        } catch (err) {
+          console.warn("Falha na compressão preventiva:", err);
+        }
+      }
+
+      const cleanedData = cleanData({ ...formData, photoUrl: finalPhotoUrl });
       if (isEditModalOpen && editingElderly) {
         await updateDoc(doc(db, 'elderly', editingElderly.id), {
           ...cleanedData,
@@ -2137,15 +2147,21 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
     setSelectedElderly(null);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+      const compressed = await compressImage(base64);
+      setFormData(prev => ({ ...prev, photoUrl: compressed }));
+    } catch (err) {
+      console.error("Erro ao comprimir foto do idoso:", err);
+    }
   };
 
   const filtered = elderly.filter(e => e.name?.toLowerCase().includes(searchTerm.toLowerCase()));

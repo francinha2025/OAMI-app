@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, X, Image as ImageIcon, Plus, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, compressImage } from '../lib/utils';
 import { CameraModal } from './CameraModal';
 
 interface PhotoUploadProps {
@@ -15,37 +15,51 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   photos, 
   onChange, 
   label = "Fotos da Atividade / Registro",
-  maxPhotos = 10
+  maxPhotos = 5
 }) => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files: File[] = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const newBase64Photos: string[] = [];
-    let processedCount = 0;
+    setIsProcessing(true);
+    try {
+      const compressedPhotos: string[] = [];
+      for (const file of files) {
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+        const compressed = await compressImage(base64);
+        compressedPhotos.push(compressed);
+      }
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        newBase64Photos.push(base64);
-        processedCount++;
-
-        if (processedCount === files.length) {
-          const updatedPhotos = [...photos, ...newBase64Photos].slice(0, maxPhotos);
-          onChange(updatedPhotos);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+      const updatedPhotos = [...photos, ...compressedPhotos].slice(0, maxPhotos);
+      onChange(updatedPhotos);
+    } catch (error) {
+      console.error("Erro ao processar fotos:", error);
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const handleCameraCapture = (base64: string) => {
+  const handleCameraCapture = async (base64: string) => {
     if (photos.length < maxPhotos) {
-      onChange([...photos, `data:image/jpeg;base64,${base64}`]);
+      setIsProcessing(true);
+      try {
+        const fullBase64 = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+        const compressed = await compressImage(fullBase64);
+        onChange([...photos, compressed]);
+      } catch (err) {
+        console.error("Erro ao processar foto da câmera:", err);
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -63,6 +77,11 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
       </div>
 
       <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+        {isProcessing && (
+          <div className="aspect-square rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center border-2 border-dashed border-blue-200 animate-pulse">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          </div>
+        )}
         {photos.map((photo, index) => (
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}

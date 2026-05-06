@@ -1463,17 +1463,19 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   );
 
   const renderResidents = () => {
-    if (selectedPatient) {
-      const history = (lifeHistories || []).find(h => h.patientId === selectedPatient.id);
-      const assessment = (assessments || []).find(a => a.patientId === selectedPatient.id);
-      const plan = (individualPlans || []).find(p => p.patientId === selectedPatient.id);
+    if (!selectedPatient) return null;
+
+    try {
+      const history = (lifeHistories || []).find(h => h?.patientId === selectedPatient.id);
+      const assessment = (assessments || []).find(a => a?.patientId === selectedPatient.id);
+      const plan = (individualPlans || []).find(p => p?.patientId === selectedPatient.id);
 
       const subTabs = [
         { id: 'profile', label: 'Perfil & Interesses', icon: UserCircle },
         { id: 'history', label: 'História de Vida', icon: History },
         { id: 'assessment', label: 'Avaliação Inicial', icon: Brain },
         { id: 'plan', label: 'Plano (PPI)', icon: Target },
-      ];
+      ] as const;
 
       return (
         <div className="space-y-6">
@@ -1555,9 +1557,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                       <div className="flex flex-wrap gap-2">
                         {(Array.isArray(selectedPatient?.interests) ? selectedPatient.interests : []).map((interest, i) => (
                           <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/40 text-gray-900 dark:text-blue-300 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
-                            {interest}
+                            {String(interest || 'N/A')}
                           </span>
                         ))}
+                        {(!selectedPatient?.interests || selectedPatient.interests.length === 0) && <p className="text-xs text-gray-500">Nenhum interesse registrado.</p>}
                       </div>
                     </div>
                     <div>
@@ -1747,103 +1750,31 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </div>
         </div>
       );
-    }
-
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar idoso..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
-            />
-          </div>
-          <button
-            onClick={() => openModal('patient')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+    } catch (error) {
+      console.error("Erro ao renderizar detalhes do residente:", error);
+      return (
+        <div className="p-12 text-center bg-red-50 dark:bg-red-900/20 rounded-3xl border border-red-100 dark:border-red-900/30">
+          <Brain className="w-16 h-16 text-red-300 mx-auto mb-4" />
+          <h3 className="text-xl font-black text-red-900 dark:text-red-400 uppercase">Erro no Prontuário</h3>
+          <p className="text-red-700 dark:text-red-500 font-bold mt-2">Não foi possível carregar todas as informações deste residente.</p>
+          <button 
+            onClick={() => setSelectedPatient(null)}
+            className="mt-6 px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700"
           >
-            <Plus className="w-5 h-5" />
-            Novo Cadastro Educacional
+            Voltar para Lista
           </button>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPatients.map((patient) => (
-            <motion.div
-              key={patient.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => setSelectedPatient(patient)}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100">
-                      {patient.photoUrl ? (
-                        <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <UserIcon className="w-8 h-8 text-blue-400" />
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-black text-gray-900 dark:text-white">{patient.name}</h4>
-                      <p className="text-sm text-gray-900 dark:text-gray-300 font-black">{patient.age} anos • {patient.schooling}</p>
-                    </div>
-                  </div>
-                  <div className={cn(
-                    "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
-                    patient.cognitiveLevel === 'ALTO' ? "bg-green-50 text-green-700 border-green-100" :
-                    patient.cognitiveLevel === 'MEDIO' ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
-                    "bg-red-50 text-red-700 border-red-100"
-                  )}>
-                    {patient.cognitiveLevel}
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
-                    <BookOpen className="w-4 h-4 text-blue-500" />
-                    <span>{safeReplace(patient.literacyLevel, '_', ' ')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
-                    <Star className="w-4 h-4 text-yellow-500" />
-                    <span className="truncate">{(patient.interests || []).join(', ')}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setSelectedPatient(patient); }}
-                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-black hover:bg-blue-100 transition-colors"
-                  >
-                    Ver Prontuário
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); openModal('patient', patient); }}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: patient.id, type: 'resident' }); }}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    );
+      );
+    }
   };
+
+
+
+
+
+
+
+
 
   const renderActivitiesTab = () => (
     <div className="space-y-8">
@@ -2154,7 +2085,102 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           >
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'settings' && renderSettings()}
-            {activeTab === 'residents' && renderResidents()}
+            {activeTab === 'residents' && (
+              selectedPatient ? renderResidents() : (
+                <div className="space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar idoso..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <button
+                      onClick={() => openModal('patient')}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Novo Cadastro Educacional
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {(filteredPatients || []).map((patient) => (
+                      <motion.div
+                        key={patient.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => setSelectedPatient(patient)}
+                      >
+                        <div className="p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100">
+                                {patient.photoUrl ? (
+                                  <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <UserIcon className="w-8 h-8 text-blue-400" />
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="font-black text-gray-900 dark:text-white">{patient.name}</h4>
+                                <p className="text-sm text-gray-900 dark:text-gray-300 font-black">{patient.age} anos • {patient.schooling}</p>
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
+                              patient.cognitiveLevel === 'ALTO' ? "bg-green-50 text-green-700 border-green-100" :
+                              patient.cognitiveLevel === 'MEDIO' ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
+                              "bg-red-50 text-red-700 border-red-100"
+                            )}>
+                              {patient.cognitiveLevel}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 mb-6">
+                            <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
+                              <BookOpen className="w-4 h-4 text-blue-500" />
+                              <span>{safeReplace(patient.literacyLevel, '_', ' ')}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              <span className="truncate">{(patient.interests || []).join(', ')}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setSelectedPatient(patient); }}
+                              className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-black hover:bg-blue-100 transition-colors"
+                            >
+                              Ver Prontuário
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); openModal('patient', patient); }}
+                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: patient.id, type: 'resident' }); }}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )
+            )}
             {activeTab === 'activities' && renderActivitiesTab()}
             {activeTab === 'monitoring' && renderMonitoring()}
             {activeTab === 'reports' && (
