@@ -391,6 +391,7 @@ export interface NursingPatient {
   riskLevel: 'BAIXO' | 'MEDIO' | 'ALTO';
   isBedridden: boolean;
   fallRisk: 'BAIXO' | 'MEDIO' | 'ALTO';
+  careDegree: 'GRAU_1' | 'GRAU_2' | 'GRAU_3';
   photoUrl?: string;
   createdAt: string;
 }

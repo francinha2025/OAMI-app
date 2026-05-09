@@ -1096,7 +1096,18 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
     location: '',
     aspect: '',
     conduct: '',
-    nextChangeDate: format(addDays(new Date(), 1), 'yyyy-MM-dd')
+    nextChangeDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+    // Inicialização campos paciente para evitar undefined
+    name: '',
+    fullName: '',
+    age: 0,
+    diagnosis: '',
+    comorbidities: '',
+    allergies: '',
+    fallRisk: 'BAIXO',
+    riskLevel: 'BAIXO',
+    careDegree: 'GRAU_1',
+    familyContact: ''
   });
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -1105,7 +1116,7 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
     setIsExtracting(true);
     try {
       const schemas: Record<string, string> = {
-        patient: "name, fullName, age (number), diagnosis, comorbidities, allergies, fallRisk (BAIXO, MEDIO, ALTO), familyContact",
+        patient: "name, fullName, age (number), diagnosis, comorbidities, allergies, fallRisk (BAIXO, MEDIO, ALTO), familyContact, careDegree (GRAU_1, GRAU_2, GRAU_3)",
         medication: "name, dosage, frequency, route, description, type (CONTINUA, CONTROLADA, SOS)",
         vital: "systolicBP (number), diastolicBP (number), heartRate (number), temperature (number), saturation (number), bloodGlucose (number)",
         dressing: "location, woundType, aspect, observations, nextChangeDate",
@@ -1240,27 +1251,56 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
           )}
 
           {type === 'patient' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
-              <Input label="Idade" type="number" value={formData.age} onChange={(v) => setFormData({ ...formData, age: parseInt(v) })} />
-              <Input label="Diagnóstico" value={formData.diagnosis} onChange={(v) => setFormData({ ...formData, diagnosis: v })} />
-              <Input label="Comorbidades" value={formData.comorbidities} onChange={(v) => setFormData({ ...formData, comorbidities: v })} />
-              <Input label="Alergias" value={formData.allergies} onChange={(v) => setFormData({ ...formData, allergies: v })} />
-              <Input label="Contato Familiar" value={formData.familyContact} onChange={(v) => setFormData({ ...formData, familyContact: v })} />
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nível de Risco</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.riskLevel || 'BAIXO'} onChange={(e) => setFormData({ ...formData, riskLevel: e.target.value })}>
-                  <option value="BAIXO">Baixo</option>
-                  <option value="MEDIO">Médio</option>
-                  <option value="ALTO">Alto</option>
-                </select>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="md:col-span-1 lg:col-span-2">
+                  <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
+                </div>
+                <Input label="Idade" type="number" value={formData.age} onChange={(v) => setFormData({ ...formData, age: v === '' ? 0 : parseInt(v) })} />
               </div>
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Acamado?</label>
-                <select className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold" value={formData.isBedridden ? 'true' : 'false'} onChange={(e) => setFormData({ ...formData, isBedridden: e.target.value === 'true' })}>
-                  <option value="false">Não</option>
-                  <option value="true">Sim</option>
-                </select>
+              <Input label="Diagnóstico Principal" value={formData.diagnosis} onChange={(v) => setFormData({ ...formData, diagnosis: v })} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input label="Comorbidades" value={formData.comorbidities} onChange={(v) => setFormData({ ...formData, comorbidities: v })} />
+                <Input label="Alergias" value={formData.allergies} onChange={(v) => setFormData({ ...formData, allergies: v })} />
+              </div>
+              <Input label="Contato Familiar Principal" value={formData.familyContact} onChange={(v) => setFormData({ ...formData, familyContact: v })} />
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1 tracking-wider">Risco de Queda</label>
+                  <select 
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-black focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white appearance-none" 
+                    value={formData.fallRisk || 'BAIXO'} 
+                    onChange={(e) => setFormData({ ...formData, fallRisk: e.target.value, riskLevel: e.target.value })}
+                  >
+                    <option value="BAIXO">BAIXO</option>
+                    <option value="MEDIO">MÉDIO</option>
+                    <option value="ALTO">ALTO</option>
+                  </select>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1 tracking-wider">Grau de Dependência</label>
+                  <select 
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-black focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white appearance-none" 
+                    value={formData.careDegree || 'GRAU_1'} 
+                    onChange={(e) => setFormData({ ...formData, careDegree: e.target.value })}
+                  >
+                    <option value="GRAU_1">GRAU 1</option>
+                    <option value="GRAU_2">GRAU 2</option>
+                    <option value="GRAU_3">GRAU 3</option>
+                  </select>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1 tracking-wider">Acamado?</label>
+                  <select 
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-black focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white appearance-none" 
+                    value={formData.isBedridden ? 'true' : 'false'} 
+                    onChange={(e) => setFormData({ ...formData, isBedridden: e.target.value === 'true' })}
+                  >
+                    <option value="false">Não (Móvel)</option>
+                    <option value="true">Sim (Acamado)</option>
+                  </select>
+                </div>
               </div>
             </div>
           )}
@@ -1600,13 +1640,13 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
 
 const Input = ({ label, type = "text", value, onChange, step }: { label: string, type?: string, value?: any, onChange: (v: string) => void, step?: string }) => (
   <div className="space-y-2">
-    <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
+    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</label>
     <input 
       type={type}
       step={step}
-      value={value || ''}
+      value={value === 0 ? '0' : (value || '')}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-5 py-4 text-sm focus:ring-2 focus:ring-green-500 transition-all"
+      className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white" 
     />
   </div>
 );
@@ -2057,10 +2097,11 @@ const PatientDetailView = ({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <InfoItem label="Comorbidades" value={patient.comorbidities} />
             <InfoItem label="Alergias" value={patient.allergies} color="red" />
-            <InfoItem label="Risco de Queda" value={patient.fallRisk} color={patient.fallRisk === 'ALTO' ? 'red' : 'amber'} />
+            <InfoItem label="Risco de Queda" value={patient.fallRisk} color={patient.fallRisk === 'ALTO' ? 'red' : patient.fallRisk === 'MEDIO' ? 'amber' : 'green'} />
+            <InfoItem label="Grau" value={safeReplace(patient.careDegree || '', 'GRAU_', '')} />
             <InfoItem label="Contato Familiar" value={patient.familyContact} />
           </div>
         </div>
@@ -2614,16 +2655,23 @@ const PatientsView = ({ patients, onAdd, onSelect, onDelete }: { patients: Nursi
                 )}
               </div>
               <p className="text-xs text-gray-500">{patient.age} anos • {patient.diagnosis}</p>
+              <div className="mt-2 space-y-1">
+                {patient.comorbidities && <p className="text-[10px] text-gray-400 line-clamp-1 italic">Comorbidades: {patient.comorbidities}</p>}
+                {patient.allergies && <p className="text-[10px] text-red-400 line-clamp-1 font-bold italic">Alergias: {patient.allergies}</p>}
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className={cn("px-3 py-1 rounded-lg text-[10px] font-bold text-center", 
-              patient.riskLevel === 'ALTO' ? "bg-red-100 text-red-600" : 
-              patient.riskLevel === 'MEDIO' ? "bg-amber-100 text-amber-600" : "bg-green-100 text-green-600"
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
+              patient.fallRisk === 'ALTO' ? "bg-red-100 text-red-600" : 
+              patient.fallRisk === 'MEDIO' ? "bg-amber-100 text-amber-600" : "bg-green-100 text-green-600"
             )}>
-              RISCO: {patient.riskLevel}
+              QUEDA: {patient.fallRisk}
             </div>
-            <div className={cn("px-3 py-1 rounded-lg text-[10px] font-bold text-center", 
+            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center bg-gray-100 text-gray-600")}>
+              GRAU {safeReplace(patient.careDegree || '1', 'GRAU_', '')}
+            </div>
+            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
               patient.isBedridden ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
             )}>
               {patient.isBedridden ? 'ACAMADO' : 'MÓVEL'}

@@ -1838,12 +1838,13 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 
                 {(activity.participants || []).length > 0 && (
                   <div className="mb-4">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Participantes:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {activity.participants.map(pId => {
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Participantes confirmados:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(activity.participants || []).map(pId => {
                         const p = (patients || []).find(pat => pat.id === pId);
                         return (
-                          <span key={pId} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md text-[10px] font-bold border border-gray-200 dark:border-gray-700">
+                          <span key={pId} className="px-3 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-[10px] font-black border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>
                             {p?.name || 'Idoso não encontrado'}
                           </span>
                         );

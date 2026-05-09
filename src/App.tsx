@@ -124,6 +124,7 @@ import { GlobalGallery } from './components/GlobalGallery';
 import { DigitizeButton } from './components/DigitizeButton';
 import { CameraModal } from './components/CameraModal';
 import { PhotoUpload } from './components/PhotoUpload';
+import LogoOami from './components/LogoOami';
 import { 
   collection, 
   where, 
@@ -743,10 +744,12 @@ const ConfirmationModal = ({
 };
 
 const Logo = ({ className, src }: { className?: string, src?: string | null }) => {
-  if (src) {
+  const displayLogo = src || INSTITUTION_LOGO;
+  
+  if (displayLogo && !displayLogo.includes('...')) {
     return (
       <img 
-        src={src} 
+        src={displayLogo} 
         alt="Logo" 
         className={cn("w-full h-full object-cover rounded-full", className)} 
         referrerPolicy="no-referrer"
@@ -4903,10 +4906,13 @@ const InstitutionalSection = ({ institutionalInfo }: { institutionalInfo: Instit
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-500">
-      <div className="text-center space-y-4">
-        <h2 className="text-4xl font-bold text-green-800 dark:text-green-400">OAMI</h2>
-        <p className="text-green-600 dark:text-green-500 font-medium tracking-wide uppercase">Instituição de Longa Permanência para Idosos</p>
-        <div className="w-24 h-1.5 bg-green-600 mx-auto rounded-full shadow-sm" />
+      <div className="flex justify-center flex-col items-center gap-6">
+        <LogoOami />
+        <div className="text-center space-y-4">
+          <h2 className="text-4xl font-bold text-green-800 dark:text-green-400">OAMI</h2>
+          <p className="text-green-600 dark:text-green-500 font-medium tracking-wide uppercase">Instituição de Longa Permanência para Idosos</p>
+          <div className="w-24 h-1.5 bg-green-600 mx-auto rounded-full shadow-sm" />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

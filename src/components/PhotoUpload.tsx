@@ -50,12 +50,12 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   };
 
   const handleCameraCapture = async (base64: string) => {
-    if (photos.length < maxPhotos) {
+    if ((photos || []).length < maxPhotos) {
       setIsProcessing(true);
       try {
         const fullBase64 = base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
         const compressed = await compressImage(fullBase64);
-        onChange([...photos, compressed]);
+        onChange([...(photos || []), compressed]);
       } catch (err) {
         console.error("Erro ao processar foto da câmera:", err);
       } finally {
@@ -65,7 +65,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   };
 
   const removePhoto = (index: number) => {
-    const newPhotos = [...photos];
+    const newPhotos = [...(photos || [])];
     newPhotos.splice(index, 1);
     onChange(newPhotos);
   };
@@ -74,7 +74,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">{label}</label>
-        <span className="text-[10px] font-bold text-gray-400">{photos.length}/{maxPhotos}</span>
+        <span className="text-[10px] font-bold text-gray-400">{(photos || []).length}/{maxPhotos}</span>
       </div>
 
       <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
@@ -83,7 +83,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
           </div>
         )}
-        {photos.map((photo, index) => (
+        {(photos || []).map((photo, index) => (
           <motion.div 
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -101,7 +101,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
           </motion.div>
         ))}
 
-        {photos.length < maxPhotos && (
+        {(photos || []).length < maxPhotos && (
           <div className="flex gap-2 aspect-square">
             <button 
               type="button"
