@@ -103,7 +103,7 @@ import {
 } from 'recharts';
 import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -5572,7 +5572,12 @@ const BRAZIL_HOLIDAYS = [
   { date: '2026-12-25', title: 'Natal' },
 ];
 
-const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[], user: User, showConfirm: (msg: string, onConfirm: () => void) => void }) => {
+const ScheduleSection = ({ events, user, showConfirm, sendNotification }: { 
+  events: CalendarEvent[], 
+  user: User, 
+  showConfirm: (msg: string, onConfirm: () => void) => void,
+  sendNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'date'>) => Promise<void>
+}) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -5610,6 +5615,16 @@ const ScheduleSection = ({ events, user, showConfirm }: { events: CalendarEvent[
         createdAt: new Date().toISOString()
       });
       await addDoc(collection(db, 'calendarEvents'), eventData);
+      
+      // Notificar equipe
+      sendNotification({
+        title: `Novo Evento: ${formData.title}`,
+        message: `${user.name} agendou um(a) ${formData.type} para ${format(selectedDate, 'dd/MM/yyyy')} às ${formData.time || '--:--'}`,
+        type: 'SCHEDULE',
+        targetRole: 'ALL',
+        professionalName: user.name
+      });
+
       setIsModalOpen(false);
       setFormData({
         title: '',
@@ -8200,6 +8215,19 @@ export default function App() {
     testConnection();
   }, []);
 
+  // --- Service Worker Registration for PWA & Notifications ---
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => {
+          console.log('SW Registered with scope:', reg.scope);
+        })
+        .catch(err => {
+          console.error('SW registration failed:', err);
+        });
+    }
+  }, []);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -8280,6 +8308,7 @@ export default function App() {
   const [familyEngagements, setFamilyEngagements] = useState<FamilyEngagement[]>([]);
   const [institutionalInfo, setInstitutionalInfo] = useState<InstitutionalInfo | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   const onSaveCommunityElderly = async (data: any) => {
     try {
@@ -9113,6 +9142,65 @@ export default function App() {
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
     }
 
+    // Notifications Listener
+    let unsubNotifications: () => void = () => {};
+    if (user) {
+      const qNotifications = query(
+        collection(db, 'notifications'), 
+        where('targetRole', 'in', ['ALL', user.role]),
+        orderBy('date', 'desc'), 
+        limit(50)
+      );
+      unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
+        setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+        
+        // Trigger browser notification for new items
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added' && !snapshot.metadata.hasPendingWrites) {
+            const n = change.doc.data() as AppNotification;
+            if (window.Notification && Notification.permission === 'granted' && !n.read) {
+              // Priority for Service Worker implementation (better for mobile system trays)
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then(registration => {
+                  registration.showNotification(n.title, {
+                    body: n.message,
+                    icon: INSTITUTION_LOGO,
+                    badge: INSTITUTION_LOGO,
+                    tag: n.id,
+                    vibrate: [200, 100, 200],
+                    renotify: true,
+                    data: { url: n.link || '/' }
+                  } as any);
+                }).catch(() => {
+                  // Fallback to basic notification if SW ready fails
+                  new Notification(n.title, {
+                    body: n.message,
+                    icon: INSTITUTION_LOGO
+                  });
+                });
+              } else {
+                new Notification(n.title, {
+                  body: n.message,
+                  icon: INSTITUTION_LOGO
+                });
+              }
+            }
+          }
+        });
+      }, (err) => {
+        // If query fails (could be missing index), fallback to simpler query
+        const qSimple = query(collection(db, 'notifications'), limit(50));
+        onSnapshot(qSimple, (snap) => {
+          setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+        });
+      });
+    }
+
+    // Request Notification Permission
+    if (window.Notification && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
     return () => {
       unsubElderly();
       unsubStaff();
@@ -9177,6 +9265,7 @@ export default function App() {
       unsubNutritionEvolutions();
       unsubNutritionAnthropometries();
       unsubNutritionMealPlans();
+      unsubNotifications();
     };
   }, [isAuthReady, user?.id, user?.role, activeTab]);
 
@@ -9255,6 +9344,27 @@ export default function App() {
     } catch (err) {
       console.error("Error updating profile:", err);
       showToast('Erro ao atualizar perfil', 'error');
+    }
+  };
+
+  const sendNotification = async (notification: Omit<AppNotification, 'id' | 'read' | 'date'>) => {
+    try {
+      const newNotification = {
+        ...notification,
+        date: new Date().toISOString(),
+        read: false
+      };
+      await addDoc(collection(db, 'notifications'), newNotification);
+    } catch (err) {
+      console.error("Error sending notification:", err);
+    }
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
     }
   };
 
@@ -9347,6 +9457,16 @@ export default function App() {
         showToast('Agendamento atualizado com sucesso');
       } else {
         await addDoc(collection(db, 'physioAppointments'), cleanedData);
+        
+        // Notificar equipe
+        sendNotification({
+          title: 'Novo Agendamento de Fisioterapia',
+          message: `Uma nova sessão foi agendada para ${format(parseISO(data.date), 'dd/MM/yyyy')} às ${data.time}`,
+          type: 'SCHEDULE',
+          targetRole: 'FISIOTERAPEUTA',
+          professionalName: user.name
+        });
+
         showToast('Agendamento realizado com sucesso');
       }
     } catch (err) {
@@ -9496,6 +9616,19 @@ export default function App() {
         showToast('Intercorrência atualizada com sucesso');
       } else {
         await addDoc(collection(db, 'incidentRecords'), cleanedData);
+        
+        // Notificar equipe (Coordenação, Presidente e Enfermagem)
+        const targetRoles: Role[] = ['COORDENADORA', 'PRESIDENTE', 'ENFERMEIRA'];
+        targetRoles.forEach(role => {
+          sendNotification({
+            title: 'ALERTA: Nova Intercorrência',
+            message: `Uma intercorrência foi registrada para o idoso(a) ${elderly.find(e => e.id === data.patientId)?.name}. Tipo: ${data.type}`,
+            type: 'URGENTE',
+            targetRole: role,
+            professionalName: user.name
+          });
+        });
+
         showToast('Intercorrência registrada com sucesso');
       }
     } catch (err) {
@@ -9512,6 +9645,16 @@ export default function App() {
         showToast('Plantão atualizado com sucesso');
       } else {
         await addDoc(collection(db, 'shiftSchedules'), cleanedData);
+
+        // Notificar equipe
+        sendNotification({
+          title: 'Novo Plantão Cadastrado',
+          message: `Um novo plantão foi cadastrado para o dia ${format(parseISO(data.date), 'dd/MM/yyyy')}`,
+          type: 'SCHEDULE',
+          targetRole: 'ALL',
+          professionalName: user.name
+        });
+
         showToast('Plantão salvo com sucesso');
       }
     } catch (err) {
@@ -9681,6 +9824,16 @@ export default function App() {
         showToast('Atendimento atualizado com sucesso');
       } else {
         await addDoc(collection(db, 'psychAppointments'), cleanedData);
+
+        // Notificar equipe
+        sendNotification({
+          title: 'Novo Agendamento de Psicologia',
+          message: `Uma nova sessão foi agendada para ${format(parseISO(data.date), 'dd/MM/yyyy')} às ${data.time}`,
+          type: 'SCHEDULE',
+          targetRole: 'PSICOLOGA',
+          professionalName: user.name
+        });
+
         showToast('Atendimento registrado com sucesso');
       }
     } catch (err) {
@@ -10459,7 +10612,7 @@ export default function App() {
       case 'volunteers': return <VolunteersSection volunteers={volunteers} showToast={showToast} user={user} />;
       case 'family': return <FamilySection engagements={familyEngagements} elderly={elderly} showToast={showToast} />;
       case 'staff': return <StaffManagementSection staff={users} onSave={handleSaveStaffMember} showToast={showToast} />;
-      case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} />;
+      case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} sendNotification={sendNotification} />;
       case 'workshops': return <WorkshopsSection workshops={workshops} communityElderly={communityElderly} caregivers={caregivers} showToast={showToast} />;
       case 'monitoring': return (
         <MonitoringSection 
@@ -10603,15 +10756,119 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setIsNotificationsOpen(true)}
-              className="p-3 bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 text-gray-400 dark:text-gray-500 hover:text-green-600 transition-colors relative"
-            >
-              <Bell size={20} />
-              {calendarEvents.length > 0 && (
-                <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900" />
-              )}
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                className="p-3 bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 text-gray-400 dark:text-gray-500 hover:text-green-600 transition-colors relative"
+              >
+                <Bell size={20} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-900" />
+                )}
+              </button>
+
+              <AnimatePresence>
+                {isNotificationsOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setIsNotificationsOpen(false)} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-4 w-80 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 z-50 overflow-hidden"
+                    >
+                      <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
+                        <div>
+                          <h3 className="font-bold text-gray-800 dark:text-white">Notificações</h3>
+                          {window.Notification && Notification.permission !== 'granted' ? (
+                            <button 
+                              onClick={() => Notification.requestPermission().then(res => {
+                                if (res === 'granted') showToast('Notificações ativadas!');
+                              })}
+                              className="text-[9px] font-bold text-blue-500 hover:underline"
+                            >
+                              Ativar no celular
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                if ('serviceWorker' in navigator) {
+                                  navigator.serviceWorker.ready.then(registration => {
+                                    registration.showNotification('Teste OAMI', {
+                                      body: 'Se você está vendo isso, as notificações no celular estão funcionando!',
+                                      icon: INSTITUTION_LOGO,
+                                      vibrate: [200, 100, 200]
+                                    } as any);
+                                  });
+                                }
+                              }}
+                              className="text-[9px] font-bold text-gray-400 hover:text-green-500 transition-colors"
+                            >
+                              Testar notificações
+                            </button>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
+                          {notifications.filter(n => !n.read).length} Novas
+                        </span>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((n) => (
+                            <div 
+                              key={n.id} 
+                              className={cn(
+                                "p-4 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer relative",
+                                !n.read && "bg-green-50/30 dark:bg-green-900/10"
+                              )}
+                              onClick={() => {
+                                markNotificationAsRead(n.id);
+                                if (n.link) setActiveTab(n.link as any);
+                                setIsNotificationsOpen(false);
+                              }}
+                            >
+                              <div className="flex gap-3">
+                                <div className={cn(
+                                  "p-2 rounded-xl shrink-0",
+                                  n.type === 'SCHEDULE' ? 'bg-blue-100 text-blue-600' :
+                                  n.type === 'INCIDENT' ? 'bg-red-100 text-red-600' :
+                                  'bg-green-100 text-green-600'
+                                )}>
+                                  {n.type === 'SCHEDULE' ? <Calendar size={16} /> : 
+                                   n.type === 'INCIDENT' ? <AlertCircle size={16} /> : 
+                                   <Bell size={16} />}
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs font-bold text-gray-800 dark:text-white leading-tight">{n.title}</p>
+                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2">{n.message}</p>
+                                  <p className="text-[9px] text-gray-400 dark:text-gray-600 font-medium">
+                                    {format(parseISO(n.date), "HH:mm '•' dd/MM")}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-12 text-center">
+                            <BellOff className="mx-auto text-gray-200 dark:text-gray-800 mb-2" size={32} />
+                            <p className="text-xs text-gray-400 font-medium">Nenhuma notificação</p>
+                          </div>
+                        )}
+                      </div>
+                      {notifications.length > 0 && (
+                        <button className="w-full p-4 text-[10px] font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
+                          Ver Todas
+                        </button>
+                      )}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             <button 
               onClick={() => setIsProfileOpen(true)}
               className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 pr-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all group"

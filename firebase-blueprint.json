@@ -743,6 +743,22 @@
         "registeredBy": { "type": "string" }
       },
       "required": ["patientId", "date", "title", "meals", "registeredBy"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "System notification for professionals",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["SCHEDULE", "INCIDENT", "SYSTEM", "URGENTE"] },
+        "date": { "type": "string" },
+        "read": { "type": "boolean" },
+        "targetRole": { "type": "string" },
+        "professionalName": { "type": "string" },
+        "link": { "type": "string" }
+      },
+      "required": ["title", "message", "type", "date", "read"]
     }
   },
   "firestore": {
@@ -795,6 +811,7 @@
     "nutritionEvolutions": { "schema": "NutritionEvolution", "description": "Nutrition evolutions" },
     "nutritionAnthropometries": { "schema": "NutritionAnthropometry", "description": "Nutrition anthropometry data" },
     "nutritionMealPlans": { "schema": "NutritionMealPlan", "description": "Nutrition meal plans" },
+    "notifications": { "schema": "AppNotification", "description": "Professional notifications" },
     "users": { "schema": "StaffMember", "description": "Support staff records" }
   }
 }

@@ -924,3 +924,15 @@ export interface NutritionMealPlan {
   registeredBy: string;
 }
 
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'SCHEDULE' | 'INCIDENT' | 'SYSTEM' | 'URGENTE';
+  date: string; // ISO string
+  read: boolean;
+  targetRole?: Role | 'ALL';
+  professionalName?: string;
+  link?: string;
+}
+
