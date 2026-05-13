@@ -543,7 +543,14 @@ service cloud.firestore {
     function isValidWorkshop(data) {
       return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
-             data.type in ['PROFISSIONAL', 'IDOSOS'];
+             data.type in ['OFICINA', 'CAPACITACAO', 'PROFISSIONAL', 'IDOSOS'] &&
+             (!('what' in data) || data.what is string) &&
+             (!('why' in data) || data.why is string) &&
+             (!('where' in data) || data.where is string) &&
+             (!('who' in data) || data.who is string) &&
+             (!('how' in data) || data.how is string) &&
+             (!('howMuch' in data) || data.howMuch is string) &&
+             (!('registeredBy' in data) || data.registeredBy is string);
     }
 
     function isValidCaregiver(data) {

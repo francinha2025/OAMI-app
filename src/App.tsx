@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  AlertTriangle,
   FileDown,
   Trash2,
   LayoutDashboard,
@@ -6475,16 +6476,21 @@ const ReportsSection = ({
   );
 };
 
-const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }: { 
+const WorkshopsSection = ({ workshops, communityElderly, caregivers, elderly, showToast }: { 
   workshops: Workshop[], 
   communityElderly: CommunityElderly[],
   caregivers: Caregiver[],
+  elderly: Elderly[],
   showToast: (msg: string, type?: 'success' | 'error') => void 
 }) => {
   const [isElderlyModalOpen, setIsElderlyModalOpen] = useState(false);
   const [isCaregiverModalOpen, setIsCaregiverModalOpen] = useState(false);
   const [isWorkshopModalOpen, setIsWorkshopModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState<Workshop | null>(null);
+  const [editingWorkshop, setEditingWorkshop] = useState<Workshop | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState<{ msg: string; onConfirm: () => void } | null>(null);
   
   const [elderlyFormData, setElderlyFormData] = useState({
     name: '',
@@ -6588,9 +6594,17 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
         ...workshopFormData,
         registeredBy: auth.currentUser?.email || 'Sistema'
       });
-      await addDoc(collection(db, 'workshops'), workshopData);
-      showToast('Registro de atividade realizado com sucesso!');
+      
+      if (editingWorkshop) {
+        await updateDoc(doc(db, 'workshops', editingWorkshop.id), workshopData);
+        showToast('Registro de atividade atualizado com sucesso!');
+      } else {
+        await addDoc(collection(db, 'workshops'), workshopData);
+        showToast('Registro de atividade realizado com sucesso!');
+      }
+      
       setIsWorkshopModalOpen(false);
+      setEditingWorkshop(null);
       setWorkshopFormData({
         title: '',
         date: '',
@@ -6606,10 +6620,60 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
         howMuch: ''
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'workshops');
+      handleFirestoreError(err, editingWorkshop ? OperationType.UPDATE : OperationType.CREATE, 'workshops');
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleCategory = (ids: string[]) => {
+    const allSelected = ids.length > 0 && ids.every(id => workshopFormData.participants.includes(id));
+    if (allSelected) {
+      setWorkshopFormData({
+        ...workshopFormData,
+        participants: workshopFormData.participants.filter(id => !ids.includes(id))
+      });
+    } else {
+      const newParticipants = Array.from(new Set([...workshopFormData.participants, ...ids]));
+      setWorkshopFormData({
+        ...workshopFormData,
+        participants: newParticipants
+      });
+    }
+  };
+
+  const handleDeleteWorkshop = async (id: string) => {
+    setShowConfirm({
+      msg: 'Tem certeza que deseja excluir esta atividade? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'workshops', id));
+          showToast('Atividade excluída com sucesso!');
+        } catch (err) {
+          handleFirestoreError(err, OperationType.DELETE, 'workshops');
+        }
+        setShowConfirm(null);
+      }
+    });
+  };
+
+  const handleEditWorkshop = (w: Workshop) => {
+    setEditingWorkshop(w);
+    setWorkshopFormData({
+      title: w.title,
+      date: w.date,
+      description: w.description || '',
+      type: w.type,
+      participants: w.participants || [],
+      what: w.what || '',
+      why: w.why || '',
+      where: w.where || '',
+      when: w.when || '',
+      who: w.who || '',
+      how: w.how || '',
+      howMuch: w.howMuch || ''
+    });
+    setIsWorkshopModalOpen(true);
   };
 
   return (
@@ -6648,13 +6712,25 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
         {workshops.length > 0 ? workshops.map((w) => (
           <div key={w.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
             <div className="flex justify-between items-start">
-              <div className={cn(
-                "px-3 py-1 rounded-full text-[10px] font-bold uppercase", 
-                w.type === 'CAPACITACAO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-              )}>
-                {w.type}
+              <div className="flex gap-2 items-center">
+                <div className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase", 
+                  w.type === 'CAPACITACAO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                )}>
+                  {w.type}
+                </div>
               </div>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(w.date).toLocaleDateString('pt-BR')}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(w.date).toLocaleDateString('pt-BR')}</span>
+                <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-800 ml-2 pl-2">
+                  <button onClick={() => handleEditWorkshop(w)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+                    <Edit2 size={14} />
+                  </button>
+                  <button onClick={() => handleDeleteWorkshop(w.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
             <h4 className="font-bold text-gray-800 dark:text-white text-lg">{w.title}</h4>
             <div className="space-y-2">
@@ -6669,7 +6745,15 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
             </div>
             <div className="flex justify-between items-center pt-2 border-t border-gray-50 dark:border-gray-800">
               <span className="text-xs text-gray-400 font-medium">{w.participants?.length || 0} participantes</span>
-              <button className="text-green-600 dark:text-green-400 text-sm font-bold hover:underline">Ver detalhes</button>
+              <button 
+                onClick={() => {
+                  setSelectedWorkshop(w);
+                  setIsDetailsModalOpen(true);
+                }}
+                className="text-green-600 dark:text-green-400 text-sm font-bold hover:underline"
+              >
+                Ver detalhes
+              </button>
             </div>
           </div>
         )) : (
@@ -6914,7 +6998,6 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
         )}
       </AnimatePresence>
 
-      {/* Modal Registrar Oficina/Capacitação */}
       <AnimatePresence>
         {isWorkshopModalOpen && (
           <div className="fixed inset-0 z-[60] flex justify-center items-start p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
@@ -6925,9 +7008,14 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
               className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-2xl my-4 md:my-10"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Registrar Oficina/Capacitação</h3>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+                  {editingWorkshop ? 'Editar' : 'Registrar'} Oficina/Capacitação
+                </h3>
                 <button 
-                  onClick={() => setIsWorkshopModalOpen(false)} 
+                  onClick={() => {
+                    setIsWorkshopModalOpen(false);
+                    setEditingWorkshop(null);
+                  }} 
                   className="bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2.5 rounded-2xl transition-all shadow-sm"
                   aria-label="Fechar"
                 >
@@ -6941,7 +7029,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                     <label className="text-xs font-bold text-gray-400 uppercase">Título do Evento</label>
                     <input 
                       type="text"
-                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-medium"
                       value={workshopFormData.title}
                       onChange={e => setWorkshopFormData({...workshopFormData, title: e.target.value})}
                       required
@@ -6950,13 +7038,99 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-400 uppercase">Tipo</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-medium"
                       value={workshopFormData.type}
                       onChange={e => setWorkshopFormData({...workshopFormData, type: e.target.value as any})}
                     >
                       <option value="OFICINA">Oficina</option>
                       <option value="CAPACITACAO">Capacitação</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-4">
+                  <label className="text-xs font-bold text-gray-400 uppercase">Participantes (Idosos, Idosos da Comunidade e Cuidadores)</label>
+                  <div className="max-h-64 overflow-y-auto space-y-2 pr-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase">Idosos Residentes</p>
+                      <button 
+                        type="button"
+                        onClick={() => toggleCategory(elderly.map(e => e.id))}
+                        className="text-[9px] font-bold text-green-600 hover:underline"
+                      >
+                        {elderly.every(e => workshopFormData.participants.includes(e.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                      </button>
+                    </div>
+                    {elderly.map(e => (
+                      <label key={e.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                        <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={workshopFormData.participants.includes(e.id)}
+                          onChange={() => {
+                            const newParticipants = workshopFormData.participants.includes(e.id)
+                              ? workshopFormData.participants.filter(id => id !== e.id)
+                              : [...workshopFormData.participants, e.id];
+                            setWorkshopFormData({...workshopFormData, participants: newParticipants});
+                          }}
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-600">{e.name}</span>
+                      </label>
+                    ))}
+
+                    <div className="flex justify-between items-center mt-4 mb-1">
+                      <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">Idosos da Comunidade</p>
+                      <button 
+                        type="button"
+                        onClick={() => toggleCategory(communityElderly.map(e => e.id))}
+                        className="text-[9px] font-bold text-blue-600 hover:underline"
+                      >
+                        {communityElderly.every(e => workshopFormData.participants.includes(e.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                      </button>
+                    </div>
+                    {communityElderly.map(e => (
+                      <label key={e.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                        <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={workshopFormData.participants.includes(e.id)}
+                          onChange={() => {
+                            const newParticipants = workshopFormData.participants.includes(e.id)
+                              ? workshopFormData.participants.filter(id => id !== e.id)
+                              : [...workshopFormData.participants, e.id];
+                            setWorkshopFormData({...workshopFormData, participants: newParticipants});
+                          }}
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-600">{e.name}</span>
+                      </label>
+                    ))}
+                    
+                    <div className="flex justify-between items-center mt-4 mb-1">
+                      <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase">Cuidadores</p>
+                      <button 
+                        type="button"
+                        onClick={() => toggleCategory(caregivers.map(c => c.id))}
+                        className="text-[9px] font-bold text-purple-600 hover:underline"
+                      >
+                        {caregivers.every(c => workshopFormData.participants.includes(c.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                      </button>
+                    </div>
+                    {caregivers.map(c => (
+                      <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                        <input 
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={workshopFormData.participants.includes(c.id)}
+                          onChange={() => {
+                            const newParticipants = workshopFormData.participants.includes(c.id)
+                              ? workshopFormData.participants.filter(id => id !== c.id)
+                              : [...workshopFormData.participants, c.id];
+                            setWorkshopFormData({...workshopFormData, participants: newParticipants});
+                          }}
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-green-600">{c.name}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -6968,6 +7142,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                       <label className="text-xs font-bold text-gray-400 uppercase">What (O que será feito?)</label>
                       <input 
                         type="text"
+                        required
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                         value={workshopFormData.what}
                         onChange={e => setWorkshopFormData({...workshopFormData, what: e.target.value})}
@@ -6998,6 +7173,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                       <label className="text-xs font-bold text-gray-400 uppercase">When (Quando / Data?)</label>
                       <input 
                         type="date"
+                        required
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                         value={workshopFormData.date}
                         onChange={e => setWorkshopFormData({...workshopFormData, date: e.target.value})}
@@ -7010,6 +7186,7 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                       <label className="text-xs font-bold text-gray-400 uppercase">Who (Quem irá fazer / Responsável?)</label>
                       <input 
                         type="text"
+                        required
                         className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
                         value={workshopFormData.who}
                         onChange={e => setWorkshopFormData({...workshopFormData, who: e.target.value})}
@@ -7040,7 +7217,10 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                 <div className="flex gap-4 pt-4">
                   <button 
                     type="button"
-                    onClick={() => setIsWorkshopModalOpen(false)}
+                    onClick={() => {
+                      setIsWorkshopModalOpen(false);
+                      setEditingWorkshop(null);
+                    }}
                     className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
                   >
                     Cancelar
@@ -7050,10 +7230,122 @@ const WorkshopsSection = ({ workshops, communityElderly, caregivers, showToast }
                     disabled={loading}
                     className="flex-1 py-4 bg-green-600 text-white rounded-2xl font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all disabled:opacity-50"
                   >
-                    {loading ? 'Salvando...' : 'Salvar Registro'}
+                    {loading ? 'Salvando...' : editingWorkshop ? 'Salvar Alterações' : 'Salvar Registro'}
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Detalhes */}
+      <AnimatePresence>
+        {isDetailsModalOpen && selectedWorkshop && (
+          <div className="fixed inset-0 z-[60] flex justify-center items-start p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-2xl my-4 md:my-16"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase mb-2 inline-block", 
+                    selectedWorkshop.type === 'CAPACITACAO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  )}>
+                    {selectedWorkshop.type}
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedWorkshop.title}</h3>
+                  <p className="text-sm text-gray-400 font-medium">{format(parseISO(selectedWorkshop.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                </div>
+                <button 
+                  onClick={() => setIsDetailsModalOpen(false)} 
+                  className="bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 p-2.5 rounded-2xl transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Participantes ({selectedWorkshop.participants?.length || 0})</p>
+                  <div className="max-h-40 overflow-y-auto space-y-2">
+                    {selectedWorkshop.participants?.map(pid => {
+                      const resident = elderly.find(e => e.id === pid);
+                      const community = communityElderly.find(e => e.id === pid);
+                      const caregiver = caregivers.find(c => c.id === pid);
+                      const person = resident || community || caregiver;
+                      if (!person) return null;
+                      return (
+                        <div key={pid} className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            resident ? "bg-green-500" : community ? "bg-blue-500" : "bg-purple-500"
+                          )} />
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{person.name}</span>
+                          <span className="text-[9px] font-medium text-gray-400 ml-auto">{resident ? 'Residente' : community ? 'Idoso Comunidade' : 'Cuidador'}</span>
+                        </div>
+                      );
+                    })}
+                    {(!selectedWorkshop.participants || selectedWorkshop.participants.length === 0) && (
+                      <p className="text-xs text-gray-400 text-center py-4">Nenhum participante registrado</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-green-50 dark:bg-green-900/10 p-4 rounded-2xl space-y-3">
+                  <p className="text-[10px] font-black text-green-700 dark:text-green-400 uppercase mb-2">Informações 5W2H</p>
+                  <div className="space-y-2 text-xs">
+                    <p className="text-gray-600 dark:text-gray-300"><span className="font-bold text-green-600">WHERE:</span> {selectedWorkshop.where}</p>
+                    <p className="text-gray-600 dark:text-gray-300"><span className="font-bold text-green-600">WHO:</span> {selectedWorkshop.who}</p>
+                    <p className="text-gray-600 dark:text-gray-300"><span className="font-bold text-green-600">HOW MUCH:</span> {selectedWorkshop.howMuch}</p>
+                    <p className="text-gray-600 dark:text-gray-300"><span className="font-bold text-green-600">WHY:</span> {selectedWorkshop.why}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Detalhamento (HOW)</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{selectedWorkshop.how || 'Sem detalhamento disponível'}</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Confirmação Exclusão */}
+      <AnimatePresence>
+        {showConfirm && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white dark:bg-gray-900 rounded-[2rem] p-8 shadow-2xl w-full max-w-sm text-center"
+            >
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Confirmar Exclusão</h3>
+              <p className="text-gray-500 text-sm mb-8 leading-relaxed">{showConfirm.msg}</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowConfirm(null)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold rounded-xl hover:bg-gray-200 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={showConfirm.onConfirm}
+                  className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200 dark:shadow-none hover:bg-red-700 transition-all"
+                >
+                  Confirmar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -10613,7 +10905,7 @@ export default function App() {
       case 'family': return <FamilySection engagements={familyEngagements} elderly={elderly} showToast={showToast} />;
       case 'staff': return <StaffManagementSection staff={users} onSave={handleSaveStaffMember} showToast={showToast} />;
       case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} sendNotification={sendNotification} />;
-      case 'workshops': return <WorkshopsSection workshops={workshops} communityElderly={communityElderly} caregivers={caregivers} showToast={showToast} />;
+      case 'workshops': return <WorkshopsSection workshops={workshops} communityElderly={communityElderly} caregivers={caregivers} elderly={elderly} showToast={showToast} />;
       case 'monitoring': return (
         <MonitoringSection 
           elderly={elderly} 

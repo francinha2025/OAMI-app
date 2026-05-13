@@ -243,8 +243,15 @@
         "title": { "type": "string" },
         "date": { "type": "string" },
         "description": { "type": "string" },
-        "type": { "type": "string", "enum": ["PROFISSIONAL", "IDOSOS"] },
-        "participants": { "type": "array", "items": { "type": "string" } }
+        "type": { "type": "string", "enum": ["OFICINA", "CAPACITACAO", "PROFISSIONAL", "IDOSOS"] },
+        "participants": { "type": "array", "items": { "type": "string" } },
+        "what": { "type": "string" },
+        "why": { "type": "string" },
+        "where": { "type": "string" },
+        "who": { "type": "string" },
+        "how": { "type": "string" },
+        "howMuch": { "type": "string" },
+        "registeredBy": { "type": "string" }
       },
       "required": ["title", "date", "type"]
     },
