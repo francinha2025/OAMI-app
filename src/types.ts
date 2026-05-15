@@ -825,7 +825,7 @@ export interface SocialStudy {
 
 export interface SocialEvolution {
   id: string;
-  patientId: string;
+  patientId?: string;
   date: string;
   serviceType: string;
   observation: string;

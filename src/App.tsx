@@ -10713,6 +10713,7 @@ export default function App() {
       case 'physio': return (
         <PhysioSection 
           user={user}
+          elderly={elderly}
           patients={physioPatientsList}
           assessments={physioAssessments}
           evolutions={physioEvolutions}
@@ -10736,6 +10737,7 @@ export default function App() {
       case 'nursing': return (
         <NursingSection 
           user={user}
+          elderly={elderly}
           patients={nursingPatientsList}
           medications={medications}
           administrations={medicationAdministrations}
@@ -10771,6 +10773,7 @@ export default function App() {
       case 'psychology': return (
         <PsychologySection 
           user={user}
+          elderly={elderly}
           patients={psychPatientsList}
           initialAssessments={psychInitialAssessments}
           evolutions={psychEvolutions}
@@ -10802,6 +10805,7 @@ export default function App() {
       case 'pedagogy': return (
         <PedagogySection 
           user={user}
+          elderly={elderly}
           patients={pedagogyPatientsList}
           assessments={pedagogyInitialAssessments}
           evolutions={pedagogyEvolutions}
@@ -10831,6 +10835,7 @@ export default function App() {
       case 'socialWork': return (
         <SocialWorkSection 
           user={user}
+          elderly={elderly}
           patients={socialPatientsList}
           familyTies={socialFamilyTies}
           documentations={socialDocumentations}
@@ -10864,6 +10869,7 @@ export default function App() {
       case 'nutrition': return (
         <NutritionSection 
           user={user}
+          elderly={elderly}
           patients={nutritionPatientsList}
           evolutions={nutritionEvolutions}
           anthropometries={nutritionAnthropometries}

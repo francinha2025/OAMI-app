@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -35,7 +35,8 @@ import {
   NutritionEvolution, 
   NutritionAnthropometry, 
   NutritionMealPlan, 
-  User as UserType 
+  User as UserType,
+  Elderly
 } from '../types';
 import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
@@ -43,6 +44,7 @@ import { generateModernWord } from '../lib/wordUtils';
 
 interface NutritionSectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: NutritionPatient[];
   evolutions: NutritionEvolution[];
   anthropometries: NutritionAnthropometry[];
@@ -62,6 +64,7 @@ interface NutritionSectionProps {
 
 export const NutritionSection: React.FC<NutritionSectionProps> = ({
   user,
+  elderly,
   patients,
   evolutions,
   anthropometries,
@@ -80,11 +83,33 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
+  const [localFormData, setLocalFormData] = useState<any>({});
+
+  // Sincronização automática com Cadastro Geral
+  const linkedElderly = useMemo(() => 
+    localFormData.elderlyId ? (elderly || []).find(e => e.id === localFormData.elderlyId) : null,
+  [localFormData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly && modalType === 'profile') {
+      const birthDate = linkedElderly.birthDate;
+      const age = birthDate ? (new Date().getFullYear() - new Date(birthDate).getFullYear()) : 0;
+      
+      setLocalFormData((prev: any) => ({
+        ...prev,
+        name: linkedElderly.name,
+        age: age
+      }));
+    }
+  }, [linkedElderly, modalType]);
 
   // Filtered Data
-  const filteredPatients = patients.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(p => {
+    const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+    const name = linked?.name || p.name;
+    return name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const filteredEvolutions = useMemo(() => {
     return evolutions
@@ -335,34 +360,49 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <button 
+          onClick={() => handleOpenModal('profile')}
+          className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-100 dark:shadow-none"
+        >
+          <Plus size={20} /> Novo Perfil Nutricional
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPatients.map(p => (
-          <motion.div 
-            key={p.id}
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 group relative"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-16 h-16 bg-orange-50 dark:bg-orange-900/20 rounded-3xl flex items-center justify-center text-orange-500">
-                <User size={32} />
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setEditingRecord(p); setIsModalOpen(true); }}
-                  className="p-2 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl transition-colors"
-                >
-                  <Edit2 size={16} />
-                </button>
-              </div>
-            </div>
+        {filteredPatients.map(p => {
+          const linkedElderly = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+          const name = linkedElderly?.name || p.name;
 
-            <h4 className="text-xl font-black text-gray-900 dark:text-white leading-tight mb-2">{p.name}</h4>
-            
-            <div className="space-y-3">
+          return (
+            <motion.div 
+              key={p.id}
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 group relative"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-16 h-16 bg-orange-50 dark:bg-orange-900/20 rounded-3xl flex items-center justify-center text-orange-500">
+                  <User size={32} />
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleOpenModal('profile', p)}
+                    className="p-2 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl transition-colors"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1 mb-3">
+                <h4 className="text-xl font-black text-gray-900 dark:text-white leading-tight">{name}</h4>
+                {linkedElderly && (
+                  <span className="w-fit px-2 py-0.5 bg-orange-100 text-orange-700 text-[8px] font-black uppercase rounded tracking-widest border border-orange-200">Vinculado ao Cadastro Geral</span>
+                )}
+              </div>
+              
+              <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <span className="text-[10px] font-black px-2 py-1 bg-orange-100 text-orange-700 rounded-full uppercase tracking-wider">{p.dietType}</span>
                 <span className="text-[10px] font-black px-2 py-1 bg-blue-100 text-blue-700 rounded-full uppercase tracking-wider">{p.consistency}</span>
@@ -388,7 +428,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
               )}
             </div>
           </motion.div>
-        ))}
+        )})}
       </div>
     </div>
   );
@@ -692,9 +732,6 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
     </div>
   );
 
-  const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
-  const [localFormData, setLocalFormData] = useState<any>({});
-
   const handleOpenModal = (type: any, record: any = null) => {
     setModalType(type);
     setEditingRecord(record);
@@ -793,20 +830,52 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
               </h2>
 
               <form onSubmit={handleSave} className="space-y-6">
+                {modalType === 'profile' && (
+                  <div className="space-y-3 p-6 bg-orange-50 dark:bg-orange-900/10 rounded-[32px] border border-orange-100 dark:border-orange-800/30 transition-all mb-4">
+                    <label className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Users size={14} />
+                      Vincular ao Cadastro Geral (Idosos)
+                    </label>
+                    <select 
+                      className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-orange-500 transition-all font-bold dark:text-white"
+                      value={localFormData.elderlyId || ''}
+                      onChange={(e) => setLocalFormData({ ...localFormData, elderlyId: e.target.value })}
+                    >
+                      <option value="">-- Não vinculado / Novo Perfil --</option>
+                      {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                    <p className="text-[10px] text-orange-600/60 ml-1 italic font-medium">Sincroniza nome e idade.</p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Acolhido</label>
-                    <select 
-                      required
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-bold"
-                      value={localFormData.patientId || localFormData.id}
-                      onChange={e => setLocalFormData({...localFormData, patientId: e.target.value})}
-                    >
-                      <option value="">Selecione...</option>
-                      {patients.map(p => (
-                        <option key={p.id} value={p.elderlyId || p.id}>{p.name}</option>
-                      ))}
-                    </select>
+                    {modalType === 'profile' ? (
+                      <input 
+                        type="text"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-bold disabled:opacity-50"
+                        value={localFormData.name || ''}
+                        onChange={e => setLocalFormData({...localFormData, name: e.target.value})}
+                        disabled={!!localFormData.elderlyId}
+                      />
+                    ) : (
+                      <select 
+                        required
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-bold"
+                        value={localFormData.patientId || localFormData.id}
+                        onChange={e => setLocalFormData({...localFormData, patientId: e.target.value})}
+                      >
+                        <option value="">Selecione...</option>
+                        {patients.map(p => {
+                          const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                          const name = linked?.name || p.name;
+                          return (
+                            <option key={p.id} value={p.elderlyId || p.id}>{name}</option>
+                          );
+                        })}
+                      </select>
+                    )}
                   </div>
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Data</label>
@@ -915,7 +984,18 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                 )}
 
                 {modalType === 'profile' && (
+                  <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Idade</label>
+                      <input 
+                        type="number"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-bold disabled:opacity-50"
+                        value={localFormData.age || ''}
+                        onChange={e => setLocalFormData({...localFormData, age: parseInt(e.target.value)})}
+                        disabled={!!localFormData.elderlyId}
+                      />
+                    </div>
                     <div>
                       <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Tipo de Dieta</label>
                       <select 
@@ -944,6 +1024,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                       </select>
                     </div>
                   </div>
+                  </>
                 )}
 
                 <button 

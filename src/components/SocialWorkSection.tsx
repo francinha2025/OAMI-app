@@ -9,7 +9,7 @@ import {
   ArrowLeft, TrendingUp, UserCircle, LogOut,
   Moon, Sun, Smile, Meh, Frown, History,
   Lightbulb, Target, Star, ShieldAlert, Loader2, Zap,
-  Home, MapPin, Briefcase, DollarSign,
+  Home, MapPin, Briefcase, DollarSign, Activity,
   FileCheck, FileWarning, FileX, Landmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,7 +29,7 @@ import {
   SocialPatient, SocialFamilyTie, SocialDocumentation,
   SocialLegalSituation, SocialStudy, SocialEvolution,
   SocialReferral, SocialFamilyVisit, SocialRiskSituation,
-  PIA
+  PIA, Elderly
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
@@ -37,6 +37,7 @@ import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 
 interface SocialWorkSectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: SocialPatient[];
   familyTies: SocialFamilyTie[];
   documentations: SocialDocumentation[];
@@ -102,6 +103,7 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
 
 export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   user,
+  elderly,
   patients,
   familyTies,
   documentations,
@@ -143,6 +145,24 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [formData, setFormData] = useState<any>({});
   const [isExtracting, setIsExtracting] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+
+  // Sincronização automática com Cadastro Geral
+  const linkedElderly = useMemo(() => 
+    formData.elderlyId ? (elderly || []).find(e => e.id === formData.elderlyId) : null,
+  [formData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly && (modalType === 'patient' || modalType === 'profile' || activeTab === 'profile')) {
+      setFormData((prev: any) => ({
+        ...prev,
+        name: linkedElderly.name,
+        birthDate: linkedElderly.birthDate,
+        cpf: linkedElderly.cpf,
+        entryDate: linkedElderly.entryDate
+      }));
+    }
+  }, [linkedElderly, modalType, activeTab]);
+
   const [familyPatientFilter, setFamilyPatientFilter] = useState('');
   const [docsPatientFilter, setDocsPatientFilter] = useState('');
   const [legalPatientFilter, setLegalPatientFilter] = useState('');
@@ -529,23 +549,41 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'profile':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-[32px] border border-blue-100 dark:border-blue-800/30 transition-all">
+              <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                <Users size={14} />
+                Vincular ao Cadastro Geral (Idosos)
+              </label>
+              <select 
+                className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-bold dark:text-white"
+                value={formData.elderlyId || ''}
+                onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
+              >
+                <option value="">-- Não vinculado / Novo Cadastro --</option>
+                {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              <p className="text-[10px] text-blue-600/60 ml-1 italic font-medium">Sincroniza nome, data de nascimento, CPF e data de entrada.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="col-span-2">
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nome Completo</label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium disabled:opacity-50"
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  disabled={!!formData.elderlyId}
                 />
               </div>
               <div>
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Data de Nascimento</label>
                 <input
                   type="date"
-                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
+                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium disabled:opacity-50"
                   value={formData.birthDate || ''}
                   onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  disabled={!!formData.elderlyId}
                 />
               </div>
               <div>
@@ -689,12 +727,17 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
               <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
+                className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="">Fluxo de Atendimento Geral (Sem idoso específico)</option>
+                {patients.map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return (
+                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                  );
+                })}
               </select>
             </div>
             <div>
@@ -1476,9 +1519,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -1561,9 +1607,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -1646,9 +1695,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -1723,6 +1775,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       const patientLegal = (legalSituations || []).find(l => l.patientId === selectedPatient.id);
       const patientStudy = (socialStudies || []).find(s => s.patientId === selectedPatient.id);
       const patientEvolutions = (evolutions || []).filter(e => e.patientId === selectedPatient.id);
+      const linkedElderly = selectedPatient.elderlyId ? (elderly || []).find(e => e.id === selectedPatient.elderlyId) : null;
+      const name = linkedElderly?.name || selectedPatient.name;
+      const birthDate = linkedElderly?.birthDate || selectedPatient.birthDate;
+      const age = birthDate ? (new Date().getFullYear() - new Date(birthDate).getFullYear()) : 0;
+      const photoUrl = linkedElderly?.photo || selectedPatient.photoUrl;
 
       return (
         <div className="space-y-6">
@@ -1738,14 +1795,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             <div className="lg:col-span-1 space-y-6">
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm text-center">
                 <div className="w-32 h-32 rounded-full bg-blue-50 mx-auto mb-4 border-4 border-white shadow-md overflow-hidden">
-                  {selectedPatient.photoUrl ? (
-                    <img src={selectedPatient.photoUrl} alt={selectedPatient.name} className="w-full h-full object-cover" />
+                  {photoUrl ? (
+                    <img src={photoUrl} alt={name || selectedPatient.name} className="w-full h-full object-cover" />
                   ) : (
                     <UserIcon className="w-16 h-16 text-blue-400 mt-6 mx-auto" />
                   )}
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPatient.name}</h3>
-                <p className="text-sm text-gray-500 mb-4">{safeFormat(selectedPatient.birthDate, 'dd/MM/yyyy')} ({selectedPatient.birthDate ? (new Date().getFullYear() - new Date(selectedPatient.birthDate).getFullYear()) : '--'} anos)</p>
+                <div className="flex flex-col items-center gap-1 mb-2">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{name || selectedPatient.name}</h3>
+                  {linkedElderly && (
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black uppercase rounded tracking-widest border border-blue-200">Vinculado ao Cadastro Geral</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mb-4">{safeFormat(birthDate, 'dd/MM/yyyy')} ({age} anos)</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase">{selectedPatient.maritalStatus}</span>
                   <span className={cn(
@@ -1895,39 +1957,52 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPatients.map((patient) => (
-            <motion.div
-              key={patient.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
-              onClick={() => setSelectedPatient(patient)}
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100 group-hover:border-blue-300 transition-colors">
-                      {patient.photoUrl ? (
-                        <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <UserIcon className="w-8 h-8 text-blue-400" />
+          {filteredPatients.map((patient) => {
+            const linkedElderly = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+            const name = linkedElderly?.name || patient.name;
+            const birthDate = linkedElderly?.birthDate || patient.birthDate;
+
+            return (
+              <motion.div
+                key={patient.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer group relative"
+                onClick={() => setSelectedPatient(patient)}
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100 group-hover:border-blue-300 transition-colors">
+                        {(() => {
+                          const photoUrl = linkedElderly?.photo || patient.photoUrl;
+                          return photoUrl ? (
+                            <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
+                          ) : (
+                            <UserIcon className="w-8 h-8 text-blue-400" />
+                          );
+                        })()}
+                      </div>
+                      <div className="max-w-[120px]">
+                        <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight truncate">{name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{safeFormat(birthDate, 'dd/MM/yyyy')}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={cn(
+                        "px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                        patient.benefitStatus === 'ATIVO' ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" :
+                        patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" :
+                        "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400"
+                      )}>
+                        {safeReplace(patient.benefitStatus, '_', ' ') || 'ATIVO'}
+                      </div>
+                      {linkedElderly && (
+                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black uppercase rounded">Vinculado</span>
                       )}
                     </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight">{patient.name}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{safeFormat(patient.birthDate, 'dd/MM/yyyy')}</p>
-                    </div>
                   </div>
-                  <div className={cn(
-                    "px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                    patient.benefitStatus === 'ATIVO' ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" :
-                    patient.benefitStatus === 'SUSPENSO' ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" :
-                    "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-400"
-                  )}>
-                    {safeReplace(patient.benefitStatus, '_', ' ') || 'ATIVO'}
-                  </div>
-                </div>
 
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 font-medium">
@@ -1960,7 +2035,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 </div>
               </div>
             </motion.div>
-          ))}
+          )
+        })}
         </div>
       </div>
     );
@@ -1977,9 +2053,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -2002,7 +2081,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <BookOpen className="w-7 h-7 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight capitalize">{patient?.name}</h4>
+                    <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight capitalize">
+                      {(() => {
+                        const patient = (patients || []).find(p => p.id === study.patientId);
+                        const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                        return linked?.name || patient?.name;
+                      })()}
+                    </h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400 font-bold mt-0.5">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
@@ -2066,10 +2151,14 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             onChange={(e) => setEvolutionPatientFilter(e.target.value)}
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
-            <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            <option value="">Ver Todas</option>
+            <option value="GENERAL">Fluxo de Atendimento Geral</option>
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -2083,17 +2172,30 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).map((evolution) => {
+          {(evolutions || []).filter(e => {
+            if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
+            return !evolutionPatientFilter || e.patientId === evolutionPatientFilter;
+          }).map((evolution) => {
             const patient = (patients || []).find(p => p.id === evolution.patientId);
+            const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+            const displayName = linked?.name || patient?.name || 'Fluxo de Atendimento Geral';
+            
             return (
               <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      <ClipboardList className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                    <div className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center",
+                      !evolution.patientId ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-gray-800"
+                    )}>
+                      {!evolution.patientId ? (
+                        <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <ClipboardList className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                      )}
                     </div>
                     <div>
-                      <h4 className="font-bold text-gray-900 dark:text-white">{patient?.name}</h4>
+                      <h4 className="font-bold text-gray-900 dark:text-white">{displayName}</h4>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
                     </div>
                   </div>
@@ -2146,9 +2248,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -2236,9 +2341,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -2308,9 +2416,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button
@@ -2393,9 +2504,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
           >
             <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+              return (
+                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+              );
+            })}
           </select>
         </div>
         <button

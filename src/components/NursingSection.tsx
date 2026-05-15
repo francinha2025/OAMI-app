@@ -26,7 +26,7 @@ import {
   NursingPatient, Medication, MedicationAdministration, 
   VitalSigns, DressingRecord, NursingEvolution, 
   IncidentRecord, ShiftSchedule, StaffMember, AVDRecord, 
-  DiaperChangeRecord, User as UserType, Professional
+  DiaperChangeRecord, User as UserType, Professional, Elderly
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
@@ -34,6 +34,7 @@ import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 
 interface NursingSectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: NursingPatient[];
   medications: Medication[];
   administrations: MedicationAdministration[];
@@ -75,7 +76,7 @@ export const NursingSection = (props: NursingSectionProps) => {
   const { 
     patients, medications, administrations, vitalSigns, 
     dressings, evolutions, incidents, shifts, 
-    users, professionals, avds, diaperChanges 
+    users, professionals, avds, diaperChanges, elderly 
   } = props;
   const [activeTab, setActiveTab] = useState<NursingTab>(() => {
     const saved = localStorage.getItem('oami-nursing-tab');
@@ -569,7 +570,7 @@ export const NursingSection = (props: NursingSectionProps) => {
           >
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'settings' && renderSettings()}
-            {activeTab === 'patients' && !selectedPatientId && <PatientsView patients={filteredPatients} onAdd={() => { setModalType('patient'); setIsModalOpen(true); }} onSelect={setSelectedPatientId} onDelete={(id) => setDeleteConfirm({ id, type: 'patient' })} />}
+            {activeTab === 'patients' && !selectedPatientId && <PatientsView patients={filteredPatients} elderly={elderly} onAdd={() => { setModalType('patient'); setIsModalOpen(true); }} onSelect={setSelectedPatientId} onDelete={(id) => setDeleteConfirm({ id, type: 'patient' })} />}
             {activeTab === 'patients' && selectedPatientId && selectedPatient && (
               <PatientDetailView 
                 patient={selectedPatient} 
@@ -577,6 +578,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 vitals={(props.vitalSigns || []).filter(v => v.patientId === selectedPatientId)}
                 evolutions={(props.evolutions || []).filter(e => e.patientId === selectedPatientId)}
                 avds={(props.avds || []).filter(a => a.patientId === selectedPatientId)}
+                elderly={elderly}
                 onBack={() => setSelectedPatientId(null)}
                 onAddMedication={() => { setModalType('medication'); setIsModalOpen(true); }}
                 onAddVital={() => { setModalType('vital'); setIsModalOpen(true); }}
@@ -689,6 +691,7 @@ export const NursingSection = (props: NursingSectionProps) => {
               medications={medications}
               users={users}
               professionals={professionals}
+              elderly={elderly}
               editingData={editingData}
               initialPatientId={selectedPatientId || undefined}
               showToast={props.showToast}
@@ -1062,12 +1065,13 @@ const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }:
   </div>
 );
 
-const NursingModal = ({ type, patients, medications, users, professionals, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
+const NursingModal = ({ type, patients, medications, users, professionals, elderly, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
   type: string | null,
   patients: NursingPatient[],
   medications: Medication[],
   users: StaffMember[],
   professionals: Professional[],
+  elderly: Elderly[],
   onClose: () => void,
   onSavePatient: any,
   onSaveMedication: any,
@@ -1091,6 +1095,7 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
     status: 'PENDENTE',
     photos: [],
     patientId: initialPatientId || '',
+    elderlyId: editingData?.elderlyId || '',
     content: '',
     woundType: '',
     location: '',
@@ -1110,6 +1115,24 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
     familyContact: ''
   });
   const [isExtracting, setIsExtracting] = useState(false);
+
+  // Sincronização automática com Cadastro Geral
+  const linkedElderly = useMemo(() => 
+    formData.elderlyId ? (elderly || []).find(e => e.id === formData.elderlyId) : null,
+  [formData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly && type === 'patient') {
+      const birthDate = parseISO(linkedElderly.birthDate);
+      const age = new Date().getFullYear() - birthDate.getFullYear();
+      setFormData((prev: any) => ({
+        ...prev,
+        name: linkedElderly.name,
+        fullName: linkedElderly.fullName || linkedElderly.name,
+        age: age
+      }));
+    }
+  }, [linkedElderly, type]);
 
   const handleDigitize = async (text: string) => {
     if (!text) return;
@@ -1252,11 +1275,38 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
 
           {type === 'patient' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="space-y-3 p-4 bg-green-50 dark:bg-green-900/10 rounded-3xl border border-green-100 dark:border-green-900/30">
+                <label className="text-xs font-bold text-green-600 dark:text-green-400 uppercase ml-1 flex items-center gap-2">
+                  <Users size={14} />
+                  Vincular ao Cadastro Geral (Idosos)
+                </label>
+                <select 
+                  className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold dark:text-white"
+                  value={formData.elderlyId || ''}
+                  onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
+                >
+                  <option value="">-- Não vinculado / Novo Cadastro --</option>
+                  {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                <p className="text-[10px] text-green-600/60 ml-1 italic font-medium">Ao vincular, os dados de nome, idade e CPF serão sincronizados automaticamente da área geral.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <div className="md:col-span-1 lg:col-span-2">
-                  <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
+                  <Input 
+                    label="Nome Completo" 
+                    value={formData.name} 
+                    onChange={(v) => setFormData({ ...formData, name: v })} 
+                    disabled={!!formData.elderlyId}
+                  />
                 </div>
-                <Input label="Idade" type="number" value={formData.age} onChange={(v) => setFormData({ ...formData, age: v === '' ? 0 : parseInt(v) })} />
+                <Input 
+                  label="Idade" 
+                  type="number" 
+                  value={formData.age} 
+                  onChange={(v) => setFormData({ ...formData, age: v === '' ? 0 : parseInt(v) })} 
+                  disabled={!!formData.elderlyId}
+                />
               </div>
               <Input label="Diagnóstico Principal" value={formData.diagnosis} onChange={(v) => setFormData({ ...formData, diagnosis: v })} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1638,7 +1688,7 @@ const NursingModal = ({ type, patients, medications, users, professionals, onClo
   );
 };
 
-const Input = ({ label, type = "text", value, onChange, step }: { label: string, type?: string, value?: any, onChange: (v: string) => void, step?: string }) => (
+const Input = ({ label, type = "text", value, onChange, step, disabled }: { label: string, type?: string, value?: any, onChange: (v: string) => void, step?: string, disabled?: boolean }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">{label}</label>
     <input 
@@ -1646,7 +1696,11 @@ const Input = ({ label, type = "text", value, onChange, step }: { label: string,
       step={step}
       value={value === 0 ? '0' : (value || '')}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white" 
+      disabled={disabled}
+      className={cn(
+        "w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm font-bold focus:ring-4 focus:ring-green-500/10 outline-none transition-all dark:text-white",
+        disabled && "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700"
+      )} 
     />
   </div>
 );
@@ -1989,6 +2043,7 @@ const PatientDetailView = ({
   vitals, 
   evolutions,
   avds,
+  elderly,
   onBack, 
   onAddMedication, 
   onAddVital, 
@@ -2010,6 +2065,7 @@ const PatientDetailView = ({
   vitals: VitalSigns[],
   evolutions: NursingEvolution[],
   avds: AVDRecord[],
+  elderly: Elderly[],
   onBack: () => void,
   onAddMedication: () => void,
   onAddVital: () => void,
@@ -2027,6 +2083,14 @@ const PatientDetailView = ({
   onDeleteEvolution: (id: string) => void
 }) => {
   const latestAVD = (avds || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+  const linkedElderly = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+  const name = linkedElderly?.name || patient.name;
+  let age = patient.age;
+  if (linkedElderly) {
+    const birthDate = parseISO(linkedElderly.birthDate);
+    age = new Date().getFullYear() - birthDate.getFullYear();
+  }
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -2079,8 +2143,16 @@ const PatientDetailView = ({
         <div className="flex-1 space-y-4">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-3xl font-black text-gray-800 dark:text-white">{patient.name}</h2>
-              <p className="text-gray-500 font-medium">{patient.age} anos • {patient.diagnosis}</p>
+              <h2 className="text-3xl font-black text-gray-800 dark:text-white">{name}</h2>
+              <p className="text-gray-500 font-medium">{age} anos • {patient.diagnosis}</p>
+              {linkedElderly && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase tracking-tighter">
+                    Sincronizado com Cadastro Geral
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-medium tracking-tight">CPF: {linkedElderly.cpf}</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <button 
@@ -2619,7 +2691,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   </button>
 );
 
-const PatientsView = ({ patients, onAdd, onSelect, onDelete }: { patients: NursingPatient[], onAdd: () => void, onSelect: (id: string) => void, onDelete?: (id: string) => void }) => (
+const PatientsView = ({ patients, elderly, onAdd, onSelect, onDelete }: { patients: NursingPatient[], elderly: Elderly[], onAdd: () => void, onSelect: (id: string) => void, onDelete?: (id: string) => void }) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <h2 className="text-2xl font-black text-gray-800 dark:text-white">Pacientes sob Cuidado</h2>
@@ -2629,63 +2701,78 @@ const PatientsView = ({ patients, onAdd, onSelect, onDelete }: { patients: Nursi
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {(patients || []).map(patient => (
-        <div key={patient.id} onClick={() => onSelect(patient.id)} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all cursor-pointer group relative">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 font-bold text-xl overflow-hidden">
-              {patient.photoUrl ? (
-                <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                patient.name.charAt(0)
-              )}
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <h3 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors">{patient.name}</h3>
-                {onDelete && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(patient.id);
-                    }}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+      {(patients || []).map(patient => {
+        const linkedElderly = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+        const name = linkedElderly?.name || patient.name;
+        let age = patient.age;
+        if (linkedElderly) {
+          const birthDate = parseISO(linkedElderly.birthDate);
+          age = new Date().getFullYear() - birthDate.getFullYear();
+        }
+
+        return (
+          <div key={patient.id} onClick={() => onSelect(patient.id)} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900 transition-all cursor-pointer group relative">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 font-bold text-xl overflow-hidden">
+                {patient.photoUrl ? (
+                  <img src={patient.photoUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  name.charAt(0)
                 )}
               </div>
-              <p className="text-xs text-gray-500">{patient.age} anos • {patient.diagnosis}</p>
-              <div className="mt-2 space-y-1">
-                {patient.comorbidities && <p className="text-[10px] text-gray-400 line-clamp-1 italic">Comorbidades: {patient.comorbidities}</p>}
-                {patient.allergies && <p className="text-[10px] text-red-400 line-clamp-1 font-bold italic">Alergias: {patient.allergies}</p>}
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <h3 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors">{name}</h3>
+                  {onDelete && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(patient.id);
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">{age} anos • {patient.diagnosis}</p>
+                {linkedElderly && (
+                  <div className="mt-1">
+                    <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-[8px] font-black rounded uppercase tracking-tighter">Vinculado</span>
+                  </div>
+                )}
+                <div className="mt-2 space-y-1">
+                  {patient.comorbidities && <p className="text-[10px] text-gray-400 line-clamp-1 italic">Comorbidades: {patient.comorbidities}</p>}
+                  {patient.allergies && <p className="text-[10px] text-red-400 line-clamp-1 font-bold italic">Alergias: {patient.allergies}</p>}
+                </div>
               </div>
             </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
+                patient.fallRisk === 'ALTO' ? "bg-red-100 text-red-600" : 
+                patient.fallRisk === 'MEDIO' ? "bg-amber-100 text-amber-600" : "bg-green-100 text-green-600"
+              )}>
+                QUEDA: {patient.fallRisk}
+              </div>
+              <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center bg-gray-100 text-gray-600")}>
+                GRAU {safeReplace(patient.careDegree || '1', 'GRAU_', '')}
+              </div>
+              <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
+                patient.isBedridden ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
+              )}>
+                {patient.isBedridden ? 'ACAMADO' : 'MÓVEL'}
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-4 border-t border-gray-50 dark:border-gray-800">
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <AlertCircle size={14} className="text-red-400" />
+                {patient.allergies || 'Sem alergias'}
+              </div>
+              <ChevronRight size={18} className="text-gray-300 group-hover:text-green-600 transition-all" />
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
-              patient.fallRisk === 'ALTO' ? "bg-red-100 text-red-600" : 
-              patient.fallRisk === 'MEDIO' ? "bg-amber-100 text-amber-600" : "bg-green-100 text-green-600"
-            )}>
-              QUEDA: {patient.fallRisk}
-            </div>
-            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center bg-gray-100 text-gray-600")}>
-              GRAU {safeReplace(patient.careDegree || '1', 'GRAU_', '')}
-            </div>
-            <div className={cn("px-2 py-1 rounded-lg text-[9px] font-bold text-center", 
-              patient.isBedridden ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"
-            )}>
-              {patient.isBedridden ? 'ACAMADO' : 'MÓVEL'}
-            </div>
-          </div>
-          <div className="flex items-center justify-between pt-4 border-t border-gray-50 dark:border-gray-800">
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <AlertCircle size={14} className="text-red-400" />
-              {patient.allergies || 'Sem alergias'}
-            </div>
-            <ChevronRight size={18} className="text-gray-300 group-hover:text-green-600 transition-all" />
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 );

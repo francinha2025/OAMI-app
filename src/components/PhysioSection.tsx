@@ -24,13 +24,14 @@ import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
-import { PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType } from '../types';
+import { PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType, Elderly } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 
 interface PhysioSectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: PhysioPatient[];
   assessments: PhysioAssessment[];
   evolutions: PhysioEvolution[];
@@ -53,6 +54,7 @@ interface PhysioSectionProps {
 
 export const PhysioSection = ({ 
   user, 
+  elderly,
   patients, 
   assessments, 
   evolutions, 
@@ -476,22 +478,35 @@ export const PhysioSection = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {filteredPatients.map((patient) => (
-                  <div key={patient.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900/30 transition-all group">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 overflow-hidden">
-                          {patient.photoUrl ? (
-                            <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <UserIcon size={28} />
-                          )}
+                {(filteredPatients || []).map((patient) => {
+                  const linkedElder = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                  const displayName = linkedElder ? linkedElder.name : patient.name;
+                  
+                  let displayAge = patient.age;
+                  if (linkedElder) {
+                    const birthDate = parseISO(linkedElder.birthDate);
+                    displayAge = new Date().getFullYear() - birthDate.getFullYear();
+                  }
+
+                  return (
+                    <div key={patient.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900/30 transition-all group">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 overflow-hidden">
+                            {patient.photoUrl || (linkedElder && linkedElder.photoUrl) ? (
+                              <img src={linkedElder?.photoUrl || patient.photoUrl} alt={displayName} className="w-full h-full object-cover" />
+                            ) : (
+                              <UserIcon size={28} />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors uppercase truncate max-w-[150px]">{displayName}</h4>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{displayAge} anos • {patient.category}</p>
+                              {linkedElder && <span className="text-[8px] bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded-full font-black uppercase">Vinculado</span>}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors">{patient.name}</h4>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{patient.age} anos • {patient.category}</p>
-                        </div>
-                      </div>
                       <div className="flex gap-1">
                         <button 
                           onClick={() => {
@@ -528,7 +543,8 @@ export const PhysioSection = ({
                       </div>
                     </div>
                   </div>
-                ))}
+                )
+              })}
                 {(filteredPatients || []).length === 0 && (
                   <div className="col-span-full py-20 text-center space-y-4">
                     <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto text-gray-300 dark:text-gray-700">
@@ -1074,6 +1090,7 @@ export const PhysioSection = ({
               </div>
               <div className="flex-1 overflow-y-auto p-6 md:p-8">
                 <PatientForm 
+                  elderly={elderly}
                   initialData={selectedPatient} 
                   onSave={async (data) => {
                     await onSavePatient(data, selectedPatient?.id);
@@ -1314,8 +1331,9 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }: { title: string
   );
 };
 
-const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPatient | null, onSave: (data: Omit<PhysioPatient, 'id'>) => Promise<void>, onCancel: () => void }) => {
+const PatientForm = ({ elderly, initialData, onSave, onCancel }: { elderly: Elderly[], initialData: PhysioPatient | null, onSave: (data: Omit<PhysioPatient, 'id'>) => Promise<void>, onCancel: () => void }) => {
   const [formData, setFormData] = useState<Omit<PhysioPatient, 'id'>>({
+    elderlyId: initialData?.elderlyId || '',
     name: initialData?.name || '',
     age: initialData?.age || 0,
     diagnosis: initialData?.diagnosis || '',
@@ -1327,6 +1345,22 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
     createdAt: initialData?.createdAt || new Date().toISOString()
   });
   const [isExtracting, setIsExtracting] = useState(false);
+
+  const linkedElderly = useMemo(() => 
+    formData.elderlyId ? (elderly || []).find(e => e.id === formData.elderlyId) : null,
+  [formData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly) {
+      const birthDate = parseISO(linkedElderly.birthDate);
+      const age = new Date().getFullYear() - birthDate.getFullYear();
+      setFormData(prev => ({
+        ...prev,
+        name: linkedElderly.name,
+        age: age
+      }));
+    }
+  }, [linkedElderly]);
 
   const handleDigitize = async (text: string) => {
     if (!text) return;
@@ -1353,12 +1387,31 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
+        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Vincular ao Cadastro Geral (Idosos)</label>
+        <select
+          value={formData.elderlyId}
+          onChange={e => setFormData({ ...formData, elderlyId: e.target.value })}
+          className="w-full p-4 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white font-bold"
+        >
+          <option value="">-- Não vinculado / Novo Cadastro --</option>
+          {(elderly || []).map(e => (
+            <option key={e.id} value={e.id}>{e.name} (Entrada: {format(parseISO(e.entryDate), 'dd/MM/yyyy')})</option>
+          ))}
+        </select>
+        <p className="text-[10px] text-gray-500 ml-1 italic">Ao vincular, os dados de nome, idade e CPF serão sincronizados automaticamente.</p>
+      </div>
+
+      <div className="space-y-2">
         <label className="text-xs font-bold text-gray-400 uppercase ml-1">Nome Completo</label>
         <input 
           type="text" 
           value={formData.name}
+          readOnly={!!formData.elderlyId}
           onChange={e => setFormData({ ...formData, name: e.target.value })}
-          className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+          className={cn(
+            "w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white",
+            formData.elderlyId && "opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-900"
+          )}
           placeholder="Ex: Maria Oliveira"
         />
       </div>
@@ -1368,8 +1421,12 @@ const PatientForm = ({ initialData, onSave, onCancel }: { initialData: PhysioPat
           <input 
             type="number" 
             value={formData.age || ''}
+            readOnly={!!formData.elderlyId}
             onChange={e => setFormData({ ...formData, age: parseInt(e.target.value) })}
-            className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
+            className={cn(
+              "w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white",
+              formData.elderlyId && "opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-900"
+            )}
           />
         </div>
         <div className="space-y-2">

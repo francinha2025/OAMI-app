@@ -12,28 +12,27 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, LineChart as ReLineChart, Line,
-  PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts';
-import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+  PsychPatient, PsychInitialAssessment, PsychEvolution, 
+  PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, 
+  PsychActivity, PsychCognitionAssessment, PsychInterventionPlan,
+  User as UserType, Elderly 
+} from '../types';
+import { format, parseISO } from 'date-fns';
 import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
-  PsychPatient, PsychInitialAssessment, PsychEvolution, 
-  PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, 
-  PsychActivity, PsychCognitionAssessment, PsychInterventionPlan,
-  User as UserType 
-} from '../types';
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, AreaChart, Area
+} from 'recharts';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 
 interface PsychologySectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: PsychPatient[];
   initialAssessments: PsychInitialAssessment[];
   evolutions: PsychEvolution[];
@@ -69,6 +68,15 @@ type PsychTab =
   | 'alerts' | 'reports' | 'settings';
 
 export const PsychologySection = (props: PsychologySectionProps) => {
+  const { 
+    elderly, patients, initialAssessments, evolutions, appointments, 
+    emotionalMonitorings, familyBonds, activities, cognitionAssessments,
+    interventionPlans, theme, setTheme, onLogout, showToast,
+    onSavePatient, onSaveInitialAssessment, onSaveEvolution, onSaveAppointment,
+    onSaveEmotionalMonitoring, onSaveFamilyBond, onSaveActivity,
+    onSaveCognitionAssessment, onSaveInterventionPlan, onDeleteRecord,
+    onDeletePatient, onSavePhotos, user, onUpdateProfile
+  } = props;
   const [activeTab, setActiveTab] = useState<PsychTab>(() => {
     const saved = localStorage.getItem('oami-psychology-tab');
     return (saved as PsychTab) || 'dashboard';
@@ -95,30 +103,33 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   }, [activeTab]);
 
   const filteredPatients = useMemo(() => {
-    return (props.patients || []).filter(p => 
-      (p.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [props.patients, searchQuery]);
+    return (patients || []).filter(p => {
+      const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+      const name = linked?.name || p.name || '';
+      return name.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [patients, elderly, searchQuery]);
 
   const selectedPatient = useMemo(() => 
-    (props.patients || []).find(p => p.id === selectedPatientId), 
-    [props.patients, selectedPatientId]
+    (patients || []).find(p => p.id === selectedPatientId), 
+    [patients, selectedPatientId]
   );
 
   const renderReports = () => {
     const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
-      if ((props.patients || []).length === 0) return;
+      if ((patients || []).length === 0) return;
 
-      let filteredPatients = (props.patients || []);
+      let filteredPatients = (patients || []);
       if (reportsPatientFilter) {
         filteredPatients = filteredPatients.filter(p => p.id === reportsPatientFilter);
       }
 
       const data = filteredPatients.map((p: any) => {
-        const patientEvolutions = (props.evolutions || []).filter((e: any) => e.patientId === p.id);
+        const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === p.id);
+        const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
         return [
-          p.name,
-          p.age,
+          linked?.name || p.name,
+          linked ? (new Date().getFullYear() - new Date(linked.birthDate).getFullYear()) : p.age,
           patientEvolutions.length,
           patientEvolutions[0]?.intervention || 'Sem intervenção recente'
         ];
@@ -127,7 +138,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
       if (formatType === 'pdf') {
         await generateModernPDF({
           title,
-          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
+          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
           columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
           data,
           fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
@@ -135,7 +146,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
       } else {
         await generateModernWord({
           title,
-          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
+          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
           columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
           data,
           fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
@@ -155,9 +166,12 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
             >
               <option value="">Todos os Idosos (Geral)</option>
-              {props.patients.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {patients.map(p => {
+                const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                return (
+                  <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                );
+              })}
               <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
             </select>
           </div>
@@ -190,23 +204,18 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   };
 
   const stats = useMemo(() => {
-    const patientsList = props.patients || [];
-    const appointmentsList = props.appointments || [];
-    const emotionalMonitoringsList = props.emotionalMonitorings || [];
-    const familyBondsList = props.familyBonds || [];
-
     const today = format(new Date(), 'yyyy-MM-dd');
-    const todayAppointments = (appointmentsList || []).filter(a => a.date === today);
-    const sadPatients = (emotionalMonitoringsList || []).filter(m => m.date === today && m.wellBeing === 'TRISTE').length;
-    const isolatedPatients = (familyBondsList || []).filter(f => !f.receivesVisits).length;
+    const todayAppointments = (appointments || []).filter(a => a.date === today);
+    const sadPatients = (emotionalMonitorings || []).filter(m => m.date === today && m.wellBeing === 'TRISTE').length;
+    const isolatedPatients = (familyBonds || []).filter(f => !f.receivesVisits).length;
 
     return {
-      totalPatients: patientsList.length,
+      totalPatients: (patients || []).length,
       todayAppointments: todayAppointments.length,
       sadPatients,
       isolatedPatients
     };
-  }, [props.patients, props.appointments, props.emotionalMonitorings, props.familyBonds]);
+  }, [patients, appointments, emotionalMonitorings, familyBonds]);
 
   const renderSettings = () => (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -220,7 +229,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
           <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-                {props.theme === 'light' ? <Sun className="text-yellow-500" /> : <Moon className="text-blue-400" />}
+                {theme === 'light' ? <Sun className="text-yellow-500" /> : <Moon className="text-blue-400" />}
               </div>
               <div>
                 <p className="font-bold text-gray-800 dark:text-white">Tema do Sistema</p>
@@ -228,10 +237,10 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               </div>
             </div>
             <button 
-              onClick={() => props.setTheme(props.theme === 'light' ? 'dark' : 'light')}
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 transition-all"
             >
-              {props.theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
+              {theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}
             </button>
           </div>
 
@@ -246,7 +255,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               </div>
             </div>
             <button 
-              onClick={props.onLogout}
+              onClick={onLogout}
               className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 dark:shadow-none"
             >
               Sair Agora
@@ -297,7 +306,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             </h3>
             <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={(props.emotionalMonitorings || []).slice(-7).map(m => ({
+                <AreaChart data={(emotionalMonitorings || []).slice(-7).map(m => ({
                   date: m.date,
                   score: m.wellBeing === 'FELIZ' ? 3 : m.wellBeing === 'NEUTRO' ? 2 : 1
                 }))}>
@@ -325,11 +334,13 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               Próximos Atendimentos
             </h3>
             <div className="space-y-3">
-              {(props.appointments || [])
+              {(appointments || [])
                 .filter(a => a.status === 'PENDENTE')
                 .slice(0, 5)
                 .map(app => {
-                  const patient = (props.patients || []).find(p => p.id === app.patientId);
+                  const patient = (patients || []).find(p => p.id === app.patientId);
+                  const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                  const displayName = linked?.name || patient?.name;
                   return (
                     <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
                       <div className="flex items-center gap-3">
@@ -337,7 +348,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                           <MessageSquare size={20} />
                         </div>
                         <div>
-                          <p className="text-sm font-bold">{patient?.name}</p>
+                          <p className="text-sm font-bold">{displayName}</p>
                           <p className="text-xs text-gray-500">{app.type} • {app.time}</p>
                         </div>
                       </div>
@@ -347,7 +358,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                     </div>
                   );
                 })}
-              {(props.appointments || []).filter(a => a.status === 'PENDENTE').length === 0 && (
+              {(appointments || []).filter(a => a.status === 'PENDENTE').length === 0 && (
                 <p className="text-center text-gray-400 py-4 text-sm italic">Nenhum atendimento pendente.</p>
               )}
             </div>
@@ -441,20 +452,38 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'settings' && renderSettings()}
             {activeTab === 'patients' && (
-              <PatientsView 
-                patients={filteredPatients}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                onSelect={setSelectedPatientId}
-                onAdd={() => { setModalType('patient'); setIsModalOpen(true); }}
-                onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
-                onDelete={(id: string) => setDeleteConfirm({ id, type: 'patient' })}
-              />
+              selectedPatientId ? (
+                <PatientDetailView 
+                  patient={selectedPatient}
+                  elderly={elderly}
+                  evolutions={evolutions}
+                  monitorings={emotionalMonitorings}
+                  bonds={familyBonds}
+                  activities={activities}
+                  assessments={initialAssessments}
+                  appointments={appointments}
+                  onBack={() => setSelectedPatientId(null)}
+                  onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
+                  onDelete={(id: string) => setDeleteConfirm({ id, type: 'patient' })}
+                />
+              ) : (
+                <PatientsView 
+                  patients={filteredPatients}
+                  elderly={elderly}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  onSelect={setSelectedPatientId}
+                  onAdd={() => { setModalType('patient'); setIsModalOpen(true); }}
+                  onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
+                  onDelete={(id: string) => setDeleteConfirm({ id, type: 'patient' })}
+                />
+              )
             )}
             {activeTab === 'initial' && (
               <InitialAssessmentView 
-                patients={props.patients}
-                assessments={props.initialAssessments}
+                patients={patients}
+                elderly={elderly}
+                assessments={initialAssessments}
                 filter={initialPatientFilter}
                 setFilter={setInitialPatientFilter}
                 onAdd={() => { setModalType('initial'); setIsModalOpen(true); }}
@@ -464,8 +493,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'evolution' && (
               <EvolutionView 
-                patients={props.patients}
-                evolutions={props.evolutions}
+                patients={patients}
+                elderly={elderly}
+                evolutions={evolutions}
                 filter={evolutionPatientFilter}
                 setFilter={setEvolutionPatientFilter}
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
@@ -475,8 +505,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'appointments' && (
               <AppointmentsView 
-                patients={props.patients}
-                appointments={props.appointments}
+                patients={patients}
+                elderly={elderly}
+                appointments={appointments}
                 filter={appointmentPatientFilter}
                 setFilter={setAppointmentPatientFilter}
                 onAdd={() => { setModalType('appointment'); setIsModalOpen(true); }}
@@ -486,8 +517,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'emotions' && (
               <EmotionsView 
-                patients={props.patients}
-                monitorings={props.emotionalMonitorings}
+                patients={patients}
+                elderly={elderly}
+                monitorings={emotionalMonitorings}
                 filter={emotionPatientFilter}
                 setFilter={setEmotionPatientFilter}
                 onAdd={() => { setModalType('emotion'); setIsModalOpen(true); }}
@@ -497,8 +529,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'family' && (
               <FamilyView 
-                patients={props.patients}
-                bonds={props.familyBonds}
+                patients={patients}
+                elderly={elderly}
+                bonds={familyBonds}
                 filter={familyPatientFilter}
                 setFilter={setFamilyPatientFilter}
                 onAdd={() => { setModalType('family'); setIsModalOpen(true); }}
@@ -508,8 +541,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'activities' && (
               <ActivitiesView 
-                patients={props.patients}
-                activities={props.activities}
+                patients={patients}
+                elderly={elderly}
+                activities={activities}
                 filter={activityPatientFilter}
                 setFilter={setActivityPatientFilter}
                 onAdd={() => { setModalType('activity'); setIsModalOpen(true); }}
@@ -519,8 +553,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'cognition' && (
               <CognitionView 
-                patients={props.patients}
-                assessments={props.cognitionAssessments}
+                patients={patients}
+                elderly={elderly}
+                assessments={cognitionAssessments}
                 filter={cognitionPatientFilter}
                 setFilter={setCognitionPatientFilter}
                 onAdd={() => { setModalType('cognition'); setIsModalOpen(true); }}
@@ -530,18 +565,19 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             )}
             {activeTab === 'alerts' && (
               <AlertsView 
-                patients={props.patients}
-                monitorings={props.emotionalMonitorings}
-                bonds={props.familyBonds}
+                patients={patients}
+                elderly={elderly}
+                monitorings={emotionalMonitorings}
+                bonds={familyBonds}
               />
             )}
             {activeTab === 'reports' && renderReports()}
             {activeTab === 'settings' && (
               <SettingsView 
-                user={props.user}
-                theme={props.theme}
-                setTheme={props.setTheme}
-                onLogout={props.onLogout}
+                user={user}
+                theme={theme}
+                setTheme={setTheme}
+                onLogout={onLogout}
               />
             )}
           </motion.div>
@@ -558,22 +594,23 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               setModalType(null);
             }}
             type={modalType}
-            patients={props.patients}
-            showToast={props.showToast}
-            onSavePhotos={props.onSavePhotos}
+            patients={patients}
+            elderly={elderly}
+            showToast={showToast}
+            onSavePhotos={onSavePhotos}
             editingData={editingData}
             onSave={async (data: any) => {
-              const payload = { ...data, registeredBy: props.user.name };
+              const payload = { ...data, registeredBy: user.name };
               const id = editingData?.id;
-              if (modalType === 'patient') await props.onSavePatient(data as any, id);
-              if (modalType === 'initial') await props.onSaveInitialAssessment(payload as any, id);
-              if (modalType === 'evolution') await props.onSaveEvolution(payload as any, id);
-              if (modalType === 'appointment') await props.onSaveAppointment(payload as any, id);
-              if (modalType === 'emotion') await props.onSaveEmotionalMonitoring(payload as any, id);
-              if (modalType === 'family') await props.onSaveFamilyBond(payload as any, id);
-              if (modalType === 'activity') await props.onSaveActivity(payload as any, id);
-              if (modalType === 'cognition') await props.onSaveCognitionAssessment(payload as any, id);
-              if (modalType === 'plan') await props.onSaveInterventionPlan(payload as any, id);
+              if (modalType === 'patient') await onSavePatient(data as any, id);
+              if (modalType === 'initial') await onSaveInitialAssessment(payload as any, id);
+              if (modalType === 'evolution') await onSaveEvolution(payload as any, id);
+              if (modalType === 'appointment') await onSaveAppointment(payload as any, id);
+              if (modalType === 'emotion') await onSaveEmotionalMonitoring(payload as any, id);
+              if (modalType === 'family') await onSaveFamilyBond(payload as any, id);
+              if (modalType === 'activity') await onSaveActivity(payload as any, id);
+              if (modalType === 'cognition') await onSaveCognitionAssessment(payload as any, id);
+              if (modalType === 'plan') await onSaveInterventionPlan(payload as any, id);
               setIsModalOpen(false);
               setEditingData(null);
             }}
@@ -588,7 +625,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
           if (!deleteConfirm) return;
           try {
             if (deleteConfirm.type === 'patient') {
-              await props.onDeletePatient(deleteConfirm.id);
+              await onDeletePatient(deleteConfirm.id);
               setSelectedPatientId(null);
             } else {
               const mapping: Record<string, string> = {
@@ -601,7 +638,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 cognition: 'psychCognitionAssessments',
                 plan: 'psychInterventionPlans'
               };
-              await props.onDeleteRecord(mapping[deleteConfirm.type], deleteConfirm.id);
+              await onDeleteRecord(mapping[deleteConfirm.type], deleteConfirm.id);
             }
           } finally {
             setDeleteConfirm(null);
@@ -650,7 +687,119 @@ const StatCard = ({ icon, label, value, color, alert }: { icon: React.ReactNode,
   </div>
 );
 
-const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, onEdit, onDelete }: any) => (
+const PatientDetailView = ({ patient, elderly, evolutions, monitorings, bonds, activities, assessments, appointments, onBack, onEdit, onDelete }: any) => {
+  const linkedElderly = patient.elderlyId ? (elderly || []).find((e: any) => e.id === patient.elderlyId) : null;
+  const name = linkedElderly?.name || patient.name;
+  
+  let age = patient.age;
+  if (linkedElderly) {
+    const birthDate = parseISO(linkedElderly.birthDate);
+    age = new Date().getFullYear() - birthDate.getFullYear();
+  }
+  
+  const photoUrl = linkedElderly?.photo || patient.photoUrl;
+
+  const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === patient.id);
+  const patientMonitorings = (monitorings || []).filter((m: any) => m.patientId === patient.id);
+  const patientBonds = (bonds || []).filter((b: any) => b.patientId === patient.id);
+  const patientActivities = (activities || []).filter((a: any) => a.patientId === patient.id);
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onBack}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <div>
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Perfil do Paciente</h2>
+          <p className="text-gray-500 font-bold">Psicologia • {name}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm text-center">
+            <div className="w-32 h-32 rounded-3xl bg-blue-100 dark:bg-blue-900/30 mx-auto mb-6 border-4 border-white dark:border-gray-800 shadow-xl overflow-hidden">
+              {photoUrl ? (
+                <img src={photoUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <UserIcon className="w-16 h-16 text-blue-600 mt-8 mx-auto" />
+              )}
+            </div>
+            <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight mb-1">{name}</h3>
+            <p className="text-gray-500 font-bold mb-6 italic">Ingressou em {format(parseISO(patient.entryDate || patient.createdAt), 'dd/MM/yyyy')}</p>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 text-center">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Idade</p>
+                <p className="font-bold text-gray-900 dark:text-white">{age} anos</p>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 text-center">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Visitas</p>
+                <p className="font-bold text-gray-900 dark:text-white">{patient.hasVisits ? 'Sim' : 'Não'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <h4 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <History size={18} className="text-blue-600" />
+              Histórico de Vida
+            </h4>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800/50">
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic">
+                "{patient.lifeHistory || 'Nenhum histórico registrado.'}"
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <StatCard icon={<Smile className="text-green-600" />} label="Bem-estar" value={patientMonitorings[0]?.wellBeing || 'N/A'} color="green" />
+            <StatCard icon={<ClipboardList className="text-blue-600" />} label="Evoluções" value={String(patientEvolutions.length)} color="blue" />
+          </div>
+
+          <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-50 dark:border-gray-800">
+              <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <TrendingUp size={18} className="text-blue-600" />
+                Resumo de Acompanhamento
+              </h4>
+            </div>
+            <div className="p-6">
+              <div className="space-y-6">
+                {patientEvolutions.length > 0 ? (
+                  patientEvolutions.slice(0, 3).map((evo: any) => (
+                    <div key={evo.id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                      <div className="w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                        <Calendar size={20} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{format(parseISO(evo.date), 'dd/MM/yyyy')}</span>
+                          <span className="text-[10px] px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-full font-black uppercase tracking-widest">{evo.category}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{evo.evolution}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-400 py-8 italic font-medium">Nenhuma evolução registrada para este paciente.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PatientsView = ({ patients, elderly, searchQuery, setSearchQuery, onSelect, onAdd, onEdit, onDelete }: any) => (
   <div className="space-y-6">
     <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
       <div className="relative w-full md:w-96">
@@ -669,55 +818,72 @@ const PatientsView = ({ patients, searchQuery, setSearchQuery, onSelect, onAdd, 
     </div>
 
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {(patients || []).map((patient: PsychPatient) => (
-        <div key={patient.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all group">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 overflow-hidden">
-                {patient.photoUrl ? (
-                  <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <UserIcon size={32} />
-                )}
-              </div>
-              <div>
-                <h4 className="font-black text-gray-800 dark:text-white group-hover:text-blue-600 transition-colors">{patient.name}</h4>
-                <p className="text-xs text-gray-500">{patient.age} anos • {patient.entryDate}</p>
-              </div>
-            </div>
-            <div className="flex gap-1">
-              <button onClick={(e) => { e.stopPropagation(); onEdit(patient); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">
-                <Edit2 size={16} />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); onDelete(patient.id); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-          
-          <div className="space-y-3 mb-6">
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <Users2 size={14} className="text-blue-500" />
-              <span>Visitas: {patient.hasVisits ? 'Sim' : 'Não'}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <History size={14} className="text-blue-500" />
-              <span className="line-clamp-1">{patient.lifeHistory}</span>
-            </div>
-          </div>
+      {(patients || []).map((patient: PsychPatient) => {
+        const linkedElderly = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+        const name = linkedElderly?.name || patient.name;
+        const photoUrl = linkedElderly?.photo || patient.photoUrl;
+        let age = patient.age;
+        if (linkedElderly) {
+          const birthDate = parseISO(linkedElderly.birthDate);
+          age = new Date().getFullYear() - birthDate.getFullYear();
+        }
 
-          <div className="flex gap-2">
-            <button onClick={() => onSelect(patient.id)} className="flex-1 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all">
-              Ver Perfil
-            </button>
+        return (
+          <div key={patient.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all group">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 overflow-hidden">
+                  {photoUrl ? (
+                    <img src={photoUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <UserIcon size={32} />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-black text-gray-800 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-1">{name}</h4>
+                  <p className="text-xs text-gray-500">{age} anos • {linkedElderly?.entryDate || patient.entryDate}</p>
+                </div>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                <button onClick={(e) => { e.stopPropagation(); onEdit(patient); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-xl transition-colors">
+                  <Edit2 size={16} />
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onDelete(patient.id); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="space-y-2 mb-6">
+              {linkedElderly && (
+                <div className="flex items-center gap-1.5 mb-2">
+                  <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 text-[8px] font-black rounded uppercase tracking-tighter">Vinculado</span>
+                  <span className="text-[10px] text-gray-400 font-medium truncate">CPF: {linkedElderly.cpf}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <Users2 size={14} className="text-blue-500" />
+                <span>Visitas: {patient.hasVisits ? 'Sim' : 'Não'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <History size={14} className="text-blue-500 shrink-0" />
+                <span className="line-clamp-1">{patient.lifeHistory || 'Sem histórico de vida registrado'}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t border-gray-50 dark:border-gray-800">
+              <button onClick={() => onSelect(patient.id)} className="flex-1 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 transition-all">
+                Ver Perfil
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 );
 
-const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const InitialAssessmentView = ({ patients, elderly, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -728,9 +894,13 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete,
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -741,9 +911,10 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete,
     <div className="space-y-4">
       {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === a.patientId);
+        const linked = patient?.elderlyId ? (elderly || []).find((e: any) => e.id === patient.elderlyId) : null;
         const displayName = a.patientId === 'OUTRO' 
           ? `${a.targetName || 'Outro'} (${a.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : patient?.name;
+          : (linked?.name || patient?.name);
 
         return (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
@@ -783,7 +954,7 @@ const InitialAssessmentView = ({ patients, assessments, onAdd, onEdit, onDelete,
   </div>
 );
 
-const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -794,9 +965,13 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, 
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -807,9 +982,10 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, 
     <div className="space-y-6">
       {(evolutions || []).filter((e: any) => !filter || e.patientId === filter).map((e: PsychEvolution) => {
         const patient = (patients || []).find((p: any) => p.id === e.patientId);
+        const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
         const displayName = e.patientId === 'OUTRO' 
           ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : patient?.name;
+          : (linked?.name || patient?.name);
 
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
@@ -835,7 +1011,7 @@ const EvolutionView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, 
   </div>
 );
 
-const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const AppointmentsView = ({ patients, elderly, appointments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -846,9 +1022,13 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, fil
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -870,9 +1050,10 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, fil
         <tbody className="text-sm">
           {(appointments || []).filter((app: any) => !filter || app.patientId === filter).map((app: PsychAppointment & { targetName?: string, targetType?: string }) => {
             const patient = (patients || []).find((p: any) => p.id === app.patientId);
+            const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
             const displayName = app.patientId === 'OUTRO' 
               ? `${app.targetName || 'Outro'} (${app.targetType?.replace('_', ' ') || 'Comunidade'})`
-              : patient?.name;
+              : (linked?.name || patient?.name);
 
             return (
               <tr key={app.id} className="border-t border-gray-50 dark:border-gray-800">
@@ -907,7 +1088,7 @@ const AppointmentsView = ({ patients, appointments, onAdd, onEdit, onDelete, fil
   </div>
 );
 
-const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const EmotionsView = ({ patients, elderly, monitorings, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
@@ -918,9 +1099,13 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, 
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -931,9 +1116,10 @@ const EmotionsView = ({ patients, monitorings, onAdd, onEdit, onDelete, filter, 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {(monitorings || []).filter((m: any) => !filter || m.patientId === filter).map((m: PsychEmotionalMonitoring & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === m.patientId);
+        const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
         const displayName = m.patientId === 'OUTRO' 
           ? `${m.targetName || 'Outro'} (${m.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : patient?.name;
+          : (linked?.name || patient?.name);
 
         return (
           <div key={m.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
@@ -989,7 +1175,7 @@ const EmotionIndicator = ({ label, level }: { label: string, level: string }) =>
   </div>
 );
 
-const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const FamilyView = ({ patients, elderly, bonds, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -1000,9 +1186,13 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -1013,9 +1203,10 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
     <div className="space-y-4">
       {(bonds || []).filter((b: any) => !filter || b.patientId === filter).map((b: PsychFamilyBond & { targetName?: string, targetType?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === b.patientId);
+        const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
         const displayName = b.patientId === 'OUTRO' 
           ? `${b.targetName || 'Outro'} (${b.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : patient?.name;
+          : (linked?.name || patient?.name);
 
         return (
           <div key={b.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl flex items-start gap-4">
@@ -1049,7 +1240,7 @@ const FamilyView = ({ patients, bonds, onAdd, onEdit, onDelete, filter, setFilte
   </div>
 );
 
-const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
@@ -1060,9 +1251,13 @@ const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter,
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -1090,9 +1285,10 @@ const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter,
           <div className="flex flex-wrap gap-2">
             {(act.participants || []).map(pid => {
               const p = (patients || []).find((pt: any) => pt.id === pid);
+              const linked = p?.elderlyId ? (elderly || []).find((ed: any) => ed.id === p.elderlyId) : null;
               return (
                 <span key={pid} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] text-gray-500">
-                  {p?.name}
+                  {linked?.name || p?.name}
                 </span>
               );
             })}
@@ -1103,7 +1299,7 @@ const ActivitiesView = ({ patients, activities, onAdd, onEdit, onDelete, filter,
   </div>
 );
 
-const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const CognitionView = ({ patients, elderly, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -1114,9 +1310,13 @@ const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter,
           className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
         >
           <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
+          {(patients || []).map((p: any) => {
+            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+            const name = linked?.name || p.name;
+            return (
+              <option key={p.id} value={p.id}>{name}</option>
+            );
+          })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
         </select>
       </div>
@@ -1139,9 +1339,10 @@ const CognitionView = ({ patients, assessments, onAdd, onEdit, onDelete, filter,
         <tbody className="text-sm">
           {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychCognitionAssessment & { targetName?: string, targetType?: string }) => {
             const patient = (patients || []).find((p: any) => p.id === a.patientId);
+            const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
             const displayName = a.patientId === 'OUTRO' 
               ? `${a.targetName || 'Outro'} (${a.targetType?.replace('_', ' ') || 'Comunidade'})`
-              : patient?.name;
+              : (linked?.name || patient?.name);
 
             return (
               <tr key={a.id} className="border-t border-gray-50 dark:border-gray-800">
@@ -1180,7 +1381,7 @@ const CognitionBadge = ({ status }: { status: string }) => (
   </span>
 );
 
-const AlertsView = ({ patients, monitorings, bonds }: any) => {
+const AlertsView = ({ patients, elderly, monitorings, bonds }: any) => {
   const alerts = useMemo(() => {
     const list: any[] = [];
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -1188,17 +1389,19 @@ const AlertsView = ({ patients, monitorings, bonds }: any) => {
     // Sadness alerts
     (monitorings || []).filter((m: any) => m.date === today && m.wellBeing === 'TRISTE').forEach((m: any) => {
       const p = (patients || []).find((pt: any) => pt.id === m.patientId);
-      list.push({ type: 'TRISTEZA', patient: p?.name, detail: 'Sinal de tristeza persistente registrado hoje.' });
+      const linked = p?.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+      list.push({ type: 'TRISTEZA', patient: linked?.name || p?.name, detail: 'Sinal de tristeza persistente registrado hoje.' });
     });
 
     // Isolation alerts
     (bonds || []).filter((b: any) => !b.receivesVisits).forEach((b: any) => {
       const p = (patients || []).find((pt: any) => pt.id === b.patientId);
-      list.push({ type: 'ISOLAMENTO', patient: p?.name, detail: 'Idoso não recebe visitas familiares.' });
+      const linked = p?.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+      list.push({ type: 'ISOLAMENTO', patient: linked?.name || p?.name, detail: 'Idoso não recebe visitas familiares.' });
     });
 
     return list;
-  }, [patients, monitorings, bonds]);
+  }, [patients, elderly, monitorings, bonds]);
 
   return (
     <div className="space-y-6">
@@ -1274,11 +1477,12 @@ const SettingsView = ({ user, theme, setTheme, onLogout }: any) => (
   </div>
 );
 
-const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos, editingData, showToast }: any) => {
+const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onSavePhotos, editingData, showToast }: any) => {
   const [formData, setFormData] = useState<any>(editingData || {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: format(new Date(), 'HH:mm'),
-    photos: []
+    photos: [],
+    elderlyId: editingData?.elderlyId || ''
   });
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -1288,10 +1492,32 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
       setFormData(editingData || {
         date: format(new Date(), 'yyyy-MM-dd'),
         time: format(new Date(), 'HH:mm'),
-        photos: []
+        photos: [],
+        elderlyId: editingData?.elderlyId || ''
       });
     }
   }, [isOpen, editingData]);
+
+  // Sincronização automática com Cadastro Geral
+  const linkedElderly = useMemo(() => 
+    formData.elderlyId ? (elderly || []).find(e => e.id === formData.elderlyId) : null,
+  [formData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly && type === 'patient') {
+      const birthDate = parseISO(linkedElderly.birthDate);
+      const age = new Date().getFullYear() - birthDate.getFullYear();
+      setFormData((prev: any) => ({
+        ...prev,
+        name: linkedElderly.name,
+        fullName: linkedElderly.fullName || linkedElderly.name,
+        age: age,
+        birthDate: linkedElderly.birthDate,
+        cpf: linkedElderly.cpf,
+        entryDate: linkedElderly.entryDate
+      }));
+    }
+  }, [linkedElderly, type]);
 
   const handleDigitize = async (text: string) => {
     if (!text) return;
@@ -1347,9 +1573,12 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
   };
 
   const patientOptions = useMemo(() => [
-    ...(patients || []).map((p: any) => ({ value: p.id, label: p.name })),
+    ...(patients || []).map((p: any) => {
+      const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+      return { value: p.id, label: linked?.name || p.name };
+    }),
     { value: 'OUTRO', label: 'OUTRO (Comunidade / Cuidador)' }
-  ], [patients]);
+  ], [patients, elderly]);
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-2 md:p-4">
@@ -1395,17 +1624,35 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-5 md:p-8 overflow-y-auto flex-1 space-y-6 md:space-y-8">
             {type === 'patient' && (
+              <div className="md:col-span-2 space-y-3 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-[32px] border border-blue-100 dark:border-blue-800/30 transition-all mb-4">
+                <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                  <Users size={14} />
+                  Vincular ao Cadastro Geral (Idosos)
+                </label>
+                <select 
+                  className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-bold dark:text-white"
+                  value={formData.elderlyId || ''}
+                  onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
+                >
+                  <option value="">-- Não vinculado / Novo Cadastro --</option>
+                  {(elderly || []).map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+                <p className="text-[10px] text-blue-600/60 ml-1 italic font-medium">Ao vincular, os dados de nome, idade, CPF e data de entrada serão sincronizados automaticamente.</p>
+              </div>
+            )}
+            {type === 'patient' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} />
-                <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} />
+                <Input label="Nome Completo" value={formData.name} onChange={(v) => setFormData({ ...formData, name: v })} disabled={!!formData.elderlyId} />
+                <Input label="CPF" value={formData.cpf} onChange={(v) => setFormData({ ...formData, cpf: v })} disabled={!!formData.elderlyId} />
                 <Input 
                   label="Idade" 
                   type="number" 
                   value={formData.age === undefined || isNaN(formData.age) ? '' : formData.age.toString()} 
                   onChange={(v) => setFormData({ ...formData, age: v === '' ? 0 : parseInt(v) })} 
+                  disabled={!!formData.elderlyId}
                 />
-                <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} />
-                <Input label="Data de Entrada" type="date" value={formData.entryDate} onChange={(v) => setFormData({ ...formData, entryDate: v })} />
+                <Input label="Data de Nascimento" type="date" value={formData.birthDate} onChange={(v) => setFormData({ ...formData, birthDate: v })} disabled={!!formData.elderlyId} />
+                <Input label="Data de Entrada" type="date" value={formData.entryDate} onChange={(v) => setFormData({ ...formData, entryDate: v })} disabled={!!formData.elderlyId} />
                 <Input label="Escolaridade" value={formData.schooling} onChange={(v) => setFormData({ ...formData, schooling: v })} />
                 <Input label="Contato Familiar" value={formData.familyContact} onChange={(v) => setFormData({ ...formData, familyContact: v })} />
                 <div className="md:col-span-2">
@@ -1821,14 +2068,18 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, onSave, onSavePhotos
   );
 };
 
-const Input = ({ label, type = "text", value, onChange }: { label: string, type?: string, value?: string, onChange: (v: string) => void }) => (
+const Input = ({ label, type = "text", value, onChange, disabled }: { label: string, type?: string, value?: any, onChange: (v: string) => void, disabled?: boolean }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <input 
       type={type} 
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all" 
+      disabled={disabled}
+      className={cn(
+        "w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all",
+        disabled && "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700"
+      )} 
     />
   </div>
 );
@@ -1845,13 +2096,17 @@ const TextArea = ({ label, value, onChange }: { label: string, value?: string, o
   </div>
 );
 
-const Select = ({ label, options, value, onChange }: { label: string, options: { value: string, label: string }[], value?: string, onChange: (v: string) => void }) => (
+const Select = ({ label, options, value, onChange, disabled }: { label: string, options: { value: string, label: string }[], value?: string, onChange: (v: string) => void, disabled?: boolean }) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-gray-400 uppercase">{label}</label>
     <select 
       value={value || ''}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all"
+      disabled={disabled}
+      className={cn(
+        "w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all",
+        disabled && "opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-700"
+      )}
     >
       <option value="">Selecione...</option>
       {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}

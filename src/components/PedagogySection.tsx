@@ -26,7 +26,7 @@ import {
   PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, 
   PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, 
   PedagogyIndividualPlan, PedagogyLifeHistory,
-  User as UserType 
+  User as UserType, Elderly 
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
@@ -70,6 +70,7 @@ const ScoreCard: React.FC<{ label: string, score: number }> = ({ label, score })
 
 interface PedagogySectionProps {
   user: UserType;
+  elderly: Elderly[];
   patients: PedagogyPatient[];
   assessments: PedagogyInitialAssessment[];
   evolutions: PedagogyEvolution[];
@@ -116,6 +117,7 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
 
 export const PedagogySection: React.FC<PedagogySectionProps> = ({
   user,
+  elderly,
   patients,
   assessments,
   evolutions,
@@ -170,6 +172,26 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+
+  // Sincronização automática com Cadastro Geral
+  const linkedElderly = useMemo(() => 
+    formData.elderlyId ? (elderly || []).find(e => e.id === formData.elderlyId) : null,
+  [formData.elderlyId, elderly]);
+
+  useEffect(() => {
+    if (linkedElderly && (modalType === 'patient' || activeTab === 'residents')) {
+      const birthDate = parseISO(linkedElderly.birthDate);
+      const age = new Date().getFullYear() - birthDate.getFullYear();
+      setFormData((prev: any) => ({
+        ...prev,
+        name: linkedElderly.name,
+        age: age,
+        birthDate: linkedElderly.birthDate,
+        cpf: linkedElderly.cpf,
+        entryDate: linkedElderly.entryDate
+      }));
+    }
+  }, [linkedElderly, modalType, activeTab]);
 
   useEffect(() => {
     localStorage.setItem('oami-pedagogy-tab', activeTab);
@@ -325,14 +347,31 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'residents':
         return (
           <form onSubmit={handleSave} className="p-5 md:p-8 space-y-6 md:space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3 p-6 bg-blue-50 dark:bg-blue-900/10 rounded-[32px] border border-blue-100 dark:border-blue-800/30 transition-all">
+              <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                <Users size={14} />
+                Vincular ao Cadastro Geral (Idosos)
+              </label>
+              <select 
+                className="w-full bg-white dark:bg-gray-800 border-none rounded-2xl px-6 py-4 text-sm focus:ring-2 focus:ring-blue-500 transition-all font-bold dark:text-white"
+                value={formData.elderlyId || ''}
+                onChange={(e) => setFormData({ ...formData, elderlyId: e.target.value })}
+              >
+                <option value="">-- Não vinculado / Novo Cadastro --</option>
+                {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              <p className="text-[10px] text-blue-600/60 ml-1 italic font-medium">Sincroniza nome, idade, CPF e data de entrada.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="col-span-2">
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Nome Completo</label>
                 <input
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black disabled:opacity-50"
                   value={formData.name || ''}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  disabled={!!formData.elderlyId}
                 />
               </div>
               <div className="col-span-2">
@@ -349,9 +388,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Idade</label>
                 <input
                   type="number"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black disabled:opacity-50"
                   value={formData.age === undefined || isNaN(formData.age) ? '' : formData.age}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                  disabled={!!formData.elderlyId}
                 />
               </div>
               <div>
@@ -1484,6 +1524,14 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const renderResidents = () => {
     if (!selectedPatient) return null;
 
+    const linkedElderly = selectedPatient.elderlyId ? (elderly || []).find(e => e.id === selectedPatient.elderlyId) : null;
+    const name = linkedElderly?.name || selectedPatient.name;
+    let age = selectedPatient.age;
+    if (linkedElderly) {
+      const birthDate = parseISO(linkedElderly.birthDate);
+      age = new Date().getFullYear() - birthDate.getFullYear();
+    }
+
     try {
       const history = (lifeHistories || []).find(h => h?.patientId === selectedPatient.id);
       const assessment = (assessments || []).find(a => a?.patientId === selectedPatient.id);
@@ -1520,15 +1568,20 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
               <div className="flex items-center gap-6">
                 <div className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-4 border-white/30 overflow-hidden shadow-inner">
                   {selectedPatient?.photoUrl ? (
-                    <img src={selectedPatient.photoUrl} alt={selectedPatient.name} className="w-full h-full object-cover" />
+                    <img src={selectedPatient.photoUrl} alt={name || selectedPatient.name} className="w-full h-full object-cover" />
                   ) : (
                     <UserIcon className="w-12 h-12 text-white" />
                   )}
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black">{selectedPatient?.name || 'N/A'}</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-3xl font-black">{name || selectedPatient?.name || 'N/A'}</h2>
+                    {linkedElderly && (
+                      <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-widest border border-white/30">Vinculado</span>
+                    )}
+                  </div>
                   <p className="text-blue-50 font-bold mt-1">
-                    {selectedPatient?.age ? `${selectedPatient.age} anos` : 'Idade não informada'} • {selectedPatient?.schooling || 'Escolaridade não informada'}
+                    {age || selectedPatient?.age} anos • {selectedPatient?.schooling || 'Escolaridade não informada'}
                   </p>
                   <div className="flex gap-2 mt-4">
                     <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-black uppercase tracking-wider border border-white/20">
@@ -2187,39 +2240,53 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(filteredPatients || []).map((patient) => (
-                      <motion.div
-                        key={patient.id}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-                        onClick={() => setSelectedPatient(patient)}
-                      >
-                        <div className="p-6">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100">
-                                {patient.photoUrl ? (
-                                  <img src={patient.photoUrl} alt={patient.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <UserIcon className="w-8 h-8 text-blue-400" />
+                    {(filteredPatients || []).map((patient) => {
+                      const linkedElderly = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                      const name = linkedElderly?.name || patient.name;
+                      let age = patient.age;
+                      if (linkedElderly) {
+                        const birthDate = parseISO(linkedElderly.birthDate);
+                        age = new Date().getFullYear() - birthDate.getFullYear();
+                      }
+
+                      return (
+                        <motion.div
+                          key={patient.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden hover:shadow-md transition-shadow cursor-pointer relative"
+                          onClick={() => setSelectedPatient(patient)}
+                        >
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center overflow-hidden border-2 border-blue-100">
+                                  {patient.photoUrl ? (
+                                    <img src={patient.photoUrl} alt={name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <UserIcon className="w-8 h-8 text-blue-400" />
+                                  )}
+                                </div>
+                                <div>
+                                  <h4 className="font-black text-gray-900 dark:text-white line-clamp-1">{name}</h4>
+                                  <p className="text-sm text-gray-900 dark:text-gray-300 font-black">{age} anos • {patient.schooling}</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <div className={cn(
+                                  "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
+                                  patient.cognitiveLevel === 'ALTO' ? "bg-green-50 text-green-700 border-green-100" :
+                                  patient.cognitiveLevel === 'MEDIO' ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
+                                  "bg-red-50 text-red-700 border-red-100"
+                                )}>
+                                  {patient.cognitiveLevel}
+                                </div>
+                                {linkedElderly && (
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-bold rounded uppercase">Vinculado</span>
                                 )}
                               </div>
-                              <div>
-                                <h4 className="font-black text-gray-900 dark:text-white">{patient.name}</h4>
-                                <p className="text-sm text-gray-900 dark:text-gray-300 font-black">{patient.age} anos • {patient.schooling}</p>
-                              </div>
                             </div>
-                            <div className={cn(
-                              "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
-                              patient.cognitiveLevel === 'ALTO' ? "bg-green-50 text-green-700 border-green-100" :
-                              patient.cognitiveLevel === 'MEDIO' ? "bg-yellow-50 text-yellow-700 border-yellow-100" :
-                              "bg-red-50 text-red-700 border-red-100"
-                            )}>
-                              {patient.cognitiveLevel}
-                            </div>
-                          </div>
 
                           <div className="space-y-3 mb-6">
                             <div className="flex items-center gap-2 text-sm text-gray-900 dark:text-gray-200 font-black">
@@ -2254,7 +2321,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                           </div>
                         </div>
                       </motion.div>
-                    ))}
+                    )
+                  })}
                   </div>
                 </div>
               )
