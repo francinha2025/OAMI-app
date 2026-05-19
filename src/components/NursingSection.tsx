@@ -692,6 +692,7 @@ export const NursingSection = (props: NursingSectionProps) => {
               users={users}
               professionals={professionals}
               elderly={elderly}
+              vitalSigns={vitalSigns}
               editingData={editingData}
               initialPatientId={selectedPatientId || undefined}
               showToast={props.showToast}
@@ -1065,13 +1066,14 @@ const ReportCard = ({ title, description, icon, onDownloadPDF, onDownloadWord }:
   </div>
 );
 
-const NursingModal = ({ type, patients, medications, users, professionals, elderly, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
+const NursingModal = ({ type, patients, medications, users, professionals, elderly, vitalSigns, onClose, onSavePatient, onSaveMedication, onSaveAdministration, onSaveVitalSigns, onSaveDressing, onSaveEvolution, onSaveIncident, onSaveShift, onSaveAVD, onSaveDiaperChange, onSavePhotos, editingData, initialPatientId, showToast, user }: {
   type: string | null,
   patients: NursingPatient[],
   medications: Medication[],
   users: StaffMember[],
   professionals: Professional[],
   elderly: Elderly[],
+  vitalSigns: VitalSigns[],
   onClose: () => void,
   onSavePatient: any,
   onSaveMedication: any,
@@ -1089,6 +1091,17 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
   showToast: (msg: string, type?: 'success' | 'error') => void,
   user: UserType
 }) => {
+  const [loading, setLoading] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [showVitalsForm, setShowVitalsForm] = useState(false);
+  const [quickVitals, setQuickVitals] = useState<Partial<VitalSigns>>({
+    systolicBP: '',
+    diastolicBP: '',
+    heartRate: '',
+    temperature: '',
+    saturation: '',
+    bloodGlucose: ''
+  });
   const [formData, setFormData] = useState<any>(editingData || {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: format(new Date(), 'HH:mm'),
@@ -1114,7 +1127,6 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
     careDegree: 'GRAU_1',
     familyContact: ''
   });
-  const [isExtracting, setIsExtracting] = useState(false);
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -1178,6 +1190,20 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
     try {
       const { photos, ...data } = formData;
       const id = editingData?.id;
+
+      // Quick Vitals Save in Evolution Flow
+      if (type === 'evolution' && showVitalsForm && quickVitals.systolicBP) {
+        await onSaveVitalSigns({
+          ...quickVitals,
+          patientId: formData.patientId,
+          date: data.date || new Date().toISOString().split('T')[0],
+          time: data.time || new Date().toTimeString().slice(0, 5),
+          registeredBy: user.name
+        });
+        
+        const vitalsSummary = `\n[Sinais Vitais Registrados: PA ${quickVitals.systolicBP}/${quickVitals.diastolicBP}, FC ${quickVitals.heartRate}, T ${quickVitals.temperature}ºC, Sat ${quickVitals.saturation}%, Glic ${quickVitals.bloodGlucose}]`;
+        data.content = (data.content || '') + vitalsSummary;
+      }
 
       switch (type) {
         case 'patient': await onSavePatient(data, id); break;
@@ -1646,9 +1672,117 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
                       {isExtracting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap size={14} />}
                       Corrigir Texto
                     </button>
+                    <button 
+                      type="button"
+                      disabled={!formData.patientId}
+                      onClick={() => {
+                        const lastVitals = (vitalSigns || []).filter(v => v.patientId === formData.patientId).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))[0];
+                        if (lastVitals) {
+                          const vitalsText = `Últimos Sinais Vitais (${format(parseISO(lastVitals.date), 'dd/MM')} às ${lastVitals.time}): PA: ${lastVitals.systolicBP}/${lastVitals.diastolicBP} mmHg, FC: ${lastVitals.heartRate} bpm, Temp: ${lastVitals.temperature}ºC, Sat: ${lastVitals.saturation}%, Glic: ${lastVitals.bloodGlucose} mg/dL.`;
+                          setFormData({ ...formData, content: (formData.content || '') + (formData.content ? '\n' : '') + vitalsText });
+                          showToast('Sinais vitais inseridos', 'success');
+                        } else {
+                          showToast('Nenhum dado de sinais vitais encontrado para este paciente', 'error');
+                        }
+                      }}
+                      className="flex items-center gap-1 text-[10px] font-bold text-red-600 hover:text-red-700 transition-colors bg-red-50 dark:bg-red-900/30 px-3 py-1.5 rounded-xl disabled:opacity-50"
+                    >
+                      <Activity size={14} />
+                      Sinais Vitais
+                    </button>
                     <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, content: (formData.content || '') + ' ' + t })} />
                   </div>
                 </div>
+
+                <div className="mt-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowVitalsForm(!showVitalsForm)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                      showVitalsForm 
+                        ? 'bg-red-100 text-red-600 dark:bg-red-900/40' 
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800'
+                    }`}
+                  >
+                    <Activity size={14} />
+                    {showVitalsForm ? 'Fechar Registro de Sinais Vitais' : 'Registrar Sinais Vitais nesta Evolução'}
+                  </button>
+
+                  <AnimatePresence>
+                    {showVitalsForm && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">PA (Sist/Diast)</label>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                placeholder="120"
+                                className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                                value={quickVitals.systolicBP || ''}
+                                onChange={e => setQuickVitals({...quickVitals, systolicBP: e.target.value})}
+                              />
+                              <span className="text-gray-400">/</span>
+                              <input
+                                type="text"
+                                placeholder="80"
+                                className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                                value={quickVitals.diastolicBP || ''}
+                                onChange={e => setQuickVitals({...quickVitals, diastolicBP: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">FC (bpm)</label>
+                            <input
+                              type="text"
+                              placeholder="75"
+                              className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                              value={quickVitals.heartRate || ''}
+                              onChange={e => setQuickVitals({...quickVitals, heartRate: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Temp (ºC)</label>
+                            <input
+                              type="text"
+                              placeholder="36.5"
+                              className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                              value={quickVitals.temperature || ''}
+                              onChange={e => setQuickVitals({...quickVitals, temperature: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Sat (%)</label>
+                            <input
+                              type="text"
+                              placeholder="98"
+                              className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                              value={quickVitals.saturation || ''}
+                              onChange={e => setQuickVitals({...quickVitals, saturation: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Glicemia</label>
+                            <input
+                              type="text"
+                              placeholder="100"
+                              className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-center"
+                              value={quickVitals.bloodGlucose || ''}
+                              onChange={e => setQuickVitals({...quickVitals, bloodGlucose: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <textarea 
                   value={formData.content || ''}
                   className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm min-h-[180px] font-medium"
