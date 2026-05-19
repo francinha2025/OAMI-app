@@ -462,34 +462,104 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       const monthEnd = endOfMonth(monthStart);
       const monthLabel = format(monthStart, 'MMMM yyyy', { locale: ptBR });
 
-      // Prepare data for the reports - Final Packings is usually what's delivered
-      const data = finalPackings
+      const { totalRaw, totalFinal, wipLoss, lossRate, efficiency, goal } = dashboardData;
+
+      // 1. Prepare Summary Rows
+      const summaryData = [
+        ['---', 'RESUMO EXECUTIVO DO PERÍODO', '---', '---', '---'],
+        ['Indicador', 'Valor Nominal', 'Percentual', 'Meta', 'Status'],
+        ['Produção Bruta Total', `${totalRaw} un`, '-', '-', 'OK'],
+        ['Produção Finalizada', `${totalFinal} un`, `${efficiency.toFixed(1)}%`, `${goal} un`, totalFinal >= goal ? 'META ATINGIDA' : 'EM ANDAMENTO'],
+        ['Perda em Processamento', `${wipLoss} un`, `${lossRate.toFixed(1)}%`, '< 5%', lossRate > 5 ? 'ATENÇÃO' : 'NORMAL'],
+        ['---', '---', '---', '---', '---'],
+        ['', '', '', '', ''],
+      ];
+
+      // 2. Prepare Detailed Activity Log
+      const filteredRaw = rawProductions
         .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
-        .sort((a, b) => b.date.localeCompare(a.date))
-        .map(p => [
-          format(parseISO(p.date), 'dd/MM/yyyy'),
-          p.batchNumber,
-          safeReplace(p.packageType, '_', ' '),
-          p.quantityPackaged,
-          p.operator
+        .map(p => ({
+          date: p.date,
+          activity: 'PRODUÇÃO BRUTA',
+          details: `Turno: ${p.shift}`,
+          qty: p.quantity,
+          resp: p.operator
+        }));
+
+      const filteredWip = wipProcessings
+        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+        .flatMap(p => [
+          {
+            date: p.date,
+            activity: 'PROCESSAMENTO (WIP)',
+            details: `Saída Processada`,
+            qty: p.quantityOut,
+            resp: p.operator
+          },
+          ...(p.wasteAmount > 0 ? [{
+            date: p.date,
+            activity: 'PERDA REGISTRADA',
+            details: `Motivo: ${p.wasteReason || 'Não informado'}`,
+            qty: -p.wasteAmount,
+            resp: p.operator
+          }] : [])
         ]);
 
-      const columns = ['Data', 'Lote', 'Tipo', 'Qtd', 'Operador'];
-      const title = `Relatório de Produção - ${monthLabel}`;
-      const fileName = `producao_fraldas_${selectedMonth}`;
+      const filteredFinal = finalPackings
+        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+        .map(p => ({
+          date: p.date,
+          activity: 'EMBALAGEM FINAL',
+          details: `Lote: ${p.batchNumber} (${safeReplace(p.packageType, '_', ' ')})`,
+          qty: p.quantityPackaged,
+          resp: p.operator
+        }));
+
+      const filteredDonations = (donations || [])
+        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+        .map(p => ({
+          date: p.date,
+          activity: 'DOAÇÃO',
+          details: `Beneficiário: ${p.beneficiaryName}`,
+          qty: -p.quantity,
+          resp: 'Assistente Social'
+        }));
+
+      // Combine and Sort by Date
+      const combinedActivities = [...filteredRaw, ...filteredWip, ...filteredFinal, ...filteredDonations]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(a => [
+          format(parseISO(a.date), 'dd/MM/yyyy'),
+          a.activity,
+          a.details,
+          a.qty.toString(),
+          a.resp
+        ]);
+
+      const columns = ['Data', 'Atividade', 'Detalhes / Observações', 'Qtd', 'Operador/Destino'];
+      const data = [...summaryData, ...combinedActivities];
+      const title = `Relatório Detalhado de Produção de Fraldas - ${monthLabel}`;
+      const fileName = `producao_detalhada_fraldas_${selectedMonth}`;
 
       if (type === 'pdf') {
-        await generateModernPDF({ title, columns, data, fileName, subtitle: `Resumo Mensal de Produção Finalizada` });
+        await generateModernPDF({ 
+          title, 
+          columns, 
+          data, 
+          fileName, 
+          subtitle: `Consolidado de Fluxo: Bruta -> Processada -> Embalada -> Doadas`,
+          orientation: 'landscape' 
+        });
       } else if (type === 'word') {
-        await generateModernWord({ title, columns, data, fileName, subtitle: `Resumo Mensal de Produção Finalizada` });
+        await generateModernWord({ title, columns, data, fileName, subtitle: `Relatório detalhado de fluxo de produção` });
       } else if (type === 'excel') {
         generateModernExcel({ title, columns, data, fileName });
       }
       
-      showToast(`Relatório exportado com sucesso (${type.toUpperCase()})!`);
+      showToast(`Relatório detalhado exportado com sucesso (${type.toUpperCase()})!`);
     } catch (err) {
       console.error(err);
-      showToast('Erro ao exportar relatório', 'error');
+      showToast('Erro ao exportar relatório detalhado', 'error');
     } finally {
       setExporting(false);
     }
