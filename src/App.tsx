@@ -1029,7 +1029,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       ]
     },
     {
-      title: 'Assitência Técnica',
+      title: 'Serviços Técnicos',
       items: [
         { id: 'physio', label: 'Fisioterapia', icon: Activity, roles: ['FISIOTERAPEUTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'nursing', label: 'Enfermagem', icon: Stethoscope, roles: ['ENFERMEIRA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
@@ -2069,11 +2069,26 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
     name: '',
     fullName: '',
     cpf: '',
+    rg: '',
+    susCard: '',
     birthCertificate: '',
     lastProfession: '',
     birthDate: '',
+    gender: 'F' as 'M' | 'F' | 'OUTRO',
     photoUrl: '',
     entryDate: new Date().toISOString().split('T')[0],
+    address: '',
+    phone: '',
+    responsibleName: '',
+    responsiblePhone: '',
+    schooling: '',
+    literacyLevel: 'ALFABETIZADO' as 'ALFABETIZADO' | 'ANALFABETO' | 'ALFABETIZADO_FUNCIONAL',
+    diseases: '',
+    medications: '',
+    allergies: '',
+    diagnoses: '',
+    physicalLimitations: '',
+    observations: '',
     status: 'ATIVO' as const
   });
 
@@ -2112,11 +2127,26 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
         name: '',
         fullName: '',
         cpf: '',
+        rg: '',
+        susCard: '',
         birthCertificate: '',
         lastProfession: '',
         birthDate: '',
+        gender: 'F',
         photoUrl: '',
         entryDate: new Date().toISOString().split('T')[0],
+        address: '',
+        phone: '',
+        responsibleName: '',
+        responsiblePhone: '',
+        schooling: '',
+        literacyLevel: 'ALFABETIZADO',
+        diseases: '',
+        medications: '',
+        allergies: '',
+        diagnoses: '',
+        physicalLimitations: '',
+        observations: '',
         status: 'ATIVO'
       });
     } catch (err) {
@@ -2140,15 +2170,30 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
   const openEditModal = (e: Elderly) => {
     setEditingElderly(e);
     setFormData({
-      name: e.name,
+      name: e.name || '',
       fullName: e.fullName || '',
       cpf: e.cpf || '',
+      rg: e.rg || '',
+      susCard: e.susCard || '',
       birthCertificate: e.birthCertificate || '',
       lastProfession: e.lastProfession || '',
-      birthDate: e.birthDate,
+      birthDate: e.birthDate || '',
+      gender: e.gender || 'F',
       photoUrl: e.photoUrl || '',
-      entryDate: e.entryDate,
-      status: e.status
+      entryDate: e.entryDate || '',
+      address: e.address || '',
+      phone: e.phone || '',
+      responsibleName: e.responsibleName || '',
+      responsiblePhone: e.responsiblePhone || '',
+      schooling: e.schooling || '',
+      literacyLevel: e.literacyLevel || 'ALFABETIZADO',
+      diseases: e.diseases || '',
+      medications: e.medications || '',
+      allergies: e.allergies || '',
+      diagnoses: e.diagnoses || '',
+      physicalLimitations: e.physicalLimitations || '',
+      observations: e.observations || '',
+      status: e.status || 'ATIVO'
     });
     setIsEditModalOpen(true);
     setSelectedElderly(null);
@@ -2297,6 +2342,126 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                       value={formData.birthDate}
                       onChange={e => setFormData({...formData, birthDate: e.target.value})}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Gênero</label>
+                    <select
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.gender}
+                      onChange={e => setFormData({...formData, gender: e.target.value as any})}
+                    >
+                      <option value="M">Masculino</option>
+                      <option value="F">Feminino</option>
+                      <option value="OUTRO">Outro</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">RG</label>
+                    <input 
+                      type="text" 
+                      placeholder="Nº do RG"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.rg || ''}
+                      onChange={e => setFormData({...formData, rg: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cartão SUS</label>
+                    <input 
+                      type="text" 
+                      placeholder="Nº do Cartão SUS"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.susCard || ''}
+                      onChange={e => setFormData({...formData, susCard: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Endereço de Origem</label>
+                    <input 
+                      type="text" 
+                      placeholder="Rua, Número, Bairro, Cidade"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.address || ''}
+                      onChange={e => setFormData({...formData, address: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Responsável Legal</label>
+                    <input 
+                      type="text" 
+                      placeholder="Nome do Responsável"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.responsibleName || ''}
+                      onChange={e => setFormData({...formData, responsibleName: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Telefone Responsável</label>
+                    <input 
+                      type="tel" 
+                      placeholder="(00) 0 0000-0000"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.responsiblePhone || ''}
+                      onChange={e => setFormData({...formData, responsiblePhone: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Informações Multidisciplinares Sincronizadas</h4>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Escolaridade</label>
+                    <input 
+                      type="text" 
+                      placeholder="Grau de instrução"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.schooling || ''}
+                      onChange={e => setFormData({...formData, schooling: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Alfabetização</label>
+                    <select
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.literacyLevel}
+                      onChange={e => setFormData({...formData, literacyLevel: e.target.value as any})}
+                    >
+                      <option value="ALFABETIZADO">Alfabetizado</option>
+                      <option value="ANALFABETO">Analfabeto</option>
+                      <option value="ALFABETIZADO_FUNCIONAL">Alfabetizado Funcional</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+                        <ShieldAlert size={14} /> Doenças / Comorbidades
+                      </label>
+                      <textarea 
+                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-gray-800 dark:text-white h-20"
+                        value={formData.diseases || ''}
+                        onChange={e => setFormData({...formData, diseases: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                        <ClipboardList size={14} /> Medicações em Uso
+                      </label>
+                      <textarea 
+                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 text-gray-800 dark:text-white h-20"
+                        value={formData.medications || ''}
+                        onChange={e => setFormData({...formData, medications: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Diagnósticos / Observações Gerais</label>
+                      <textarea 
+                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white h-24"
+                        value={formData.observations || ''}
+                        onChange={e => setFormData({...formData, observations: e.target.value})}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Data de Entrada</label>
@@ -8978,6 +9143,7 @@ export default function App() {
     let unsubStaff = () => {};
     let unsubDonors = () => {};
     let unsubDiaperDonations = () => {};
+    let unsubDiaperBeneficiaries = () => {};
     let unsubProductionLogs = () => {};
     let unsubVolunteers = () => {};
     let unsubRawProd = () => {};
@@ -9150,6 +9316,26 @@ export default function App() {
     ), (snapshot) => {
       setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
+
+    unsubRawProd = onSnapshot(query(collection(db, 'diaperRawProductions'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+      setDiaperRawProductions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperRawProduction)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperRawProductions'));
+
+    unsubWIP = onSnapshot(query(collection(db, 'diaperWIPProcessings'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+      setDiaperWIPProcessings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperWIPProcessing)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperWIPProcessings'));
+
+    unsubGoals = onSnapshot(collection(db, 'diaperProductionGoals'), (snapshot) => {
+      setDiaperProductionGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperProductionGoal)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperProductionGoals'));
+
+    unsubDiaperDonations = onSnapshot(query(collection(db, 'diaperDonations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+      setDiaperDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperDonation)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperDonations'));
+
+    unsubDiaperBeneficiaries = onSnapshot(query(collection(db, 'diaperBeneficiaries'), orderBy('name'), limit(100)), (snapshot) => {
+      setDiaperBeneficiaries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperBeneficiary)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperBeneficiaries'));
 
     // Listen to Financial Records
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
@@ -9499,8 +9685,12 @@ export default function App() {
       unsubEvolutions();
       unsubDonors();
       unsubDiaperDonations();
+      unsubDiaperBeneficiaries();
       unsubStock();
       unsubProductionLogs();
+      unsubRawProd();
+      unsubWIP();
+      unsubGoals();
       unsubEvents();
       unsubFinancial();
       unsubUsers();
@@ -9662,15 +9852,25 @@ export default function App() {
 
   const handleSavePhysioPatient = async (data: Omit<PhysioPatient, 'id'>, id?: string) => {
     try {
-      const existing = physioPatients.find(p => p.elderlyId === id || p.id === id);
+      const elderlyId = id;
+      if (!elderlyId) return;
+
+      const existing = physioPatients.find(p => p.elderlyId === elderlyId || p.id === elderlyId);
       const cleanedData = cleanData(data);
       if (existing) {
-        await updateDoc(doc(db, 'physioPatients', existing.id), { ...cleanedData, elderlyId: id });
-        showToast('Paciente atualizado com sucesso');
+        await updateDoc(doc(db, 'physioPatients', existing.id), { ...cleanedData, elderlyId });
       } else {
-        await addDoc(collection(db, 'physioPatients'), { ...cleanedData, elderlyId: id });
-        showToast('Paciente cadastrado com sucesso');
+        await addDoc(collection(db, 'physioPatients'), { ...cleanedData, elderlyId });
       }
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(elderlyId, {
+        diagnoses: data.diagnosis,
+        phone: data.phone,
+        physicalLimitations: data.observations
+      });
+
+      showToast('Dados de fisioterapia salvos e compartilhados');
     } catch (err) {
       handleFirestoreError(err, id ? OperationType.UPDATE : OperationType.CREATE, 'physioPatients');
       showToast('Erro ao salvar paciente', 'error');
@@ -9767,18 +9967,48 @@ export default function App() {
     }
   };
 
+  const updateSharedElderlyData = async (elderlyId: string, data: Partial<Elderly>) => {
+    if (!elderlyId) return;
+    try {
+      const elderlyRef = doc(db, 'elderly', elderlyId);
+      const cleanedSyncData = cleanData(data);
+      if (Object.keys(cleanedSyncData).length > 0) {
+        await updateDoc(elderlyRef, {
+          ...cleanedSyncData,
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error("Error syncing elderly data:", err);
+    }
+  };
+
   // Nursing Handlers
   const handleSaveNursingPatient = async (data: Omit<NursingPatient, 'id'>, id?: string) => {
     try {
-      const existing = nursingPatients.find(p => p.elderlyId === id || p.id === id);
+      const elderlyId = id;
+      if (!elderlyId) return;
+
+      const existing = nursingPatients.find(p => p.elderlyId === elderlyId || p.id === elderlyId);
       const cleanedData = cleanData(data);
+      
+      // Update Nursing specific collection
       if (existing) {
-        await updateDoc(doc(db, 'nursingPatients', existing.id), { ...cleanedData, elderlyId: id });
-        showToast('Paciente atualizado com sucesso');
+        await updateDoc(doc(db, 'nursingPatients', existing.id), { ...cleanedData, elderlyId });
       } else {
-        await addDoc(collection(db, 'nursingPatients'), { ...cleanedData, elderlyId: id });
-        showToast('Paciente cadastrado com sucesso');
+        await addDoc(collection(db, 'nursingPatients'), { ...cleanedData, elderlyId });
       }
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(elderlyId, {
+        diseases: data.comorbidities,
+        allergies: data.allergies,
+        diagnoses: data.diagnosis,
+        phone: data.familyContact,
+        physicalLimitations: data.careDegree + (data.isBedridden ? ' - Acamado' : '')
+      });
+
+      showToast('Dados de enfermagem salvos e compartilhados');
     } catch (err) {
       handleFirestoreError(err, id ? OperationType.UPDATE : OperationType.CREATE, 'nursingPatients');
       showToast('Erro ao salvar paciente', 'error');
@@ -10056,20 +10286,28 @@ export default function App() {
   // Psychology Handlers
   const handleSavePsychPatient = async (data: Omit<PsychPatient, 'id'>, id?: string) => {
     try {
-      const existing = psychPatients.find(p => p.elderlyId === id || p.id === id);
-      
+      const elderlyId = id;
+      if (!elderlyId) return;
+
+      const existing = psychPatients.find(p => p.elderlyId === elderlyId || p.id === elderlyId);
       const cleanedData = cleanData(data);
 
       if (existing) {
-        await updateDoc(doc(db, 'psychPatients', existing.id), { ...cleanedData, elderlyId: id });
-        showToast('Idoso atualizado com sucesso');
+        await updateDoc(doc(db, 'psychPatients', existing.id), { ...cleanedData, elderlyId });
       } else {
-        await addDoc(collection(db, 'psychPatients'), { ...cleanedData, elderlyId: id });
-        showToast('Idoso cadastrado com sucesso');
+        await addDoc(collection(db, 'psychPatients'), { ...cleanedData, elderlyId });
       }
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(elderlyId, {
+        phone: data.familyContact,
+        observations: data.lifeHistory
+      });
+
+      showToast('Dados de psicologia salvos e compartilhados');
     } catch (err) {
       handleFirestoreError(err, id ? OperationType.UPDATE : OperationType.CREATE, 'psychPatients');
-      showToast('Erro ao salvar idoso', 'error');
+      showToast('Erro ao salvar paciente', 'error');
     }
   };
 
@@ -10223,6 +10461,7 @@ export default function App() {
   const handleSavePedagogyPatient = async (data: Partial<PedagogyPatient>) => {
     try {
       const id = data.id;
+      if (!id) return;
       const existing = pedagogyPatients.find(p => p.elderlyId === id || p.id === id);
       
       const { id: _, ...rest } = data;
@@ -10230,14 +10469,22 @@ export default function App() {
 
       if (existing) {
         await updateDoc(doc(db, 'pedagogyPatients', existing.id), { ...cleanedData, elderlyId: id });
-        showToast('Idoso atualizado com sucesso');
       } else {
         await addDoc(collection(db, 'pedagogyPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
-        showToast('Idoso cadastrado com sucesso');
       }
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(id, {
+        schooling: data.schooling,
+        literacyLevel: data.literacyLevel,
+        lastProfession: data.previousProfession,
+        physicalLimitations: data.cognitiveLimitations
+      });
+
+      showToast('Dados pedagógicos salvos e compartilhados');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'pedagogyPatients');
-      showToast('Erro ao salvar idoso', 'error');
+      showToast('Erro ao salvar dados pedagógicos', 'error');
     }
   };
 
@@ -10363,6 +10610,7 @@ export default function App() {
   const handleSaveSocialPatient = async (data: Partial<SocialPatient>) => {
     try {
       const id = data.id;
+      if (!id) return;
       const existing = socialPatients.find(p => p.elderlyId === id || p.id === id);
       
       const { id: _, ...rest } = data;
@@ -10373,7 +10621,15 @@ export default function App() {
       } else {
         await addDoc(collection(db, 'socialPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
       }
-      showToast('Perfil social salvo com sucesso');
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(id, {
+        birthDate: data.birthDate,
+        schooling: data.schooling,
+        lastProfession: data.previousProfession
+      });
+
+      showToast('Perfil social salvo e compartilhado');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialPatients');
       showToast('Erro ao salvar perfil social', 'error');
@@ -10556,6 +10812,70 @@ export default function App() {
     }
   };
 
+  const handleSaveDiaperRawProduction = async (data: Partial<DiaperRawProduction>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperRawProductions', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperRawProductions'), cleanedData);
+      }
+      showToast('Produção bruta salva com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperRawProductions');
+      showToast('Erro ao salvar produção bruta', 'error');
+    }
+  };
+
+  const handleSaveDiaperWIPProcessing = async (data: Partial<DiaperWIPProcessing>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperWIPProcessings', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperWIPProcessings'), cleanedData);
+      }
+      showToast('Processamento WIP salvo com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperWIPProcessings');
+      showToast('Erro ao salvar processamento WIP', 'error');
+    }
+  };
+
+  const handleSaveDiaperFinalPacking = async (data: Partial<DiaperFinalPacking>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperFinalPackings', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperFinalPackings'), cleanedData);
+      }
+      showToast('Embalamento final salvo com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperFinalPackings');
+      showToast('Erro ao salvar embalamento final', 'error');
+    }
+  };
+
+  const handleSaveDiaperProductionGoal = async (data: Partial<DiaperProductionGoal>) => {
+    try {
+      const { id, ...rest } = data;
+      const cleanedData = cleanData(rest);
+      if (id) {
+        await updateDoc(doc(db, 'diaperProductionGoals', id), cleanedData);
+      } else {
+        await addDoc(collection(db, 'diaperProductionGoals'), cleanedData);
+      }
+      showToast('Meta de produção salva com sucesso');
+    } catch (err) {
+      handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'diaperProductionGoals');
+      showToast('Erro ao salvar meta de produção', 'error');
+    }
+  };
+
   const handleDeleteDiaperRecord = async (collectionName: string, id: string) => {
     try {
       await deleteDoc(doc(db, collectionName, id));
@@ -10570,6 +10890,7 @@ export default function App() {
   const handleSaveNutritionPatient = async (data: Partial<NutritionPatient>) => {
     try {
       const id = data.id;
+      if (!id) return;
       const existing = nutritionPatients.find(p => p.elderlyId === id || p.id === id);
       const { id: _, ...rest } = data;
       const cleanedData = cleanData(rest);
@@ -10580,6 +10901,11 @@ export default function App() {
         await addDoc(collection(db, 'nutritionPatients'), { ...cleanedData, elderlyId: id, createdAt: new Date().toISOString() });
         showToast('Perfil nutricional cadastrado');
       }
+
+      // Sync shared fields to central Elderly record
+      await updateSharedElderlyData(id, {
+        allergies: data.allergies?.join(', ')
+      });
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'nutritionPatients');
       showToast('Erro ao salvar perfil nutricional', 'error');
@@ -10981,6 +11307,10 @@ export default function App() {
           goals={diaperProductionGoals}
           onSaveDonation={handleSaveDiaperDonation}
           onSaveBeneficiary={handleSaveDiaperBeneficiary}
+          onSaveRaw={handleSaveDiaperRawProduction}
+          onSaveWip={handleSaveDiaperWIPProcessing}
+          onSaveFinal={handleSaveDiaperFinalPacking}
+          onSaveGoal={handleSaveDiaperProductionGoal}
           onDeleteRecord={handleDeleteDiaperRecord}
           showToast={showToast}
         />

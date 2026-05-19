@@ -94,7 +94,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({
             <button 
               type="button"
               onClick={() => removePhoto(index)}
-              className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+              className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full transition-opacity shadow-lg"
             >
               <X size={12} />
             </button>

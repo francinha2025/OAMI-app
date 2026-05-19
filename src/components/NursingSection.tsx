@@ -477,7 +477,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                   <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl group relative">
                     <div className="flex justify-between items-start mb-2">
                        <span className="text-[10px] font-bold text-blue-600 uppercase italic">{patient?.name || 'Paciente não encontrado'}</span>
-                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <div className="flex gap-2 transition-opacity">
                          <button onClick={() => { setEditingData(evo); setModalType('evolution'); setIsModalOpen(true); }} className="text-gray-400 hover:text-green-600"><Edit2 size={14} /></button>
                          <button onClick={() => setDeleteConfirm({ id: evo.id, type: 'evolution' })} className="text-gray-400 hover:text-red-600"><Trash2 size={14} /></button>
                        </div>
@@ -772,7 +772,7 @@ const ShiftView = ({ shifts, users, onAdd, onEdit, onDelete }: {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {(shifts || []).map(s => (
         <div key={s.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 group relative flex flex-col h-full">
-          <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-4 right-4 flex gap-1 transition-opacity">
             <button 
               onClick={() => onEdit(s)}
               className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
@@ -1129,7 +1129,12 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
         ...prev,
         name: linkedElderly.name,
         fullName: linkedElderly.fullName || linkedElderly.name,
-        age: age
+        age: age,
+        comorbidities: linkedElderly.diseases || prev.comorbidities,
+        allergies: linkedElderly.allergies || prev.allergies,
+        diagnosis: linkedElderly.diagnoses || prev.diagnosis,
+        familyContact: linkedElderly.phone || linkedElderly.responsiblePhone || prev.familyContact,
+        careDegree: linkedElderly.physicalLimitations?.includes('GRAU') ? linkedElderly.physicalLimitations.split(' ')[0] : prev.careDegree
       }));
     }
   }, [linkedElderly, type]);
@@ -1858,7 +1863,7 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, s
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase">{d.date}</span>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2 transition-opacity">
                   <button 
                     onClick={() => onEdit(d)}
                     className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
@@ -2009,7 +2014,7 @@ const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete, filter, s
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className="text-[10px] font-bold text-gray-400 uppercase">{i.date} {i.time}</span>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-2 transition-opacity">
                   <button 
                     onClick={() => onEdit(i)}
                     className="p-1.5 text-gray-400 hover:text-green-600 transition-colors"
@@ -2274,7 +2279,7 @@ const PatientDetailView = ({
                     <td className="py-3">{v.temperature}°C</td>
                     <td className="py-3">{v.saturation}%</td>
                     <td className="py-3 text-right">
-                      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-1 transition-opacity">
                         <button 
                           onClick={() => onEditVital(v)}
                           className="p-1 text-gray-400 hover:text-green-600 transition-colors"
@@ -2314,7 +2319,7 @@ const PatientDetailView = ({
               <div key={evo.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl space-y-2 group">
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold text-gray-400 uppercase">{evo.date} às {evo.time}</span>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-2 transition-opacity">
                     <button 
                       onClick={() => onEditEvolution(evo)}
                       className="p-1 text-gray-400 hover:text-green-600 transition-colors"

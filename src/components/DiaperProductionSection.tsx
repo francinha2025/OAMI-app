@@ -72,6 +72,10 @@ interface DiaperProductionSectionProps {
   goals: DiaperProductionGoal[];
   onSaveDonation: (data: Partial<DiaperDonation>) => Promise<void>;
   onSaveBeneficiary: (data: Partial<DiaperBeneficiary>) => Promise<void>;
+  onSaveRaw: (data: Partial<DiaperRawProduction>) => Promise<void>;
+  onSaveWip: (data: Partial<DiaperWIPProcessing>) => Promise<void>;
+  onSaveFinal: (data: Partial<DiaperFinalPacking>) => Promise<void>;
+  onSaveGoal: (data: Partial<DiaperProductionGoal>) => Promise<void>;
   onDeleteRecord: (collection: string, id: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
@@ -88,9 +92,13 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   goals,
   onSaveDonation,
   onSaveBeneficiary,
+  onSaveRaw,
+  onSaveWip,
+  onSaveFinal,
+  onSaveGoal,
   onDeleteRecord,
   showToast
-}) => {
+}: DiaperProductionSectionProps) => {
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const saved = localStorage.getItem('oami-diaper-tab');
     return (saved as TabType) || 'dashboard';
@@ -212,28 +220,86 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       lossRate,
       efficiency,
       goal: currentGoal?.targetQuantity || 0,
+      goalId: currentGoal?.id || null,
       dailyData,
       pieData
     };
   }, [rawProductions, wipProcessings, finalPackings, goals, selectedMonth]);
+
+  const handleEditRaw = (record: DiaperRawProduction) => {
+    setRawForm({
+      date: record.date,
+      quantity: record.quantity.toString(),
+      operator: record.operator,
+      shift: record.shift,
+      observations: record.observations || ''
+    });
+    setEditingId(record.id);
+    setIsModalOpen(true);
+  };
+
+  const handleEditWip = (record: DiaperWIPProcessing) => {
+    setWipForm({
+      date: record.date,
+      quantityIn: record.quantityIn.toString(),
+      quantityOut: record.quantityOut.toString(),
+      wasteReason: record.wasteReason || '',
+      operator: record.operator,
+      observations: record.observations || ''
+    });
+    setEditingId(record.id);
+    setIsModalOpen(true);
+  };
+
+  const handleEditFinal = (record: DiaperFinalPacking) => {
+    setFinalForm({
+      date: record.date,
+      quantityPackaged: record.quantityPackaged.toString(),
+      packageType: record.packageType,
+      operator: record.operator,
+      batchNumber: record.batchNumber,
+      observations: record.observations || ''
+    });
+    setEditingId(record.id);
+    setIsModalOpen(true);
+  };
+
+  const handleEditDonation = (record: DiaperDonation) => {
+    setDonationForm({
+      beneficiaryId: record.beneficiaryId,
+      beneficiaryName: record.beneficiaryName,
+      date: record.date,
+      quantity: record.quantity.toString(),
+      observations: record.observations || ''
+    });
+    setEditingId(record.id);
+    setModalType('donations');
+    setIsModalOpen(true);
+  };
 
   // Handlers
   const handleSaveRaw = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         ...rawForm,
         quantity: parseInt(rawForm.quantity) || 0,
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
       
-      await addDoc(collection(db, 'diaperRawProductions'), payload);
-      showToast('Produção bruta registrada com sucesso!');
+      if (editingId) {
+        payload.id = editingId;
+      } else {
+        payload.createdAt = new Date().toISOString();
+      }
+
+      await onSaveRaw(payload);
       setIsModalOpen(false);
       setRawForm({ ...rawForm, quantity: '', observations: '' });
+      setEditingId(null);
     } catch (err: any) {
-      showToast(err.message || 'Erro ao registrar produção', 'error');
+      // Error handled by parent
     } finally {
       setLoading(false);
     }
@@ -246,20 +312,26 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       const inVal = parseInt(wipForm.quantityIn) || 0;
       const outVal = parseInt(wipForm.quantityOut) || 0;
 
-      const payload = {
+      const payload: any = {
         ...wipForm,
         quantityIn: inVal,
         quantityOut: outVal,
         wasteAmount: Math.max(0, inVal - outVal),
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'diaperWIPProcessings'), payload);
-      showToast('Processamento WIP registrado com sucesso!');
+      if (editingId) {
+        payload.id = editingId;
+      } else {
+        payload.createdAt = new Date().toISOString();
+      }
+
+      await onSaveWip(payload);
       setIsModalOpen(false);
       setWipForm({ ...wipForm, quantityIn: '', quantityOut: '', wasteReason: '', observations: '' });
+      setEditingId(null);
     } catch (err: any) {
-      showToast(err.message || 'Erro ao registrar processamento', 'error');
+      // Error handled by parent
     } finally {
       setLoading(false);
     }
@@ -269,16 +341,23 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         ...donationForm,
         quantity: parseInt(donationForm.quantity) || 0,
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
       
+      if (editingId) {
+        payload.id = editingId;
+      } else {
+        payload.createdAt = new Date().toISOString();
+      }
+
       await onSaveDonation(payload);
-      showToast('Doação registrada com sucesso!');
+      showToast(editingId ? 'Doação atualizada!' : 'Doação registrada com sucesso!');
       setIsModalOpen(false);
       setDonationForm({ ...donationForm, quantity: '', observations: '', beneficiaryId: '', beneficiaryName: '' });
+      setEditingId(null);
     } catch (err: any) {
       showToast(err.message || 'Erro ao registrar doação', 'error');
     } finally {
@@ -329,18 +408,24 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         ...finalForm,
         quantityPackaged: parseInt(finalForm.quantityPackaged) || 0,
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'diaperFinalPackings'), payload);
-      showToast('Embalagem finalizada com sucesso!');
+      if (editingId) {
+        payload.id = editingId;
+      } else {
+        payload.createdAt = new Date().toISOString();
+      }
+
+      await onSaveFinal(payload);
       setIsModalOpen(false);
       setFinalForm({ ...finalForm, quantityPackaged: '', observations: '', batchNumber: `BAT-${format(new Date(), 'yyyyMMdd')}` });
+      setEditingId(null);
     } catch (err: any) {
-      showToast(err.message || 'Erro ao registrar embalagem', 'error');
+      // Error handled by parent
     } finally {
       setLoading(false);
     }
@@ -350,7 +435,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         ...goalForm,
         targetQuantity: parseInt(goalForm.targetQuantity) || 0,
         updatedAt: new Date().toISOString()
@@ -358,14 +443,13 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
       const existingGoal = goals.find(g => g.month === goalForm.month);
       if (existingGoal) {
-        await updateDoc(doc(db, 'diaperProductionGoals', existingGoal.id), payload);
-      } else {
-        await addDoc(collection(db, 'diaperProductionGoals'), payload);
+        payload.id = existingGoal.id;
       }
-      showToast('Meta mensal atualizada!');
+
+      await onSaveGoal(payload);
       setIsModalOpen(false);
     } catch (err: any) {
-      showToast('Erro ao salvar meta', 'error');
+      // Error handled by parent
     } finally {
       setLoading(false);
     }
@@ -431,7 +515,17 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           <p className="text-sm text-gray-500 dark:text-gray-400">Atividade diária de costura e montagem primária.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingId(null);
+            setRawForm({
+              date: format(new Date(), 'yyyy-MM-dd'),
+              quantity: '',
+              operator: user.name,
+              shift: 'MANHA',
+              observations: ''
+            });
+            setIsModalOpen(true);
+          }}
           className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-200 dark:shadow-none"
         >
           <Plus size={20} />
@@ -469,12 +563,22 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => handleDeleteRecord(record.id, 'diaperRawProductions')}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleEditRaw(record)}
+                  className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                  title="Editar Registro"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button 
+                  onClick={() => onDeleteRecord('diaperRawProductions', record.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                  title="Excluir Registro"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -490,7 +594,18 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           <p className="text-sm text-gray-500 dark:text-gray-400">Corte, ajuste de bordas e preparação de núcleo.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingId(null);
+            setWipForm({
+              date: format(new Date(), 'yyyy-MM-dd'),
+              quantityIn: '',
+              quantityOut: '',
+              wasteReason: '',
+              operator: user.name,
+              observations: ''
+            });
+            setIsModalOpen(true);
+          }}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none"
         >
           <Plus size={20} />
@@ -533,12 +648,22 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => handleDeleteRecord(record.id, 'diaperWIPProcessings')}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleEditWip(record)}
+                  className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                  title="Editar Registro"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button 
+                  onClick={() => onDeleteRecord('diaperWIPProcessings', record.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                  title="Excluir Registro"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -554,7 +679,18 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           <p className="text-sm text-gray-500 dark:text-gray-400">Saída pronta para estoque e rastreabilidade por lote.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingId(null);
+            setFinalForm({
+              date: format(new Date(), 'yyyy-MM-dd'),
+              quantityPackaged: '',
+              packageType: 'TAMANHO_UNICO',
+              operator: user.name,
+              batchNumber: `BAT-${format(new Date(), 'yyyyMMdd')}`,
+              observations: ''
+            });
+            setIsModalOpen(true);
+          }}
           className="flex items-center gap-2 bg-amber-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-200 dark:shadow-none"
         >
           <Plus size={20} />
@@ -593,12 +729,22 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => handleDeleteRecord(record.id, 'diaperFinalPackings')}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleEditFinal(record)}
+                  className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                  title="Editar Registro"
+                >
+                  <Edit2 size={18} />
+                </button>
+                <button 
+                  onClick={() => onDeleteRecord('diaperFinalPackings', record.id)}
+                  className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                  title="Excluir Registro"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -700,14 +846,41 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             <p className="text-xs text-gray-500 mt-2">Volume descartado por defeito</p>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 relative">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-2xl">
                 <Target size={24} />
               </div>
+              <div className="flex items-center gap-1">
+                {dashboardData.goalId && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        const g = goals.find(x => x.id === dashboardData.goalId);
+                        if (g) {
+                          setGoalForm({ month: g.month, targetQuantity: g.targetQuantity.toString(), notes: g.notes || '' });
+                          setModalType('goals');
+                          setIsModalOpen(true);
+                        }
+                      }}
+                      className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                      title="Editar Meta"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDeleteRecord('diaperProductionGoals', dashboardData.goalId!)}
+                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      title="Excluir Meta"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Meta Mensal</span>
             </div>
-            <p className="text-3xl font-black text-gray-900 dark:text-white">{goal}<span className="text-xs text-gray-400 ml-1">un</span></p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white">{dashboardData.goal}<span className="text-xs text-gray-400 ml-1">un</span></p>
             <p className={cn("text-xs font-bold mt-2 flex items-center gap-1", isGoalMet ? "text-green-600" : "text-amber-600")}>
               {isGoalMet ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
               {goalProgress.toFixed(1)}% atingido
@@ -802,7 +975,18 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           <p className="text-sm text-gray-500 font-bold">Registro de saída de fraldas para beneficiários externos</p>
         </div>
         <button
-          onClick={() => { setModalType('donations' as any); setEditingId(null); setIsModalOpen(true); }}
+          onClick={() => { 
+            setEditingId(null); 
+            setDonationForm({
+              beneficiaryId: '',
+              beneficiaryName: '',
+              date: format(new Date(), 'yyyy-MM-dd'),
+              quantity: '',
+              observations: ''
+            });
+            setModalType('donations' as any); 
+            setIsModalOpen(true); 
+          }}
           className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
         >
           <Plus size={20} />
@@ -812,13 +996,21 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {(donations || []).slice().sort((a, b) => b.date.localeCompare(a.date)).map((donation) => (
-          <div key={donation.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm relative group overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div key={donation.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 flex gap-2">
+              <button 
+                onClick={() => handleEditDonation(donation)}
+                className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
+                title="Editar Doação"
+              >
+                <Edit2 size={16} />
+              </button>
               <button 
                 onClick={() => onDeleteRecord('diaperDonations', donation.id)}
-                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+                title="Excluir Doação"
               >
-                <Trash2 size={18} />
+                <Trash2 size={16} />
               </button>
             </div>
             <div className="flex items-center gap-4 mb-4">

@@ -466,6 +466,12 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                   onEdit={(p: any) => { setEditingData(p); setModalType('patient'); setIsModalOpen(true); }}
                   onDelete={(id: string) => setDeleteConfirm({ id, type: 'patient' })}
                 />
+              ) : selectedPatientId && !selectedPatient ? (
+                <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800">
+                  <UserIcon className="w-16 h-16 text-gray-200 mb-4" />
+                  <p className="text-gray-500 font-bold">Idoso não encontrado ou sem vínculo.</p>
+                  <button onClick={() => setSelectedPatientId(null)} className="mt-4 text-blue-600 font-black hover:underline">Voltar para lista</button>
+                </div>
               ) : (
                 <PatientsView 
                   patients={filteredPatients}
@@ -1514,7 +1520,9 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
         age: age,
         birthDate: linkedElderly.birthDate,
         cpf: linkedElderly.cpf,
-        entryDate: linkedElderly.entryDate
+        entryDate: linkedElderly.entryDate,
+        familyContact: linkedElderly.phone || linkedElderly.responsiblePhone || prev.familyContact,
+        lifeHistory: linkedElderly.observations || prev.lifeHistory
       }));
     }
   }, [linkedElderly, type]);

@@ -29,7 +29,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInYears } from 'date-fns';
 import { 
   NutritionPatient, 
   NutritionEvolution, 
@@ -94,12 +94,14 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   useEffect(() => {
     if (linkedElderly && modalType === 'profile') {
       const birthDate = linkedElderly.birthDate;
-      const age = birthDate ? (new Date().getFullYear() - new Date(birthDate).getFullYear()) : 0;
+      const age = birthDate ? differenceInYears(new Date(), parseISO(birthDate)) : 0;
       
       setLocalFormData((prev: any) => ({
         ...prev,
         name: linkedElderly.name,
-        age: age
+        age: age,
+        comorbidities: linkedElderly.diseases || prev.comorbidities,
+        allergies: linkedElderly.allergies ? linkedElderly.allergies.split(',').map(a => a.trim()).filter(a => a) : prev.allergies
       }));
     }
   }, [linkedElderly, modalType]);

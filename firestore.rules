@@ -462,6 +462,10 @@ service cloud.firestore {
              get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role in roles;
     }
 
+    function isDiaperWorker() {
+      return hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE', 'ASSISTENTE_SOCIAL']) || isAdmin();
+    }
+
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
@@ -598,6 +602,11 @@ service cloud.firestore {
       return data.patientId is string && data.date is string;
     }
 
+    function isValidDiaperBeneficiary(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.status in ['ATIVO', 'INATIVO'];
+    }
+
     function isValidAppNotification(data) {
       return data.title is string && data.title.size() > 0 &&
              data.message is string && data.message.size() > 0 &&
@@ -653,38 +662,45 @@ service cloud.firestore {
     }
 
     match /diaperDonations/{donationId} {
-      allow read: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA']);
-      allow create: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PROJETISTA']);
+      allow get, list: if request.auth != null;
+      allow create, update: if isDiaperWorker();
+      allow delete: if isAdmin() || isCoordinator();
+    }
+
+    match /diaperBeneficiaries/{beneficiaryId} {
+      allow get, list: if request.auth != null;
+      allow create, update: if isDiaperWorker();
+      allow delete: if isAdmin() || isCoordinator();
     }
 
     match /diaperStock/{stockId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /diaperProductionLogs/{logId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /diaperRawProductions/{rawId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /diaperWIPProcessings/{wipId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /diaperFinalPackings/{finalId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /diaperProductionGoals/{goalId} {
       allow read: if isAuthenticated();
-      allow write: if hasAnyRole(['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
+      allow write: if isDiaperWorker();
     }
 
     match /calendarEvents/{eventId} {

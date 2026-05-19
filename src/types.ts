@@ -153,9 +153,33 @@ export interface Elderly {
   birthCertificate?: string;
   lastProfession?: string;
   birthDate: string;
+  gender?: 'M' | 'F' | 'OUTRO';
   entryDate: string;
   status: 'ATIVO' | 'INATIVO';
   photoUrl?: string;
+  
+  // Shared Fields
+  rg?: string;
+  susCard?: string;
+  address?: string;
+  phone?: string;
+  responsibleName?: string;
+  responsiblePhone?: string;
+  
+  // Shared Health (primarily Nursing/Physio)
+  diseases?: string;
+  medications?: string;
+  allergies?: string;
+  diagnoses?: string;
+  physicalLimitations?: string;
+  
+  // Shared Education/Social (primarily Pedagogy/Social)
+  schooling?: string;
+  literacyLevel?: 'ALFABETIZADO' | 'ANALFABETO' | 'ALFABETIZADO_FUNCIONAL';
+  
+  // General
+  observations?: string;
+  updatedAt?: string;
 }
 
 export interface PIA {

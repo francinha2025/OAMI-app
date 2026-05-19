@@ -188,7 +188,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
         age: age,
         birthDate: linkedElderly.birthDate,
         cpf: linkedElderly.cpf,
-        entryDate: linkedElderly.entryDate
+        entryDate: linkedElderly.entryDate,
+        schooling: linkedElderly.schooling || prev.schooling,
+        literacyLevel: linkedElderly.literacyLevel || prev.literacyLevel,
+        previousProfession: linkedElderly.lastProfession || prev.previousProfession,
+        cognitiveLimitations: linkedElderly.physicalLimitations || prev.cognitiveLimitations
       }));
     }
   }, [linkedElderly, modalType, activeTab]);

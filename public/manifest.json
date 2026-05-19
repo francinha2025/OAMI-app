@@ -1,7 +1,7 @@
 {
   "name": "OAMI - Gestão Multidisciplinar",
   "short_name": "OAMI",
-  "description": "Sistema de gestão para a Organização de Assistência ao Menor e ao Idoso",
+  "description": "Sistema de gestão multidisciplinar para a OAMI - Gestão ILPI",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

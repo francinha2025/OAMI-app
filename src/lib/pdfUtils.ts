@@ -10,6 +10,7 @@ interface PDFOptions {
   fileName: string;
   institutionName?: string;
   institutionLogo?: string; // Base64 or URL
+  orientation?: 'portrait' | 'landscape';
 }
 
 export const generateModernPDF = async ({
@@ -19,9 +20,14 @@ export const generateModernPDF = async ({
   data,
   fileName,
   institutionName = INSTITUTION_NAME,
-  institutionLogo = INSTITUTION_LOGO
+  institutionLogo = INSTITUTION_LOGO,
+  orientation = 'portrait'
 }: PDFOptions) => {
-  const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation,
+    unit: 'mm',
+    format: 'a4'
+  });
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 

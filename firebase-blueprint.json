@@ -94,6 +94,27 @@
       },
       "required": ["beneficiaryName", "date", "quantity"]
     },
+    "DiaperBeneficiary": {
+      "title": "DiaperBeneficiary",
+      "description": "Beneficiary of diaper donations",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "document": { "type": "string" },
+        "rg": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "gender": { "type": "string", "enum": ["M", "F", "OUTRO"] },
+        "observations": { "type": "string" },
+        "familyContact": { "type": "string" },
+        "diaperSize": { "type": "string", "enum": ["P", "M", "G", "GG", "XG", "XXG"] },
+        "needsEvolution": { "type": "boolean" },
+        "registrationDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["ATIVO", "INATIVO"] }
+      },
+      "required": ["name", "phone", "address", "status"]
+    },
     "DiaperStock": {
       "title": "DiaperStock",
       "description": "Current diaper stock level",
@@ -775,6 +796,7 @@
     "evolutions": { "schema": "EvolutionRecord", "description": "Professional evolutions" },
     "donors": { "schema": "Donor", "description": "Donors and members" },
     "diaperDonations": { "schema": "DiaperDonation", "description": "Community diaper donations" },
+    "diaperBeneficiaries": { "schema": "DiaperBeneficiary", "description": "Community diaper beneficiaries" },
     "diaperStock": { "schema": "DiaperStock", "description": "Factory stock control" },
     "diaperProductionLogs": { "schema": "DiaperProductionLog", "description": "Factory production logs" },
     "diaperRawProductions": { "schema": "DiaperRawProduction", "description": "Raw production (sewing)" },

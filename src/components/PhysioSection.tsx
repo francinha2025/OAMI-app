@@ -1357,7 +1357,10 @@ const PatientForm = ({ elderly, initialData, onSave, onCancel }: { elderly: Elde
       setFormData(prev => ({
         ...prev,
         name: linkedElderly.name,
-        age: age
+        age: age,
+        diagnosis: linkedElderly.diagnoses || prev.diagnosis,
+        phone: linkedElderly.phone || linkedElderly.responsiblePhone || prev.phone,
+        observations: linkedElderly.physicalLimitations || prev.observations
       }));
     }
   }, [linkedElderly]);

@@ -33,7 +33,7 @@ TIPOS DE REGISTRO (recordType):
 - PHYSIO_EVOLUTION: Evolução de fisioterapia, exercícios.
 - PSYCH_EVOLUTION: Evolução psicológica.
 - PEDAGOGY_EVOLUTION: Evolução pedagógica/estímulo.
-- SOCIAL_EVOLUTION: Evolução da assistência social/vínculo.
+- SOCIAL_EVOLUTION: Evolução do serviço social/vínculo.
 - PEDAGOGY_ACTIVITY: Relato de oficina ou atividade coletiva.
 - WORKSHOP: Oficinas institucionais, projetos.
 - CALENDAR_EVENT: Reuniões, datas, eventos, compromissos.

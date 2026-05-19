@@ -18,7 +18,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
   AreaChart, Area, LineChart, Line
 } from 'recharts';
-import { format, isToday, parseISO, startOfToday, isSameDay, subMonths } from 'date-fns';
+import { format, isToday, parseISO, startOfToday, isSameDay, subMonths, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
@@ -152,14 +152,29 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   [formData.elderlyId, elderly]);
 
   useEffect(() => {
-    if (linkedElderly && (modalType === 'patient' || modalType === 'profile' || activeTab === 'profile')) {
-      setFormData((prev: any) => ({
-        ...prev,
-        name: linkedElderly.name,
-        birthDate: linkedElderly.birthDate,
-        cpf: linkedElderly.cpf,
-        entryDate: linkedElderly.entryDate
-      }));
+    if (linkedElderly) {
+      if (modalType === 'patient' || modalType === 'profile' || activeTab === 'profile') {
+        setFormData((prev: any) => ({
+          ...prev,
+          name: linkedElderly.name,
+          birthDate: linkedElderly.birthDate,
+          cpf: linkedElderly.cpf,
+          entryDate: linkedElderly.entryDate,
+          schooling: linkedElderly.schooling || prev.schooling,
+          previousProfession: linkedElderly.lastProfession || prev.previousProfession,
+          address: linkedElderly.address || prev.address,
+          phone: linkedElderly.phone || prev.phone,
+          responsibleName: linkedElderly.responsibleName || prev.responsibleName,
+          responsiblePhone: linkedElderly.responsiblePhone || prev.responsiblePhone
+        }));
+      } else if (modalType === 'pia') {
+        setFormData((prev: any) => ({
+          ...prev,
+          healthStatus: linkedElderly.diagnoses || prev.healthStatus,
+          medications: linkedElderly.medications || prev.medications,
+          mobilityStatus: linkedElderly.physicalLimitations || prev.mobilityStatus
+        }));
+      }
     }
   }, [linkedElderly, modalType, activeTab]);
 
@@ -172,6 +187,287 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [visitPatientFilter, setVisitPatientFilter] = useState('');
   const [riskPatientFilter, setRiskPatientFilter] = useState('');
   const [piaPatientFilter, setPiaPatientFilter] = useState('');
+
+  const [reportStartDate, setReportStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
+  const [reportEndDate, setReportEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  const handleDownloadBulkEvolutions = async () => {
+    let filtered = (evolutions || []).filter(e => {
+      const date = e.date ? e.date.split('T')[0] : '';
+      return date >= reportStartDate && date <= reportEndDate;
+    });
+
+    if (reportsPatientFilter) {
+      filtered = filtered.filter(e => e.patientId === reportsPatientFilter);
+    }
+
+    if (filtered.length === 0) {
+      showToast('Nenhuma evolução encontrada no período selecionado', 'error');
+      return;
+    }
+
+    // Sort by date ascending
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+      const name = linked?.name || patient?.name || 'Geral/Coletivo';
+      
+      return [
+        safeFormat(evo.date, 'dd/MM/yy HH:mm'),
+        name,
+        evo.serviceType || '-',
+        `${evo.observation || ''}\n\nConduta: ${evo.conduct || ''}`
+      ];
+    });
+
+    const patientName = reportsPatientFilter ? patients.find(p => p.id === reportsPatientFilter)?.name : 'Todos';
+
+    await generateModernPDF({
+      title: 'Relatório Consolidado de Evoluções',
+      subtitle: `Período: ${safeFormat(reportStartDate, 'dd/MM/yy')} a ${safeFormat(reportEndDate, 'dd/MM/yy')} - Idoso: ${patientName}`,
+      columns: ['Data/Hora', 'Idoso', 'Tipo', 'Detalhamento Técnico'],
+      data: data,
+      fileName: `relatorio_evolucoes_${reportStartDate}_a_${reportEndDate}`,
+      orientation: 'landscape'
+    });
+  };
+
+  const handleDownloadEvolution = async (evolution: SocialEvolution) => {
+    const patient = (patients || []).find(p => p.id === evolution.patientId);
+    const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient?.name || 'Fluxo de Atendimento Geral';
+    
+    const data = [
+      ['DADOS DO ATENDIMENTO', ''],
+      ['Assistido', name],
+      ['Data/Hora', safeFormat(evolution.date, "dd/MM/yyyy 'às' HH:mm")],
+      ['Tipo de Serviço', evolution.serviceType || 'Não especificado'],
+      ['Registrado por', evolution.registeredBy || user.name],
+      ['', ''],
+      ['DETALHAMENTO TÉCNICO', ''],
+      ['Relato da Observação', evolution.observation || 'Nenhuma observação registrada'],
+      ['Conduta Tomada', evolution.conduct || 'Nenhuma conduta registrada'],
+      ['Situação Identificada', evolution.observation?.length > 100 ? 'Análise Detalhada em Anexo' : 'Registro Direto']
+    ];
+
+    await generateModernPDF({
+      title: 'Relatório de Evolução Social',
+      subtitle: `Registro de Atendimento e Acompanhamento - ${name}`,
+      columns: ['Indicador/Campo', 'Descrição do Atendimento'],
+      data: data,
+      fileName: `evolucao_detalhada_${name.toLowerCase().replace(/\s/g, '_')}_${evolution.id.substring(0, 5)}`
+    });
+  };
+
+  const handleDownloadPIA = async (pia: PIA) => {
+    const patient = (patients || []).find(p => p.id === pia.elderlyId);
+    const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient?.name || 'Idoso não encontrado';
+
+    const data = [
+      ['DADOS DE IDENTIFICAÇÃO', ''],
+      ['Idoso', name],
+      ['Data de Registro', safeFormat(pia.date, 'dd/MM/yyyy')],
+      ['Status do Plano', safeReplace(pia.status, '_', ' ') || 'EM ANDAMENTO'],
+      ['Responsável Técnico', pia.responsible || 'Assistente Social'],
+      ['', ''],
+      ['SITUAÇÃO SOCIOECONÔMICA', ''],
+      ['Possui BPC', pia.hasBPC ? 'Sim' : 'Não'],
+      ['Possui Aposentadoria', pia.hasPension ? 'Sim' : 'Não'],
+      ['Tem Empréstimos', pia.hasLoans ? 'Sim' : 'Não'],
+      ['Detalhes Empréstimo', pia.loanDetails || 'NADA CONSTA'],
+      ['Possui Imóvel', pia.hasProperty ? 'Sim' : 'Não'],
+      ['Renda Mensal', `R$ ${Number(pia.monthlyIncome || 0).toLocaleString('pt-BR')}`],
+      ['', ''],
+      ['RELAÇÕES FAMILIARES', ''],
+      ['Vínculo Familiar', pia.familyInvolvement || 'MÉDIO'],
+      ['Observações Família', pia.familyObservations || 'Não informado'],
+      ['', ''],
+      ['SAÚDE E BEM-ESTAR', ''],
+      ['Estado de Saúde', pia.healthStatus || 'Não informado'],
+      ['Medicamentos', pia.medications || 'Não informado'],
+      ['Mobilidade', pia.mobilityStatus || 'Não informado'],
+      ['', ''],
+      ['PLANEJAMENTO TÉCNICO', ''],
+      ['Objetivos Estratégicos', pia.objectives || 'Sem objetivos descritos'],
+      ['Ações Propostas', pia.actions || 'Sem ações propostas'],
+      ['Outras Observações', pia.observations || 'Nenhuma observação adicional']
+    ];
+
+    await generateModernPDF({
+      title: 'Plano Individual de Atendimento (PIA)',
+      subtitle: `Ficha Cadastral Social e Plano de Metas Completo - ${name}`,
+      columns: ['Campo/Área', 'Detalhamento Técnico'],
+      data: data,
+      fileName: `pia_detalhado_${name.toLowerCase().replace(/\s/g, '_')}_${pia.id ? pia.id.substring(0, 5) : 'new'}`
+    });
+  };
+
+  const handleDownloadPatientProfile = async (patient: SocialPatient) => {
+    const linked = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient.name;
+    const birthDate = linked?.birthDate || patient.birthDate;
+    
+    // Get related records for a full profile
+    const patientFamily = (familyTies || []).find(f => f.patientId === patient.id);
+    const patientDocs = (documentations || []).find(d => d.patientId === patient.id);
+    const patientLegal = (legalSituations || []).find(l => l.patientId === patient.id);
+
+    const data = [
+      ['NOME', name],
+      ['DATA NASC.', safeFormat(birthDate, 'dd/MM/yyyy')],
+      ['CPF', linked?.cpf || 'N/A'],
+      ['NATURALIDADE', patient.naturalness || 'N/A'],
+      ['ESTADO CIVIL', patient.maritalStatus || 'N/A'],
+      ['ESCOLARIDADE', patient.schooling || 'N/A'],
+      ['PROFISSÃO', patient.previousProfession || 'N/A'],
+      ['RENDA', `R$ ${Number(patient.income || 0).toLocaleString('pt-BR')}`],
+      ['STATUS BENEFÍCIO', patient.benefitStatus || 'N/A'],
+      ['EMPRÉSTIMOS', patient.hasLoans ? 'SIM' : 'NÃO'],
+      ['---', '---'],
+      ['DOCUMENTAÇÃO', 'Status'],
+      ['RG', patientDocs?.rg || 'N/A'],
+      ['CPF (SIT.)', patientDocs?.cpf || 'N/A'],
+      ['SUS', patientDocs?.sus || 'N/A'],
+      ['CERTIDÃO', patientDocs?.birthCertificate || 'N/A'],
+      ['---', '---'],
+      ['FAMÍLIA', 'Status'],
+      ['POSSUI FAMÍLIA', patientFamily?.hasFamily ? 'SIM' : 'NÃO'],
+      ['RISCO ABANDONO', patientFamily?.abandonmentRisk ? 'SIM' : 'NÃO'],
+      ['MEMBROS', (patientFamily?.members || []).map(m => `${m.name} (${m.kinship})`).join('; ') || 'NADA CONSTA'],
+      ['---', '---'],
+      ['SITUAÇÃO LEGAL', 'Status'],
+      ['INTERDITADO', patientLegal?.isInterdicted ? 'SIM' : 'NÃO'],
+      ['CURADOR', patientLegal?.curatorName || 'N/A']
+    ];
+
+    await generateModernPDF({
+      title: 'Prontuário Social Individual',
+      subtitle: `Ficha Cadastral Detalhada - ${name}`,
+      columns: ['Campo', 'Informação'],
+      data: data,
+      fileName: `prontuario_${name.toLowerCase().replace(/\s/g, '_')}`
+    });
+  };
+
+  const handleDownloadFamilyBondReport = async (patient: SocialPatient) => {
+    const linked = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient.name;
+    
+    const patientFamily = (familyTies || []).find(f => f.patientId === patient.id);
+    const patientVisits = (familyVisits || []).filter(v => v.patientId === patient.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    const birthDate = linked?.birthDate || patient.birthDate;
+    const age = birthDate ? differenceInYears(new Date(), parseISO(birthDate)) : 'N/A';
+
+    const section1 = [
+      ['DADOS DO IDOSO', ''],
+      ['NOME', name],
+      ['IDADE', String(age)],
+      ['VÍNCULO FAMILIAR', patientFamily?.hasFamily ? 'POSSUI FAMÍLIA' : 'NÃO POSSUI FAMÍLIA'],
+      ['RISCO DE ABANDONO', patientFamily?.abandonmentRisk ? 'SIM - ALTO RISCO' : 'NÃO IDENTIFICADO'],
+      ['FREQ. DE VISITAS', (patientFamily?.members || []).map(m => `${m.name}: ${m.visitFrequency}`).join('; ') || 'N/A'],
+      ['---', '---']
+    ];
+
+    const section2 = [
+      ['MAIS PRÓXIMOS', 'GRAU / CONTATO'],
+      ...(patientFamily?.members || []).map(m => [m.name, `${m.kinship} - ${m.phone || 'N/A'}`]),
+      ['---', '---']
+    ];
+
+    const section3 = [
+      ['HISTÓRICO DE VISITAS RECEBIDAS', ''],
+      ['Data', 'Visitante / Observação'],
+      ...patientVisits.map(v => [
+        safeFormat(v.date, 'dd/MM/yyyy'),
+        `${v.visitorName} (${v.kinship})\n${v.observations || ''}`
+      ])
+    ];
+
+    if (patientVisits.length === 0) {
+      section3.push(['NADA CONSTA', 'Nenhum registro de visita encontrado no sistema.']);
+    }
+
+    const data = [...section1, ...section2, ...section3];
+
+    await generateModernPDF({
+      title: 'Relatório de Vínculo Familiar e Histórico de Visitas',
+      subtitle: `Avaliação de Relacionamento e Contatos - ${name}`,
+      columns: ['Atributo / Data', 'Detalhamento Técnico'],
+      data: data,
+      fileName: `vinculo_familiar_${name.toLowerCase().replace(/\s/g, '_')}`,
+      orientation: 'portrait'
+    });
+  };
+
+  const handleDownloadSocialStudy = async (study: SocialStudy) => {
+    const patient = (patients || []).find(p => p.id === study.patientId);
+    const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient?.name || 'Idoso não encontrado';
+
+    const data = [
+      ['Idoso', name],
+      ['Data', safeFormat(study.date, 'dd/MM/yyyy')],
+      ['Histór. de Vida', study.lifeHistory || 'Não informado'],
+      ['Condições Sociais', study.socialConditions || 'Não informado'],
+      ['Motivo da Inst.', study.institutionalizationReason || 'Não informado'],
+      ['Parecer Técnico', study.technicalOpinion || 'Não informado']
+    ];
+
+    await generateModernPDF({
+      title: 'Estudo Social Técnico',
+      subtitle: `Avaliação Socioeconômica - ${name}`,
+      columns: ['Campo', 'Detalhamento'],
+      data: data,
+      fileName: `estudo_social_${name.toLowerCase().replace(/\s/g, '_')}_${study.id.substring(0, 5)}`
+    });
+  };
+
+  const handleDownloadSocialReport = async (patient: SocialPatient) => {
+    const linked = patient.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+    const name = linked?.name || patient.name;
+    
+    const patientEvolutions = (evolutions || []).filter(e => e.patientId === patient.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10);
+    const patientReferrals = (referrals || []).filter(r => r.patientId === patient.id).sort((a, b) => b.date.localeCompare(a.date));
+
+    const section1 = [
+      ['DADOS DE IDENTIFICAÇÃO', ''],
+      ['NOME', name],
+      ['CPF', linked?.cpf || 'N/A'],
+      ['DATA ENTRADA', safeFormat(linked?.entryDate || patient.createdAt, 'dd/MM/yyyy')],
+      ['---', '---']
+    ];
+
+    const section2 = [
+      ['EVOLUÇÕES RECENTES', 'TIPO / DESCRIÇÃO'],
+      ...patientEvolutions.map(e => [
+        safeFormat(e.date, 'dd/MM/yy'),
+        `${e.serviceType || 'Atendimento'}: ${e.observation || ''}`
+      ]),
+      ['---', '---']
+    ];
+
+    const section3 = [
+      ['ENCAMINHAMENTOS', 'DESTINO / STATUS'],
+      ...patientReferrals.map(r => [
+        safeFormat(r.date, 'dd/MM/yy'),
+        `${r.destination}: ${r.status}`
+      ])
+    ];
+
+    const data = [...section1, ...section2, ...section3];
+
+    await generateModernPDF({
+      title: 'Relatório Social Individual',
+      subtitle: `Histórico Consolidado - ${name}`,
+      columns: ['Atributo / Data', 'Detalhamento'],
+      data: data,
+      fileName: `relatorio_social_${name.toLowerCase().replace(/\s/g, '_')}`
+    });
+  };
 
   // Dashboard Stats
   const stats = useMemo(() => {
@@ -420,6 +716,29 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             </div>
           </motion.div>
         ))}
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+        <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2 uppercase tracking-tight">
+          <Zap className="w-5 h-5 text-yellow-500" />
+          Ações Rápidas
+        </h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => openModal('evolution')}
+            className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 dark:shadow-none font-bold active:scale-95"
+          >
+            <Activity className="w-5 h-5" />
+            Registrar Fluxo de Atendimento Geral
+          </button>
+          <button
+            onClick={() => openModal('patient')}
+            className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-100 dark:shadow-none font-bold active:scale-95"
+          >
+            <Plus className="w-5 h-5" />
+            Novo Cadastro Social
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1099,6 +1418,27 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                 />
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Possui Empréstimos</label>
               </div>
+              <div className="flex items-center gap-2 mt-6">
+                <input
+                  type="checkbox"
+                  checked={formData.hasProperty || false}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+                  onChange={(e) => setFormData({ ...formData, hasProperty: e.target.checked })}
+                />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Possui Imóvel</label>
+              </div>
+              {formData.hasLoans && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Detalhes dos Empréstimos</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    placeholder="Ex: Banco, Valor, Parcelas..."
+                    value={formData.loanDetails || ''}
+                    onChange={(e) => setFormData({ ...formData, loanDetails: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Renda Mensal (R$)</label>
                 <input
@@ -1108,40 +1448,109 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   onChange={(e) => setFormData({ ...formData, monthlyIncome: parseFloat(e.target.value) })}
                 />
               </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Envolvimento Familiar</label>
-                <select
-                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  value={formData.familyInvolvement || 'MEDIO'}
-                  onChange={(e) => setFormData({ ...formData, familyInvolvement: e.target.value })}
-                >
-                  <option value="ALTO">Alto</option>
-                  <option value="MEDIO">Médio</option>
-                  <option value="BAIXO">Baixo</option>
-                  <option value="NENHUM">Nenhum</option>
-                </select>
-              </div>
-              <div className="col-span-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Objetivos do Plano</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
+
+              <div className="col-span-2 space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                   <Heart size={16} className="text-pink-500" />
+                   Relações Familiares
+                </h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Envolvimento Familiar</label>
+                  <select
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    value={formData.familyInvolvement || 'MEDIO'}
+                    onChange={(e) => setFormData({ ...formData, familyInvolvement: e.target.value })}
+                  >
+                    <option value="ALTO">Alto</option>
+                    <option value="MEDIO">Médio</option>
+                    <option value="BAIXO">Baixo</option>
+                    <option value="NENHUM">Nenhum</option>
+                  </select>
                 </div>
-                <textarea
-                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
-                  value={formData.objectives || ''}
-                  onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
-                />
-              </div>
-              <div className="col-span-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ações Propostas</label>
-                  <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, actions: (formData.actions || '') + ' ' + t })} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observações da Família</label>
+                  <textarea
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-20"
+                    placeholder="Detalhes sobre visitas, contatos, conflitos..."
+                    value={formData.familyObservations || ''}
+                    onChange={(e) => setFormData({ ...formData, familyObservations: e.target.value })}
+                  />
                 </div>
-                <textarea
-                  className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
-                  value={formData.actions || ''}
-                  onChange={(e) => setFormData({ ...formData, actions: e.target.value })}
-                />
+              </div>
+
+              <div className="col-span-2 space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                   <Activity size={16} className="text-green-500" />
+                   Saúde e Mobilidade
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estado de Saúde</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      value={formData.healthStatus || ''}
+                      onChange={(e) => setFormData({ ...formData, healthStatus: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Mobilidade</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      value={formData.mobilityStatus || ''}
+                      onChange={(e) => setFormData({ ...formData, mobilityStatus: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Medicamentos em Uso</label>
+                    <textarea
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-20"
+                      value={formData.medications || ''}
+                      onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="col-span-2 space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                   <CheckCircle2 size={16} className="text-blue-500" />
+                   Planejamento Ténico
+                </h4>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Objetivos do Plano</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, objectives: (formData.objectives || '') + ' ' + t })} />
+                  </div>
+                  <textarea
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
+                    value={formData.objectives || ''}
+                    onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Ações Propostas</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, actions: (formData.actions || '') + ' ' + t })} />
+                  </div>
+                  <textarea
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
+                    value={formData.actions || ''}
+                    onChange={(e) => setFormData({ ...formData, actions: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Observações Adicionais</label>
+                    <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
+                  </div>
+                  <textarea
+                    className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 h-24"
+                    value={formData.observations || ''}
+                    onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1807,6 +2216,13 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black uppercase rounded tracking-widest border border-blue-200">Vinculado ao Cadastro Geral</span>
                   )}
                 </div>
+                <button
+                  onClick={() => handleDownloadPatientProfile(selectedPatient)}
+                  className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-bold text-xs"
+                >
+                  <Download size={16} />
+                  Baixar Ficha Cadastral Social
+                </button>
                 <p className="text-sm text-gray-500 mb-4">{safeFormat(birthDate, 'dd/MM/yyyy')} ({age} anos)</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase">{selectedPatient.maritalStatus}</span>
@@ -2025,6 +2441,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      handleDownloadPatientProfile(patient);
+                    }}
+                    className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                    title="Baixar Ficha"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onDeletePatient(patient.id);
                     }}
                     className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
@@ -2099,8 +2525,12 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   >
                     <Edit2 className="w-5 h-5" />
                   </button>
-                  <button className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                    <Download className="w-5 h-5 text-gray-400" />
+                  <button 
+                    onClick={() => handleDownloadSocialStudy(study)}
+                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Baixar Estudo Social"
+                  >
+                    <Download className="w-5 h-5 text-blue-600" />
                   </button>
                   <button
                     onClick={() => onDeleteRecord('socialStudies', study.id)}
@@ -2161,13 +2591,22 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             })}
           </select>
         </div>
-        <button
-          onClick={() => openModal('evolution')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Evolução
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openModal('evolution')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100 dark:shadow-none"
+          >
+            <Activity className="w-5 h-5" />
+            Fluxo Geral
+          </button>
+          <button
+            onClick={() => openModal('evolution')}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-colors font-bold shadow-lg shadow-gray-100 dark:shadow-none"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Evolução (Idoso)
+          </button>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
@@ -2204,11 +2643,25 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       {evolution.serviceType}
                     </span>
                     <button
+                      onClick={() => handleDownloadEvolution(evolution)}
+                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                      title="Baixar PDF"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
+                    <button
                       onClick={() => openModal('evolution', evolution)}
                       className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
                       title="Editar"
                     >
                       <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDownloadEvolution(evolution)}
+                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                      title="Baixar Evolução"
+                    >
+                      <Download className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => onDeleteRecord('socialEvolutions', evolution.id)}
@@ -2549,8 +3002,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   <button 
                     onClick={() => openModal('pia', pia)}
                     className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                    title="Editar"
                   >
                     <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => handleDownloadPIA(pia)}
+                    className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                    title="Baixar PIA"
+                  >
+                    <Download className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => onDeleteRecord('socialPIAs', pia.id)}
@@ -2710,9 +3171,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       return filtered.map(p => {
         const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
         const patientReferrals = (referrals || []).filter(r => r.patientId === p.id);
+        const age = p.birthDate ? differenceInYears(new Date(), parseISO(p.birthDate)) : 'N/A';
         return [
           p.name,
-          String(p.age),
+          String(age),
           String(patientEvolutions.length),
           String(patientReferrals.length),
           p.status
@@ -2721,10 +3183,68 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     };
 
     const handleGeneratePDF = async (title: string) => {
+      // Find the specific patient if a filter is active
+      const patient = reportsPatientFilter ? patients.find(p => p.id === reportsPatientFilter) : null;
+      
+      if (title === 'Prontuário Social Individual') {
+        if (patient) {
+          await handleDownloadPatientProfile(patient);
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o prontuário individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Relatório Social Individual') {
+        if (patient) {
+          await handleDownloadSocialReport(patient);
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o relatório individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Estudo Social Técnico') {
+        if (patient) {
+          const study = socialStudies.find(s => s.patientId === patient.id);
+          if (study) {
+            await handleDownloadSocialStudy(study);
+          } else {
+            showToast('Nenhum estudo social encontrado para este idoso', 'error');
+          }
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o estudo social individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Plano Individual - PIA') {
+        if (patient) {
+          const pia = pias.find(p => p.elderlyId === patient.id);
+          if (pia) {
+            await handleDownloadPIA(pia);
+          } else {
+            showToast('Nenhum PIA encontrado para este idoso', 'error');
+          }
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o PIA individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Relatório de Vínculo Familiar') {
+        if (patient) {
+          await handleDownloadFamilyBondReport(patient);
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o relatório de vínculo', 'error');
+        }
+        return;
+      }
+
       const data = prepareReportData();
       if (!data) return;
 
-      const subtitle = `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+      const subtitle = `Relatório de Serviço Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
 
       await generateModernPDF({
         title,
@@ -2739,7 +3259,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       const data = prepareReportData();
       if (!data) return;
 
-      const subtitle = `Relatório de Assistência Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+      const subtitle = `Relatório de Serviço Social - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
 
       await generateModernWord({
         title,
@@ -2751,67 +3271,120 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     };
 
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white uppercase tracking-tighter">Gerar Relatórios</h3>
-          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <Filter size={16} className="text-gray-400 ml-2" />
-            <select 
-              value={reportsPatientFilter}
-              onChange={(e) => setReportsPatientFilter(e.target.value)}
-              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
-            >
-              <option value="">Todos os Idosos (Geral)</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-[40px] text-white shadow-xl shadow-blue-100 dark:shadow-none mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Central de Relatórios</h3>
+              <p className="text-blue-100 font-medium">Gere documentos técnicos e relatórios gerenciais do Serviço Social</p>
+            </div>
+            <div className="flex flex-col gap-2 bg-white/10 p-4 rounded-3xl backdrop-blur-md border border-white/20">
+              <label className="text-[10px] font-black uppercase tracking-widest text-blue-100 ml-1">Filtrar por Idoso</label>
+              <div className="flex items-center gap-3 bg-white dark:bg-gray-900 px-4 py-2 rounded-2xl">
+                <Filter size={16} className="text-gray-400" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white min-w-[200px] outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            { title: 'Relatório Social Individual', desc: 'Perfil completo, histórico e evolução do idoso.', icon: FileText, color: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
-            { title: 'Estudo Social Técnico', desc: 'Análise aprofundada para fins judiciais ou de rede.', icon: BookOpen, color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
-            { title: 'Relatório para Ministério Público', desc: 'Documento padronizado para órgãos de fiscalização.', icon: Scale, color: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
-            { title: 'Relatório de Vínculo Familiar', desc: 'Histórico de visitas e contatos com a família.', icon: Heart, color: 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' },
-          ].map((report, i) => (
-            <div 
-              key={i} 
-              onClick={() => handleGeneratePDF(report.title)}
-              className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
-            >
-              <div className="flex items-start gap-4">
-                <div className={cn("p-4 rounded-2xl transition-colors", report.color)}>
-                  <report.icon className="w-8 h-8" />
+
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-[40px] border border-gray-100 dark:border-gray-800 shadow-sm mb-8">
+          <div className="flex flex-col md:flex-row md:items-end gap-6">
+            <div className="flex-1 space-y-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl">
+                  <History size={24} />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight">{report.title}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">{report.desc}</p>
-                  <div className="flex gap-4 mt-4">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGeneratePDF(report.title);
-                      }}
-                      className="flex items-center gap-2 text-sm font-black text-blue-600 dark:text-blue-400 hover:scale-105 transition-transform"
-                    >
-                      <Download className="w-4 h-4" />
-                      Gerar PDF
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleGenerateWord(report.title);
-                      }}
-                      className="flex items-center gap-2 text-sm font-black text-green-600 dark:text-green-400 hover:scale-105 transition-transform"
-                    >
-                      <FileCheck className="w-4 h-4" />
-                      Gerar Word
-                    </button>
-                  </div>
+                <div>
+                  <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">Extração de Evoluções em Lote</h4>
+                  <p className="text-sm text-gray-500">Baixe todas as evoluções detalhadas de um período específico.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data Inicial</label>
+                  <input 
+                    type="date" 
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data Final</label>
+                  <input 
+                    type="date" 
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  />
                 </div>
               </div>
             </div>
+            <button 
+              onClick={handleDownloadBulkEvolutions}
+              className="flex items-center justify-center gap-3 px-8 py-4 bg-green-600 text-white rounded-[32px] font-black uppercase tracking-widest text-xs hover:bg-green-700 active:scale-95 transition-all shadow-xl shadow-green-100 dark:shadow-none h-[52px]"
+            >
+              <Download size={18} />
+              Baixar Evoluções Detalhadas
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+          {[
+            { title: 'Prontuário Social Individual', desc: 'Ficha detalhada com todos os dados cadastrais e sociais.', icon: Users, color: 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400' },
+            { title: 'Relatório Social Individual', desc: 'Histórico consolidado, encaminhamentos e evolução do idoso.', icon: FileText, color: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+            { title: 'Plano Individual - PIA', desc: 'Plano Individual de Atendimento detalhado para impressão.', icon: ClipboardList, color: 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' },
+            { title: 'Estudo Social Técnico', desc: 'Análise aprofundada para fins judiciais ou de rede.', icon: BookOpen, color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+            { title: 'Relatório Conselhos/MP', desc: 'Documento padronizado para órgãos de fiscalização.', icon: Scale, color: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
+            { title: 'Relatório de Vínculo Familiar', desc: 'Histórico de visitas e contatos com a família.', icon: Heart, color: 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' },
+          ].map((report, i) => (
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-white dark:bg-gray-900 p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl transition-all group flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-start gap-4 mb-6">
+                  <div className={cn("p-4 rounded-2xl transition-colors", report.color)}>
+                    <report.icon className="w-8 h-8" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-black text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors uppercase tracking-tight text-lg">{report.title}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium leading-relaxed">{report.desc}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-4">
+                <button 
+                  onClick={() => handleGeneratePDF(report.title)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Gerar PDF
+                </button>
+                <button 
+                  onClick={() => handleGenerateWord(report.title)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-100 transition-colors"
+                >
+                  <FileCheck className="w-4 h-4" />
+                  Gerar Word
+                </button>
+              </div>
+            </motion.div>
           ))}
         </div>
       </div>
