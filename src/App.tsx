@@ -10626,7 +10626,11 @@ export default function App() {
       await updateSharedElderlyData(id, {
         birthDate: data.birthDate,
         schooling: data.schooling,
-        lastProfession: data.previousProfession
+        lastProfession: data.previousProfession,
+        address: data.address,
+        phone: data.phone,
+        responsibleName: data.responsibleName,
+        responsiblePhone: data.responsiblePhone
       });
 
       showToast('Perfil social salvo e compartilhado');
@@ -10904,6 +10908,7 @@ export default function App() {
 
       // Sync shared fields to central Elderly record
       await updateSharedElderlyData(id, {
+        diseases: data.comorbidities,
         allergies: data.allergies?.join(', ')
       });
     } catch (err) {

@@ -234,6 +234,46 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     });
   };
 
+  const handleDownloadAllFilteredEvolutions = async () => {
+    let filtered = (evolutions || []).filter(e => {
+      if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
+      return !evolutionPatientFilter || e.patientId === evolutionPatientFilter;
+    });
+
+    if (filtered.length === 0) {
+      showToast('Nenhuma evolução encontrada para o filtro selecionado', 'error');
+      return;
+    }
+
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+      const name = linked?.name || patient?.name || 'Fluxo de Atendimento Geral';
+      
+      return [
+        safeFormat(evo.date, 'dd/MM/yy HH:mm'),
+        name,
+        evo.serviceType || '-',
+        `${evo.observation || ''}\n\nConduta: ${evo.conduct || ''}`
+      ];
+    });
+
+    const patientName = evolutionPatientFilter 
+      ? (evolutionPatientFilter === 'GENERAL' ? 'Fluxo Geral' : patients.find(p => p.id === evolutionPatientFilter)?.name) 
+      : 'Todos';
+
+    await generateModernPDF({
+      title: 'Consolidado de Evoluções Sociais',
+      subtitle: `Filtro atual: ${patientName} - Total: ${filtered.length} registros`,
+      columns: ['Data/Hora', 'Idoso/Fluxo', 'Tipo', 'Detalhamento (Obs/Conduta)'],
+      data: data,
+      fileName: `evolucoes_sociais_${new Date().getTime()}`,
+      orientation: 'landscape'
+    });
+  };
+
   const handleDownloadEvolution = async (evolution: SocialEvolution) => {
     const patient = (patients || []).find(p => p.id === evolution.patientId);
     const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
@@ -986,6 +1026,50 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   value={formData.cadUnicoUpdateDate || ''}
                   onChange={(e) => setFormData({ ...formData, cadUnicoUpdateDate: e.target.value })}
                 />
+              </div>
+              <div className="col-span-2 space-y-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Telefone de Contato</label>
+                    <input
+                      type="tel"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                      value={formData.phone || ''}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="(00) 0 0000-0000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Responsável Legal</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                      value={formData.responsibleName || ''}
+                      onChange={(e) => setFormData({ ...formData, responsibleName: e.target.value })}
+                      placeholder="Nome do Responsável"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Tel. Responsável</label>
+                    <input
+                      type="tel"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                      value={formData.responsiblePhone || ''}
+                      onChange={(e) => setFormData({ ...formData, responsiblePhone: e.target.value })}
+                      placeholder="(00) 0 0000-0000"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Endereço de Origem</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+                      value={formData.address || ''}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Rua, Número, Bairro, Cidade"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex items-center gap-2 mt-4">
                 <input
@@ -2592,6 +2676,14 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           </select>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadAllFilteredEvolutions}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-100 dark:shadow-none"
+            title="Baixar todas as evoluções filtradas"
+          >
+            <Download size={18} />
+            Baixar Tudo
+          </button>
           <button
             onClick={() => openModal('evolution')}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100 dark:shadow-none"

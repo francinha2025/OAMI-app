@@ -1026,6 +1026,17 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                       </select>
                     </div>
                   </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">Doenças / Comorbidades</label>
+                      <textarea 
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium h-20"
+                        value={localFormData.comorbidities || ''}
+                        onChange={e => setLocalFormData({...localFormData, comorbidities: e.target.value})}
+                        placeholder="Ex: Diabetes, Hipertensão..."
+                      />
+                    </div>
+                  </div>
                   </>
                 )}
 

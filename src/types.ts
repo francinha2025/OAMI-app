@@ -785,6 +785,10 @@ export interface SocialPatient {
   loanDetails?: string;
   isFamilyComplementing?: boolean;
   familyComplementDetails?: string;
+  address?: string;
+  phone?: string;
+  responsibleName?: string;
+  responsiblePhone?: string;
   photoUrl?: string;
   createdAt: string;
 }
@@ -897,6 +901,7 @@ export interface NutritionPatient {
   age: number;
   dietType: 'LIVRE' | 'BRANDA' | 'PASTOSA' | 'LIQUIDA' | 'ENTERAL' | 'DIABETICA' | 'HIPOSSODICA';
   consistency: 'NORMAL' | 'ESPESSADA' | 'RESTRITA';
+  comorbidities?: string;
   allergies: string[];
   intolerances: string[];
   riskLevel: 'BAIXO' | 'MEDIO' | 'ALTO';
