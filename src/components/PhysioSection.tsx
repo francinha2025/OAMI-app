@@ -21,6 +21,7 @@ import {
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
+import { ROLE_LABELS } from '../constants';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -37,6 +38,7 @@ interface PhysioSectionProps {
   evolutions: PhysioEvolution[];
   exercises: PhysioExercise[];
   appointments: PhysioAppointment[];
+  professionals?: any[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onSavePatient: (data: Omit<PhysioPatient, 'id'>, id?: string) => Promise<void>;
   onDeletePatient: (id: string) => Promise<void>;
@@ -60,6 +62,7 @@ export const PhysioSection = ({
   evolutions, 
   exercises, 
   appointments,
+  professionals = [],
   showToast,
   onSavePatient,
   onDeletePatient,
@@ -1181,6 +1184,8 @@ export const PhysioSection = ({
                   patients={patients}
                   showToast={showToast}
                   initialData={editingData}
+                  professionals={professionals}
+                  user={user}
                   onSave={async (data) => {
                     await onSaveEvolution(data, editingData?.id);
                     setIsEvolutionModalOpen(false);
@@ -2162,7 +2167,25 @@ const AssessmentForm = ({
   );
 };
 
-const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, showToast }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioEvolution, 'id'>) => Promise<void>, onCancel: () => void, onSavePhotos: any, initialData?: PhysioEvolution | null, showToast: (msg: string, type?: 'success' | 'error') => void }) => {
+const EvolutionForm = ({ 
+  patients, 
+  onSave, 
+  onCancel, 
+  onSavePhotos, 
+  initialData, 
+  showToast,
+  professionals = [],
+  user
+}: { 
+  patients: PhysioPatient[], 
+  onSave: (data: Omit<PhysioEvolution, 'id'>) => Promise<void>, 
+  onCancel: () => void, 
+  onSavePhotos: any, 
+  initialData?: PhysioEvolution | null, 
+  showToast: (msg: string, type?: 'success' | 'error') => void,
+  professionals?: any[],
+  user?: UserType
+}) => {
   const [formData, setFormData] = useState<Omit<PhysioEvolution, 'id'> & { photos: string[] }>({
     patientId: initialData?.patientId || '',
     date: initialData?.date || new Date().toISOString(),
@@ -2170,9 +2193,11 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
     evolution: initialData?.evolution || '',
     observations: initialData?.observations || '',
     painLevel: initialData?.painLevel || 0,
-    photos: initialData?.photos || []
+    photos: initialData?.photos || [],
+    coWorkers: initialData?.coWorkers || []
   });
   const [isExtracting, setIsExtracting] = useState(false);
+  const [profSearch, setProfSearch] = useState('');
 
   const handleDigitize = async (text: string) => {
     if (!text) return;
@@ -2321,6 +2346,90 @@ const EvolutionForm = ({ patients, onSave, onCancel, onSavePhotos, initialData, 
           className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all h-24 text-gray-800 dark:text-white resize-none"
           placeholder="Como o paciente reagiu aos exercícios?"
         />
+      </div>
+
+      <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-6">
+        <div className="flex justify-between items-center bg-transparent">
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+            <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+          </div>
+          {formData.coWorkers && formData.coWorkers.length > 0 && (
+            <button 
+              type="button" 
+              onClick={() => setFormData({ ...formData, coWorkers: [] })}
+              className="text-[10px] text-red-500 font-bold uppercase tracking-wider animate-pulse"
+            >
+              Limpar Seleção ({formData.coWorkers.length})
+            </button>
+          )}
+        </div>
+        
+        <div className="relative">
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-green-500 transition-all">
+            <Search size={16} className="text-gray-400" />
+            <input 
+              type="text"
+              placeholder="Buscar profissional por nome ou cargo..."
+              value={profSearch}
+              onChange={(e) => setProfSearch(e.target.value)}
+              className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+            />
+            {profSearch && (
+              <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+          {(professionals || [])
+            .filter((p: any) => {
+              if (!profSearch) return true;
+              
+              const term = profSearch.toLowerCase();
+              const pName = (p.name || '').toLowerCase();
+              const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+              return pName.includes(term) || pRole.includes(term);
+            })
+            .map((p: any) => {
+              const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+              return (
+                <button
+                  key={p.id || p.email}
+                  type="button"
+                  onClick={() => {
+                    const list = formData.coWorkers || [];
+                    const identifier = p.id || p.email;
+                    if (isSelected) {
+                      setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                    } else {
+                      setFormData({ ...formData, coWorkers: [...list, identifier] });
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                    isSelected 
+                      ? "bg-blend-color-burn bg-green-500/10 dark:bg-green-950/20 border-green-400 dark:border-green-800 text-green-900 dark:text-green-300"
+                      : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-700 dark:text-gray-300"
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold truncate">{p.name}</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                  </div>
+                  <div className={cn(
+                    "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                    isSelected ? "bg-green-500 border-green-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                  )}>
+                    {isSelected && <CheckCircle2 size={12} />}
+                  </div>
+                </button>
+              );
+            })
+          }
+        </div>
       </div>
       <div className="space-y-4">
         <div className="flex justify-between items-center">

@@ -22,6 +22,7 @@ import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
+import { ROLE_LABELS } from '../constants';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, AreaChart, Area
@@ -59,6 +60,8 @@ interface PsychologySectionProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
+  professionals?: any[];
+  sendNotification?: any;
 }
 
 type PsychTab = 
@@ -75,7 +78,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     onSavePatient, onSaveInitialAssessment, onSaveEvolution, onSaveAppointment,
     onSaveEmotionalMonitoring, onSaveFamilyBond, onSaveActivity,
     onSaveCognitionAssessment, onSaveInterventionPlan, onDeleteRecord,
-    onDeletePatient, onSavePhotos, user, onUpdateProfile
+    onDeletePatient, onSavePhotos, user, onUpdateProfile,
+    professionals = []
   } = props;
   const [activeTab, setActiveTab] = useState<PsychTab>(() => {
     const saved = localStorage.getItem('oami-psychology-tab');
@@ -555,6 +559,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onAdd={() => { setModalType('activity'); setIsModalOpen(true); }}
                 onEdit={(a: any) => { setEditingData(a); setModalType('activity'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'activity' })}
+                professionals={professionals}
               />
             )}
             {activeTab === 'cognition' && (
@@ -605,6 +610,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
             showToast={showToast}
             onSavePhotos={onSavePhotos}
             editingData={editingData}
+            professionals={professionals}
+            user={user}
             onSave={async (data: any) => {
               const payload = { ...data, registeredBy: user.name };
               const id = editingData?.id;
@@ -1246,7 +1253,7 @@ const FamilyView = ({ patients, elderly, bonds, onAdd, onEdit, onDelete, filter,
   </div>
 );
 
-const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete, filter, setFilter, professionals = [] }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
@@ -1273,32 +1280,54 @@ const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {(activities || []).filter((act: any) => !filter || (act.participants || []).includes(filter)).map((act: PsychActivity) => (
-        <div key={act.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="flex justify-between items-start mb-4">
-            <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold uppercase">
-              {act.type}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{act.date}</span>
-              <div className="flex gap-1">
-                <button onClick={() => onEdit(act)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
-                <button onClick={() => onDelete(act.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+        <div key={act.id} className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-4">
+              <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full text-[10px] font-bold uppercase">
+                {act.type}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">{act.date}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => onEdit(act)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
+                  <button onClick={() => onDelete(act.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            </div>
+            <h4 className="text-lg font-bold mb-2">{act.title}</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{act.description}</p>
+            
+            <div className="space-y-1">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Participantes:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(act.participants || []).map(pid => {
+                  const p = (patients || []).find((pt: any) => pt.id === pid);
+                  const linked = p?.elderlyId ? (elderly || []).find((ed: any) => ed.id === p.elderlyId) : null;
+                  return (
+                    <span key={pid} className="px-2 py-0.5 bg-gray-105 dark:bg-gray-800 rounded-lg text-[10px] text-gray-500">
+                      {linked?.name || p?.name || pid}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>
-          <h4 className="text-lg font-bold mb-2">{act.title}</h4>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{act.description}</p>
-          <div className="flex flex-wrap gap-2">
-            {(act.participants || []).map(pid => {
-              const p = (patients || []).find((pt: any) => pt.id === pid);
-              const linked = p?.elderlyId ? (elderly || []).find((ed: any) => ed.id === p.elderlyId) : null;
-              return (
-                <span key={pid} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-[10px] text-gray-500">
-                  {linked?.name || p?.name}
-                </span>
-              );
-            })}
-          </div>
+
+          {act.coWorkers && act.coWorkers.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-1">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Equipe / Colaboradores:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {act.coWorkers.map(cwId => {
+                  const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                  return (
+                    <span key={cwId} className="px-2 py-0.5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900 rounded-lg text-[9.5px] font-medium text-blue-600 dark:text-blue-400">
+                      {prof ? prof.name : cwId}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -1483,14 +1512,16 @@ const SettingsView = ({ user, theme, setTheme, onLogout }: any) => (
   </div>
 );
 
-const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onSavePhotos, editingData, showToast }: any) => {
+const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onSavePhotos, editingData, showToast, professionals = [], user }: any) => {
   const [formData, setFormData] = useState<any>(editingData || {
     date: format(new Date(), 'yyyy-MM-dd'),
     time: format(new Date(), 'HH:mm'),
     photos: [],
-    elderlyId: editingData?.elderlyId || ''
+    elderlyId: editingData?.elderlyId || '',
+    coWorkers: []
   });
   const [isExtracting, setIsExtracting] = useState(false);
+  const [profSearch, setProfSearch] = useState('');
 
   // Sync formData when editingData changes or when modal opens
   React.useEffect(() => {
@@ -1499,8 +1530,10 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
         date: format(new Date(), 'yyyy-MM-dd'),
         time: format(new Date(), 'HH:mm'),
         photos: [],
-        elderlyId: editingData?.elderlyId || ''
+        elderlyId: editingData?.elderlyId || '',
+        coWorkers: editingData?.coWorkers || []
       });
+      setProfSearch('');
     }
   }, [isOpen, editingData]);
 
@@ -1975,6 +2008,91 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
                   />
+                </div>
+
+                {/* Seleção de Co-workers / Outros Profissionais da Instituição */}
+                <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                      <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                    </div>
+                    {formData.coWorkers && formData.coWorkers.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setFormData({ ...formData, coWorkers: [] })}
+                        className="text-[10px] text-red-500 font-bold uppercase tracking-wider"
+                      >
+                        Limpar Seleção ({formData.coWorkers.length})
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-blue-500 transition-all">
+                      <Search size={16} className="text-gray-400" />
+                      <input 
+                        type="text"
+                        placeholder="Buscar profissional por nome ou cargo..."
+                        value={profSearch}
+                        onChange={(e) => setProfSearch(e.target.value)}
+                        className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                      />
+                      {profSearch && (
+                        <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                    {professionals
+                      .filter((p: any) => {
+                        if (!profSearch) return true;
+                        
+                        const term = profSearch.toLowerCase();
+                        const pName = (p.name || '').toLowerCase();
+                        const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                        return pName.includes(term) || pRole.includes(term);
+                      })
+                      .map((p: any) => {
+                        const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              const list = formData.coWorkers || [];
+                              const identifier = p.id || p.email;
+                              if (isSelected) {
+                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                              } else {
+                                setFormData({ ...formData, coWorkers: [...list, identifier] });
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                              isSelected 
+                                ? "bg-blend-color-burn bg-blue-500/10 dark:bg-blue-950/20 border-blue-400 dark:border-blue-800 text-blue-900 dark:text-blue-300"
+                                : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-700 dark:text-gray-300"
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold truncate">{p.name}</p>
+                              <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                            </div>
+                            <div className={cn(
+                              "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                              isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                            )}>
+                              {isSelected && <CheckCircle2 size={12} />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    }
+                  </div>
                 </div>
               </div>
             )}

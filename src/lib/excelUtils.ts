@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { appendAgeToName, formatTextWithAges } from './utils';
 
 interface ExcelOptions {
   title: string;
@@ -8,27 +9,61 @@ interface ExcelOptions {
 }
 
 export const generateModernExcel = ({
-  title,
+  title: rawTitle,
   columns,
   data,
   fileName
 }: ExcelOptions) => {
+  const title = formatTextWithAges(rawTitle);
+
   // Create a new workbook
   const wb = XLSX.utils.book_new();
 
-  // Prepare the data with headers
+  // Highlight patient names where column matches
+  const formattedData = data.map(row => 
+    row.map((cell, colIndex) => {
+      const colHeader = String(columns[colIndex] || '').trim().toLowerCase();
+      const cellValueRaw = String(cell || '').trim();
+      
+      const matchAge = appendAgeToName(cellValueRaw);
+      const hasAgeAdded = matchAge !== cellValueRaw;
+      
+      const isPatientCol = 
+        ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(colHeader) ||
+        colHeader.includes('idoso') ||
+        colHeader.includes('paciente') ||
+        colHeader.includes('acolhido') ||
+        colHeader.includes('residente') ||
+        hasAgeAdded;
+      
+      if (isPatientCol && cellValueRaw && cellValueRaw !== 'N/A' && cellValueRaw !== 'Não informado' && cellValueRaw !== '-') {
+        const cellValue = appendAgeToName(cellValueRaw);
+        return `** ${cellValue.toUpperCase()} **`; // High-contrast visual highlight in Excel
+      }
+      return cell;
+    })
+  );
+
+  // Prepare the data with headers and professional details
   const worksheetData = [
-    [title], // Optional title row
+    [title],
+    ["INSTITUIÇÃO OAMI - Gestão ILPI"],
+    ["CNPJ: 10.706.425/0001-74"],
+    ["Endereço: MA-014, Alto São Francisco, Vitória do Mearim – Maranhão"],
     [],      // Spacer
     columns,  // Headers
-    ...data   // Values
+    ...formattedData,   // Values
+    [],
+    [],
+    ["Assinatura do Profissional:"],
+    ["______________________________________________________"]
   ];
 
   // Create a worksheet
   const ws = XLSX.utils.aoa_to_sheet(worksheetData);
 
   // Set column widths (optional but nice)
-  const colWidths = columns.map(() => ({ wch: 20 }));
+  const colWidths = columns.map(() => ({ wch: 22 }));
   ws['!cols'] = colWidths;
 
   // Append worksheet to workbook

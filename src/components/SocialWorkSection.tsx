@@ -21,6 +21,7 @@ import {
 import { format, isToday, parseISO, startOfToday, isSameDay, subMonths, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
+import { ROLE_LABELS } from '../constants';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -43,6 +44,7 @@ interface SocialWorkSectionProps {
   documentations: SocialDocumentation[];
   legalSituations: SocialLegalSituation[];
   socialStudies: SocialStudy[];
+  professionals?: any[];
   evolutions: SocialEvolution[];
   referrals: SocialReferral[];
   familyVisits: SocialFamilyVisit[];
@@ -109,6 +111,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   documentations,
   legalSituations,
   socialStudies,
+  professionals = [],
   evolutions,
   referrals,
   familyVisits,
@@ -145,6 +148,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [formData, setFormData] = useState<any>({});
   const [isExtracting, setIsExtracting] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [profSearch, setProfSearch] = useState('');
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -1233,6 +1237,90 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               />
             </div>
 
+            <div className="space-y-4 border-t border-gray-150 dark:border-gray-800 pt-6 text-gray-900 dark:text-gray-100">
+              <div className="flex justify-between items-center text-gray-800 dark:text-gray-200">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                  <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                </div>
+                {formData.coWorkers && formData.coWorkers.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({ ...formData, coWorkers: [] })}
+                    className="text-[10px] text-red-500 font-bold uppercase tracking-wider animate-pulse"
+                  >
+                    Limpar Seleção ({formData.coWorkers.length})
+                  </button>
+                )}
+              </div>
+              
+              <div className="relative">
+                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-blue-500 transition-all">
+                  <Search size={16} className="text-gray-400" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar profissional por nome ou cargo..."
+                    value={profSearch}
+                    onChange={(e) => setProfSearch(e.target.value)}
+                    className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                  />
+                  {profSearch && (
+                    <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                {(professionals || [])
+                  .filter((p: any) => {
+                    if (!profSearch) return true;
+                    
+                    const term = profSearch.toLowerCase();
+                    const pName = (p.name || '').toLowerCase();
+                    const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                    return pName.includes(term) || pRole.includes(term);
+                  })
+                  .map((p: any) => {
+                    const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                    return (
+                      <button
+                        key={p.id || p.email}
+                        type="button"
+                        onClick={() => {
+                          const list = formData.coWorkers || [];
+                          const identifier = p.id || p.email;
+                          if (isSelected) {
+                            setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                          } else {
+                            setFormData({ ...formData, coWorkers: [...list, identifier] });
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                          isSelected 
+                            ? "bg-blend-color-burn bg-blue-500/10 dark:bg-blue-950/20 border-blue-400 dark:border-blue-800 text-blue-900 dark:text-blue-300"
+                            : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-750 dark:text-gray-250"
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate text-gray-900 dark:text-gray-100">{p.name}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                        </div>
+                        <div className={cn(
+                          "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                          isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                        )}>
+                          {isSelected && <CheckCircle2 size={12} />}
+                        </div>
+                      </button>
+                    );
+                  })
+                }
+              </div>
+            </div>
+
             <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Digitalização e Fotos</label>
@@ -1328,11 +1416,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'visit':
       case 'visits':
         return (
-          <form onSubmit={handleSave} className="p-6 space-y-4">
+          <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-900">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idoso</label>
               <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
+                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg"
                 value={formData.patientId || ''}
                 onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
               >
@@ -1341,30 +1429,39 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Visitante</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data da Visita (Selecione para data retroativa)</label>
+              <input
+                type="date"
+                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg"
+                value={formData.date ? formData.date.substring(0, 10) : format(new Date(), 'yyyy-MM-dd')}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome do Visitante</label>
               <input
                 type="text"
-                className="w-full p-2 border border-gray-200 rounded-lg"
+                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg"
                 value={formData.visitorName || ''}
                 onChange={(e) => setFormData({ ...formData, visitorName: e.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Parentesco</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Parentesco</label>
               <input
                 type="text"
-                className="w-full p-2 border border-gray-200 rounded-lg"
+                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg"
                 value={formData.kinship || ''}
                 onChange={(e) => setFormData({ ...formData, kinship: e.target.value })}
               />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-medium text-gray-700">Observações da Visita</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Observações da Visita</label>
                 <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, observations: (formData.observations || '') + ' ' + t })} />
               </div>
               <textarea
-                className="w-full p-2 border border-gray-200 rounded-lg h-24"
+                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg h-24"
                 value={formData.observations || ''}
                 onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
               />
@@ -1378,8 +1475,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               <PhotoUpload photos={formData.photos || []} onChange={photos => setFormData({ ...formData, photos })} />
             </div>
 
-            <button type="submit" className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700">
-              Registrar Visita
+            <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors">
+              {formData.id ? 'Atualizar Visita' : 'Registrar Visita'}
             </button>
           </form>
         );
@@ -2730,34 +2827,27 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase">
+                  <div className="flex items-center gap-1.5 flex-wrap md:flex-nowrap justify-end">
+                    <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase mr-1">
                       {evolution.serviceType}
                     </span>
                     <button
                       onClick={() => handleDownloadEvolution(evolution)}
-                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors shrink-0"
                       title="Baixar PDF"
                     >
                       <Download className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => openModal('evolution', evolution)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors shrink-0"
                       title="Editar"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDownloadEvolution(evolution)}
-                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
-                      title="Baixar Evolução"
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
-                    <button
                       onClick={() => onDeleteRecord('socialEvolutions', evolution.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors shrink-0"
                       title="Excluir"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -3556,7 +3646,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   {modalType === 'patient' || modalType === 'profile' ? 'Novo Cadastro de Idoso' : 
                    modalType === 'evolution' ? 'Nova Evolução Social' :
                    modalType === 'referral' ? 'Novo Encaminhamento' :
-                   modalType === 'visit' ? 'Novo Registro de Visita' :
+                   (modalType === 'visit' || modalType === 'visits') ? (formData.id ? 'Editar Registro de Visita' : 'Novo Registro de Visita') :
                    modalType === 'risk' ? 'Nova Situação de Risco' :
                    modalType === 'study' ? 'Novo Estudo Social' :
                    modalType === 'legal' ? 'Nova Situação Legal' :

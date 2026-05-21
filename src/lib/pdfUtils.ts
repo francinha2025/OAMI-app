@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { INSTITUTION_LOGO, INSTITUTION_NAME } from '../constants';
+import { appendAgeToName, formatTextWithAges } from './utils';
 
 interface PDFOptions {
   title: string;
@@ -14,8 +15,8 @@ interface PDFOptions {
 }
 
 export const generateModernPDF = async ({
-  title,
-  subtitle,
+  title: rawTitle,
+  subtitle: rawSubtitle,
   columns,
   data,
   fileName,
@@ -23,6 +24,9 @@ export const generateModernPDF = async ({
   institutionLogo = INSTITUTION_LOGO,
   orientation = 'portrait'
 }: PDFOptions) => {
+  const title = formatTextWithAges(rawTitle);
+  const subtitle = rawSubtitle ? formatTextWithAges(rawSubtitle) : undefined;
+
   const doc = new jsPDF({
     orientation,
     unit: 'mm',
@@ -70,24 +74,31 @@ export const generateModernPDF = async ({
 
     // Institution Name
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(50, 50, 50);
-    doc.text(institutionName, hasLogo ? 50 : 14, 28);
+    doc.setFontSize(13);
+    doc.setTextColor(40, 40, 40);
+    doc.text(institutionName, hasLogo ? 50 : 14, 24);
+    
+    // CNPJ & Endereço
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(110, 110, 110);
+    doc.text(`CNPJ: 10.706.425/0001-74`, hasLogo ? 50 : 14, 29);
+    doc.text(`Endereço: MA-014, Alto São Francisco, Vitória do Mearim - Maranhão`, hasLogo ? 50 : 14, 33);
     
     // Unidade text
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Relatório Oficial de Atendimento', hasLogo ? 50 : 14, 34);
+    doc.setFontSize(8);
+    doc.text('Relatório Oficial de Atendimento', hasLogo ? 50 : 14, 38);
 
     // Report Title
-    doc.setFontSize(18);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(title, hasLogo ? 50 : 14, 44);
+    doc.text(title, hasLogo ? 50 : 14, 45);
 
     if (subtitle) {
-      doc.setFontSize(10);
+      doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(120, 120, 120);
       doc.text(subtitle, hasLogo ? 50 : 14, 50);
     }
 
@@ -135,14 +146,61 @@ export const generateModernPDF = async ({
     alternateRowStyles: {
       fillColor: lightGray
     },
-    margin: { top: 55, bottom: 20 },
-    didDrawPage: (data: any) => {
-      // Add header on each page
-      // Note: we can't easily know total pages here, so we'll do it after
+    margin: { top: 55, bottom: 25 },
+    didParseCell: (hookData: any) => {
+      if (hookData.section === 'body') {
+        const headerText = String(hookData.column.raw || hookData.column.title || '').trim().toLowerCase();
+        const rawVal = String(hookData.cell.raw || '').trim();
+        
+        // Let's check both column name and registry to accurately find the patient name
+        const matchAge = appendAgeToName(rawVal);
+        const hasAgeAdded = matchAge !== rawVal; // If age can be resolved, it's definitely a patient
+        
+        const isPatientCol = 
+          ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(headerText) ||
+          headerText.includes('idoso') ||
+          headerText.includes('paciente') ||
+          headerText.includes('acolhido') ||
+          headerText.includes('residente') ||
+          hasAgeAdded;
+        
+        if (isPatientCol) {
+          hookData.cell.styles.fontStyle = 'bold';
+          hookData.cell.styles.textColor = [6, 78, 59]; // Dark emerald text for extremely clean read
+          hookData.cell.styles.fillColor = [209, 250, 229]; // Light elegant background
+          hookData.cell.styles.fontSize = 9.5; // Slightly larger to highlight
+          
+          if (rawVal && rawVal !== 'N/A' && rawVal !== 'Não informado' && rawVal !== '-') {
+            hookData.cell.text = [appendAgeToName(rawVal)];
+          }
+        }
+      }
     }
   });
 
-  // Add Headers and Footers to all pages
+  // Space for signature of the professional
+  const finalY = (doc as any).lastAutoTable?.finalY || 60;
+  let signatureY = finalY + 15;
+  const signatureSpaceNeeded = 30;
+
+  if (signatureY + signatureSpaceNeeded > pageHeight - 20) {
+    doc.addPage();
+    signatureY = 60; // start nicely below header limits
+  }
+
+  // Draw Signature Line
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.5);
+  const startX = (pageWidth / 2) - 45;
+  const endX = (pageWidth / 2) + 45;
+  doc.line(startX, signatureY + 12, endX, signatureY + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(60, 60, 60);
+  doc.text('Assinatura do Profissional', pageWidth / 2, signatureY + 17, { align: 'center' });
+
+  // Add Headers and Footers to all pages (including any extra page added for signature)
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);

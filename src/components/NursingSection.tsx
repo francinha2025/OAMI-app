@@ -19,6 +19,7 @@ import {
 import { format, isToday, parseISO, startOfToday, isSameDay, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
+import { ROLE_LABELS } from '../constants';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -612,6 +613,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 }}
                 filter={medicationsPatientFilter}
                 setFilter={setMedicationsPatientFilter}
+                showToast={props.showToast}
               />
             )}
             {activeTab === 'vitals' && (
@@ -1093,7 +1095,8 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
 }) => {
   const [loading, setLoading] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [showVitalsForm, setShowVitalsForm] = useState(false);
+  const [showVitalsForm, setShowVitalsForm] = useState(true);
+  const [profSearch, setProfSearch] = useState('');
   const [quickVitals, setQuickVitals] = useState<Partial<VitalSigns>>({
     systolicBP: '',
     diastolicBP: '',
@@ -1107,6 +1110,7 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
     time: format(new Date(), 'HH:mm'),
     status: 'PENDENTE',
     photos: [],
+    coWorkers: [],
     patientId: initialPatientId || '',
     elderlyId: editingData?.elderlyId || '',
     content: '',
@@ -1789,6 +1793,90 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
                   onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                   placeholder="Descreva a evolução do paciente..."
                 />
+
+                <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                      <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                    </div>
+                    {formData.coWorkers && formData.coWorkers.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setFormData({ ...formData, coWorkers: [] })}
+                        className="text-[10px] text-red-500 font-bold uppercase tracking-wider animate-pulse"
+                      >
+                        Limpar Seleção ({formData.coWorkers.length})
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-blue-500 transition-all">
+                      <Search size={16} className="text-gray-400" />
+                      <input 
+                        type="text"
+                        placeholder="Buscar profissional por nome ou cargo..."
+                        value={profSearch}
+                        onChange={(e) => setProfSearch(e.target.value)}
+                        className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                      />
+                      {profSearch && (
+                        <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                    {(professionals || [])
+                      .filter((p: any) => {
+                        if (!profSearch) return true;
+                        
+                        const term = profSearch.toLowerCase();
+                        const pName = (p.name || '').toLowerCase();
+                        const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                        return pName.includes(term) || pRole.includes(term);
+                      })
+                      .map((p: any) => {
+                        const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                        return (
+                          <button
+                            key={p.id || p.email}
+                            type="button"
+                            onClick={() => {
+                              const list = formData.coWorkers || [];
+                              const identifier = p.id || p.email;
+                              if (isSelected) {
+                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                              } else {
+                                setFormData({ ...formData, coWorkers: [...list, identifier] });
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                              isSelected 
+                                ? "bg-blend-color-burn bg-blue-500/10 dark:bg-blue-950/20 border-blue-400 dark:border-blue-800 text-blue-900 dark:text-blue-300"
+                                : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-700 dark:text-gray-300"
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold truncate">{p.name}</p>
+                              <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                            </div>
+                            <div className={cn(
+                              "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                              isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                            )}>
+                              {isSelected && <CheckCircle2 size={12} />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    }
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2553,7 +2641,7 @@ const PatientDetailView = ({
 );
 }
 
-const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration, onAddMedication, onDeleteMedication, onEditMedication, filter, setFilter }: { 
+const MedicationView = ({ patients, medications, administrations, onSaveMedication, onSaveAdministration, onAddMedication, onDeleteMedication, onEditMedication, filter, setFilter, showToast }: { 
   patients: NursingPatient[], 
   medications: Medication[], 
   administrations: MedicationAdministration[],
@@ -2563,13 +2651,16 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
   onDeleteMedication?: (id: string) => void,
   onEditMedication?: (m: Medication) => void,
   filter: string,
-  setFilter: (f: string) => void
+  setFilter: (f: string) => void,
+  showToast: (msg: string, type?: 'success' | 'error') => void
 }) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [activeSubTab, setActiveSubTab] = useState<'runs' | 'master'>('runs');
   
   const dailyAdmins = (administrations || []).filter(a => 
     a.date === selectedDate && (!filter || a.patientId === filter)
   );
+
   const stats = {
     total: dailyAdmins.length,
     done: dailyAdmins.filter(a => a.status === 'ADMINISTRADO').length,
@@ -2577,15 +2668,136 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
     delayed: dailyAdmins.filter(a => a.status === 'ATRASADO').length
   };
 
+  // Group medications by patient
+  const groupedMeds = useMemo(() => {
+    const activeMeds = (medications || []).filter(m => !filter || m.patientId === filter);
+    const groups: { patient: NursingPatient; meds: Medication[] }[] = [];
+    
+    activeMeds.forEach(m => {
+      const patient = (patients || []).find(p => p.id === m.patientId);
+      if (!patient) return;
+      
+      let existingGroup = groups.find(g => g.patient.id === patient.id);
+      if (!existingGroup) {
+        existingGroup = { patient, meds: [] };
+        groups.push(existingGroup);
+      }
+      existingGroup.meds.push(m);
+    });
+    
+    return groups.sort((a, b) => a.patient.name.localeCompare(b.patient.name));
+  }, [medications, patients, filter]);
+
+  const handleDownloadMedicationsPDF = async () => {
+    try {
+      const filteredMeds = (medications || []).filter(m => !filter || m.patientId === filter);
+      if (filteredMeds.length === 0) {
+        showToast('Nenhuma medicação cadastrada encontrada para exportação', 'error');
+        return;
+      }
+      
+      const sorted = [...filteredMeds].sort((a, b) => {
+        const pA = (patients || []).find(p => p.id === a.patientId)?.name || '';
+        const pB = (patients || []).find(p => p.id === b.patientId)?.name || '';
+        const compPat = pA.localeCompare(pB);
+        if (compPat !== 0) return compPat;
+        return a.name.localeCompare(b.name);
+      });
+
+      const data = sorted.map(med => {
+        const patient = (patients || []).find(p => p.id === med.patientId);
+        const name = patient?.name || 'Não informado';
+        const timesStr = (med.times || []).join(', ');
+        const datesStr = `${med.startDate ? format(parseISO(med.startDate), 'dd/MM/yy') : ''}${med.endDate ? ` a ${format(parseISO(med.endDate), 'dd/MM/yy')}` : ' (Contínuo)'}`;
+        return [
+          name,
+          med.name,
+          med.dosage,
+          med.route,
+          `${med.frequency} [${timesStr}]`,
+          datesStr,
+          med.type,
+          med.status || 'ATIVO',
+          med.prescriber || '-'
+        ];
+      });
+
+      const label = filter ? (patients.find(p => p.id === filter)?.name || '') : 'Todos os Pacientes';
+
+      await generateModernPDF({
+        title: 'Relatório de Prescrições e Receituários',
+        subtitle: `OAMI - Gestão ILPI • Filtro: ${label} • Total: ${sorted.length} registros`,
+        columns: ['Paciente', 'Medicamento', 'Dosagem', 'Via', 'Frequência / Horários', 'Período', 'Tipo', 'Status', 'Prescritor'],
+        data: data,
+        fileName: `receitas_medicas_${new Date().getTime()}`,
+        orientation: 'landscape'
+      });
+      showToast('Relatório de receitas exportado com sucesso (PDF)!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao exportar PDF', 'error');
+    }
+  };
+
+  const handleDownloadMedicationsWord = async () => {
+    try {
+      const filteredMeds = (medications || []).filter(m => !filter || m.patientId === filter);
+      if (filteredMeds.length === 0) {
+        showToast('Nenhuma medicação cadastrada encontrada para exportação', 'error');
+        return;
+      }
+      
+      const sorted = [...filteredMeds].sort((a, b) => {
+        const pA = (patients || []).find(p => p.id === a.patientId)?.name || '';
+        const pB = (patients || []).find(p => p.id === b.patientId)?.name || '';
+        const compPat = pA.localeCompare(pB);
+        if (compPat !== 0) return compPat;
+        return a.name.localeCompare(b.name);
+      });
+
+      const data = sorted.map(med => {
+        const patient = (patients || []).find(p => p.id === med.patientId);
+        const name = patient?.name || 'Não informado';
+        const timesStr = (med.times || []).join(', ');
+        const datesStr = `${med.startDate ? format(parseISO(med.startDate), 'dd/MM/yy') : ''}${med.endDate ? ` a ${format(parseISO(med.endDate), 'dd/MM/yy')}` : ' (Contínuo)'}`;
+        return [
+          name,
+          med.name,
+          med.dosage,
+          med.route,
+          `${med.frequency} [${timesStr}]`,
+          datesStr,
+          med.type,
+          med.status || 'ATIVO',
+          med.prescriber || '-'
+        ];
+      });
+
+      const label = filter ? (patients.find(p => p.id === filter)?.name || '') : 'Todos os Pacientes';
+
+      await generateModernWord({
+        title: 'Relatório de Prescrições e Receituários',
+        subtitle: `OAMI - Gestão ILPI • Filtro: ${label} • Total: ${sorted.length} registros`,
+        columns: ['Paciente', 'Medicamento', 'Dosagem', 'Via', 'Frequência / Horários', 'Período', 'Tipo', 'Status', 'Prescritor'],
+        data: data,
+        fileName: `receitas_medicas_${new Date().getTime()}`,
+      });
+      showToast('Relatório de receitas exportado com sucesso (Word)!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao exportar Word', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white">Controle de Medicação</h2>
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white font-sans tracking-tight">Controle de Medicação</h2>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-green-500 min-w-[150px]"
           >
             <option value="">Todos os Idosos</option>
             {(patients || []).map(p => (
@@ -2594,15 +2806,17 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
           </select>
         </div>
         <div className="flex gap-2">
-          <input 
-            type="date" 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-2 text-sm font-bold"
-          />
+          {activeSubTab === 'runs' && (
+            <input 
+              type="date" 
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl px-4 py-2 text-sm font-bold shadow-sm"
+            />
+          )}
           <button 
             onClick={onAddMedication}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-100 dark:shadow-none"
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg"
           >
             <Plus size={18} />
             Novo Registro
@@ -2610,67 +2824,245 @@ const MedicationView = ({ patients, medications, administrations, onSaveMedicati
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 space-y-4">
-          {dailyAdmins.length > 0 ? (
-            dailyAdmins.map(admin => {
-              const patient = (patients || []).find(p => p.id === admin.patientId);
-              const med = (medications || []).find(m => m.id === admin.medicationId);
-              return (
-                <div key={admin.id} className="bg-white dark:bg-gray-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between group">
-                  <div className="flex items-center gap-4">
-                    <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg", 
-                      admin.status === 'ADMINISTRADO' ? "bg-green-100 text-green-600" : 
-                      admin.status === 'ATRASADO' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
-                    )}>
-                      {admin.scheduledTime}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-800 dark:text-white">{med?.name} <span className="text-xs font-normal text-gray-400">({med?.dosage})</span></h4>
-                      <p className="text-xs text-gray-500">{patient?.name} • {med?.route} {med?.period ? `• Uso: ${med.period}` : ''}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {admin.status === 'PENDENTE' ? (
-                      <button 
-                        onClick={() => onSaveAdministration({ ...admin, status: 'ADMINISTRADO', administeredTime: format(new Date(), 'HH:mm') })}
-                        className="px-6 py-2 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg shadow-green-100 dark:shadow-none"
-                      >
-                        Administrar
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2 text-green-600 font-bold text-xs">
-                        <CheckCircle2 size={16} />
-                        Administrado às {admin.administeredTime}
-                      </div>
-                    )}
-                    <button className="p-2 text-gray-300 hover:text-gray-600 transition-colors">
-                      <MoreVertical size={18} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="bg-white dark:bg-gray-900 rounded-3xl p-12 text-center border border-gray-100 dark:border-gray-800">
-              <Pill size={48} className="mx-auto text-gray-200 mb-4" />
-              <p className="text-gray-400 italic">Nenhuma medicação agendada para esta data.</p>
-            </div>
+      {/* Modern Sub-Tab selector */}
+      <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl max-w-md">
+        <button 
+          onClick={() => setActiveSubTab('runs')}
+          className={cn("flex-1 py-2 px-4 rounded-xl text-xs font-black transition-all", 
+            activeSubTab === 'runs' 
+              ? "bg-white dark:bg-gray-900 text-green-600 dark:text-green-400 shadow-sm" 
+              : "text-gray-500 hover:text-gray-750 dark:hover:text-gray-300"
           )}
-        </div>
+        >
+          Administração Diária
+        </button>
+        <button 
+          onClick={() => setActiveSubTab('master')}
+          className={cn("flex-1 py-2 px-4 rounded-xl text-xs font-black transition-all", 
+            activeSubTab === 'master' 
+              ? "bg-white dark:bg-gray-900 text-green-600 dark:text-green-400 shadow-sm" 
+              : "text-gray-500 hover:text-gray-750 dark:hover:text-gray-300"
+          )}
+        >
+          Medicações Cadastradas (Receitas)
+        </button>
+      </div>
 
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold mb-4">Resumo do Dia</h3>
-            <div className="space-y-4">
-              <MedStat label="Total Agendado" value={dailyAdmins.length} color="blue" />
-              <MedStat label="Administrados" value={dailyAdmins.filter(a => a.status === 'ADMINISTRADO').length} color="green" />
-              <MedStat label="Pendentes" value={dailyAdmins.filter(a => a.status === 'PENDENTE').length} color="amber" />
-              <MedStat label="Atrasados" value={dailyAdmins.filter(a => a.status === 'ATRASADO').length} color="red" />
+      {activeSubTab === 'runs' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 space-y-4">
+            {dailyAdmins.length > 0 ? (
+              dailyAdmins.map(admin => {
+                const patient = (patients || []).find(p => p.id === admin.patientId);
+                const med = (medications || []).find(m => m.id === admin.medicationId);
+                return (
+                  <div key={admin.id} className="bg-white dark:bg-gray-900 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between group">
+                    <div className="flex items-center gap-4">
+                      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg", 
+                        admin.status === 'ADMINISTRADO' ? "bg-green-100 text-green-600" : 
+                        admin.status === 'ATRASADO' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+                      )}>
+                        {admin.scheduledTime}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-800 dark:text-white">{med?.name} <span className="text-xs font-normal text-gray-400">({med?.dosage})</span></h4>
+                        <p className="text-xs text-gray-500">{patient?.name} • {med?.route} {med?.period ? `• Uso: ${med.period}` : ''}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {admin.status === 'PENDENTE' ? (
+                        <button 
+                          onClick={() => onSaveAdministration({ ...admin, status: 'ADMINISTRADO', administeredTime: format(new Date(), 'HH:mm') })}
+                          className="px-6 py-2 bg-green-600 text-white text-xs font-bold rounded-xl hover:bg-green-700 transition-all shadow-lg"
+                        >
+                          Administrar
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2 text-green-600 font-bold text-xs">
+                          <CheckCircle2 size={16} />
+                          Administrado às {admin.administeredTime}
+                        </div>
+                      )}
+                      <button className="p-2 text-gray-300 hover:text-gray-600 transition-colors">
+                        <MoreVertical size={18} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="bg-white dark:bg-gray-900 rounded-3xl p-12 text-center border border-gray-100 dark:border-gray-800">
+                <Pill size={48} className="mx-auto text-gray-200 mb-4" />
+                <p className="text-gray-400 italic font-medium">Nenhuma medicação agendada para esta data.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+              <h3 className="text-lg font-bold mb-4">Resumo do Dia</h3>
+              <div className="space-y-4">
+                <MedStat label="Total Agendado" value={stats.total} color="blue" />
+                <MedStat label="Administrados" value={stats.done} color="green" />
+                <MedStat label="Pendentes" value={stats.pending} color="amber" />
+                <MedStat label="Atrasados" value={stats.delayed} color="red" />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Prescriptions Master Tab View */
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 border border-gray-100 dark:border-gray-800 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-50 dark:border-gray-800">
+            <div>
+              <h3 className="text-lg font-black text-gray-850 dark:text-white flex items-center gap-2">
+                <Pill className="text-green-650" size={20} />
+                Receituário Médico de Pacientes
+              </h3>
+              <p className="text-xs text-gray-400 font-medium">Verifique todos os medicamentos em uso vinculados e atualizados pelo setor de enfermagem.</p>
+            </div>
+            
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleDownloadMedicationsPDF}
+                className="flex items-center gap-1.5 px-4 py-2 bg-red-100 text-red-700 dark:bg-red-950/20 dark:text-red-400 hover:bg-red-200 transition-all rounded-xl text-xs font-bold"
+                title="Exportar como PDF"
+              >
+                <Download size={14} />
+                <span>Exportar PDF</span>
+              </button>
+              <button
+                onClick={handleDownloadMedicationsWord}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-100 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 hover:bg-blue-200 transition-all rounded-xl text-xs font-bold"
+                title="Exportar como Word (Docx)"
+              >
+                <Download size={14} />
+                <span>Exportar Word</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {groupedMeds.length > 0 ? (
+              groupedMeds.map(({ patient, meds }) => (
+                <div key={patient.id} className="border border-gray-100 dark:border-gray-800 rounded-3xl p-6 space-y-4 bg-gray-50/50 dark:bg-gray-800/10">
+                  <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-800 pb-3">
+                    <div className="w-9 h-9 rounded-2xl bg-green-100 dark:bg-green-900/40 text-green-600 flex items-center justify-center font-bold text-sm uppercase">
+                      {patient.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm text-gray-800 dark:text-white leading-tight">{patient.name}</h4>
+                      <p className="text-[10px] text-gray-400 font-medium font-mono">DIP: {patient.diagnosis || 'Não cadastrado'}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {meds.map(med => (
+                      <div key={med.id} className="bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 flex flex-col justify-between shadow-sm relative hover:border-green-300 dark:hover:border-green-800 transition-colors">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className={cn("px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider", 
+                              med.status === 'SUSPENSO' 
+                                ? "bg-red-100 text-red-650 dark:bg-red-950/40 dark:text-red-400" 
+                                : "bg-green-100 text-green-650 dark:bg-green-950/40 dark:text-green-400"
+                            )}>
+                              {med.status || 'ATIVO'}
+                            </span>
+                            <span className={cn("px-2 py-0.5 rounded-lg text-[8px] font-black uppercase", 
+                              med.type === 'CONTINUA' ? "bg-blue-105 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400" : 
+                              med.type === 'CONTROLADA' ? "bg-amber-105 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400" : "bg-gray-100 text-gray-600"
+                            )}>
+                              {med.type || 'PONTUAL'}
+                            </span>
+                          </div>
+
+                          <div>
+                            <h5 className="font-extrabold text-sm text-gray-800 dark:text-white leading-snug">{med.name}</h5>
+                            <p className="text-[11px] text-gray-500 font-bold">{med.dosage} • {med.route}</p>
+                          </div>
+
+                          <div className="space-y-1.5 pt-2 border-t border-gray-50 dark:border-gray-850">
+                            <p className="text-[9px] text-gray-450 font-bold uppercase tracking-wider">Frequência e Horários</p>
+                            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 leading-tight">
+                              <Clock size={12} className="text-gray-400 shrink-0" />
+                              {med.frequency}
+                            </p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(med.times || []).map((t, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-750 text-gray-500 rounded text-[9px] font-bold">{t}</span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {(med.startDate || med.prescriber || med.period) && (
+                            <div className="text-[9px] text-gray-400 font-semibold space-y-0.5 border-t border-gray-50 dark:border-gray-850 pt-2">
+                              {med.startDate && <p>Início: {format(parseISO(med.startDate), 'dd/MM/yyyy')}</p>}
+                              {med.endDate && <p>Término: {format(parseISO(med.endDate), 'dd/MM/yyyy')}</p>}
+                              {med.period && <p>Período: {med.period}</p>}
+                              {med.prescriber && <p>Prescritor: {med.prescriber}</p>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-850 pt-3 mt-4">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const newStatus = med.status === 'SUSPENSO' ? 'ATIVO' : 'SUSPENSO';
+                                await onSaveMedication({
+                                  ...med,
+                                  status: newStatus
+                                }, med.id);
+                                showToast(`Medicação ${newStatus === 'ATIVO' ? 'ativada' : 'suspensa'} com sucesso`, 'success');
+                              } catch (err) {
+                                console.error(err);
+                                showToast('Erro ao atualizar status', 'error');
+                              }
+                            }}
+                            className={cn("px-2 py-1 text-[9px] font-bold rounded-lg transition-colors border",
+                              med.status === 'SUSPENSO'
+                                ? "bg-green-50 text-green-600 border-green-100 dark:bg-green-950/20 dark:border-green-900"
+                                : "bg-orange-50 text-orange-600 border-orange-100 dark:bg-orange-950/20 dark:border-orange-900"
+                            )}
+                          >
+                            {med.status === 'SUSPENSO' ? 'Reativar' : 'Suspender'}
+                          </button>
+
+                          <div className="flex items-center gap-1">
+                            {onEditMedication && (
+                              <button 
+                                onClick={() => onEditMedication(med)}
+                                className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 rounded-lg transition-all"
+                                title="Editar Receita"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                            {onDeleteMedication && (
+                              <button 
+                                onClick={() => onDeleteMedication(med.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-all"
+                                title="Excluir"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-12 text-center bg-gray-50 dark:bg-gray-800/10 border border-gray-100 dark:border-gray-800 rounded-3xl">
+                <Pill size={40} className="mx-auto text-gray-300 dark:text-gray-700 mb-3" />
+                <p className="text-sm text-gray-400 italic">Nenhuma prescrição de receita encontrada.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

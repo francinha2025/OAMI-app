@@ -39,6 +39,7 @@ import {
   Elderly
 } from '../types';
 import { cn, safeReplace } from '../lib/utils';
+import { ROLE_LABELS } from '../constants';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 
@@ -49,6 +50,7 @@ interface NutritionSectionProps {
   evolutions: NutritionEvolution[];
   anthropometries: NutritionAnthropometry[];
   mealPlans: NutritionMealPlan[];
+  professionals?: any[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onSavePatient: (data: Partial<NutritionPatient>) => Promise<void>;
   onSaveEvolution: (data: Partial<NutritionEvolution>) => Promise<void>;
@@ -69,6 +71,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   evolutions,
   anthropometries,
   mealPlans,
+  professionals = [],
   showToast,
   onSavePatient,
   onSaveEvolution,
@@ -85,6 +88,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
   const [localFormData, setLocalFormData] = useState<any>({});
+  const [profSearch, setProfSearch] = useState('');
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -926,6 +930,90 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                         value={localFormData.observations}
                         onChange={e => setLocalFormData({...localFormData, observations: e.target.value})}
                       />
+                    </div>
+
+                    <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-6">
+                      <div className="flex justify-between items-center bg-transparent">
+                        <div>
+                          <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                          <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                        </div>
+                        {localFormData.coWorkers && localFormData.coWorkers.length > 0 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setLocalFormData({ ...localFormData, coWorkers: [] })}
+                            className="text-[10px] text-red-500 font-bold uppercase tracking-wider animate-pulse"
+                          >
+                            Limpar Seleção ({localFormData.coWorkers.length})
+                          </button>
+                        )}
+                      </div>
+                      
+                      <div className="relative">
+                        <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-orange-500 transition-all">
+                          <Search size={16} className="text-gray-400" />
+                          <input 
+                            type="text"
+                            placeholder="Buscar profissional por nome ou cargo..."
+                            value={profSearch}
+                            onChange={(e) => setProfSearch(e.target.value)}
+                            className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                          />
+                          {profSearch && (
+                            <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-655">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                        {(professionals || [])
+                          .filter((p: any) => {
+                            if (!profSearch) return true;
+                            
+                            const term = profSearch.toLowerCase();
+                            const pName = (p.name || '').toLowerCase();
+                            const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                            return pName.includes(term) || pRole.includes(term);
+                          })
+                          .map((p: any) => {
+                            const isSelected = (localFormData.coWorkers || []).includes(p.id) || (localFormData.coWorkers || []).includes(p.email);
+                            return (
+                              <button
+                                key={p.id || p.email}
+                                type="button"
+                                onClick={() => {
+                                  const list = localFormData.coWorkers || [];
+                                  const identifier = p.id || p.email;
+                                  if (isSelected) {
+                                    setLocalFormData({ ...localFormData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                                  } else {
+                                    setLocalFormData({ ...localFormData, coWorkers: [...list, identifier] });
+                                  }
+                                }}
+                                className={cn(
+                                  "flex items-center justify-between p-3 rounded-2xl border border-transparent text-left transition-all",
+                                  isSelected 
+                                    ? "bg-blend-color-burn bg-orange-550/10 dark:bg-orange-950/20 border-orange-400 dark:border-orange-800 text-orange-900 dark:text-orange-300"
+                                    : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-750 dark:text-gray-250"
+                                )}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold truncate text-gray-900 dark:text-gray-100">{p.name}</p>
+                                  <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                                </div>
+                                <div className={cn(
+                                  "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                                  isSelected ? "bg-orange-500 border-orange-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                                )}>
+                                  {isSelected && <CheckCircle2 size={12} />}
+                                </div>
+                              </button>
+                            );
+                          })
+                        }
+                      </div>
                     </div>
                   </>
                 )}

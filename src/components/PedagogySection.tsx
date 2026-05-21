@@ -22,6 +22,7 @@ import { cn, safeReplace } from '../lib/utils';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
+import { ROLE_LABELS } from '../constants';
 import { 
   PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, 
   PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, 
@@ -94,6 +95,7 @@ interface PedagogySectionProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
+  professionals?: any[];
 }
 
 type TabType = 'dashboard' | 'residents' | 'activities' | 'monitoring' | 'reports' | 'settings';
@@ -140,7 +142,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   showToast,
   theme,
   setTheme,
-  onLogout
+  onLogout,
+  professionals = []
 }) => {
   if (!user || !user.role) {
     return (
@@ -172,6 +175,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [profSearch, setProfSearch] = useState('');
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -316,15 +320,20 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
 
   const openModal = (type: string, initialData: any = null) => {
     setModalType(type);
+    setProfSearch('');
     if (!initialData) {
       const now = new Date();
       setFormData({
         date: format(now, 'yyyy-MM-dd'),
         time: format(now, 'HH:mm'),
-        participants: []
+        participants: [],
+        coWorkers: []
       });
     } else {
-      setFormData(initialData || {});
+      setFormData({
+        ...(initialData || {}),
+        coWorkers: initialData?.coWorkers || []
+      });
     }
     setEditingData(initialData);
     setIsModalOpen(true);
@@ -772,6 +781,91 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 value={formData.description || ''}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
+            </div>
+
+            {/* Seleção de Co-workers / Outros Profissionais da Instituição */}
+            <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex justify-between items-center">
+                <div>
+                  <label className="text-xs font-black text-gray-400 dark:text-gray-350 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                  <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                </div>
+                {formData.coWorkers && formData.coWorkers.length > 0 && (
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({ ...formData, coWorkers: [] })}
+                    className="text-[10px] text-red-500 font-bold uppercase tracking-wider font-black"
+                  >
+                    Limpar Seleção ({formData.coWorkers.length})
+                  </button>
+                )}
+              </div>
+              
+              <div className="relative">
+                <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-pink-500 transition-all">
+                  <Search size={16} className="text-gray-400" />
+                  <input 
+                    type="text"
+                    placeholder="Buscar profissional por nome ou cargo..."
+                    value={profSearch}
+                    onChange={(e) => setProfSearch(e.target.value)}
+                    className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                  />
+                  {profSearch && (
+                    <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                {professionals
+                  .filter((p: any) => {
+                    if (!profSearch) return true;
+                    
+                    const term = profSearch.toLowerCase();
+                    const pName = (p.name || '').toLowerCase();
+                    const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                    return pName.includes(term) || pRole.includes(term);
+                  })
+                  .map((p: any) => {
+                    const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          const list = formData.coWorkers || [];
+                          const identifier = p.id || p.email;
+                          if (isSelected) {
+                            setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                          } else {
+                            setFormData({ ...formData, coWorkers: [...list, identifier] });
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                          isSelected 
+                            ? "bg-blend-color-burn bg-pink-500/10 dark:bg-pink-950/20 border-pink-400 dark:border-pink-850 text-pink-900 dark:text-pink-300 font-black"
+                            : "bg-white dark:bg-gray-855 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-700 dark:text-gray-300 font-medium"
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold truncate">{p.name}</p>
+                          <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                        </div>
+                        <div className={cn(
+                          "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                          isSelected ? "bg-pink-500 border-pink-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                        )}>
+                          {isSelected && <CheckCircle2 size={12} />}
+                        </div>
+                      </button>
+                    );
+                  })
+                }
+              </div>
             </div>
 
             <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -1903,6 +1997,22 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                           <span key={pId} className="px-3 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-[10px] font-black border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>
                             {p?.name || 'Idoso não encontrado'}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {activity.coWorkers && activity.coWorkers.length > 0 && (
+                  <div className="mb-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Equipe / Colaboradores:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {activity.coWorkers.map(cwId => {
+                        const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-3 py-1 bg-pink-50/50 dark:bg-pink-950/20 text-pink-700 dark:text-pink-350 rounded-xl text-[10px] font-black border border-pink-100 dark:border-pink-900 shadow-sm">
+                            {prof ? prof.name : cwId}
                           </span>
                         );
                       })}

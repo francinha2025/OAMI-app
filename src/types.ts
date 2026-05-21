@@ -29,6 +29,7 @@ export interface User {
   id: string;
   name: string;
   role: Role;
+  email?: string;
   password?: string;
   photoUrl?: string;
   registrationNumber?: string;
@@ -255,6 +256,7 @@ export interface Workshop {
   howMuch: string;
   registeredBy?: string;
   professionalId?: string;
+  coWorkers?: string[];
 }
 
 export interface CommunityElderly {
@@ -381,6 +383,7 @@ export interface PhysioEvolution {
   observations: string;
   painLevel?: number;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface PhysioExercise {
@@ -486,6 +489,7 @@ export interface NursingEvolution {
   content: string;
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface IncidentRecord {
@@ -587,6 +591,7 @@ export interface PsychEvolution {
   intervention: string;
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface PsychAppointment {
@@ -639,6 +644,7 @@ export interface PsychActivity {
   participants: string[]; // patientIds
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface PsychCognitionAssessment {
@@ -707,6 +713,7 @@ export interface PedagogyEvolution {
   observations: string;
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface PedagogyActivity {
@@ -719,6 +726,7 @@ export interface PedagogyActivity {
   participants: string[]; // patientIds
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface PedagogyStimulationTracking {
@@ -857,9 +865,11 @@ export interface SocialEvolution {
   date: string;
   serviceType: string;
   observation: string;
+  textPlan?: string;
   conduct: string;
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface SocialReferral {
@@ -923,6 +933,7 @@ export interface NutritionEvolution {
   conduct: string;
   registeredBy: string;
   photos?: string[];
+  coWorkers?: string[];
 }
 
 export interface NutritionAnthropometry {
