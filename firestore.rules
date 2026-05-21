@@ -977,6 +977,11 @@ service cloud.firestore {
       allow write: if isNutritionist() || isCoordinator() || isAdmin();
     }
 
+    match /professionalEvaluations/{evaluationId} {
+      allow read: if isAuthenticated();
+      allow write: if isCoordinator() || isAdmin();
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

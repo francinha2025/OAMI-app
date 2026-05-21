@@ -5,7 +5,7 @@ import {
   Calendar, AlertTriangle, Receipt, Settings,
   Plus, Search, Filter, MoreVertical, ChevronRight,
   CheckCircle2, Clock, Phone, User as UserIcon,
-  Trash2, Edit2, Download, Printer, X, Info,
+  Trash2, Edit2, Download, Printer, X, Info, Check,
   ArrowLeft, TrendingUp, UserCircle, LogOut,
   Moon, Sun, Smile, Meh, Frown, History,
   Lightbulb, Target, Star, ShieldAlert, Loader2, Zap,
@@ -138,8 +138,28 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const saved = localStorage.getItem('oami-social-tab');
+    if (saved === 'visits') return 'family';
+    if (saved === 'legal') return 'docs';
     return (saved as TabType) || 'dashboard';
   });
+  const [familySubTab, setFamilySubTab] = useState<'ties' | 'visits'>(() => {
+    const saved = localStorage.getItem('oami-social-family-subtab');
+    return (saved as 'ties' | 'visits') || 'ties';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('oami-social-family-subtab', familySubTab);
+  }, [familySubTab]);
+
+  const [docsSubTab, setDocsSubTab] = useState<'docs' | 'legal'>(() => {
+    const saved = localStorage.getItem('oami-social-docs-subtab');
+    return (saved as 'docs' | 'legal') || 'docs';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('oami-social-docs-subtab', docsSubTab);
+  }, [docsSubTab]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<string>('');
@@ -149,6 +169,32 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [profSearch, setProfSearch] = useState('');
+
+  // States for Editable table & multi-select deletion in Documentation & Visit Control tabs
+  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  const [selectedVisitIds, setSelectedVisitIds] = useState<string[]>([]);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
+  const [inlineDocForm, setInlineDocForm] = useState<any>({});
+  const [inlineVisitForm, setInlineVisitForm] = useState<any>({});
+  const [isAddingDoc, setIsAddingDoc] = useState(false);
+  const [isAddingVisit, setIsAddingVisit] = useState(false);
+  const [newDocForm, setNewDocForm] = useState<any>({
+    patientId: '',
+    rg: 'PENDENTE',
+    cpf: 'PENDENTE',
+    sus: 'PENDENTE',
+    birthCertificate: 'PENDENTE',
+    addressProof: 'PENDENTE',
+    observations: ''
+  });
+  const [newVisitForm, setNewVisitForm] = useState<any>({
+    patientId: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    visitorName: '',
+    kinship: '',
+    observations: ''
+  });
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -2098,263 +2144,1135 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     }
   };
 
-  const renderDocumentation = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Documentação</h3>
-          <select
-            value={docsPatientFilter}
-            onChange={(e) => setDocsPatientFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+  const renderDocumentationOnly = () => {
+    const tableDocs = (documentations || []).filter(d => !docsPatientFilter || d.patientId === docsPatientFilter);
+    const allSelected = tableDocs.length > 0 && tableDocs.every(d => selectedDocIds.includes(d.id));
+    const someSelected = tableDocs.some(d => selectedDocIds.includes(d.id)) && !allSelected;
+
+    const handleSelectAll = (checked: boolean) => {
+      if (checked) {
+        const toAdd = tableDocs.map(d => d.id);
+        setSelectedDocIds(prev => Array.from(new Set([...prev, ...toAdd])));
+      } else {
+        const toRemove = tableDocs.map(d => d.id);
+        setSelectedDocIds(prev => prev.filter(id => !toRemove.includes(id)));
+      }
+    };
+
+    const handleSelectOne = (id: string, checked: boolean) => {
+      if (checked) {
+        setSelectedDocIds(prev => [...prev, id]);
+      } else {
+        setSelectedDocIds(prev => prev.filter(item => item !== id));
+      }
+    };
+
+    const handleStartEdit = (doc: any) => {
+      setEditingDocId(doc.id);
+      setInlineDocForm({ ...doc });
+    };
+
+    const handleBulkDeleteDocs = async () => {
+      const selectedInCurrentView = selectedDocIds.filter(id => (documentations || []).some(d => d.id === id));
+      if (selectedInCurrentView.length === 0) return;
+      if (window.confirm(`Deseja realmente excluir os ${selectedInCurrentView.length} registros de documentos selecionados?`)) {
+        try {
+          for (const id of selectedInCurrentView) {
+            await onDeleteRecord('socialDocumentations', id);
+          }
+          showToast(`${selectedInCurrentView.length} registros de documentos excluídos com sucesso!`, 'success');
+          setSelectedDocIds(prev => prev.filter(id => !selectedInCurrentView.includes(id)));
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao excluir registros em lote', 'error');
+        }
+      }
+    };
+
+    const handleInlineSaveDoc = async (id: string) => {
+      if (!inlineDocForm.patientId) {
+        showToast('Idoso inválido', 'error');
+        return;
+      }
+      try {
+        await onSaveDocumentation(inlineDocForm, id);
+        setEditingDocId(null);
+        setInlineDocForm({});
+        showToast('Documentos atualizados com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao atualizar documentos', 'error');
+      }
+    };
+
+    const handleInlineAddDoc = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newDocForm.patientId) {
+        showToast('Selecione o idoso para os documentos', 'error');
+        return;
+      }
+      try {
+        await onSaveDocumentation(newDocForm);
+        setIsAddingDoc(false);
+        setNewDocForm({
+          patientId: '',
+          rg: 'PENDENTE',
+          cpf: 'PENDENTE',
+          sus: 'PENDENTE',
+          birthCertificate: 'PENDENTE',
+          addressProof: 'PENDENTE',
+          observations: ''
+        });
+        showToast('Novos documentos cadastrados com sucesso!', 'success');
+      } catch (err) {
+        console.error(err);
+        showToast('Erro ao cadastrar documentos', 'error');
+      }
+    };
+
+    const getStatusBadge = (status: string) => (
+      <span className={cn(
+        "px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight border block text-center",
+        status === 'COMPLETO' ? "bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800/40" :
+        status === 'PENDENTE' ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40" :
+        "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/40"
+      )}>
+        {status === 'COMPLETO' ? 'Completo' : status === 'PENDENTE' ? 'Pendente' : 'Inexistente'}
+      </span>
+    );
+
+    return (
+      <div className="space-y-6">
+        {/* Bulk action strip */}
+        {selectedDocIds.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col sm:flex-row gap-4 items-center justify-between p-5 bg-gray-900 text-white rounded-3xl shadow-xl dark:bg-gray-950 border border-gray-800"
           >
-            <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => {
-              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-              return (
-                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-              );
-            })}
-          </select>
-        </div>
-        <button
-          onClick={() => openModal('docs')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Atualizar Documentos
-        </button>
-      </div>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-red-600/20 text-red-400 rounded-2xl">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-black uppercase tracking-widest text-red-400">Ações em Lote Ativas</p>
+                <p className="text-xs text-gray-400">{selectedDocIds.length} {selectedDocIds.length === 1 ? 'registro selecionado' : 'registros selecionados'}</p>
+              </div>
+            </div>
+            <div className="flex w-full sm:w-auto justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDocIds([])}
+                className="px-4 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-gray-800 dark:hover:bg-gray-900 rounded-xl transition-all"
+              >
+                Limpar Seleção
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDeleteDocs}
+                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-red-900/30"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir Selecionados
+              </button>
+            </div>
+          </motion.div>
+        )}
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-            <tr>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Idoso</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">RG</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">CPF</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">SUS</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Certidão</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {(documentations || []).filter(d => !docsPatientFilter || d.patientId === docsPatientFilter).map((doc) => {
-              const patient = (patients || []).find(p => p.id === doc.patientId);
-              const getStatusBadge = (status: string) => (
-                <span className={cn(
-                  "px-2 py-1 rounded-full text-[10px] font-black uppercase border",
-                  status === 'COMPLETO' ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800" :
-                  status === 'PENDENTE' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-800" :
-                  "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800"
-                )}>
-                  {status}
-                </span>
-              );
-
-              return (
-                <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white capitalize">{patient?.name}</td>
-                  <td className="px-6 py-4">{getStatusBadge(doc.rg)}</td>
-                  <td className="px-6 py-4">{getStatusBadge(doc.cpf)}</td>
-                  <td className="px-6 py-4">{getStatusBadge(doc.sus)}</td>
-                  <td className="px-6 py-4">{getStatusBadge(doc.birthCertificate)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openModal('docs', doc)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
-                        title="Editar"
+        {/* Inline documentation adder */}
+        <AnimatePresence>
+          {isAddingDoc && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-gray-800/40 dark:to-gray-900/30 p-6 rounded-[32px] border border-blue-100 dark:border-gray-800 space-y-4 mb-4">
+                <div className="flex items-center justify-between border-b border-blue-100/80 dark:border-gray-800 pb-3">
+                  <h4 className="text-sm font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                    <Plus className="w-5 h-5 text-blue-600" />
+                    Registrar controle de documentos
+                  </h4>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAddingDoc(false)}
+                    className="p-1 px-3 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 font-bold rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                  >
+                    Fechar
+                  </button>
+                </div>
+                
+                <form onSubmit={handleInlineAddDoc} className="space-y-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Idoso Beneficiado *</label>
+                      <select
+                        required
+                        value={newDocForm.patientId}
+                        onChange={(e) => setNewDocForm({ ...newDocForm, patientId: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                       >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteRecord('socialDocumentations', doc.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                        <option value="">Selecione o idoso</option>
+                        {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>)}
+                      </select>
                     </div>
-                  </td>
+                    <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { key: 'rg', label: 'RG' },
+                        { key: 'cpf', label: 'CPF' },
+                        { key: 'sus', label: 'SUS' },
+                        { key: 'birthCertificate', label: 'Certidão' },
+                        { key: 'addressProof', label: 'Comprovante' }
+                      ].map(field => (
+                        <div key={field.key}>
+                          <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">{field.label}</label>
+                          <select
+                            value={newDocForm[field.key] || 'PENDENTE'}
+                            onChange={(e) => setNewDocForm({ ...newDocForm, [field.key]: e.target.value })}
+                            className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                            <option value="COMPLETO">COMPLETO</option>
+                            <option value="PENDENTE">PENDENTE</option>
+                            <option value="INEXISTENTE">INEXISTENTE</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Observações da Ficha de Documentos</label>
+                    <textarea
+                      value={newDocForm.observations || ''}
+                      onChange={(e) => setNewDocForm({ ...newDocForm, observations: e.target.value })}
+                      placeholder="Identifique detalhes de pendências, prazos para correção ou numerações de vias..."
+                      className="w-full text-xs p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl h-20 resize-none font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-blue-100/50 dark:border-gray-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingDoc(false)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-100 dark:shadow-none"
+                    >
+                      Salvar Cadastro
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Master documents list table */}
+        <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800/80 overflow-hidden shadow-sm transition-all">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-[#FAF9F6] dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                <tr>
+                  <th className="p-4 pl-6 w-12 text-center">
+                    <input 
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => {
+                        if (el) {
+                          el.indeterminate = someSelected;
+                        }
+                      }}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-5 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest w-64">Idoso</th>
+                  <th className="px-3 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest text-center w-32">RG</th>
+                  <th className="px-3 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest text-center w-32">CPF</th>
+                  <th className="px-3 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest text-center w-32">SUS</th>
+                  <th className="px-3 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest text-center w-32">Certidão</th>
+                  <th className="px-3 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest text-center w-32">Comprovante</th>
+                  <th className="px-5 py-4 text-xs font-black text-gray-650 dark:text-gray-400 uppercase tracking-widest">Observações</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-550 dark:text-gray-400 uppercase tracking-widest text-right w-36">Ações</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {tableDocs.map((doc) => {
+                  const patient = (patients || []).find(p => p.id === doc.patientId);
+                  const isEditing = editingDocId === doc.id;
+
+                  return (
+                    <tr 
+                      key={doc.id} 
+                      className={cn(
+                        "hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors",
+                        isEditing && "bg-blue-50/50 dark:bg-blue-950/20",
+                        selectedDocIds.includes(doc.id) && "bg-red-50/20 dark:bg-red-950/10 font-bold"
+                      )}
+                    >
+                      {/* Checkbox column */}
+                      <td className="p-4 pl-6 w-12 text-center">
+                        <input 
+                          type="checkbox"
+                          checked={selectedDocIds.includes(doc.id)}
+                          onChange={(e) => handleSelectOne(doc.id, e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
+                      {/* Patient Name / Dropdown */}
+                      <td className="px-5 py-4 font-black text-gray-900 dark:text-white capitalize">
+                        {isEditing ? (
+                          <select
+                            value={inlineDocForm.patientId || ''}
+                            onChange={(e) => setInlineDocForm({ ...inlineDocForm, patientId: e.target.value })}
+                            className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                            {(patients || []).map(p => (
+                              <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 font-black text-blue-700 dark:text-blue-400 flex items-center justify-center text-xs tracking-tighter shrink-0 border border-blue-100 dark:border-none">
+                              {patient?.name?.slice(0, 2).toUpperCase() || 'ID'}
+                            </div>
+                            <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">{patient?.name || 'Não identificado'}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Five status cells */}
+                      {['rg', 'cpf', 'sus', 'birthCertificate', 'addressProof'].map((field) => (
+                        <td key={field} className="px-3 py-4 text-center">
+                          {isEditing ? (
+                            <select
+                              value={inlineDocForm[field] || 'PENDENTE'}
+                              onChange={(e) => setInlineDocForm({ ...inlineDocForm, [field]: e.target.value })}
+                              className="text-[11px] p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 font-bold text-gray-800 dark:text-gray-100 w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                            >
+                              <option value="COMPLETO">COMPLETO</option>
+                              <option value="PENDENTE">PENDENTE</option>
+                              <option value="INEXISTENTE">INEXISTENTE</option>
+                            </select>
+                          ) : (
+                            getStatusBadge(doc[field as keyof SocialDocumentation] as string || 'PENDENTE')
+                          )}
+                        </td>
+                      ))}
+
+                      {/* Observations cell */}
+                      <td className="px-5 py-4">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={inlineDocForm.observations || ''}
+                            onChange={(e) => setInlineDocForm({ ...inlineDocForm, observations: e.target.value })}
+                            className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                          />
+                        ) : (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium max-w-xs truncate" title={doc.observations}>
+                            {doc.observations || '--'}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Actions cell */}
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleInlineSaveDoc(doc.id)}
+                                className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded-xl transition-all shadow-sm border border-green-100 dark:border-none"
+                                title="Salvar"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingDocId(null);
+                                  setInlineDocForm({});
+                                }}
+                                className="p-2 text-gray-500 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all"
+                                title="Cancelar"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(doc)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                                title="Editar instantaneamente"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Deseja realmente excluir a documentação de ${patient?.name}?`)) {
+                                    onDeleteRecord('socialDocumentations', doc.id);
+                                    showToast('Registro de documentos deletado.', 'success');
+                                  }
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                title="Excluir"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {tableDocs.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="px-6 py-16 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <FileText className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                        <p className="text-sm text-gray-400 dark:text-gray-500 font-bold italic">Nenhum registro de documento filtrado.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
+    );
+  };
+
+  const renderDocumentationAndLegal = () => (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto">
+          <button
+            onClick={() => setDocsSubTab('docs')}
+            className={cn(
+              "flex-1 md:flex-initial px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+              docsSubTab === 'docs'
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            )}
+          >
+            <FileText className="w-4 h-4 text-blue-500" />
+            Controle de Documentação
+          </button>
+          <button
+            onClick={() => setDocsSubTab('legal')}
+            className={cn(
+              "flex-1 md:flex-initial px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+              docsSubTab === 'legal'
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            )}
+          >
+            <Scale className="w-4 h-4 text-purple-500" />
+            Situação Legal
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          {docsSubTab === 'docs' ? (
+            <>
+              <select
+                value={docsPatientFilter}
+                onChange={(e) => setDocsPatientFilter(e.target.value)}
+                className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              >
+                <option value="">Filtrar p/ Idoso</option>
+                {(patients || []).map((p: any) => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return (
+                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => setIsAddingDoc(!isAddingDoc)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-100 dark:shadow-none font-bold text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                {isAddingDoc ? 'Fechar Formulário' : 'Novo Controle de Doc'}
+              </button>
+            </>
+          ) : (
+            <>
+              <select
+                value={legalPatientFilter}
+                onChange={(e) => setLegalPatientFilter(e.target.value)}
+                className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              >
+                <option value="">Filtrar p/ Idoso</option>
+                {(patients || []).map((p: any) => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return (
+                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => openModal('legal')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-100 dark:shadow-none font-bold text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Nova Situação
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {docsSubTab === 'docs' ? renderDocumentationOnly() : renderLegalSituationOnly()}
     </div>
   );
 
   const renderFamilyTies = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-black text-gray-900 dark:text-white">Vínculo Familiar</h3>
-          <select
-            value={familyPatientFilter}
-            onChange={(e) => setFamilyPatientFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto">
+          <button
+            onClick={() => setFamilySubTab('ties')}
+            className={cn(
+              "flex-1 md:flex-initial px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+              familySubTab === 'ties'
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            )}
           >
-            <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => {
-              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-              return (
-                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-              );
-            })}
-          </select>
+            <Heart className="w-4 h-4 text-pink-500" />
+            Vínculo Familiar
+          </button>
+          <button
+            onClick={() => setFamilySubTab('visits')}
+            className={cn(
+              "flex-1 md:flex-initial px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2",
+              familySubTab === 'visits'
+                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            )}
+          >
+            <Calendar className="w-4 h-4 text-green-500" />
+            Controle de Visitas
+          </button>
         </div>
-        <button
-          onClick={() => openModal('family')}
-          className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors shadow-lg shadow-pink-100 dark:shadow-none font-bold"
-        >
-          <Plus className="w-5 h-5" />
-          Novo Vínculo
-        </button>
+
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          {familySubTab === 'ties' ? (
+            <>
+              <select
+                value={familyPatientFilter}
+                onChange={(e) => setFamilyPatientFilter(e.target.value)}
+                className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              >
+                <option value="">Filtrar p/ Idoso</option>
+                {(patients || []).map((p: any) => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return (
+                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => openModal('family')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 text-white rounded-xl hover:bg-pink-700 transition-colors shadow-lg shadow-pink-100 dark:shadow-none font-bold text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Vínculo
+              </button>
+            </>
+          ) : (
+            <>
+              <select
+                value={visitPatientFilter}
+                onChange={(e) => setVisitPatientFilter(e.target.value)}
+                className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+              >
+                <option value="">Filtrar p/ Idoso</option>
+                {(patients || []).map((p: any) => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return (
+                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                  );
+                })}
+              </select>
+              <button
+                onClick={() => setIsAddingVisit(!isAddingVisit)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-100 dark:shadow-none font-bold text-xs"
+              >
+                <Plus className="w-4 h-4" />
+                {isAddingVisit ? 'Fechar Formulário' : 'Registrar Visita'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {(familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).map((tie) => {
-          const patient = (patients || []).find(p => p.id === tie.patientId);
-          return (
-            <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
-                    <Heart className="w-6 h-6 text-pink-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {tie.abandonmentRisk && (
-                    <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full text-xs font-black uppercase flex items-center gap-1 border border-red-200 dark:border-red-800">
-                      <AlertTriangle className="w-3 h-3" />
-                      Risco
-                    </span>
-                  )}
-                  <button
-                    onClick={() => openModal('family', tie)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteRecord('socialFamilyTies', tie.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                    title="Excluir"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {(tie.members || []).map((member) => (
-                  <div key={member.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
+      {familySubTab === 'ties' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {(familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).map((tie) => {
+            const patient = (patients || []).find(p => p.id === tie.patientId);
+            return (
+              <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+                      <Heart className="w-6 h-6 text-pink-500" />
+                    </div>
                     <div>
-                      <p className="text-sm font-black text-gray-900 dark:text-white capitalize">{member.name} ({member.kinship})</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold">{member.phone}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-black text-gray-400 uppercase">Visitas</p>
-                      <p className="text-xs font-black text-gray-700 dark:text-gray-300 capitalize">{member.visitFrequency?.toLowerCase()}</p>
+                      <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
                     </div>
                   </div>
-                ))}
+                  <div className="flex items-center gap-2">
+                    {tie.abandonmentRisk && (
+                      <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded-full text-xs font-black uppercase flex items-center gap-1 border border-red-200 dark:border-red-800">
+                        <AlertTriangle className="w-3 h-3" />
+                        Risco
+                      </span>
+                    )}
+                    <button
+                      onClick={() => openModal('family', tie)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteRecord('socialFamilyTies', tie.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                      title="Excluir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {(tie.members || []).map((member) => (
+                    <div key={member.id} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl flex items-center justify-between border border-gray-100 dark:border-gray-700">
+                      <div>
+                        <p className="text-sm font-black text-gray-900 dark:text-white capitalize">{member.name} ({member.kinship})</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-bold">{member.phone}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-gray-400 uppercase">Visitas</p>
+                        <p className="text-xs font-black text-gray-700 dark:text-gray-300 capitalize">{member.visitFrequency?.toLowerCase()}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {(!tie.members || tie.members.length === 0) && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-2">Nenhum membro familiar cadastrado nesta estrutura.</p>
+                  )}
+                  {tie.observations && (
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                      <strong>Obs:</strong> {tie.observations}
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })}
+          {((familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).length === 0) && (
+            <div className="col-span-full py-12 text-center bg-gray-50 dark:bg-gray-800/20 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-400 dark:text-gray-500 font-bold">Nenhum vínculo familiar registrado para os filtros selecionados.</p>
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Bulk action strip for Visits */}
+          {selectedVisitIds.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col sm:flex-row gap-4 items-center justify-between p-5 bg-gray-900 text-white rounded-3xl shadow-xl dark:bg-gray-950 border border-gray-800"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-600/20 text-red-400 rounded-2xl">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-black uppercase tracking-widest text-red-400">Ações em Lote Ativas</p>
+                  <p className="text-xs text-gray-400">{selectedVisitIds.length} {selectedVisitIds.length === 1 ? 'visita selecionada' : 'visitas selecionadas'}</p>
+                </div>
+              </div>
+              <div className="flex w-full sm:w-auto justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedVisitIds([])}
+                  className="px-4 py-2.5 text-xs font-black uppercase tracking-wider hover:bg-gray-800 dark:hover:bg-gray-900 rounded-xl transition-all"
+                >
+                  Limpar Seleção
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const selectedCurrentView = selectedVisitIds.filter(id => (familyVisits || []).some(v => v.id === id));
+                    if (selectedCurrentView.length === 0) return;
+                    if (window.confirm(`Deseja realmente excluir os ${selectedCurrentView.length} registros de visitas selecionados?`)) {
+                      try {
+                        for (const id of selectedCurrentView) {
+                          await onDeleteRecord('socialFamilyVisits', id);
+                        }
+                        showToast(`${selectedCurrentView.length} registros de visitas excluídos com sucesso!`, 'success');
+                        setSelectedVisitIds(prev => prev.filter(id => !selectedCurrentView.includes(id)));
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Erro ao realizar a exclusão das visitas', 'error');
+                      }
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-red-900/30"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir Selecionados
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Inline visit adder */}
+          <AnimatePresence>
+            {isAddingVisit && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-gray-800/40 dark:to-gray-900/30 p-6 rounded-[32px] border border-green-100 dark:border-gray-800 space-y-4 mb-4">
+                  <div className="flex items-center justify-between border-b border-green-100/80 dark:border-gray-800 pb-3">
+                    <h4 className="text-sm font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-2">
+                      <Plus className="w-5 h-5 text-green-600" />
+                      Registrar Nova Visita Familiar
+                    </h4>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsAddingVisit(false)}
+                      className="p-1 px-3 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 font-bold rounded-lg transition-colors text-gray-600 dark:text-gray-300"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                  
+                  <form 
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newVisitForm.patientId) {
+                        showToast('Selecione o idoso para a visita', 'error');
+                        return;
+                      }
+                      if (!newVisitForm.visitorName) {
+                        showToast('Preencha o nome do visitante', 'error');
+                        return;
+                      }
+                      try {
+                        const data = {
+                          ...newVisitForm,
+                          date: newVisitForm.date || new Date().toISOString()
+                        };
+                        await onSaveFamilyVisit(data);
+                        setIsAddingVisit(false);
+                        setNewVisitForm({
+                          patientId: '',
+                          date: format(new Date(), 'yyyy-MM-dd'),
+                          visitorName: '',
+                          kinship: '',
+                          observations: ''
+                        });
+                        showToast('Registro de visita cadastrado com sucesso!', 'success');
+                      } catch (err) {
+                        console.error(err);
+                        showToast('Erro ao cadastrar visita', 'error');
+                      }
+                    }} 
+                    className="space-y-4"
+                  >
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Idoso Visitado *</label>
+                        <select
+                          required
+                          value={newVisitForm.patientId}
+                          onChange={(e) => setNewVisitForm({ ...newVisitForm, patientId: e.target.value })}
+                          className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                        >
+                          <option value="">Selecione o idoso</option>
+                          {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Data da Visita *</label>
+                        <input
+                          type="date"
+                          required
+                          value={newVisitForm.date}
+                          onChange={(e) => setNewVisitForm({ ...newVisitForm, date: e.target.value })}
+                          className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Nome do Visitante *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Maria de Souza"
+                          value={newVisitForm.visitorName}
+                          onChange={(e) => setNewVisitForm({ ...newVisitForm, visitorName: e.target.value })}
+                          className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Parentesco / Relação *</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Ex: Filho(a), Sobrinho(a)"
+                          value={newVisitForm.kinship}
+                          onChange={(e) => setNewVisitForm({ ...newVisitForm, kinship: e.target.value })}
+                          className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Observações e Relato da Visita</label>
+                      <textarea
+                        value={newVisitForm.observations || ''}
+                        onChange={(e) => setNewVisitForm({ ...newVisitForm, observations: e.target.value })}
+                        placeholder="Quais foram as reações do idoso, assuntos tratados na visita ou necessidades identificadas..."
+                        className="w-full text-xs p-3 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl h-20 resize-none font-medium focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 border-t border-green-100/50 dark:border-gray-800">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingVisit(false)}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-all shadow-md shadow-green-100 dark:shadow-none"
+                      >
+                        Salvar Registro de Visita
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Master visits list table */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-[#FAF9F6] dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                  <tr>
+                    <th className="p-4 pl-6 w-12 text-center">
+                      <input 
+                        type="checkbox"
+                        checked={(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).length > 0 && (familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).every(v => selectedVisitIds.includes(v.id))}
+                        onChange={(e) => {
+                          const tableVisits = (familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter);
+                          if (e.target.checked) {
+                            const toAdd = tableVisits.map(v => v.id);
+                            setSelectedVisitIds(prev => Array.from(new Set([...prev, ...toAdd])));
+                          } else {
+                            const toRemove = tableVisits.map(v => v.id);
+                            setSelectedVisitIds(prev => prev.filter(id => !toRemove.includes(id)));
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </th>
+                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-36">Data</th>
+                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-64">Idoso</th>
+                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Visitante</th>
+                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-40">Parentesco</th>
+                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Observações</th>
+                    <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest text-right w-36">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).map((visit) => {
+                    const patient = (patients || []).find(p => p.id === visit.patientId);
+                    const isEditing = editingVisitId === visit.id;
+
+                    return (
+                      <tr 
+                        key={visit.id} 
+                        className={cn(
+                          "hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors",
+                          isEditing && "bg-blue-50/50 dark:bg-blue-950/20",
+                          selectedVisitIds.includes(visit.id) && "bg-red-50/20 dark:bg-red-950/10 font-bold"
+                        )}
+                      >
+                        {/* Checkbox column */}
+                        <td className="p-4 pl-6 w-12 text-center">
+                          <input 
+                            type="checkbox"
+                            checked={selectedVisitIds.includes(visit.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedVisitIds(prev => [...prev, visit.id]);
+                              } else {
+                                setSelectedVisitIds(prev => prev.filter(item => item !== visit.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
+
+                        {/* Date column */}
+                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold tracking-tighter">
+                          {isEditing ? (
+                            <input
+                              type="date"
+                              required
+                              value={inlineVisitForm.date ? inlineVisitForm.date.substring(0, 10) : ''}
+                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, date: e.target.value })}
+                              className="text-xs p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                              <span>{safeFormat(visit.date, 'dd/MM/yyyy')}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Patient column */}
+                        <td className="px-5 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight capitalize">
+                          {isEditing ? (
+                            <select
+                              value={inlineVisitForm.patientId || ''}
+                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, patientId: e.target.value })}
+                              className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
+                            >
+                              {(patients || []).map(p => (
+                                <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">{patient?.name || 'Não identificado'}</span>
+                          )}
+                        </td>
+
+                        {/* Visitor Name column */}
+                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold capitalize">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              required
+                              value={inlineVisitForm.visitorName || ''}
+                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, visitorName: e.target.value })}
+                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                          ) : (
+                            <span>{visit.visitorName}</span>
+                          )}
+                        </td>
+
+                        {/* Kinship column */}
+                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              required
+                              value={inlineVisitForm.kinship || ''}
+                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, kinship: e.target.value })}
+                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                          ) : (
+                            <span>{visit.kinship}</span>
+                          )}
+                        </td>
+
+                        {/* Observations column */}
+                        <td className="px-5 py-4">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={inlineVisitForm.observations || ''}
+                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, observations: e.target.value })}
+                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                          ) : (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium max-w-xs truncate" title={visit.observations}>
+                              {visit.observations || '--'}
+                            </p>
+                          )}
+                        </td>
+
+                        {/* Actions column */}
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!inlineVisitForm.patientId || !inlineVisitForm.visitorName) {
+                                      showToast('Campos obrigatórios não preenchidos!', 'error');
+                                      return;
+                                    }
+                                    try {
+                                      await onSaveFamilyVisit(inlineVisitForm, visit.id);
+                                      setEditingVisitId(null);
+                                      setInlineVisitForm({});
+                                      showToast('Visita familiar atualizada com sucesso!', 'success');
+                                    } catch (err) {
+                                      console.error(err);
+                                      showToast('Erro ao atualizar a visita', 'error');
+                                    }
+                                  }}
+                                  className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded-xl transition-all shadow-sm border border-green-100 dark:border-none"
+                                  title="Salvar"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingVisitId(null);
+                                    setInlineVisitForm({});
+                                  }}
+                                  className="p-2 text-gray-500 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingVisitId(visit.id);
+                                    setInlineVisitForm({ ...visit });
+                                  }}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                                  title="Editar instantaneamente"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (window.confirm(`Deseja realmente excluir a visita de ${visit.visitorName}?`)) {
+                                      onDeleteRecord('socialFamilyVisits', visit.id);
+                                      showToast('Visita excluída com sucesso!', 'success');
+                                    }
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {((familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).length === 0) && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-16 text-center">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                          <p className="text-sm text-gray-400 dark:text-gray-500 font-bold italic">Nenhum registro de visita filtrado.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
-  const renderLegalSituation = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Situação Legal</h3>
-          <select
-            value={legalPatientFilter}
-            onChange={(e) => setLegalPatientFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
-          >
-            <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => {
-              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-              return (
-                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-              );
-            })}
-          </select>
-        </div>
-        <button
-          onClick={() => openModal('legal')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-lg shadow-purple-100 dark:shadow-none font-bold"
-        >
-          <Plus className="w-5 h-5" />
-          Nova Situação
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {(legalSituations || []).filter(l => !legalPatientFilter || l.patientId === legalPatientFilter).map((legal) => {
-          const patient = (patients || []).find(p => p.id === legal.patientId);
-          return (
-            <div key={legal.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center">
-                    <Scale className="w-6 h-6 text-purple-500" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white capitalize tracking-tight">{patient?.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">Status: {legal.situationStatus}</p>
-                  </div>
+  const renderLegalSituationOnly = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {(legalSituations || []).filter(l => !legalPatientFilter || l.patientId === legalPatientFilter).map((legal) => {
+        const patient = (patients || []).find(p => p.id === legal.patientId);
+        return (
+          <div key={legal.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center">
+                  <Scale className="w-6 h-6 text-purple-500" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-black uppercase border",
-                    legal.isInterdicted ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800" : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800"
-                  )}>
-                    {legal.isInterdicted ? 'Interditado' : 'Não Interditado'}
-                  </span>
-                  <button
-                    onClick={() => openModal('legal', legal)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteRecord('socialLegalSituations', legal.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                    title="Excluir"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                <div>
+                  <h4 className="font-bold text-gray-900 dark:text-white capitalize tracking-tight">{patient?.name}</h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">Status: {legal.situationStatus}</p>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
-                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Curador</p>
-                  <p className="font-black text-gray-700 dark:text-gray-300 capitalize">{legal.curatorName || 'Não possui'}</p>
-                </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
-                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Processo</p>
-                  <p className="font-black text-gray-700 dark:text-gray-300">{legal.processNumber || 'N/A'}</p>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase border",
+                  legal.isInterdicted ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800" : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-800"
+                )}>
+                  {legal.isInterdicted ? 'Interditado' : 'Não Interditado'}
+                </span>
+                <button
+                  onClick={() => openModal('legal', legal)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                  title="Editar"
+                >
+                  <Edit2 className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => onDeleteRecord('socialLegalSituations', legal.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                  title="Excluir"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Curador</p>
+                <p className="font-black text-gray-700 dark:text-gray-300 capitalize">{legal.curatorName || 'Não possui'}</p>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700">
+                <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase mb-1 tracking-widest">Processo</p>
+                <p className="font-black text-gray-700 dark:text-gray-300">{legal.processNumber || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {((legalSituations || []).filter(l => !legalPatientFilter || l.patientId === legalPatientFilter).length === 0) && (
+        <div className="col-span-full py-12 text-center bg-gray-50 dark:bg-gray-800/20 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-400 dark:text-gray-500 font-bold">Nenhuma situação legal registrada para os filtros selecionados.</p>
+        </div>
+      )}
     </div>
   );
 
@@ -2965,81 +3883,6 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     </div>
   );
 
-  const renderVisits = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Controle de Visitas</h3>
-          <select
-            value={visitPatientFilter}
-            onChange={(e) => setVisitPatientFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
-          >
-            <option value="">Filtrar p/ Idoso</option>
-            {(patients || []).map((p: any) => {
-              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-              return (
-                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-              );
-            })}
-          </select>
-        </div>
-        <button
-          onClick={() => openModal('visits')}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-lg shadow-green-100 dark:shadow-none font-bold"
-        >
-          <Plus className="w-5 h-5" />
-          Registrar Visita
-        </button>
-      </div>
-
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-            <tr>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Data</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Idoso</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Visitante</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Parentesco</th>
-              <th className="px-6 py-4 text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).map((visit) => {
-              const patient = (patients || []).find(p => p.id === visit.patientId);
-              return (
-                <tr key={visit.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold tracking-tighter">{safeFormat(visit.date, 'dd/MM/yyyy')}</td>
-                  <td className="px-6 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight capitalize">{patient?.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold capitalize">{visit.visitorName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">{visit.kinship}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openModal('visits', visit)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
-                        title="Editar"
-                      >
-                        <Edit2 className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteRecord('socialFamilyVisits', visit.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-
   const renderRiskSituations = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -3580,13 +4423,11 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'profile', label: 'Perfil do Idoso', icon: Users },
           { id: 'pia', label: 'PIA', icon: ClipboardList },
-          { id: 'family', label: 'Vínculo Familiar', icon: Heart },
-          { id: 'docs', label: 'Documentação', icon: FileText },
-          { id: 'legal', label: 'Situação Legal', icon: Scale },
+          { id: 'family', label: 'Vínculos e Visitas', icon: Heart },
+          { id: 'docs', label: 'Doc. e Situação Legal', icon: FileText },
           { id: 'study', label: 'Estudo Social', icon: BookOpen },
           { id: 'evolution', label: 'Evolução', icon: ClipboardList },
           { id: 'referrals', label: 'Encaminhamentos', icon: Share2 },
-          { id: 'visits', label: 'Visitas', icon: Calendar },
           { id: 'risk', label: 'Situações de Risco', icon: ShieldAlert },
           { id: 'benefits', label: 'Benefícios', icon: Receipt },
           { id: 'reports', label: 'Relatórios', icon: FileCheck },
@@ -3619,12 +4460,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             {activeTab === 'profile' && renderPatients()}
             {activeTab === 'pia' && renderPIA()}
             {activeTab === 'family' && renderFamilyTies()}
-            {activeTab === 'docs' && renderDocumentation()}
-            {activeTab === 'legal' && renderLegalSituation()}
+            {activeTab === 'docs' && renderDocumentationAndLegal()}
             {activeTab === 'study' && renderSocialStudy()}
             {activeTab === 'evolution' && renderEvolution()}
             {activeTab === 'referrals' && renderReferrals()}
-            {activeTab === 'visits' && renderVisits()}
             {activeTab === 'risk' && renderRiskSituations()}
             {activeTab === 'benefits' && renderBenefits()}
             {activeTab === 'reports' && renderReports()}

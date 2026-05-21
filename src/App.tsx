@@ -56,7 +56,9 @@ import {
   Phone,
   Printer,
   History,
-  User as UserIcon
+  User as UserIcon,
+  Star,
+  Award
 } from 'lucide-react';
 import { 
   format, 
@@ -104,7 +106,7 @@ import {
 } from 'recharts';
 import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -750,6 +752,43 @@ const MOCK_PROFESSIONALS: Professional[] = [
     admissionDate: '2023-10-15',
     status: 'ATIVO',
     createdAt: '2023-10-15'
+  }
+];
+
+const MOCK_PROFESSIONAL_EVALUATIONS: ProfessionalEvaluation[] = [
+  {
+    id: 'eval-1',
+    professionalId: 'p2',
+    professionalName: 'Dra. Ana Paula (Assistente Social)',
+    professionalRole: 'ASSISTENTE_SOCIAL',
+    evaluatorId: 'p1',
+    evaluatorName: 'Franciara Coelho',
+    date: '2026-05-15',
+    attendance: 5,
+    teamwork: 4,
+    competence: 5,
+    proactivity: 5,
+    relationshipWithElderly: 5,
+    comments: 'Excelente profissional, demonstra extremo comprometimento com a documentação social e o bem-estar dos acolhidos.',
+    recommendations: 'Manter a alta qualidade do trabalho. Sugere-se participação em novos simpósios de assistência ao idoso.',
+    createdAt: '2026-05-15T10:00:00.000Z'
+  },
+  {
+    id: 'eval-2',
+    professionalId: 'p3',
+    professionalName: 'Dra. Camila Santos (Psicóloga)',
+    professionalRole: 'PSICOLOGA',
+    evaluatorId: 'p1',
+    evaluatorName: 'Franciara Coelho',
+    date: '2026-05-18',
+    attendance: 4,
+    teamwork: 5,
+    competence: 4,
+    proactivity: 4,
+    relationshipWithElderly: 5,
+    comments: 'Muito dedicada e com ótima postura ética. Tem desenvolvido dinâmicas excelentes com os idosos.',
+    recommendations: 'Reforçar o preenchimento diário das evoluções de acompanhamento clínico.',
+    createdAt: '2026-05-18T14:30:00.000Z'
   }
 ];
 
@@ -1453,7 +1492,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'pedagogy', label: 'Pedagogia', icon: BookOpen, roles: ['PEDAGOGA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'socialWork', label: 'Serviço Social', icon: Heart, roles: ['ASSISTENTE_SOCIAL', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'nutrition', label: 'Nutrição', icon: Utensils, roles: ['NUTRICIONISTA', 'COORDENADORA', 'PROJETISTA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'professional', label: 'Área Profissional', icon: UserCircle, roles: ['COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'PROJETISTA', 'PRESIDENTE'] },
+        { id: 'professional', label: 'Avaliação & Monitoramento', icon: Award, roles: ['COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'PROJETISTA', 'PRESIDENTE'] },
       ]
     },
     {
@@ -3622,115 +3661,248 @@ const PIAForm = ({ user, elderly, showToast }: { user: User, elderly: Elderly[],
   );
 };
 
-const ProfessionalArea = ({ elderly, evolutions, user, showToast }: { 
-  elderly: Elderly[], 
-  evolutions: EvolutionRecord[], 
+const ProfessionalArea = ({ 
+  professionals, 
+  evaluations, 
+  onSaveEvaluation, 
+  onDeleteEvaluation, 
+  user, 
+  showToast 
+}: { 
+  professionals: Professional[], 
+  evaluations: ProfessionalEvaluation[], 
+  onSaveEvaluation: (evaluationData: Partial<ProfessionalEvaluation>) => Promise<void>,
+  onDeleteEvaluation: (evalId: string) => Promise<void>,
   user: User,
   showToast: (msg: string, type?: 'success' | 'error') => void
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'evolucao' | 'pia' | 'visitas'>('evolucao');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectedProfessionalId, setSelectedProfessionalId] = useState<string>('');
+  const [evaluationDate, setEvaluationDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [attendance, setAttendance] = useState<number>(5);
+  const [teamwork, setTeamwork] = useState<number>(5);
+  const [competence, setCompetence] = useState<number>(5);
+  const [proactivity, setProactivity] = useState<number>(5);
+  const [relationshipWithElderly, setRelationshipWithElderly] = useState<number>(5);
+  const [comments, setComments] = useState<string>('');
+  const [recommendations, setRecommendations] = useState<string>('');
+
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [roleFilter, setRoleFilter] = useState<string>('');
+  const [viewingEvaluation, setViewingEvaluation] = useState<ProfessionalEvaluation | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // Evolution Form State
-  const [selectedElderly, setSelectedElderly] = useState('');
-  const [evolutionType, setEvolutionType] = useState<'INDIVIDUAL' | 'GRUPO' | 'VISITA_DOMICILIAR'>('INDIVIDUAL');
-  const [evolutionDate, setEvolutionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [evolutionContent, setEvolutionContent] = useState('');
+  const canEvaluate = user.role === 'COORDENADORA' || user.role === 'PRESIDENTE';
 
-  useEffect(() => {
-    if (activeSubTab === 'visitas') {
-      setEvolutionType('VISITA_DOMICILIAR');
-    } else if (activeSubTab === 'evolucao') {
-      setEvolutionType('INDIVIDUAL');
+  const handleEditClick = (ev: ProfessionalEvaluation) => {
+    setEditingId(ev.id);
+    setSelectedProfessionalId(ev.professionalId);
+    setEvaluationDate(ev.date);
+    setAttendance(ev.attendance);
+    setTeamwork(ev.teamwork);
+    setCompetence(ev.competence);
+    setProactivity(ev.proactivity);
+    setRelationshipWithElderly(ev.relationshipWithElderly);
+    setComments(ev.comments);
+    setRecommendations(ev.recommendations);
+    
+    // Smooth scroll to top of form
+    document.getElementById('evaluation-form-card')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setSelectedProfessionalId('');
+    setEvaluationDate(new Date().toISOString().split('T')[0]);
+    setAttendance(5);
+    setTeamwork(5);
+    setCompetence(5);
+    setProactivity(5);
+    setRelationshipWithElderly(5);
+    setComments('');
+    setRecommendations('');
+  };
+
+  const handleSaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProfessionalId) {
+      showToast('Por favor, selecione um profissional.', 'error');
+      return;
     }
-  }, [activeSubTab]);
 
-  const handleSaveEvolution = async () => {
-    if (!selectedElderly || !evolutionContent) {
-      showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
+    const prof = professionals.find(p => p.id === selectedProfessionalId);
+    if (!prof) {
+      showToast('Profissional selecionado inválido.', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const evolutionData = cleanData({
-        elderlyId: selectedElderly,
-        professionalId: user.id,
-        professionalRole: user.role,
-        date: evolutionDate,
-        content: evolutionContent,
-        type: evolutionType,
-        createdAt: new Date().toISOString()
+      await onSaveEvaluation({
+        id: editingId || undefined,
+        professionalId: selectedProfessionalId,
+        professionalName: prof.name,
+        professionalRole: prof.role,
+        date: evaluationDate,
+        attendance,
+        teamwork,
+        competence,
+        proactivity,
+        relationshipWithElderly,
+        comments,
+        recommendations
       });
-      await addDoc(collection(db, 'evolutions'), evolutionData);
-
-      showToast('Registro de evolução salvo com sucesso!');
-      setSelectedElderly('');
-      setEvolutionContent('');
-      setEvolutionDate(new Date().toISOString().split('T')[0]);
+      handleCancelEdit();
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'evolutions');
-      showToast('Erro ao salvar registro de evolução.', 'error');
+      showToast('Erro ao salvar avaliação.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const generateProfessionalReportPDF = async () => {
+  // Stats calculation
+  const stats = useMemo(() => {
+    const list = evaluations || [];
+    if (list.length === 0) return { total: 0, average: 0, attendanceAvg: 0, teamworkAvg: 0, competenceAvg: 0, proactivityAvg: 0, relationshipAvg: 0 };
+    
+    let sumAttendance = 0;
+    let sumTeamwork = 0;
+    let sumCompetence = 0;
+    let sumProactivity = 0;
+    let sumRelationship = 0;
+
+    list.forEach(ev => {
+      sumAttendance += ev.attendance;
+      sumTeamwork += ev.teamwork;
+      sumCompetence += ev.competence;
+      sumProactivity += ev.proactivity;
+      sumRelationship += ev.relationshipWithElderly;
+    });
+
+    const attendanceAvg = sumAttendance / list.length;
+    const teamworkAvg = sumTeamwork / list.length;
+    const competenceAvg = sumCompetence / list.length;
+    const proactivityAvg = sumProactivity / list.length;
+    const relationshipAvg = sumRelationship / list.length;
+
+    const totalAvg = (attendanceAvg + teamworkAvg + competenceAvg + proactivityAvg + relationshipAvg) / 5;
+
+    return {
+      total: list.length,
+      average: Number(totalAvg.toFixed(1)),
+      attendanceAvg: Number(attendanceAvg.toFixed(1)),
+      teamworkAvg: Number(teamworkAvg.toFixed(1)),
+      competenceAvg: Number(competenceAvg.toFixed(1)),
+      proactivityAvg: Number(proactivityAvg.toFixed(1)),
+      relationshipAvg: Number(relationshipAvg.toFixed(1))
+    };
+  }, [evaluations]);
+
+  const generateReportPDF = async () => {
     setExporting(true);
     try {
-      const columns = ['Data', 'Acolhido', 'Evolução'];
-      const data = filteredEvolutions.map(ev => [
-        safeFormat(ev.date, 'dd/MM/yyyy'),
-        (elderly || []).find(e => e.id === ev.elderlyId)?.name || 'N/A',
-        ev.content
-      ]);
+      const columns = ['Data', 'Profissional', 'Cargo', 'Avaliador', 'Média'];
+      const data = filteredEvaluations.map(ev => {
+        const avg = ((ev.attendance + ev.teamwork + ev.competence + ev.proactivity + ev.relationshipWithElderly) / 5).toFixed(1);
+        return [
+          format(parseISO(ev.date), 'dd/MM/yyyy'),
+          ev.professionalName,
+          ROLE_LABELS[ev.professionalRole as Role] || ev.professionalRole,
+          ev.evaluatorName,
+          `${avg} / 5.0`
+        ];
+      });
 
       await generateModernPDF({
-        title: `Relatório Mensal - ${ROLE_LABELS[user.role]}`,
-        subtitle: `Profissional: ${user.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        title: `Relatório de Avaliações de Desempenho`,
+        subtitle: `OAMI - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
         columns,
         data,
-        fileName: `relatorio_${user.role.toLowerCase()}`
+        fileName: `relatorio_avaliacoes_desempenho`
       });
-      showToast('Relatório profissional exportado com sucesso (PDF)!');
+      showToast('Relatório de de avaliações exportado com sucesso (PDF)!');
     } catch (err) {
       console.error("Export Error:", err);
-      showToast('Erro ao exportar relatório profissional', 'error');
+      showToast('Erro ao exportar relatório', 'error');
     } finally {
       setExporting(false);
     }
   };
 
-  const generateProfessionalReportWord = async () => {
+  const generateReportWord = async () => {
     setExporting(true);
     try {
-      const columns = ['Data', 'Acolhido', 'Evolução'];
-      const data = filteredEvolutions.map(ev => [
-        safeFormat(ev.date, 'dd/MM/yyyy'),
-        (elderly || []).find(e => e.id === ev.elderlyId)?.name || 'N/A',
-        ev.content
-      ]);
+      const columns = ['Data', 'Profissional', 'Cargo', 'Avaliador', 'Nota Média'];
+      const data = filteredEvaluations.map(ev => {
+        const avg = ((ev.attendance + ev.teamwork + ev.competence + ev.proactivity + ev.relationshipWithElderly) / 5).toFixed(1);
+        return [
+          format(parseISO(ev.date), 'dd/MM/yyyy'),
+          ev.professionalName,
+          ROLE_LABELS[ev.professionalRole as Role] || ev.professionalRole,
+          ev.evaluatorName,
+          `${avg} / 5.0`
+        ];
+      });
 
       await generateModernWord({
-        title: `Relatório Mensal - ${ROLE_LABELS[user.role]}`,
-        subtitle: `Profissional: ${user.name} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
+        title: `Relatório de Avaliações de Desempenho`,
+        subtitle: `OAMI - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
         columns,
         data,
-        fileName: `relatorio_${user.role.toLowerCase()}`
+        fileName: `relatorio_avaliacoes_desempenho`
       });
-      showToast('Relatório profissional exportado com sucesso (Word)!');
+      showToast('Relatório de avaliações exportado com sucesso (Word)!');
     } catch (err) {
       console.error("Export Error:", err);
-      showToast('Erro ao exportar relatório profissional (Word)', 'error');
+      showToast('Erro ao exportar relatório (Word)', 'error');
     } finally {
       setExporting(false);
     }
   };
 
-  const filteredEvolutions = evolutions.filter(ev => ev.professionalRole === user.role);
+  const filteredEvaluations = useMemo(() => {
+    return (evaluations || []).filter(ev => {
+      const nameMatch = ev.professionalName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        ev.evaluatorName.toLowerCase().includes(searchQuery.toLowerCase());
+      const roleMatch = !roleFilter || ev.professionalRole === roleFilter;
+      return nameMatch && roleMatch;
+    });
+  }, [evaluations, searchQuery, roleFilter]);
+
+  const StarRating = ({ value, onChange, label, description, disabled }: { value: number, onChange: (val: number) => void, label: string, description: string, disabled?: boolean }) => {
+    return (
+      <div className="space-y-1">
+        <div className="flex justify-between items-center">
+          <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">{label}</label>
+          <span className="text-xs font-black text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-2.5 py-0.5 rounded-full">{value} / 5</span>
+        </div>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 ml-1 mb-2">{description}</p>
+        <div className="flex gap-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(star)}
+              className="p-1 transition-all transform hover:scale-110 disabled:scale-100 disabled:opacity-80"
+            >
+              <Star
+                size={22}
+                className={cn(
+                  "transition-colors",
+                  star <= value 
+                    ? "fill-amber-400 text-amber-400" 
+                    : "text-gray-300 dark:text-gray-700"
+                )}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div id="professional-area-top" className="space-y-8">
@@ -3740,31 +3912,157 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
         onConfirm={async () => {
           if (deleteConfirm) {
             try {
-              await deleteDoc(doc(db, 'evolutions', deleteConfirm.id));
-              showToast('Registro excluído com sucesso!');
+              await onDeleteEvaluation(deleteConfirm.id);
+              setDeleteConfirm(null);
             } catch (err) {
-              handleFirestoreError(err, OperationType.DELETE, `evolutions/${deleteConfirm.id}`);
-              showToast('Erro ao excluir registro', 'error');
+              showToast('Erro ao excluir avaliação.', 'error');
             }
           }
         }}
-        title="Excluir Registro de Evolução"
-        message="Tem certeza que deseja excluir este registro de evolução técnica? Esta ação não pode ser desfeita."
+        title="Excluir Avaliação de Desempenho"
+        message="Tem certeza que deseja excluir esta avaliação? Esta ação não poderá ser desfeita."
       />
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {viewingEvaluation && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-2xl w-full shadow-2xl space-y-6 overflow-y-auto max-h-[90vh] custom-scrollbar border border-gray-100 dark:border-gray-800"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 text-amber-600 rounded-2xl">
+                    <Award size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Ficha de Avaliação de Desempenho</h3>
+                    <p className="text-xs text-gray-400">Avaliação realizada em {format(parseISO(viewingEvaluation.date), 'dd/MM/yyyy')}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setViewingEvaluation(null)}
+                  className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 text-sm">
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Profissional Avaliado</span>
+                  <p className="font-bold text-gray-850 dark:text-white">{viewingEvaluation.professionalName}</p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-black uppercase mt-1">({ROLE_LABELS[viewingEvaluation.professionalRole as Role] || viewingEvaluation.professionalRole})</p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Avaliador Responsável</span>
+                  <p className="font-bold text-gray-850 dark:text-white">{viewingEvaluation.evaluatorName}</p>
+                  <p className="text-xs text-gray-450 mt-1">Cargo de Gestão</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-2">Pontuações Detalhadas</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-450">Pontualidade e Assiduidade</span>
+                      <span className="font-bold text-gray-800 dark:text-white">{viewingEvaluation.attendance}/5</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full" style={{ width: `${(viewingEvaluation.attendance / 5) * 100}%` }} />
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-455">Trabalho em Equipe</span>
+                      <span className="font-bold text-gray-800 dark:text-white">{viewingEvaluation.teamwork}/5</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full" style={{ width: `${(viewingEvaluation.teamwork / 5) * 100}%` }} />
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-450">Competência Técnica</span>
+                      <span className="font-bold text-gray-800 dark:text-white">{viewingEvaluation.competence}/5</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full" style={{ width: `${(viewingEvaluation.competence / 5) * 100}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-450">Proatividade e Iniciativa</span>
+                      <span className="font-bold text-gray-800 dark:text-white">{viewingEvaluation.proactivity}/5</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full" style={{ width: `${(viewingEvaluation.proactivity / 5) * 100}%` }} />
+                    </div>
+
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-450">Relação com Idosos & Família</span>
+                      <span className="font-bold text-gray-800 dark:text-white">{viewingEvaluation.relationshipWithElderly}/5</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full" style={{ width: `${(viewingEvaluation.relationshipWithElderly / 5) * 100}%` }} />
+                    </div>
+
+                    <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-xl flex justify-between items-center border border-green-100 dark:border-green-950/30">
+                      <span className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Nota Média Final</span>
+                      <span className="text-lg font-black text-green-700 dark:text-green-400">{(((viewingEvaluation.attendance + viewingEvaluation.teamwork + viewingEvaluation.competence + viewingEvaluation.proactivity + viewingEvaluation.relationshipWithElderly) / 5)).toFixed(1)} / 5.0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="font-bold text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-2">Feedback Qualitativo</h4>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-xs text-gray-400 font-bold uppercase block mb-1">Pontos Fortes e Observações</span>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-100 dark:border-gray-800/60 text-sm text-gray-650 dark:text-gray-350 italic">
+                      {viewingEvaluation.comments || 'Nenhuma observação técnica registrada.'}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-400 font-bold uppercase block mb-1">Recomendações de Melhoria / Plano de Ação</span>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-xl border border-gray-100 dark:border-gray-800/60 text-sm text-gray-650 dark:text-gray-350 italic">
+                      {viewingEvaluation.recommendations || 'Nenhuma recomendação registrada.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setViewingEvaluation(null)}
+                className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold py-3 rounded-xl transition-all"
+              >
+                Voltar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Header card */}
       <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="p-4 bg-green-600 rounded-2xl text-white shadow-lg">
-              <UserCircle size={32} />
+              <Award size={32} />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Área da {ROLE_LABELS[user.role]}</h2>
-              <p className="text-gray-500 dark:text-gray-400">Registro de atividades e acompanhamento técnico</p>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Avaliação e Monitoramento</h2>
+              <p className="text-gray-500 dark:text-gray-400">Avaliação profissional e monitoramento de desempenho</p>
             </div>
           </div>
           <div className="flex gap-2">
             <button 
-              onClick={generateProfessionalReportPDF}
+              onClick={generateReportPDF}
               disabled={exporting}
               className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2" 
               title="Exportar Relatório Mensal (PDF)"
@@ -3773,7 +4071,7 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
               <span className="text-xs font-bold">PDF</span>
             </button>
             <button 
-              onClick={generateProfessionalReportWord}
+              onClick={generateReportWord}
               disabled={exporting}
               className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl transition-all disabled:opacity-50 flex items-center gap-2" 
               title="Exportar Relatório Mensal (Word)"
@@ -3784,216 +4082,293 @@ const ProfessionalArea = ({ elderly, evolutions, user, showToast }: {
           </div>
         </div>
 
-        <div className="flex gap-4 border-b border-gray-100 dark:border-gray-800 mb-8 overflow-x-auto custom-scrollbar whitespace-nowrap pb-1">
-          {[
-            { id: 'evolucao', label: 'Evolução Profissional', icon: Activity },
-            { id: 'pia', label: 'Gestão de PIA', icon: FileText },
-            { id: 'visitas', label: 'Visitas/Atendimentos', icon: Calendar },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveSubTab(tab.id as any)}
-              className={cn(
-                "pb-4 px-2 text-sm font-bold transition-all flex items-center gap-2",
-                activeSubTab === tab.id 
-                  ? "text-green-600 border-b-2 border-green-600" 
-                  : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-              )}
-            >
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {activeSubTab === 'pia' ? (
-          <PIAForm user={user} elderly={elderly} showToast={showToast} />
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-800 dark:text-white">
-                    {activeSubTab === 'visitas' ? 'Novo Registro de Visita/Atendimento' : 'Novo Registro de Evolução'}
-                  </h3>
-                  <div className="flex gap-2 items-center">
-                    <TranscriptionButton 
-                      onTranscribe={(text) => setEvolutionContent((evolutionContent ? evolutionContent + '\n' : '') + text)} 
-                      label="Digitalizar Relatório"
-                    />
-                    <button className="text-xs font-bold text-green-600 dark:text-green-400 hover:underline flex items-center gap-1">
-                      <FileDown size={14} />
-                      Modelo DOC
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <select 
-                    value={selectedElderly}
-                    onChange={e => setSelectedElderly(e.target.value)}
-                    className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
-                  >
-                    <option value="">Selecione o Idoso...</option>
-                    {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-                  </select>
-                  <div className="flex gap-4">
-                    <select 
-                      value={evolutionType}
-                      onChange={e => setEvolutionType(e.target.value as any)}
-                      className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
-                    >
-                      <option value="INDIVIDUAL">Individual</option>
-                      <option value="GRUPO">Grupo</option>
-                      <option value="VISITA_DOMICILIAR">Visita Domiciliar</option>
-                    </select>
-                    <input 
-                      type="date" 
-                      value={evolutionDate}
-                      onChange={e => setEvolutionDate(e.target.value)}
-                      className="flex-1 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
-                    />
-                  </div>
-                  <textarea 
-                    placeholder="Descreva a evolução técnica..."
-                    value={evolutionContent}
-                    onChange={e => setEvolutionContent(e.target.value)}
-                    className="w-full p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 h-32 text-gray-800 dark:text-white"
-                  />
-                  <button 
-                    onClick={handleSaveEvolution}
-                    disabled={loading}
-                    className="w-full bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                  >
-                    {loading ? 'Salvando...' : 'Salvar Registro'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <h3 className="font-bold text-gray-800 dark:text-white mb-6">Registros Recentes</h3>
-                <div className="space-y-4">
-                  {filteredEvolutions.map(ev => (
-                    <div key={ev.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800 group">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase">
-                            {(elderly || []).find(e => e.id === ev.elderlyId)?.name || 'Desconhecido'}
-                          </p>
-                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{new Date(ev.date).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                        <button 
-                          onClick={() => setDeleteConfirm({ isOpen: true, id: ev.id })}
-                          className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{ev.content}</p>
-                    </div>
-                  ))}
-                  {filteredEvolutions.length === 0 && (
-                    <p className="text-center text-gray-400 dark:text-gray-500 italic py-8">Nenhum registro encontrado no banco de dados.</p>
-                  )}
-                </div>
-              </div>
+        {/* Dashboard Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Total de Avaliações</span>
+            <p className="text-3xl font-black text-gray-800 dark:text-white mt-1">{stats.total}</p>
+          </div>
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Nota Média Geral</span>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-3xl font-black text-green-600 dark:text-green-400">{stats.average > 0 ? `${stats.average}` : '0.0'}</p>
+              <span className="text-xs text-gray-400">/ 5.0</span>
             </div>
-
-            <div className="space-y-6">
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                    <Bell className="text-orange-500" size={18} />
-                    Pendências de Revisão
-                  </h4>
-                  <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-bold rounded-full">
-                    3 Pendentes
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { elderlyId: '1', name: 'Maria Silva', task: 'Revisão PIA Trimestral', due: 'Atrasado (2 dias)', status: 'OVERDUE', targetTab: 'pia' },
-                    { elderlyId: '2', name: 'João Pereira', task: 'Relatório de Visita', due: 'Hoje', status: 'TODAY', targetTab: 'visitas' },
-                    { elderlyId: '3', name: 'Francisca Oliveira', task: 'Evolução Semanal', due: 'Amanhã', status: 'UPCOMING', targetTab: 'evolucao' },
-                  ].map((p, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => {
-                        setSelectedElderly(p.elderlyId);
-                        setActiveSubTab(p.targetTab as any);
-                        showToast(`Navegando para: ${p.task} - ${p.name}`);
-                        document.getElementById('professional-area-top')?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className={cn(
-                        "p-3 rounded-xl border transition-all hover:shadow-md cursor-pointer group",
-                        p.status === 'OVERDUE' ? "bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/30 hover:border-red-300" : 
-                        p.status === 'TODAY' ? "bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-900/30 hover:border-orange-300" : 
-                        "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/30 hover:border-blue-300"
-                      )}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <p className={cn(
-                          "text-xs font-bold group-hover:underline",
-                          p.status === 'OVERDUE' ? "text-red-800 dark:text-red-400" : 
-                          p.status === 'TODAY' ? "text-orange-800 dark:text-orange-400" : 
-                          "text-blue-800 dark:text-blue-400"
-                        )}>{p.name}</p>
-                        {p.status === 'OVERDUE' && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
-                      </div>
-                      <p className={cn(
-                        "text-xs",
-                        p.status === 'OVERDUE' ? "text-red-600 dark:text-red-500" : 
-                        p.status === 'TODAY' ? "text-orange-600 dark:text-orange-500" : 
-                        "text-blue-600 dark:text-blue-500"
-                      )}>{p.task}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <div className="flex items-center gap-1">
-                          <Clock size={10} className={p.status === 'OVERDUE' ? "text-red-400 dark:text-red-500" : "text-gray-400 dark:text-gray-500"} />
-                          <p className={cn(
-                            "text-[10px] font-bold",
-                            p.status === 'OVERDUE' ? "text-red-500" : 
-                            p.status === 'TODAY' ? "text-orange-500" : 
-                            "text-blue-500"
-                          )}>{p.due}</p>
-                        </div>
-                        <ChevronRight size={12} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button className="w-full mt-4 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors border-t border-gray-50 dark:border-gray-800 pt-4">
-                  Ver todas as pendências
-                </button>
+          </div>
+          <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 sm:col-span-2">
+            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Média por Critério</span>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2 text-gray-500">
+              <div className="flex justify-between">
+                <span>Pontualidade:</span>
+                <span className="font-bold text-gray-750 dark:text-white">{stats.attendanceAvg}/5</span>
               </div>
-
-              <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                  <CheckCircle2 className="text-green-500" size={18} />
-                  Metas do Mês
-                </h4>
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-500 dark:text-gray-400">Atendimentos Individuais</span>
-                      <span className="font-bold text-green-600 dark:text-green-400">12/15</span>
-                    </div>
-                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-green-500 h-full w-[80%]" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-gray-500 dark:text-gray-400">Visitas Domiciliares</span>
-                      <span className="font-bold text-blue-600 dark:text-blue-400">4/5</span>
-                    </div>
-                    <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-blue-500 h-full w-[80%]" />
-                    </div>
-                  </div>
-                </div>
+              <div className="flex justify-between">
+                <span>Trabalho em Equipe:</span>
+                <span className="font-bold text-gray-750 dark:text-white">{stats.teamworkAvg}/5</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Competência Técnica:</span>
+                <span className="font-bold text-gray-750 dark:text-white">{stats.competenceAvg}/5</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Proatividade:</span>
+                <span className="font-bold text-gray-750 dark:text-white">{stats.proactivityAvg}/5</span>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Form Column */}
+        <div id="evaluation-form-card" className="lg:col-span-5">
+          <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+            <div className="border-b border-gray-105 dark:border-gray-800 pb-4">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-white">
+                {editingId ? 'Editar Avaliação de Desempenho' : 'Nova Avaliação de Desempenho'}
+              </h3>
+              <p className="text-xs text-gray-450 mt-1">
+                {canEvaluate 
+                  ? 'Preencha as notas e comentários para registrar o monitoramento técnico.' 
+                  : 'Apenas coordenadores e presidentes possuem permissões para preencher e registrar avaliações.'}
+              </p>
+            </div>
+
+            {canEvaluate ? (
+              <form onSubmit={handleSaveSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Profissional Técnico</label>
+                  <select
+                    disabled={loading}
+                    value={selectedProfessionalId}
+                    onChange={(e) => setSelectedProfessionalId(e.target.value)}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold"
+                    required
+                  >
+                    <option value="">Selecione o profissional...</option>
+                    {(professionals || [])
+                      .filter(p => p.status === 'ATIVO')
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({ROLE_LABELS[p.role as Role] || p.role})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data da Avaliação</label>
+                  <input
+                    type="date"
+                    disabled={loading}
+                    value={evaluationDate}
+                    onChange={(e) => setEvaluationDate(e.target.value)}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold"
+                    required
+                  />
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-800/30 p-4 rounded-3xl space-y-4 border border-gray-100 dark:border-gray-800/50">
+                  <StarRating 
+                    value={attendance} 
+                    onChange={setAttendance} 
+                    label="1. Pontualidade & Assiduidade" 
+                    description="Cumprimento dos horários de entrada, saída, e compromissos internos." 
+                    disabled={loading}
+                  />
+                  <StarRating 
+                    value={teamwork} 
+                    onChange={setTeamwork} 
+                    label="2. Trabalho em Equipe" 
+                    description="Colaboração ativa com outros profissionais e sintonia nas rotinas institucionais." 
+                    disabled={loading}
+                  />
+                  <StarRating 
+                    value={competence} 
+                    onChange={setCompetence} 
+                    label="3. Competência Técnica" 
+                    description="Eficiência no atendimento técnico e exatidão nos registros diários." 
+                    disabled={loading}
+                  />
+                  <StarRating 
+                    value={proactivity} 
+                    onChange={setProactivity} 
+                    label="4. Proatividade & Iniciativa" 
+                    description="Busca por soluções autônomas e implementações de melhorias." 
+                    disabled={loading}
+                  />
+                  <StarRating 
+                    value={relationshipWithElderly} 
+                    onChange={setRelationshipWithElderly} 
+                    label="5. Relação com Idosos & Família" 
+                    description="Empatia, respeito e paciência no acolhimento de residentes e familiares." 
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Pontos Fortes e Observações</label>
+                  <textarea
+                    placeholder="Quais são as principais qualidades profissionais observadas?"
+                    disabled={loading}
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 h-24 text-gray-800 dark:text-white text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase ml-1">Recomendações / Plano de Ação</label>
+                  <textarea
+                    placeholder="Quais caminhos ou comportamentos devem ser melhorados?"
+                    disabled={loading}
+                    value={recommendations}
+                    onChange={(e) => setRecommendations(e.target.value)}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500 h-24 text-gray-800 dark:text-white text-sm"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="flex-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold py-4 rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-all text-sm"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-green-600 text-white font-bold py-4 rounded-2xl hover:bg-green-700 transition-all shadow-md text-sm select-none"
+                  >
+                    {loading ? 'Processando...' : (editingId ? 'Salvar Alterações' : 'Registrar Avaliação')}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-8 text-center bg-gray-50 dark:bg-gray-800/40 rounded-3xl border border-gray-150 border-dashed dark:border-gray-800 text-gray-400 space-y-3">
+                <Shield size={32} className="mx-auto text-gray-300 dark:text-gray-750" />
+                <p className="text-xs">Seu usuário atual possui o perfil <strong className="text-gray-500">{ROLE_LABELS[user.role]}</strong>.</p>
+                <p className="text-xs">Apenas usuários com as funções de <strong>Presidente</strong> ou <strong>Coordenador</strong> podem administrar novos registros de desempenho técnico.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* List Column */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Registros de Monitoramentos Recentes</h3>
+                <p className="text-xs text-gray-450 mt-1">Lista completa das avaliações realizadas para acompanhamento de qualidade institucional.</p>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="relative">
+                <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por profissional ou avaliador..."
+                  className="w-full text-xs pl-11 pr-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800 outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <div>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="w-full text-xs p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800 outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold"
+                >
+                  <option value="">Filtro de Cargo...</option>
+                  {Object.entries(ROLE_LABELS).map(([role, label]) => (
+                    <option key={role} value={role}>{label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-4 max-h-[700px] overflow-y-auto custom-scrollbar pr-1">
+              {filteredEvaluations.map((ev) => {
+                const averageScore = ((ev.attendance + ev.teamwork + ev.competence + ev.proactivity + ev.relationshipWithElderly) / 5).toFixed(1);
+                
+                return (
+                  <div 
+                    key={ev.id} 
+                    className="p-5 bg-gray-50 dark:bg-gray-850 rounded-2xl border border-gray-100 dark:border-gray-800/60 hover:shadow-md transition-all group flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-start justify-between sm:justify-start sm:items-center gap-3">
+                        <h4 className="font-bold text-gray-800 dark:text-white text-base leading-tight">
+                          {ev.professionalName}
+                        </h4>
+                        <span className="text-[10px] bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 px-2 py-0.5 font-bold rounded-lg uppercase tracking-wide">
+                          {ROLE_LABELS[ev.professionalRole as Role] || ev.professionalRole}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <p>Avaliador: <strong className="text-gray-700 dark:text-gray-300">{ev.evaluatorName}</strong></p>
+                        <p>Data: <strong className="text-gray-700 dark:text-gray-300">{format(parseISO(ev.date), 'dd/MM/yyyy')}</strong></p>
+                      </div>
+
+                      {ev.comments && (
+                        <p className="text-xs text-gray-450 line-clamp-1 italic mt-1">"{ev.comments}"</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 border-t sm:border-t-0 border-gray-100 dark:border-gray-800 pt-3 sm:pt-0">
+                      {/* Score Badge */}
+                      <div className="flex flex-col items-center justify-center p-2.5 bg-green-50 dark:bg-green-950/30 rounded-2xl border border-green-100/50 dark:border-green-950/55 min-w-[70px]">
+                        <span className="text-[9px] uppercase font-black text-green-600 dark:text-green-400 tracking-wider">Média</span>
+                        <p className="text-lg font-black text-green-700 dark:text-green-400">{averageScore}</p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => setViewingEvaluation(ev)}
+                          className="px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 text-gray-600 dark:text-gray-300 text-xs font-bold rounded-xl border border-gray-200 dark:border-gray-750 transition-all shadow-sm"
+                        >
+                          Ver
+                        </button>
+                        {canEvaluate && (
+                          <>
+                            <button
+                              onClick={() => handleEditClick(ev)}
+                              className="p-2 bg-white dark:bg-gray-800 hover:bg-gray-100 text-blue-500 rounded-xl border border-gray-200 dark:border-gray-750 transition-all shadow-sm"
+                              title="Editar Avaliação"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm({ isOpen: true, id: ev.id })}
+                              className="p-2 bg-white dark:bg-gray-800 hover:bg-red-50 text-red-500 rounded-xl border border-gray-200 dark:border-gray-750 transition-all shadow-sm"
+                              title="Excluir Avaliação"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredEvaluations.length === 0 && (
+                <div className="p-12 text-center text-gray-400 dark:text-gray-500 italic">
+                  Nenhuma avaliação de desempenho cadastrada.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -9441,6 +9816,7 @@ export default function App() {
   const [familyEngagements, setFamilyEngagements] = useState<FamilyEngagement[]>([]);
   const [institutionalInfo, setInstitutionalInfo] = useState<InstitutionalInfo | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>(MOCK_PROFESSIONALS);
+  const [professionalEvaluations, setProfessionalEvaluations] = useState<ProfessionalEvaluation[]>(MOCK_PROFESSIONAL_EVALUATIONS);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   const onSaveCommunityElderly = async (data: any) => {
@@ -9860,6 +10236,7 @@ export default function App() {
     let unsubWorkshops = () => {};
     let unsubFamilyEngagements = () => {};
     let unsubProfessionals = () => {};
+    let unsubProfessionalEvaluations = () => {};
     let unsubPhysioPatients = () => {};
     let unsubPhysioAssessments = () => {};
     let unsubPhysioEvolutions = () => {};
@@ -10331,6 +10708,13 @@ export default function App() {
       unsubProfessionals = onSnapshot(qProfessionals, (snapshot) => {
         setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
+
+      const qEvaluations = query(collection(db, 'professionalEvaluations'), orderBy('createdAt', 'desc'), limit(100));
+      unsubProfessionalEvaluations = onSnapshot(qEvaluations, (snapshot) => {
+        setProfessionalEvaluations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfessionalEvaluation)));
+      }, (err) => {
+        console.warn("Could not sync professionalEvaluations from firestore, using local/mock:", err);
+      });
     }
 
     // Notifications Listener
@@ -10415,6 +10799,7 @@ export default function App() {
       unsubCaregivers();
       unsubFamilyEngagements();
       unsubProfessionals();
+      unsubProfessionalEvaluations();
       unsubPhysioPatients();
       unsubPhysioAssessments();
       unsubPhysioEvolutions();
@@ -11576,7 +11961,11 @@ export default function App() {
   };
 
   const handleSaveSocialFamilyTie = async (data: Partial<SocialFamilyTie>) => {
-    const tieId = data.id || `tie-${Date.now()}`;
+    const existingTie = data.id 
+      ? socialFamilyTies.find(t => t.id === data.id)
+      : socialFamilyTies.find(t => t.patientId === data.patientId);
+
+    const tieId = existingTie?.id || data.id || `tie-${Date.now()}`;
     const newTie: SocialFamilyTie = {
       id: tieId,
       patientId: data.patientId || '',
@@ -11600,11 +11989,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialFamilyTies', id), { ...cleanedData, updatedAt: new Date().toISOString() });
-      } else {
-        await addDoc(collection(db, 'socialFamilyTies'), { ...cleanedData, updatedAt: new Date().toISOString() });
-      }
+      await setDoc(doc(db, 'socialFamilyTies', tieId), { ...cleanedData, updatedAt: new Date().toISOString() }, { merge: true });
       showToast('Vínculo familiar salvo com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialFamilyTies');
@@ -11613,7 +11998,11 @@ export default function App() {
   };
 
   const handleSaveSocialDocumentation = async (data: Partial<SocialDocumentation>) => {
-    const docId = data.id || `doc-${Date.now()}`;
+    const existingDoc = data.id 
+      ? socialDocumentations.find(d => d.id === data.id)
+      : socialDocumentations.find(d => d.patientId === data.patientId);
+
+    const docId = existingDoc?.id || data.id || `doc-${Date.now()}`;
     const newDoc: SocialDocumentation = {
       id: docId,
       patientId: data.patientId || '',
@@ -11638,11 +12027,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialDocumentations', id), { ...cleanedData, updatedAt: new Date().toISOString() });
-      } else {
-        await addDoc(collection(db, 'socialDocumentations'), { ...cleanedData, updatedAt: new Date().toISOString() });
-      }
+      await setDoc(doc(db, 'socialDocumentations', docId), { ...cleanedData, updatedAt: new Date().toISOString() }, { merge: true });
       showToast('Documentação salva com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialDocumentations');
@@ -11651,11 +12036,15 @@ export default function App() {
   };
 
   const handleSaveSocialLegalSituation = async (data: Partial<SocialLegalSituation>) => {
-    const legalId = data.id || `legal-${Date.now()}`;
+    const existingLegal = data.id 
+      ? socialLegalSituations.find(l => l.id === data.id)
+      : socialLegalSituations.find(l => l.patientId === data.patientId);
+
+    const legalId = existingLegal?.id || data.id || `legal-${Date.now()}`;
     const newLegal: SocialLegalSituation = {
       id: legalId,
       patientId: data.patientId || '',
-      hasCurator: !!data.hasCurator,
+      hasCurator: data.hasCurator !== undefined ? !!data.hasCurator : !!data.curatorName,
       curatorName: data.curatorName || '',
       isInterdicted: !!data.isInterdicted,
       processNumber: data.processNumber || '',
@@ -11677,11 +12066,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialLegalSituations', id), { ...cleanedData, updatedAt: new Date().toISOString() });
-      } else {
-        await addDoc(collection(db, 'socialLegalSituations'), { ...cleanedData, updatedAt: new Date().toISOString() });
-      }
+      await setDoc(doc(db, 'socialLegalSituations', legalId), { ...cleanedData, updatedAt: new Date().toISOString() }, { merge: true });
       showToast('Situação jurídica salva com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialLegalSituations');
@@ -11715,11 +12100,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialStudies', id), cleanedData);
-      } else {
-        await addDoc(collection(db, 'socialStudies'), cleanedData);
-      }
+      await setDoc(doc(db, 'socialStudies', studyId), cleanedData, { merge: true });
       showToast('Estudo social salvo com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialStudies');
@@ -11754,11 +12135,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialEvolutions', id), cleanedData);
-      } else {
-        await addDoc(collection(db, 'socialEvolutions'), cleanedData);
-      }
+      await setDoc(doc(db, 'socialEvolutions', evolutionId), cleanedData, { merge: true });
       showToast('Evolução social salva com sucesso');
 
       // Envia notificação para novos co-workers
@@ -11816,11 +12193,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialReferrals', id), cleanedData);
-      } else {
-        await addDoc(collection(db, 'socialReferrals'), cleanedData);
-      }
+      await setDoc(doc(db, 'socialReferrals', refId), cleanedData, { merge: true });
       showToast('Encaminhamento salvo com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialReferrals');
@@ -11829,7 +12202,6 @@ export default function App() {
   };
 
   const handleSaveSocialFamilyVisit = async (data: Partial<SocialFamilyVisit>) => {
-    // Generate/use an ID for immediate rendering in-memory
     const visitId = data.id || `visit-${Date.now()}`;
     const newVisit: SocialFamilyVisit = {
       id: visitId,
@@ -11841,7 +12213,6 @@ export default function App() {
       registeredBy: data.registeredBy || user?.name || 'Assistente Social',
     };
 
-    // Update state locally first
     setSocialFamilyVisits(prev => {
       const exists = prev.some(v => v.id === visitId);
       if (exists) {
@@ -11854,16 +12225,62 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialFamilyVisits', id), cleanedData);
-      } else {
-        await addDoc(collection(db, 'socialFamilyVisits'), cleanedData);
-      }
+      await setDoc(doc(db, 'socialFamilyVisits', visitId), cleanedData, { merge: true });
       showToast('Visita familiar salva com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialFamilyVisits');
-      // Toast to represent it was safely stored locally
       showToast('Visita familiar registrada localmente (Cota excedida)', 'success');
+    }
+  };
+
+  const handleSaveProfessionalEvaluation = async (evaluationData: Partial<ProfessionalEvaluation>) => {
+    const evalId = evaluationData.id || `eval-${Date.now()}`;
+    const newEval: ProfessionalEvaluation = {
+      id: evalId,
+      professionalId: evaluationData.professionalId || '',
+      professionalName: evaluationData.professionalName || '',
+      professionalRole: evaluationData.professionalRole || '',
+      evaluatorId: evaluationData.evaluatorId || user?.id || 'evaluator-1',
+      evaluatorName: evaluationData.evaluatorName || user?.name || 'Coordenador',
+      date: evaluationData.date || new Date().toISOString().split('T')[0],
+      attendance: Number(evaluationData.attendance ?? 5),
+      teamwork: Number(evaluationData.teamwork ?? 5),
+      competence: Number(evaluationData.competence ?? 5),
+      proactivity: Number(evaluationData.proactivity ?? 5),
+      relationshipWithElderly: Number(evaluationData.relationshipWithElderly ?? 5),
+      comments: evaluationData.comments || '',
+      recommendations: evaluationData.recommendations || '',
+      createdAt: evaluationData.createdAt || new Date().toISOString()
+    };
+
+    setProfessionalEvaluations(prev => {
+      const exists = prev.some(e => e.id === evalId);
+      if (exists) {
+        return prev.map(e => e.id === evalId ? { ...newEval, ...cleanData(evaluationData) } : e);
+      } else {
+        return [newEval, ...prev];
+      }
+    });
+
+    try {
+      const { id, ...rest } = newEval;
+      const cleanedData = cleanData(rest);
+      await setDoc(doc(db, 'professionalEvaluations', evalId), cleanedData, { merge: true });
+      showToast('Avaliação de desempenho salva com sucesso!');
+    } catch (err) {
+      handleFirestoreError(err, evaluationData.id ? OperationType.UPDATE : OperationType.CREATE, 'professionalEvaluations');
+      showToast('Avaliação registrada localmente (Offline)', 'success');
+    }
+  };
+
+  const handleDeleteProfessionalEvaluation = async (evalId: string) => {
+    setProfessionalEvaluations(prev => prev.filter(e => e.id !== evalId));
+    try {
+      await deleteDoc(doc(db, 'professionalEvaluations', evalId));
+      showToast('Avaliação de desempenho excluída com sucesso!');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `professionalEvaluations/${evalId}`);
+      showToast('Registro excluído localmente', 'success');
     }
   };
 
@@ -11892,11 +12309,7 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
-      if (id) {
-        await updateDoc(doc(db, 'socialRiskSituations', id), cleanedData);
-      } else {
-        await addDoc(collection(db, 'socialRiskSituations'), cleanedData);
-      }
+      await setDoc(doc(db, 'socialRiskSituations', riskId), cleanedData, { merge: true });
       showToast('Situação de risco salva com sucesso');
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'socialRiskSituations');
@@ -12387,7 +12800,16 @@ export default function App() {
           showConfirm={showConfirm} 
         />
       );
-      case 'professional': return <ProfessionalArea elderly={elderly} evolutions={evolutions} user={user} showToast={showToast} />;
+      case 'professional': return (
+        <ProfessionalArea 
+          professionals={professionals}
+          evaluations={professionalEvaluations}
+          onSaveEvaluation={handleSaveProfessionalEvaluation}
+          onDeleteEvaluation={handleDeleteProfessionalEvaluation}
+          user={user!} 
+          showToast={showToast} 
+        />
+      );
       case 'financial': return <FinancialSection financialRecords={financialRecords} user={user!} showToast={showToast} />;
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
       case 'volunteers': return <VolunteersSection volunteers={volunteers} showToast={showToast} user={user} />;
@@ -12539,7 +12961,7 @@ export default function App() {
                  activeTab === 'psychology' ? 'Psicologia' :
                  activeTab === 'pedagogy' ? 'Pedagogia' :
                  activeTab === 'socialWork' ? 'Serviço Social' :
-                 activeTab === 'professional' ? 'Área Técnica' : 
+                 activeTab === 'professional' ? 'Avaliação & Monitoramento' : 
                  activeTab === 'financial' ? 'Financeiro' : 
                  activeTab === 'donors' ? 'Doadores e Sócios' :
                  activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 

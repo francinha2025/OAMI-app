@@ -322,6 +322,24 @@ export interface Professional {
   createdAt: string;
 }
 
+export interface ProfessionalEvaluation {
+  id: string;
+  professionalId: string;
+  professionalName: string;
+  professionalRole: string;
+  evaluatorId: string;
+  evaluatorName: string;
+  date: string;
+  attendance: number;               // 1-5 scale
+  teamwork: number;                 // 1-5 scale
+  competence: number;               // 1-5 scale
+  proactivity: number;              // 1-5 scale
+  relationshipWithElderly: number;  // 1-5 scale
+  comments: string;
+  recommendations: string;
+  createdAt: string;
+}
+
 export interface FamilyEngagement {
   id: string;
   elderlyId: string;
