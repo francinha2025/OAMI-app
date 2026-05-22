@@ -5,7 +5,7 @@ import {
   Plus, Search, Filter, MoreVertical, 
   ChevronRight, AlertCircle, CheckCircle2, 
   Clock, MapPin, Phone, Mail, 
-  User as UserIcon, Camera, Trash2, Edit2, 
+  User as UserIcon, Camera, Trash2, Edit2, Eye, 
   Download, Printer, Share2, X, Target,
   Heart, Shield, Info, ArrowLeft,
   Star, MessageSquare, Bell,
@@ -93,6 +93,7 @@ export const PhysioSection = ({
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [assessmentPatientFilter, setAssessmentPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'assessment' | 'evolution' | 'exercise' | 'appointment' } | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<PhysioEvolution | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [reportPatientId, setReportPatientId] = useState('');
   const [reportMonth, setReportMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -722,7 +723,14 @@ export const PhysioSection = ({
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
+                          <button 
+                            onClick={() => setViewingEvo(e)} 
+                            className="p-2 text-green-650 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                            title="Visualizar 👁️"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors" title="Editar ✏️">
                             <Edit2 size={16} />
                           </button>
                           <button 
@@ -731,7 +739,7 @@ export const PhysioSection = ({
                               setDeleteConfirm({ id: e.id, type: 'evolution' });
                             }} 
                             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                            title="Excluir Evolução"
+                            title="Excluir 🗑️"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1302,6 +1310,92 @@ export const PhysioSection = ({
                   className="flex-1 py-3 bg-red-600 text-white font-bold rounded-2xl shadow-lg hover:bg-red-700 transition-all"
                 >
                   Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-green-600">
+                  <Activity size={24} />
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Detalhes da Evolução</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Paciente</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {(patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {format(parseISO(viewingEvo.date), "dd/MM/yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                  {viewingEvo.painLevel !== undefined && (
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-gray-400">Nível de Dor</span>
+                      <p className="text-sm font-bold text-red-600">{viewingEvo.painLevel}/10</p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Evolução Clínica</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed whitespace-pre-wrap mt-1">
+                    {viewingEvo.evolution}
+                  </p>
+                </div>
+
+                {viewingEvo.procedures && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Procedimentos Realizados</span>
+                    <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                      {viewingEvo.procedures}
+                    </p>
+                  </div>
+                )}
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-green-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-green-700 transition"
+                >
+                  Fechar
                 </button>
               </div>
             </motion.div>

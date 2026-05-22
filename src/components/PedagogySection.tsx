@@ -4,7 +4,7 @@ import {
   Palette, Music, Gamepad2, BookOpen, Users2,
   AlertCircle, FileText, Settings, Plus, Search, 
   Filter, MoreVertical, ChevronRight, CheckCircle2, 
-  Clock, Phone, User as UserIcon, Trash2, Edit2, 
+  Clock, Phone, User as UserIcon, Trash2, Edit2, Eye, 
   Download, Printer, X, Info, ArrowLeft,
   TrendingUp, UserCircle, LogOut, Moon, Sun,
   Smile, Meh, Frown, History, Lightbulb, Loader2, Zap,
@@ -173,6 +173,8 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [formData, setFormData] = useState<any>({});
   const [editingData, setEditingData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<any | null>(null);
+  const [viewingAct, setViewingAct] = useState<any | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   const [profSearch, setProfSearch] = useState('');
@@ -2028,14 +2030,23 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     Registrar Participação
                   </button>
                   <button 
+                    onClick={() => setViewingAct(activity)}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg border border-green-100 dark:border-green-800"
+                    title="Visualizar 👁️"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  <button 
                     onClick={() => openModal('activity', activity)}
-                    className="p-2 text-pink-600 hover:bg-pink-50 rounded-lg border border-pink-100"
+                    className="p-2 text-pink-600 hover:bg-pink-50 rounded-lg border border-pink-100 dark:border-pink-850"
+                    title="Editar ✏️"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => setDeleteConfirm({ id: activity.id, type: 'activity' })}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-red-100"
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-red-100 dark:border-red-850"
+                    title="Excluir 🗑️"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -2090,14 +2101,23 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </div>
                 <div className="flex gap-1 ml-4">
                   <button 
+                    onClick={() => setViewingEvo(evolution)}
+                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Visualizar 👁️"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
                     onClick={() => openModal('evolution', evolution)}
                     className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    title="Editar ✏️"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button 
                     onClick={() => setDeleteConfirm({ id: evolution.id, type: 'evolution' })}
-                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-1.5 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir 🗑️"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -2631,6 +2651,211 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           </motion.div>
         </div>
       )}
+
+      <AnimatePresence>
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-purple-600">
+                  <Brain size={24} />
+                  <h3 className="text-xl font-bold text-gray-850 dark:text-white">Detalhes da Evolução Pedagógica</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Idoso</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data / Horário</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {safeDateFormat(viewingEvo.date)} {viewingEvo.time ? ` às ${viewingEvo.time}` : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.registeredBy || 'Pedagogo'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Oficina / Título</span>
+                    <p className="text-sm font-bold text-purple-600">
+                      {viewingEvo.activityTitle || 'Atividade Livre'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Participação</span>
+                    <p className="text-sm font-bold text-green-600">
+                      {viewingEvo.participation || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Observações Pedagógicas</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingEvo.observation || viewingEvo.observations}
+                  </p>
+                </div>
+
+                {viewingEvo.objectives && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Objetivos Alcançados</span>
+                    <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                      {viewingEvo.objectives}
+                    </p>
+                  </div>
+                )}
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-purple-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-purple-700 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {viewingAct && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-pink-600">
+                  <Palette size={24} />
+                  <h3 className="text-xl font-bold text-gray-850 dark:text-white flex items-center gap-1.5">Detalhes da Oficina / Atividade</h3>
+                </div>
+                <button onClick={() => setViewingAct(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Título</span>
+                    <p className="text-base font-bold text-gray-800 dark:text-white">
+                      {viewingAct.title}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Tipo de Oficina</span>
+                    <p className="text-sm font-bold text-pink-600 uppercase">
+                      {viewingAct.type}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {safeDateFormat(viewingAct.date)} às {viewingAct.time}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Responsável</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingAct.registeredBy || 'Orientador'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Descrição / Planejamento</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingAct.description}
+                  </p>
+                </div>
+
+                {viewingAct.participants && viewingAct.participants.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Participantes Sincronizados</span>
+                    <div className="flex flex-wrap gap-1.5 flex-row">
+                      {viewingAct.participants.map(pid => {
+                        const p = (patients || []).find(pat => pat.id === pid);
+                        return (
+                          <span key={pid} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-805 rounded-xl text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-200/60 dark:border-gray-750 flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>
+                            {p?.name || pid}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {viewingAct.coWorkers && viewingAct.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingAct.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingAct(null)}
+                  className="px-6 py-2.5 bg-pink-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-pink-700 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modal */}
       {isModalOpen && (

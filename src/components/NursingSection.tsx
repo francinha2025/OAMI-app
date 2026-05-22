@@ -4,7 +4,7 @@ import {
   Bandage, ClipboardList, AlertTriangle, Calendar, 
   FileText, Settings, Plus, Search, Filter, 
   MoreVertical, ChevronRight, AlertCircle, CheckCircle2, 
-  Clock, Phone, User as UserIcon, Trash2, Edit2, 
+  Clock, Phone, User as UserIcon, Trash2, Edit2, Eye, 
   Download, Printer, X, Heart, Info, ArrowLeft,
   TrendingUp, UserCircle, LogOut, Moon, Sun, Loader2,
   Droplets, Thermometer, Wind, Zap,
@@ -91,6 +91,7 @@ export const NursingSection = (props: NursingSectionProps) => {
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'patient' | 'evolution' | 'incident' | 'medication' | 'vital' | 'dressing' | 'shift' | 'avd' | 'diaper' } | null>(null);
   const [editingData, setEditingData] = useState<any | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<NursingEvolution | null>(null);
   const [vitalsPatientFilter, setVitalsPatientFilter] = useState('');
   const [dressingsPatientFilter, setDressingsPatientFilter] = useState('');
   const [incidentsPatientFilter, setIncidentsPatientFilter] = useState('');
@@ -751,6 +752,85 @@ export const NursingSection = (props: NursingSectionProps) => {
         title={`Excluir ${deleteConfirm?.type === 'patient' ? 'Paciente' : 'Registro'}`}
         message={`Tem certeza que deseja excluir este ${deleteConfirm?.type === 'patient' ? 'paciente' : 'registro'}? Esta ação não pode ser desfeita.`}
       />
+
+      <AnimatePresence>
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-blue-600">
+                  <ClipboardList size={24} />
+                  <h3 className="text-xl font-bold text-gray-850 dark:text-white">Detalhes da Evolução de Enfermagem</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Paciente</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {(patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data / Horário</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.date} às {viewingEvo.time}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.registeredBy}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Conteúdo do Registro</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed whitespace-pre-wrap mt-1">
+                    {viewingEvo.content}
+                  </p>
+                </div>
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-blue-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-blue-700 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -2543,14 +2623,23 @@ const PatientDetailView = ({
                   <span className="text-[10px] font-bold text-gray-400 uppercase">{evo.date} às {evo.time}</span>
                   <div className="flex gap-2 transition-opacity">
                     <button 
-                      onClick={() => onEditEvolution(evo)}
+                      onClick={() => setViewingEvo(evo)}
                       className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                      title="Visualizar 👁️"
+                    >
+                      <Eye size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onEditEvolution(evo)}
+                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Editar ✏️"
                     >
                       <Edit2 size={14} />
                     </button>
                     <button 
                       onClick={() => onDeleteEvolution(evo.id)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-1 text-gray-400 hover:text-red-650 transition-colors"
+                      title="Excluir 🗑️"
                     >
                       <Trash2 size={14} />
                     </button>

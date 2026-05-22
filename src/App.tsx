@@ -32,6 +32,7 @@ import {
   Trash2,
   LayoutDashboard,
   Edit2,
+  Eye,
   Sparkles,
   Package,
   Upload,
@@ -1660,6 +1661,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'CONVIVER' | 'INSTITUICAO'>('CONVIVER');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Professional>>({
     status: 'ATIVO',
     role: 'COORDENADORA',
@@ -1684,6 +1686,50 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
     createdAt: new Date().toISOString()
   });
 
+  const handleOpenNew = (type: 'CONVIVER' | 'INSTITUICAO') => {
+    setEditingId(null);
+    setModalType(type);
+    setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '' });
+    setStaffFormData({ name: '', role: 'CUIDADOR', status: 'ATIVO', cpf: '', address: '', phone: '', email: '', observations: '', admissionDate: '', createdAt: new Date().toISOString() });
+    setIsModalOpen(true);
+  };
+
+  const handleEditConviver = (p: Professional) => {
+    setEditingId(p.id);
+    setModalType('CONVIVER');
+    setFormData({
+      name: p.name,
+      status: p.status,
+      role: p.role,
+      cpf: p.cpf || '',
+      address: p.address || '',
+      phone: p.phone || '',
+      email: p.email || '',
+      observations: p.observations || '',
+      registrationNumber: p.registrationNumber || '',
+      admissionDate: p.admissionDate || ''
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleEditInstituicao = (s: StaffMember) => {
+    setEditingId(s.id);
+    setModalType('INSTITUICAO');
+    setStaffFormData({
+      name: s.name,
+      role: s.role,
+      status: s.status,
+      cpf: s.cpf || '',
+      address: s.address || '',
+      phone: s.phone || '',
+      email: s.email || '',
+      observations: s.observations || '',
+      admissionDate: s.admissionDate || '',
+      createdAt: s.createdAt || new Date().toISOString()
+    });
+    setIsModalOpen(true);
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (modalType === 'CONVIVER') {
@@ -1692,16 +1738,23 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
           ...formData,
           createdAt: new Date().toISOString()
         });
-        await addDoc(collection(db, 'professionals'), cleanedProfessional);
-        showToast('Profissional cadastrado com sucesso!', 'success');
+        if (editingId) {
+          await updateDoc(doc(db, 'professionals', editingId), cleanedProfessional);
+          showToast('Profissional atualizado com sucesso!', 'success');
+        } else {
+          await addDoc(collection(db, 'professionals'), cleanedProfessional);
+          showToast('Profissional cadastrado com sucesso!', 'success');
+        }
         setIsModalOpen(false);
+        setEditingId(null);
         setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '' });
       } catch (error) {
-        showToast('Erro ao cadastrar profissional.', 'error');
+        showToast('Erro ao gravar profissional.', 'error');
       }
     } else {
-      await onSaveStaff(staffFormData);
+      await onSaveStaff(staffFormData, editingId || undefined);
       setIsModalOpen(false);
+      setEditingId(null);
       setStaffFormData({ name: '', role: 'CUIDADOR', status: 'ATIVO', cpf: '', address: '', phone: '', email: '', observations: '', admissionDate: '', createdAt: new Date().toISOString() });
     }
   };
@@ -1733,13 +1786,13 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={() => { setModalType('CONVIVER'); setIsModalOpen(true); }}
+            onClick={() => handleOpenNew('CONVIVER')}
             className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm"
           >
             <Plus size={18} /> Novo Usuário Conviver
           </button>
           <button 
-            onClick={() => { setModalType('INSTITUICAO'); setIsModalOpen(true); }}
+            onClick={() => handleOpenNew('INSTITUICAO')}
             className="flex items-center gap-2 bg-green-600 text-white px-5 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all text-sm"
           >
             <Plus size={18} /> Novo Usuário Instituição
@@ -1765,12 +1818,22 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative group flex items-center gap-4"
               >
-                <button 
-                  onClick={() => handleDelete(p.id)}
-                  className="absolute top-2 right-2 p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleEditConviver(p)}
+                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Editar ✏️"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(p.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Excluir 🗑️"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
                 <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-xl flex items-center justify-center text-blue-500 flex-shrink-0">
                   <Briefcase size={24} />
                 </div>
@@ -1812,12 +1875,22 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative group flex items-center gap-4"
               >
-                <button 
-                  onClick={() => handleDeleteStaff(s.id)}
-                  className="absolute top-2 right-2 p-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => handleEditInstituicao(s)}
+                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Editar ✏️"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteStaff(s.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    title="Excluir 🗑️"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
                 <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 rounded-xl flex items-center justify-center text-green-500 flex-shrink-0">
                   <Heart size={24} />
                 </div>
@@ -1858,7 +1931,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
             >
               <div className="flex justify-between items-center p-8 pb-4 bg-white dark:bg-gray-900 sticky top-0 z-10">
                 <h3 className="text-2xl font-black text-gray-800 dark:text-white">
-                  Cadastrar {modalType === 'CONVIVER' ? 'Usuário Conviver' : 'Usuário da Instituição'}
+                  {editingId ? 'Editar' : 'Cadastrar'} {modalType === 'CONVIVER' ? 'Usuário Conviver' : 'Usuário da Instituição'}
                 </h3>
                 <button 
                   onClick={() => setIsModalOpen(false)} 
@@ -7721,10 +7794,13 @@ const WorkshopsSection = ({
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(w.date).toLocaleDateString('pt-BR')}</span>
                 <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-800 ml-2 pl-2">
-                  <button onClick={() => handleEditWorkshop(w)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors">
+                  <button onClick={() => { setSelectedWorkshop(w); setIsDetailsModalOpen(true); }} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Visualizar 👁️">
+                    <Eye size={14} />
+                  </button>
+                  <button onClick={() => handleEditWorkshop(w)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar ✏️">
                     <Edit2 size={14} />
                   </button>
-                  <button onClick={() => handleDeleteWorkshop(w.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
+                  <button onClick={() => handleDeleteWorkshop(w.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Excluir 🗑️">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -9104,7 +9180,14 @@ const ProfileModal = ({
   onToggleAIAssistant,
   workshops = [],
   psychActivities = [],
-  pedagogyActivities = []
+  pedagogyActivities = [],
+  physioEvolutions = [],
+  nursingEvolutions = [],
+  psychEvolutions = [],
+  pedagogyEvolutions = [],
+  socialEvolutions = [],
+  nutritionEvolutions = [],
+  professionals = []
 }: { 
   user: User, 
   theme: 'light' | 'dark',
@@ -9117,55 +9200,82 @@ const ProfileModal = ({
   onToggleAIAssistant: () => void,
   workshops?: Workshop[],
   psychActivities?: PsychActivity[],
-  pedagogyActivities?: PedagogyActivity[]
+  pedagogyActivities?: PedagogyActivity[],
+  physioEvolutions?: PhysioEvolution[],
+  nursingEvolutions?: NursingEvolution[],
+  psychEvolutions?: PsychEvolution[],
+  pedagogyEvolutions?: PedagogyEvolution[],
+  socialEvolutions?: SocialEvolution[],
+  nutritionEvolutions?: NutritionEvolution[],
+  professionals?: Professional[]
 }) => {
-  const myWorkshops = workshops.filter(w => 
-    w.professionalId === user.id || 
-    w.registeredBy === user.email || 
-    w.registeredBy === auth.currentUser?.email ||
-    (w.coWorkers || []).includes(user.id) ||
-    (w.coWorkers || []).includes(user.email) ||
-    (w.coWorkers || []).includes(auth.currentUser?.email || '')
-  ).map(w => ({
-    id: w.id,
-    type: 'Oficinas/Capacitação: ' + w.type,
-    title: w.title,
-    date: w.date,
-    isCreator: w.professionalId === user.id || w.registeredBy === user.email || w.registeredBy === auth.currentUser?.email,
-    sector: 'Oficinas'
-  }));
+  const filterAndMap = (list: any[], defaultTypeLabel: string, sector: string) => {
+    return (list || []).filter(item => {
+      const isCreator = item.professionalId === user.id || 
+                        item.registeredBy === user.email || 
+                        item.registeredBy === auth.currentUser?.email || 
+                        item.professional === user.name ||
+                        item.createdBy === user.email ||
+                        item.authorEmail === user.email ||
+                        item.authorName === user.name ||
+                        (item.registeredBy && (item.registeredBy.toLowerCase() === user.name.toLowerCase() || item.registeredBy.toLowerCase() === user.email.toLowerCase()));
+      const isCoWorker = (item.coWorkers || []).includes(user.id) ||
+                         (item.coWorkers || []).includes(user.email) ||
+                         (item.coWorkers || []).includes(auth.currentUser?.email || '') ||
+                         (item.coWorkers || []).includes(user.name);
+      return isCreator || isCoWorker;
+    }).map(item => {
+      const isCreator = item.professionalId === user.id || 
+                        item.registeredBy === user.email || 
+                        item.registeredBy === auth.currentUser?.email || 
+                        item.professional === user.name ||
+                        item.createdBy === user.email ||
+                        item.authorEmail === user.email ||
+                        item.authorName === user.name ||
+                        (item.registeredBy && (item.registeredBy.toLowerCase() === user.name.toLowerCase() || item.registeredBy.toLowerCase() === user.email.toLowerCase()));
+      let formattedDate = item.date;
+      try {
+        if (item.date && item.date.includes('/')) {
+          const parts = item.date.split('/');
+          if (parts.length === 3) {
+            formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          }
+        }
+      } catch (err) {}
+      return {
+        id: item.id,
+        type: `${sector}: ${item.type || defaultTypeLabel}`,
+        title: item.title || item.evolution || item.content || item.procedures || 'Evolução/Atendimento',
+        date: formattedDate || new Date().toISOString().split('T')[0],
+        isCreator,
+        sector,
+        coWorkers: item.coWorkers || [],
+        registeredBy: item.registeredBy || item.professionalId || item.professional || item.createdBy || 'Sistema'
+      };
+    });
+  };
 
-  const myPsych = psychActivities.filter(a => 
-    a.registeredBy === user.email || 
-    a.registeredBy === auth.currentUser?.email ||
-    (a.coWorkers || []).includes(user.id) ||
-    (a.coWorkers || []).includes(user.email) ||
-    (a.coWorkers || []).includes(auth.currentUser?.email || '')
-  ).map(a => ({
-    id: a.id,
-    type: 'Psicologia: ' + a.type,
-    title: a.title,
-    date: a.date,
-    isCreator: a.registeredBy === user.email || a.registeredBy === auth.currentUser?.email,
-    sector: 'Psicologia'
-  }));
+  const myWorkshops = filterAndMap(workshops, 'Oficina/Capacitação', 'Oficinas');
+  const myPsychAct = filterAndMap(psychActivities, 'Atividade Prática', 'Psicologia');
+  const myPedagogyAct = filterAndMap(pedagogyActivities, 'Atividade Pedagógica', 'Pedagogia');
+  const myPhysioEvo = filterAndMap(physioEvolutions || [], 'Evolução de Fisioterapia', 'Fisioterapia');
+  const myNursingEvo = filterAndMap(nursingEvolutions || [], 'Evolução de Enfermagem', 'Enfermagem');
+  const myPsychEvo = filterAndMap(psychEvolutions || [], 'Evolução de Psicologia', 'Psicologia');
+  const myPedagogyEvo = filterAndMap(pedagogyEvolutions || [], 'Evolução Pedagógica', 'Pedagogia');
+  const mySocialEvo = filterAndMap(socialEvolutions || [], 'Evolução de Serviço Social', 'Serviço Social');
+  const myNutritionEvo = filterAndMap(nutritionEvolutions || [], 'Evolução Nutricional', 'Nutrição');
 
-  const myPedagogy = pedagogyActivities.filter(a => 
-    a.registeredBy === user.email || 
-    a.registeredBy === auth.currentUser?.email ||
-    (a.coWorkers || []).includes(user.id) ||
-    (a.coWorkers || []).includes(user.email) ||
-    (a.coWorkers || []).includes(auth.currentUser?.email || '')
-  ).map(a => ({
-    id: a.id,
-    type: 'Pedagogia: ' + a.type,
-    title: a.title,
-    date: a.date,
-    isCreator: a.registeredBy === user.email || a.registeredBy === auth.currentUser?.email,
-    sector: 'Pedagogia'
-  }));
-
-  const allMyActivities = [...myWorkshops, ...myPsych, ...myPedagogy].sort((a, b) => b.date.localeCompare(a.date));
+  const allMyActivities = [
+    ...myWorkshops, 
+    ...myPsychAct, 
+    ...myPedagogyAct,
+    ...myPhysioEvo,
+    ...myNursingEvo,
+    ...myPsychEvo,
+    ...myPedagogyEvo,
+    ...mySocialEvo,
+    ...myNutritionEvo
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   const [formData, setFormData] = useState({
     name: user.name,
@@ -9434,6 +9544,19 @@ const ProfileModal = ({
                         <span>{act.type}</span>
                         <span>{new Date(act.date).toLocaleDateString('pt-BR')}</span>
                       </div>
+                      {act.coWorkers && act.coWorkers.length > 0 && (
+                        <div className="mt-1.5 pt-1.5 border-t border-gray-100/50 dark:border-gray-800/50 flex flex-wrap gap-1 items-center">
+                          <span className="text-[8px] font-black text-gray-400 uppercase mr-1">Ação Conjunta:</span>
+                          {act.coWorkers.map((cwId: string) => {
+                            const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                            return (
+                              <span key={cwId} className="px-1.5 py-0.5 bg-green-50/80 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-[8px] font-bold rounded">
+                                {prof?.name || cwId}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -9467,6 +9590,23 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
     values: institutionalInfo?.values || '',
     history: institutionalInfo?.history || ''
   });
+
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingUserForm, setEditingUserForm] = useState<{
+    name: string;
+    role: Role;
+    email?: string;
+    registrationNumber?: string;
+  }>({ name: '', role: 'FABRICANTE_FRALDAS', email: '', registrationNumber: '' });
+
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState<{
+    id: string;
+    name: string;
+    role: Role;
+    email?: string;
+    registrationNumber?: string;
+  }>({ id: '', name: '', role: 'FABRICANTE_FRALDAS', email: '', registrationNumber: '' });
 
   useEffect(() => {
     if (institutionalInfo) {
@@ -9547,55 +9687,344 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
         </div>
 
         {activeSubTab === 'users' && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Equipe header & trigger to manually add users */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 dark:text-white">Profissionais de Equipe</h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Configure perfis de classe, papéis organizacionais e credenciais.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddingUser(!isAddingUser)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold text-xs self-start sm:self-center"
+              >
+                <Plus className="w-4 h-4" />
+                {isAddingUser ? 'Fechar Formulário' : 'Novo Profissional'}
+              </button>
+            </div>
+
+            {/* Form to manually create a User Profile */}
+            {isAddingUser && (
+              <div className="bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-gray-800/40 dark:to-gray-900/30 p-6 rounded-[32px] border border-green-100 dark:border-gray-800 space-y-4 mb-4 animate-in fade-in duration-300">
+                <h4 className="text-sm font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-green-600" />
+                  Cadastrar Novo Profissional da Equipe
+                </h4>
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!newUserForm.name.trim()) {
+                      showToast('Preencha o nome do profissional', 'error');
+                      return;
+                    }
+                    if (!newUserForm.id.trim()) {
+                      showToast('Preencha o ID único do Usuário (Ex: e-mail ou UID)', 'error');
+                      return;
+                    }
+                    setLoading(true);
+                    try {
+                      const userUID = newUserForm.id.trim();
+                      const cleanedData = cleanData({
+                        name: newUserForm.name.trim(),
+                        role: newUserForm.role,
+                        email: newUserForm.email?.trim() || '',
+                        registrationNumber: newUserForm.registrationNumber?.trim() || ''
+                      });
+                      await setDoc(doc(db, 'profiles', userUID), cleanedData);
+                      setIsAddingUser(false);
+                      setNewUserForm({
+                        id: '',
+                        name: '',
+                        role: 'FABRICANTE_FRALDAS',
+                        email: '',
+                        registrationNumber: ''
+                      });
+                      showToast('Profissional cadastrado com sucesso!', 'success');
+                    } catch (err) {
+                      handleFirestoreError(err, OperationType.CREATE, `profiles/${newUserForm.id}`);
+                      showToast('Erro ao cadastrar profissional', 'error');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Identificador Único (UID ou E-mail) *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: joao@gmail.com ou UID do Firebase"
+                        value={newUserForm.id}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, id: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Nome Completo do Profissional *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Dra. Ana Paula"
+                        value={newUserForm.name}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Cargo / Função *</label>
+                      <select
+                        required
+                        value={newUserForm.role}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as Role })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                      >
+                        {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">E-mail Profissional (Opcional)</label>
+                      <input
+                        type="email"
+                        placeholder="Ex: ana.paula@oami.org.br"
+                        value={newUserForm.email || ''}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Registro de Classe (Opcional)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: CRESS/SP 12345"
+                        value={newUserForm.registrationNumber || ''}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, registrationNumber: e.target.value })}
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-green-100/50 dark:border-gray-800">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingUser(false)}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-all shadow-md shadow-green-100"
+                    >
+                      Salvar Cadastro
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-wider">
+                <thead className="bg-[#FAF9F6] dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-wider">
                   <tr>
                     <th className="px-6 py-4">Profissional</th>
                     <th className="px-6 py-4">Cargo Atual</th>
                     <th className="px-6 py-4">Alterar Cargo</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                  {users.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                            {u.photoUrl ? (
-                              <img src={u.photoUrl} alt={u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
-                                <UserCircle size={20} />
+                  {users.map(u => {
+                    const isEditing = editingUserId === u.id;
+                    return (
+                      <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                        <td className="px-6 py-4">
+                          {isEditing ? (
+                            <div className="space-y-2 max-w-sm">
+                              <div>
+                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">Nome Completo</label>
+                                <input
+                                  type="text"
+                                  className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold animate-in duration-250"
+                                  value={editingUserForm.name}
+                                  onChange={e => setEditingUserForm({ ...editingUserForm, name: e.target.value })}
+                                />
                               </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">E-mail</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ex: joao@gmail.com"
+                                    className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-medium"
+                                    value={editingUserForm.email || ''}
+                                    onChange={e => setEditingUserForm({ ...editingUserForm, email: e.target.value })}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">Reg. Profissional</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Ex: CRM / COREN"
+                                    className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-medium"
+                                    value={editingUserForm.registrationNumber || ''}
+                                    onChange={e => setEditingUserForm({ ...editingUserForm, registrationNumber: e.target.value })}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden shrink-0">
+                                {u.photoUrl ? (
+                                  <img src={u.photoUrl} alt={u.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                                    <UserCircle size={20} />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-800 dark:text-white text-sm">{u.name}</p>
+                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                  {u.email && (
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{u.email}</p>
+                                  )}
+                                  {u.registrationNumber && (
+                                    <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">Reg: {u.registrationNumber}</p>
+                                  )}
+                                  <p className="text-[9px] text-gray-400 dark:text-gray-500 font-mono">ID: {u.id}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-[10px] font-bold">
+                            {ROLE_LABELS[isEditing ? editingUserForm.role : u.role]}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {isEditing ? (
+                            <select 
+                              className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white font-bold"
+                              value={editingUserForm.role}
+                              onChange={(e) => setEditingUserForm({ ...editingUserForm, role: e.target.value as Role })}
+                            >
+                              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <select 
+                              disabled={loading}
+                              className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-850 dark:text-white"
+                              value={u.role}
+                              onChange={(e) => handleUpdateRole(u.id, e.target.value as Role)}
+                            >
+                              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2 text-right">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={loading}
+                                  onClick={async () => {
+                                    if (!editingUserForm.name.trim()) {
+                                      showToast('O nome não pode estar vazio!', 'error');
+                                      return;
+                                    }
+                                    setLoading(true);
+                                    try {
+                                      const cleanedData = cleanData({
+                                        name: editingUserForm.name.trim(),
+                                        role: editingUserForm.role,
+                                        email: editingUserForm.email?.trim() || '',
+                                        registrationNumber: editingUserForm.registrationNumber?.trim() || ''
+                                      });
+                                      await updateDoc(doc(db, 'profiles', u.id), cleanedData);
+                                      showToast('Profissional atualizado com sucesso!');
+                                      setEditingUserId(null);
+                                    } catch (err) {
+                                      handleFirestoreError(err, OperationType.UPDATE, `profiles/${u.id}`);
+                                      showToast('Erro ao atualizar profissional', 'error');
+                                    } finally {
+                                      setLoading(false);
+                                    }
+                                  }}
+                                  className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                                  title="Salvar alterações"
+                                >
+                                  <Save className="w-5 h-5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingUserId(null)}
+                                  className="p-2 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingUserId(u.id);
+                                    setEditingUserForm({
+                                      name: u.name,
+                                      role: u.role,
+                                      email: u.email || '',
+                                      registrationNumber: u.registrationNumber || ''
+                                    });
+                                  }}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                                  title="Editar Profissional"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (window.confirm(`Deseja realmente excluir o profissional ${u.name}? Esta ação é irreversível e removerá todos os privilégios dele.`)) {
+                                      setLoading(true);
+                                      try {
+                                        await deleteDoc(doc(db, 'profiles', u.id));
+                                        showToast('Profissional excluído com sucesso!');
+                                      } catch (err) {
+                                        handleFirestoreError(err, OperationType.DELETE, `profiles/${u.id}`);
+                                        showToast('Erro ao excluir profissional', 'error');
+                                      } finally {
+                                        setLoading(false);
+                                      }
+                                    }
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                  title="Excluir Profissional"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
                             )}
                           </div>
-                          <div>
-                            <p className="font-bold text-gray-800 dark:text-white">{u.name}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{u.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-[10px] font-bold">
-                          {ROLE_LABELS[u.role]}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <select 
-                          disabled={loading}
-                          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
-                          value={u.role}
-                          onChange={(e) => handleUpdateRole(u.id, e.target.value as Role)}
-                        >
-                          {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -13201,6 +13630,13 @@ export default function App() {
           workshops={workshops}
           psychActivities={psychActivities}
           pedagogyActivities={pedagogyActivities}
+          physioEvolutions={physioEvolutions}
+          nursingEvolutions={nursingEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          professionals={professionals}
         />
       )}
 

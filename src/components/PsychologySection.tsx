@@ -4,7 +4,7 @@ import {
   MessageSquare, Heart, Users2, Puzzle, Activity, 
   AlertCircle, FileText, Settings, Plus, Search, 
   Filter, MoreVertical, ChevronRight, CheckCircle2, 
-  Clock, Phone, User as UserIcon, Trash2, Edit2, 
+  Clock, Phone, User as UserIcon, Trash2, Edit2, Eye, 
   Download, Printer, X, Info, ArrowLeft,
   TrendingUp, UserCircle, LogOut, Moon, Sun,
   Smile, Meh, Frown, History, Lightbulb, Loader2, Zap,
@@ -101,6 +101,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   const [cognitionPatientFilter, setCognitionPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<PsychEvolution | null>(null);
+  const [viewingAct, setViewingAct] = useState<PsychActivity | null>(null);
 
   useEffect(() => {
     localStorage.setItem('oami-psychology-tab', activeTab);
@@ -511,6 +513,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
                 onEdit={(e: any) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
+                onView={setViewingEvo}
               />
             )}
             {activeTab === 'appointments' && (
@@ -560,6 +563,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onEdit={(a: any) => { setEditingData(a); setModalType('activity'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'activity' })}
                 professionals={professionals}
+                onView={setViewingAct}
               />
             )}
             {activeTab === 'cognition' && (
@@ -660,6 +664,205 @@ export const PsychologySection = (props: PsychologySectionProps) => {
         title={`Excluir ${deleteConfirm?.type === 'patient' ? 'Paciente' : 'Registro'}`}
         message={`Tem certeza que deseja excluir este ${deleteConfirm?.type === 'patient' ? 'paciente' : 'registro'}? Esta ação não pode ser desfeita.`}
       />
+
+      <AnimatePresence>
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-blue-600">
+                  <Brain size={24} />
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Detalhes da Evolução Psicológica</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Paciente</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {viewingEvo.patientId === 'OUTRO' 
+                      ? `${viewingEvo.targetName || 'Outro'} (${viewingEvo.targetType?.replace('_', ' ') || 'Comunidade'})`
+                      : ((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data / Horário</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.date} às {viewingEvo.time}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.registeredBy || 'Psicólogo'}
+                    </p>
+                  </div>
+                </div>
+
+                {viewingEvo.reason && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Motivo do Atendimento</span>
+                    <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                      {viewingEvo.reason}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Observação Clínica</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingEvo.observation}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Conduta / Intervenção</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingEvo.intervention}
+                  </p>
+                </div>
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-blue-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-blue-700 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {viewingAct && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-indigo-600">
+                  <Activity size={24} />
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Detalhes da Atividade Psicossocial</h3>
+                </div>
+                <button onClick={() => setViewingAct(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Título</span>
+                    <p className="text-base font-bold text-gray-800 dark:text-white">
+                      {viewingAct.title}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Tipo de Atividade</span>
+                    <p className="text-sm font-bold text-indigo-600">
+                      {viewingAct.type}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingAct.date}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingAct.registeredBy || 'Psicólogo'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Descrição</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingAct.description}
+                  </p>
+                </div>
+
+                {viewingAct.participants && viewingAct.participants.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Participantes</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {viewingAct.participants.map(pid => {
+                        const p = (patients || []).find((pt: any) => pt.id === pid);
+                        const linked = p?.elderlyId ? (elderly || []).find((ed: any) => ed.id === p.elderlyId) : null;
+                        return (
+                          <span key={pid} className="px-2.5 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs text-gray-700 dark:text-gray-300 font-medium border border-gray-200/50 dark:border-gray-750">
+                            {linked?.name || p?.name || pid}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {viewingAct.coWorkers && viewingAct.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingAct.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingAct(null)}
+                  className="px-6 py-2.5 bg-indigo-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-indigo-750 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -967,7 +1170,7 @@ const InitialAssessmentView = ({ patients, elderly, assessments, onAdd, onEdit, 
   </div>
 );
 
-const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, onView, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -1009,8 +1212,9 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
                 <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => onEdit(e)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
-                <button onClick={() => onDelete(e.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                <button onClick={() => onView(e)} className="p-1 text-green-600 hover:bg-green-50 rounded-md transition-colors" title="Visualizar 👁️"><Eye size={14} /></button>
+                <button onClick={() => onEdit(e)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Editar ✏️"><Edit2 size={14} /></button>
+                <button onClick={() => onDelete(e.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir 🗑️"><Trash2 size={14} /></button>
               </div>
             </div>
             <div className="space-y-2">
@@ -1253,7 +1457,7 @@ const FamilyView = ({ patients, elderly, bonds, onAdd, onEdit, onDelete, filter,
   </div>
 );
 
-const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete, filter, setFilter, professionals = [] }: any) => (
+const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete, onView, filter, setFilter, professionals = [] }: any) => (
   <div className="space-y-6">
     <div className="flex justify-between items-center">
       <div className="flex items-center gap-4">
@@ -1289,8 +1493,9 @@ const ActivitiesView = ({ patients, elderly, activities, onAdd, onEdit, onDelete
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">{act.date}</span>
                 <div className="flex gap-1">
-                  <button onClick={() => onEdit(act)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
-                  <button onClick={() => onDelete(act.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                  <button onClick={() => onView(act)} className="p-1 text-green-600 hover:bg-green-50 rounded-md transition-colors" title="Visualizar 👁️"><Eye size={14} /></button>
+                  <button onClick={() => onEdit(act)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Editar ✏️"><Edit2 size={14} /></button>
+                  <button onClick={() => onDelete(act.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir 🗑️"><Trash2 size={14} /></button>
                 </div>
               </div>
             </div>

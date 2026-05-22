@@ -5,7 +5,7 @@ import {
   Calendar, AlertTriangle, Receipt, Settings,
   Plus, Search, Filter, MoreVertical, ChevronRight,
   CheckCircle2, Clock, Phone, User as UserIcon,
-  Trash2, Edit2, Download, Printer, X, Info, Check,
+  Trash2, Edit2, Eye, Download, Printer, X, Info, Check,
   ArrowLeft, TrendingUp, UserCircle, LogOut,
   Moon, Sun, Smile, Meh, Frown, History,
   Lightbulb, Target, Star, ShieldAlert, Loader2, Zap,
@@ -169,6 +169,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [profSearch, setProfSearch] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<any | null>(null);
 
   // States for Editable table & multi-select deletion in Documentation & Visit Control tabs
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -3750,23 +3752,30 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       {evolution.serviceType}
                     </span>
                     <button
+                      onClick={() => setViewingEvo(evolution)}
+                      className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-colors shrink-0"
+                      title="Visualizar 👁️"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </button>
+                    <button
                       onClick={() => handleDownloadEvolution(evolution)}
                       className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors shrink-0"
-                      title="Baixar PDF"
+                      title="Baixar PDF 📥"
                     >
                       <Download className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => openModal('evolution', evolution)}
                       className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors shrink-0"
-                      title="Editar"
+                      title="Editar ✏️"
                     >
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => onDeleteRecord('socialEvolutions', evolution.id)}
+                      onClick={() => setDeleteConfirm({ id: evolution.id, collection: 'socialEvolutions', label: 'Evolução do Serviço Social' })}
                       className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors shrink-0"
-                      title="Excluir"
+                      title="Excluir 🗑️"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -4508,6 +4517,145 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               <div className="flex-1 overflow-y-auto">
                 {renderModalContent()}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-indigo-600">
+                  <Scale size={24} />
+                  <h3 className="text-xl font-bold text-gray-850 dark:text-white">Detalhes da Evolução Social</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Idoso</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data / Horário</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.date} {viewingEvo.time ? ` às ${viewingEvo.time}` : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.registeredBy || 'Assistente Social'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Tipo de Atendimento</span>
+                    <p className="text-sm font-bold text-indigo-600 uppercase">
+                      {viewingEvo.serviceType || 'Geral'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Descrição / Observação</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingEvo.observation || viewingEvo.description}
+                  </p>
+                </div>
+
+                {viewingEvo.conduct && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Conduta / Providência</span>
+                    <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                      {viewingEvo.conduct}
+                    </p>
+                  </div>
+                )}
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-800">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-indigo-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-indigo-755 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full space-y-6 text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-950/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Confirmar Exclusão</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Tem certeza que deseja apagar o registro de <strong className="text-gray-700 dark:text-gray-300">"{deleteConfirm.label}"</strong>? Esta ação é definitiva e não pode ser desfeita.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-205 text-gray-700 dark:text-gray-300 text-sm font-bold rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      await onDeleteRecord(deleteConfirm.collection, deleteConfirm.id);
+                      showToast("Sucesso", "Registro excluído com sucesso.");
+                    } catch (e: any) {
+                      showToast("Erro", "Falha ao excluir.");
+                    } finally {
+                      setDeleteConfirm(null);
+                    }
+                  }}
+                  className="flex-1 py-3 bg-red-650 hover:bg-red-750 text-white text-sm font-bold rounded-xl shadow-lg transition"
+                >
+                  Confirmar Exclusão
+                </button>
               </div>
             </motion.div>
           </div>

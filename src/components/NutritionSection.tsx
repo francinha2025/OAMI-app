@@ -26,7 +26,8 @@ import {
   Download,
   Share2,
   Camera,
-  X
+  X,
+  Eye
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInYears } from 'date-fns';
@@ -89,6 +90,8 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
   const [localFormData, setLocalFormData] = useState<any>({});
   const [profSearch, setProfSearch] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
+  const [viewingEvo, setViewingEvo] = useState<any | null>(null);
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -495,14 +498,23 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                 </div>
                 <div className="flex gap-2">
                   <button 
+                    onClick={() => setViewingEvo(e)}
+                    className="p-2 text-gray-400 hover:text-green-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                    title="Visualizar 👁️"
+                  >
+                    <Eye size={16} />
+                  </button>
+                  <button 
                     onClick={() => { setEditingRecord(e); setModalType('evolution'); setIsModalOpen(true); }}
                     className="p-2 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                    title="Editar ✏️"
                   >
                     <Edit2 size={16} />
                   </button>
                   <button 
-                    onClick={() => onDeleteRecord('nutritionEvolutions', e.id)}
+                    onClick={() => setDeleteConfirm({ id: e.id, collection: 'nutritionEvolutions', label: `Evolução de ${patient?.name}` })}
                     className="p-2 text-gray-400 hover:text-red-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                    title="Excluir 🗑️"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -1135,6 +1147,172 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                   Confirmar e Salvar Registro
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {viewingEvo && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-lg w-full space-y-6 max-h-[85vh] overflow-y-auto text-left"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 text-orange-600">
+                  <Apple size={24} />
+                  <h3 className="text-xl font-bold text-gray-850 dark:text-white">Detalhes da Evolução Nutricional</h3>
+                </div>
+                <button onClick={() => setViewingEvo(null)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Idoso / Paciente</span>
+                  <p className="text-base font-bold text-gray-800 dark:text-white">
+                    {((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Data e Hora</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {format(parseISO(viewingEvo.date), 'dd/MM/yyyy')} {viewingEvo.time && `às ${viewingEvo.time}`}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Registrado Por</span>
+                    <p className="text-sm text-gray-800 dark:text-white font-medium">
+                      {viewingEvo.registeredBy || 'Nutricionista'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Apetite</span>
+                    <p className="text-sm font-bold text-orange-600 uppercase">
+                      {viewingEvo.appetite || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Hidratação</span>
+                    <p className="text-sm font-bold text-blue-650 uppercase">
+                      {viewingEvo.hydration || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 bg-gray-50 dark:bg-gray-805 p-3 rounded-xl border border-gray-100 text-center">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Mastigação</span>
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      {viewingEvo.chewing || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Deglutição</span>
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      {viewingEvo.swallowing || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Ingestão</span>
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      {viewingEvo.intake || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-black uppercase text-gray-400">Evolução Clínica</span>
+                  <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                    {viewingEvo.evolution || viewingEvo.observation}
+                  </p>
+                </div>
+
+                {viewingEvo.conduct && (
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-gray-400">Conduta / Planejamento</span>
+                    <p className="text-sm text-gray-755 dark:text-gray-350 leading-relaxed mt-1">
+                      {viewingEvo.conduct}
+                    </p>
+                  </div>
+                )}
+
+                {viewingEvo.coWorkers && viewingEvo.coWorkers.length > 0 && (
+                  <div className="pt-3 border-t border-gray-105 dark:border-gray-850">
+                    <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
+                    <div className="flex flex-wrap gap-1">
+                      {viewingEvo.coWorkers.map(cwId => {
+                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        return (
+                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                            {prof ? prof.name : cwId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex pt-2 justify-end">
+                <button 
+                  onClick={() => setViewingEvo(null)}
+                  className="px-6 py-2.5 bg-orange-600 text-white font-black text-sm rounded-xl shadow-lg hover:bg-orange-700 transition"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full space-y-6 text-center shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-950/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 mx-auto">
+                <Trash2 size={32} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white">Confirmar Exclusão</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Tem certeza que deseja apagar o registro de <strong className="text-gray-700 dark:text-gray-300">"{deleteConfirm.label}"</strong>? Esta ação é de exclusão permanente.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-205 text-gray-700 dark:text-gray-300 text-sm font-bold rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      await onDeleteRecord(deleteConfirm.collection, deleteConfirm.id);
+                      showToast("Sucesso", "Registro excluído com sucesso.");
+                    } catch (e: any) {
+                      showToast("Erro", "Falha ao excluir.");
+                    } finally {
+                      setDeleteConfirm(null);
+                    }
+                  }}
+                  className="flex-1 py-3 bg-red-650 hover:bg-red-750 text-white text-sm font-bold rounded-xl shadow-lg transition"
+                >
+                  Confirmar Exclusão
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
