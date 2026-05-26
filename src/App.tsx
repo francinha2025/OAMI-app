@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { 
   Users, 
   UserCircle, 
@@ -107,6 +107,7 @@ import {
 } from 'recharts';
 import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
+import { ActivityDetailsModal } from './components/ActivityDetailsModal';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
@@ -126,6 +127,7 @@ import { DiaperProductionSection } from './components/DiaperProductionSection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { GlobalGallery } from './components/GlobalGallery';
 import { DigitizeButton } from './components/DigitizeButton';
+import { ProductivitySection } from './components/ProductivitySection';
 import { CameraModal } from './components/CameraModal';
 import { PhotoUpload } from './components/PhotoUpload';
 import LogoOami from './components/LogoOami';
@@ -1346,11 +1348,12 @@ const LoginLogo = () => {
   );
 };
 
-const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginError }: { 
+const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginError, isLoggingIn }: { 
   onGoogleLogin: () => void, 
   onCompleteProfile: (role: Role) => void,
   needsProfile: boolean,
-  error: string | null
+  error: string | null,
+  isLoggingIn: boolean
 }) => {
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
 
@@ -1413,10 +1416,22 @@ const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginErr
           
           <button 
             onClick={onGoogleLogin}
-            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm transition-all flex items-center justify-center gap-3"
+            disabled={isLoggingIn}
+            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-            Entrar com Google
+            {isLoggingIn ? (
+              <>
+                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-green-600 dark:text-green-400">
+                  <Activity size={18} />
+                </motion.div>
+                Conectando...
+              </>
+            ) : (
+              <>
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+                Entrar com Google
+              </>
+            )}
           </button>
 
           {loginError && (
@@ -1479,6 +1494,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       title: 'Geral',
       items: [
         { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'productivity', label: 'Painel e Colaboração', icon: Award, roles: ['ANY'] },
         { id: 'elderly', label: 'Idosos', icon: Users, roles: ['ANY'] },
         { id: 'schedule', label: 'Cronograma', icon: Calendar, roles: ['ANY'] },
         { id: 'gallery', label: 'Galeria de Fotos', icon: ImageIcon, roles: ['ANY'] },
@@ -1671,7 +1687,10 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
     email: '',
     observations: '',
     registrationNumber: '',
-    admissionDate: ''
+    admissionDate: '',
+    sector: '',
+    photoUrl: '',
+    permissions: []
   });
   const [staffFormData, setStaffFormData] = useState<Omit<StaffMember, 'id'>>({
     name: '',
@@ -1689,7 +1708,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
   const handleOpenNew = (type: 'CONVIVER' | 'INSTITUICAO') => {
     setEditingId(null);
     setModalType(type);
-    setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '' });
+    setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '', sector: '', photoUrl: '', permissions: [] });
     setStaffFormData({ name: '', role: 'CUIDADOR', status: 'ATIVO', cpf: '', address: '', phone: '', email: '', observations: '', admissionDate: '', createdAt: new Date().toISOString() });
     setIsModalOpen(true);
   };
@@ -1707,7 +1726,10 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
       email: p.email || '',
       observations: p.observations || '',
       registrationNumber: p.registrationNumber || '',
-      admissionDate: p.admissionDate || ''
+      admissionDate: p.admissionDate || '',
+      sector: p.sector || '',
+      photoUrl: p.photoUrl || '',
+      permissions: p.permissions || []
     });
     setIsModalOpen(true);
   };
@@ -1734,8 +1756,13 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
     e.preventDefault();
     if (modalType === 'CONVIVER') {
       try {
+        const permissionsArray = typeof formData.permissions === 'string' && formData.permissions
+          ? (formData.permissions as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+          : Array.isArray(formData.permissions) ? formData.permissions : [];
+
         const cleanedProfessional = cleanData({
           ...formData,
+          permissions: permissionsArray,
           createdAt: new Date().toISOString()
         });
         if (editingId) {
@@ -1747,7 +1774,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
         }
         setIsModalOpen(false);
         setEditingId(null);
-        setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '' });
+        setFormData({ status: 'ATIVO', role: 'COORDENADORA', cpf: '', address: '', phone: '', email: '', observations: '', registrationNumber: '', admissionDate: '', sector: '', photoUrl: '', permissions: [] });
       } catch (error) {
         showToast('Erro ao gravar profissional.', 'error');
       }
@@ -2010,6 +2037,36 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                         className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white font-bold"
                         value={formData.admissionDate || ''}
                         onChange={(e) => setFormData({...formData, admissionDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Setor</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: Clínico, Administrativo, Social"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white font-bold"
+                        value={formData.sector || ''}
+                        onChange={(e) => setFormData({...formData, sector: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Foto de Perfil (URL)</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: https://images.unsplash.com/..."
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white font-bold"
+                        value={formData.photoUrl || ''}
+                        onChange={(e) => setFormData({...formData, photoUrl: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Permissões de Acesso (Separadas por vírgula)</label>
+                      <input 
+                        type="text"
+                        placeholder="Ex: Evoluções, Dashboard, Finanças, Administrador, SGPF"
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white font-bold"
+                        value={Array.isArray(formData.permissions) ? formData.permissions.join(', ') : (formData.permissions || '')}
+                        onChange={(e) => setFormData({...formData, permissions: e.target.value})}
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
@@ -7513,7 +7570,8 @@ const WorkshopsSection = ({
   professionals = [], 
   showToast,
   user,
-  sendNotification
+  sendNotification,
+  notifyTaggedCoWorkers
 }: { 
   workshops: Workshop[], 
   communityElderly: CommunityElderly[],
@@ -7523,6 +7581,16 @@ const WorkshopsSection = ({
   showToast: (msg: string, type?: 'success' | 'error') => void;
   user: User;
   sendNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'date'>) => Promise<void>;
+  notifyTaggedCoWorkers?: (
+    currentCoWorkers: string[],
+    previousCoWorkers: string[],
+    title: string,
+    messageBuilder: (name: string) => string,
+    activityId?: string,
+    tipo?: string,
+    rotaDestino?: string,
+    link?: string
+  ) => Promise<void>;
 }) => {
   const [isElderlyModalOpen, setIsElderlyModalOpen] = useState(false);
   const [isCaregiverModalOpen, setIsCaregiverModalOpen] = useState(false);
@@ -7640,11 +7708,14 @@ const WorkshopsSection = ({
         professionalId: user?.id || ''
       });
       
+      let recordId = '';
       if (editingWorkshop) {
         await updateDoc(doc(db, 'workshops', editingWorkshop.id), workshopData);
+        recordId = editingWorkshop.id;
         showToast('Atividade em equipe atualizada com sucesso!');
       } else {
-        await addDoc(collection(db, 'workshops'), workshopData);
+        const docRef = await addDoc(collection(db, 'workshops'), workshopData);
+        recordId = docRef.id;
         showToast('Atividade em equipe registrada com sucesso!');
       }
 
@@ -7652,21 +7723,17 @@ const WorkshopsSection = ({
       try {
         const previousCoWorkers = editingWorkshop?.coWorkers || [];
         const currentCoWorkers = workshopFormData.coWorkers || [];
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Atividade em Conjunto',
-              message: `Você foi adicionado como colaborador na atividade "${workshopFormData.title}" por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
+        
+        if (notifyTaggedCoWorkers) {
+          await notifyTaggedCoWorkers(
+            currentCoWorkers,
+            previousCoWorkers,
+            'Nova Atividade em Conjunto',
+            (name) => `Você foi adicionado como colaborador na atividade "${workshopFormData.title}" por ${user?.name || 'um colega'}.`,
+            recordId,
+            'workshops',
+            'workshops'
+          );
         }
       } catch (notifErr) {
         console.error("Erro ao enviar notificações:", notifErr);
@@ -9187,7 +9254,9 @@ const ProfileModal = ({
   pedagogyEvolutions = [],
   socialEvolutions = [],
   nutritionEvolutions = [],
-  professionals = []
+  professionals = [],
+  setSelectedActivityForView,
+  users = []
 }: { 
   user: User, 
   theme: 'light' | 'dark',
@@ -9207,7 +9276,9 @@ const ProfileModal = ({
   pedagogyEvolutions?: PedagogyEvolution[],
   socialEvolutions?: SocialEvolution[],
   nutritionEvolutions?: NutritionEvolution[],
-  professionals?: Professional[]
+  professionals?: Professional[],
+  setSelectedActivityForView: (activity: any) => void,
+  users?: any[]
 }) => {
   const filterAndMap = (list: any[], defaultTypeLabel: string, sector: string) => {
     return (list || []).filter(item => {
@@ -9250,7 +9321,8 @@ const ProfileModal = ({
         isCreator,
         sector,
         coWorkers: item.coWorkers || [],
-        registeredBy: item.registeredBy || item.professionalId || item.professional || item.createdBy || 'Sistema'
+        registeredBy: item.registeredBy || item.professionalId || item.professional || item.createdBy || 'Sistema',
+        rawItem: item
       };
     });
   };
@@ -9517,7 +9589,11 @@ const ProfileModal = ({
                 </p>
               ) : (
                 allMyActivities.map((act) => (
-                  <div key={act.id} className="p-3 bg-gray-50 dark:bg-gray-850 hover:bg-green-50/20 dark:hover:bg-green-950/10 rounded-2xl border border-gray-100 dark:border-gray-750 flex items-start gap-3 transition-colors">
+                  <div 
+                    key={act.id} 
+                    onClick={() => setSelectedActivityForView(act)}
+                    className="p-3 bg-gray-50 dark:bg-gray-850 hover:bg-green-50/40 dark:hover:bg-green-950/20 active:scale-[0.99] rounded-2xl border border-gray-100 dark:border-gray-750 flex items-start gap-3 cursor-pointer transition-all"
+                  >
                     <div className={cn(
                       "p-2 rounded-xl text-xs font-bold shrink-0",
                       act.sector === 'Psicologia' ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400' :
@@ -9544,6 +9620,17 @@ const ProfileModal = ({
                         <span>{act.type}</span>
                         <span>{new Date(act.date).toLocaleDateString('pt-BR')}</span>
                       </div>
+                      {(() => {
+                        const creatorUser = users.find(u => u.id === act.registeredBy || u.email === act.registeredBy) 
+                          || professionals.find(p => p.id === act.registeredBy || p.email === act.registeredBy || p.name === act.registeredBy);
+                        const displayName = creatorUser ? creatorUser.name : act.registeredBy;
+                        return (
+                          <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                            <span className="font-bold uppercase text-[8px] tracking-wider text-gray-400 dark:text-gray-500">Responsável Principal: </span>
+                            <span className="font-semibold text-gray-750 dark:text-gray-200">{displayName}</span>
+                          </div>
+                        );
+                      })()}
                       {act.coWorkers && act.coWorkers.length > 0 && (
                         <div className="mt-1.5 pt-1.5 border-t border-gray-100/50 dark:border-gray-800/50 flex flex-wrap gap-1 items-center">
                           <span className="text-[8px] font-black text-gray-400 uppercase mr-1">Ação Conjunta:</span>
@@ -10220,6 +10307,7 @@ export default function App() {
   const [needsProfile, setNeedsProfile] = useState(false);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Real-time data states
   const [users, setUsers] = useState<StaffMember[]>([]);
@@ -10247,6 +10335,8 @@ export default function App() {
   const [professionals, setProfessionals] = useState<Professional[]>(MOCK_PROFESSIONALS);
   const [professionalEvaluations, setProfessionalEvaluations] = useState<ProfessionalEvaluation[]>(MOCK_PROFESSIONAL_EVALUATIONS);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [selectedActivityForView, setSelectedActivityForView] = useState<any | null>(null);
+  const [sectorDefaultTabs, setSectorDefaultTabs] = useState<Record<string, string>>({});
 
   const onSaveCommunityElderly = async (data: any) => {
     try {
@@ -10478,6 +10568,215 @@ export default function App() {
     });
   }, [elderly, socialPatients]);
 
+  const isRoleOrUserTagged = useCallback((coWorkersList: string[] | undefined | null, targetRoles: string[]) => {
+    if (!coWorkersList || !Array.isArray(coWorkersList)) return false;
+    
+    const lowerCoWorkers = coWorkersList.map(cw => String(cw).trim().toLowerCase());
+    const rolesLower = targetRoles.map(r => r.toLowerCase());
+
+    // 1. Direct check: Is currently logged in user tagged?
+    if (user) {
+      if (lowerCoWorkers.includes(String(user.id).toLowerCase()) ||
+          lowerCoWorkers.includes(String(user.email).toLowerCase()) ||
+          lowerCoWorkers.includes(String(user.name).toLowerCase()) ||
+          (auth.currentUser?.email && lowerCoWorkers.includes(auth.currentUser.email.toLowerCase()))) {
+        return true;
+      }
+    }
+
+    // 2. Check if any professional matching one of the target roles is in the coWorkers list
+    for (const cwStr of lowerCoWorkers) {
+      // Direct keyword match
+      if (rolesLower.some(role => cwStr.includes(role))) {
+        return true;
+      }
+
+      // Look up professional info
+      const prof = professionals.find(p => 
+        (p.id && String(p.id).toLowerCase() === cwStr) ||
+        (p.email && p.email.toLowerCase() === cwStr) ||
+        (p.name && p.name.toLowerCase() === cwStr)
+      );
+
+      if (prof && prof.role && rolesLower.includes(prof.role.toLowerCase())) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [user, professionals]);
+
+  const mergedPhysioEvolutions = useMemo(() => {
+    const list = [...physioEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...psychEvolutions.map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...socialEvolutions.map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...nutritionEvolutions.map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['FISIOTERAPEUTA'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          procedures: `[Atendimento de ${other.sectorName}]`,
+          evolution: (other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || '',
+          observations: (other as any).conduct || (other as any).conducts || (other as any).observation || (other as any).observations || '',
+          painLevel: (other as any).painLevel,
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        });
+      }
+    });
+    return list;
+  }, [physioEvolutions, nursingEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+
+  const mergedNursingEvolutions = useMemo(() => {
+    const list = [...nursingEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...physioEvolutions.map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...psychEvolutions.map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...socialEvolutions.map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...nutritionEvolutions.map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['ENFERMEIRA', 'TECNICO_ENFERMAGEM'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          time: (other as any).time || '12:00',
+          content: `[Atendimento Conjunto - ${other.sectorName}]\n${(other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || ''}\n\nConduta: ${(other as any).conduct || (other as any).conducts || (other as any).observations || ''}`,
+          registeredBy: (other as any).registeredBy || (other as any).professional || 'Sistema',
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        } as any);
+      }
+    });
+    return list;
+  }, [nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+
+  const mergedSocialEvolutions = useMemo(() => {
+    const list = [...socialEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...physioEvolutions.map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...psychEvolutions.map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...nutritionEvolutions.map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['ASSISTENTE_SOCIAL'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          serviceType: `[Atendimento de ${other.sectorName}]`,
+          observation: (other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || '',
+          conduct: (other as any).conduct || (other as any).conducts || (other as any).observations || (other as any).response || '',
+          registeredBy: (other as any).registeredBy || (other as any).professional || 'Sistema',
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        });
+      }
+    });
+    return list;
+  }, [socialEvolutions, nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+
+  const mergedPsychEvolutions = useMemo(() => {
+    const list = [...psychEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...physioEvolutions.map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...socialEvolutions.map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...nutritionEvolutions.map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['PSICOLOGA'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          time: (other as any).time || '12:00',
+          observation: (other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || '',
+          intervention: (other as any).conduct || (other as any).conducts || (other as any).observations || (other as any).response || '',
+          registeredBy: (other as any).registeredBy || (other as any).professional || 'Sistema',
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        });
+      }
+    });
+    return list;
+  }, [psychEvolutions, nursingEvolutions, physioEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+
+  const mergedPedagogyEvolutions = useMemo(() => {
+    const list = [...pedagogyEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...physioEvolutions.map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...psychEvolutions.map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...socialEvolutions.map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...nutritionEvolutions.map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['PEDAGOGA'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          time: (other as any).time || '12:00',
+          activityTitle: `Atendimento de ${other.sectorName}`,
+          participation: 'ATIVO',
+          response: (other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || '',
+          observations: (other as any).conduct || (other as any).conducts || (other as any).observations || (other as any).response || '',
+          registeredBy: (other as any).registeredBy || (other as any).professional || 'Sistema',
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        });
+      }
+    });
+    return list;
+  }, [pedagogyEvolutions, nursingEvolutions, physioEvolutions, psychEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+
+  const mergedNutritionEvolutions = useMemo(() => {
+    const list = [...nutritionEvolutions];
+    const registeredIds = new Set(list.map(e => e.id));
+    const others = [
+      ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...physioEvolutions.map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...psychEvolutions.map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...pedagogyEvolutions.map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...socialEvolutions.map(e => ({ ...e, sectorName: 'Serviço Social' }))
+    ];
+    others.forEach(other => {
+      if (!registeredIds.has(other.id) && isRoleOrUserTagged(other.coWorkers, ['NUTRICIONISTA'])) {
+        list.push({
+          id: other.id,
+          patientId: other.patientId || '',
+          date: other.date,
+          time: (other as any).time || '12:00',
+          acceptance: 'BOA',
+          hydrationLevel: 'BOM',
+          observations: (other as any).content || (other as any).evolution || (other as any).observation || (other as any).procedures || '',
+          conduct: (other as any).conduct || (other as any).conducts || (other as any).observations || (other as any).response || '',
+          registeredBy: (other as any).registeredBy || (other as any).professional || 'Sistema',
+          photos: other.photos || [],
+          coWorkers: other.coWorkers || []
+        });
+      }
+    });
+    return list;
+  }, [nutritionEvolutions, nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions, isRoleOrUserTagged]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).__allPatientsAndElderly = {
@@ -10569,18 +10868,48 @@ export default function App() {
         const userDocRef = doc(db, 'profiles', firebaseUser.uid);
         getDoc(userDocRef).then((docSnap) => {
           if (docSnap.exists()) {
-            setUser({ id: docSnap.id, ...docSnap.data() } as User);
+            const data = docSnap.data();
+            const isFranciara = firebaseUser.email === 'franciaraeabreucoelho@gmail.com';
+            const finalRole = isFranciara ? 'COORDENADORA' : (data?.role || 'COORDENADORA');
+            const finalName = isFranciara ? 'Franciara de Abreú Coelho' : (data?.name || firebaseUser.displayName || 'Usuário');
+            const finalEmail = firebaseUser.email || data?.email || '';
+
+            if (isFranciara && (data?.role !== 'COORDENADORA' || data?.name !== 'Franciara de Abreú Coelho')) {
+              updateDoc(userDocRef, {
+                role: 'COORDENADORA',
+                name: 'Franciara de Abreú Coelho',
+                email: 'franciaraeabreucoelho@gmail.com'
+              }).catch(e => console.error("Error auto-fixing admin profile doc:", e));
+            }
+
+            setUser({
+              id: docSnap.id,
+              ...data,
+              role: finalRole as Role,
+              name: finalName,
+              email: finalEmail,
+              photoUrl: firebaseUser.photoURL || data?.photoUrl || ''
+            } as User);
             setNeedsProfile(false);
-            console.log("👤 Perfil do usuário carregado:", docSnap.data()?.role);
+            console.log("👤 Perfil do usuário carregado:", finalRole);
             testConnection();
           } else {
             // Bypass para a criadora/admin se o documento não existir ou falhar por cota
             if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
+              setDoc(userDocRef, {
+                name: 'Franciara de Abreú Coelho',
+                role: 'COORDENADORA',
+                email: 'franciaraeabreucoelho@gmail.com',
+                photoUrl: firebaseUser.photoURL || '',
+                createdAt: new Date().toISOString()
+              }).catch(e => console.error("Error creating admin profile doc:", e));
+
               setUser({
                 id: firebaseUser.uid,
-                name: firebaseUser.displayName || 'Franciara Coelho',
+                name: 'Franciara de Abreú Coelho',
                 role: 'COORDENADORA',
-                photoUrl: firebaseUser.photoURL || ''
+                photoUrl: firebaseUser.photoURL || '',
+                email: 'franciaraeabreucoelho@gmail.com'
               });
               setNeedsProfile(false);
             } else {
@@ -10605,9 +10934,10 @@ export default function App() {
           if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
             setUser({
               id: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Franciara Coelho',
+              name: 'Franciara de Abreú Coelho',
               role: 'COORDENADORA',
-              photoUrl: firebaseUser.photoURL || ''
+              photoUrl: firebaseUser.photoURL || '',
+              email: 'franciaraeabreucoelho@gmail.com'
             });
             setNeedsProfile(false);
             console.log("⭐ Admin logada (Bypass de Perfil)");
@@ -11151,18 +11481,37 @@ export default function App() {
     if (user) {
       const qNotifications = query(
         collection(db, 'notifications'), 
-        where('targetRole', 'in', ['ALL', user.role]),
         orderBy('date', 'desc'), 
-        limit(50)
+        limit(150)
       );
       unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
-        setNotifications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+        const allNotifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+        const filtered = allNotifs.filter(n => {
+          if (n.targetUserId) {
+            return n.targetUserId === user.id;
+          }
+          if (n.targetEmail) {
+            return n.targetEmail.toLowerCase() === user.email?.toLowerCase() || 
+                   n.targetEmail.toLowerCase() === auth.currentUser?.email?.toLowerCase();
+          }
+          if (n.targetRole) {
+            return n.targetRole === 'ALL' || n.targetRole === user.role;
+          }
+          return true;
+        });
+        setNotifications(filtered);
         
         // Trigger browser notification for new items
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added' && !snapshot.metadata.hasPendingWrites) {
             const n = change.doc.data() as AppNotification;
-            if (window.Notification && Notification.permission === 'granted' && !n.read) {
+            const matchesUser = !n.targetUserId && !n.targetEmail
+              ? (!n.targetRole || n.targetRole === 'ALL' || n.targetRole === user.role)
+              : (n.targetUserId === user.id || 
+                 n.targetEmail?.toLowerCase() === user.email?.toLowerCase() || 
+                 n.targetEmail?.toLowerCase() === auth.currentUser?.email?.toLowerCase());
+
+            if (matchesUser && window.Notification && Notification.permission === 'granted' && !n.read) {
               // Priority for Service Worker implementation (better for mobile system trays)
               if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.ready.then(registration => {
@@ -11170,7 +11519,7 @@ export default function App() {
                     body: n.message,
                     icon: INSTITUTION_LOGO,
                     badge: INSTITUTION_LOGO,
-                    tag: n.id,
+                    tag: change.doc.id,
                     vibrate: [200, 100, 200],
                     renotify: true,
                     data: { url: n.link || '/' }
@@ -11192,10 +11541,20 @@ export default function App() {
           }
         });
       }, (err) => {
-        // If query fails (could be missing index), fallback to simpler query
-        const qSimple = query(collection(db, 'notifications'), limit(50));
+        // If query fails, fallback to simpler query
+        const qSimple = query(collection(db, 'notifications'), limit(150));
         onSnapshot(qSimple, (snap) => {
-          setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+          const allNotifs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+          const filtered = allNotifs.filter(n => {
+            if (n.targetUserId) return n.targetUserId === user.id;
+            if (n.targetEmail) {
+              return n.targetEmail.toLowerCase() === user.email?.toLowerCase() || 
+                     n.targetEmail.toLowerCase() === auth.currentUser?.email?.toLowerCase();
+            }
+            if (n.targetRole) return n.targetRole === 'ALL' || n.targetRole === user.role;
+            return true;
+          });
+          setNotifications(filtered);
         });
       });
     }
@@ -11282,6 +11641,8 @@ export default function App() {
   }, [isAuthReady, user?.id, user?.role, activeTab]);
 
   const handleGoogleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
     setLoginError(null);
     try {
       await signInWithPopup(auth, googleProvider);
@@ -11297,6 +11658,8 @@ export default function App() {
         setLoginError("Erro ao autenticar com Google. Tente novamente.");
         showToast("Erro ao autenticar com Google", 'error');
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -11366,9 +11729,71 @@ export default function App() {
         date: new Date().toISOString(),
         read: false
       };
-      await addDoc(collection(db, 'notifications'), newNotification);
+      await addDoc(collection(db, 'notifications'), cleanData(newNotification));
     } catch (err) {
       console.error("Error sending notification:", err);
+    }
+  };
+
+  const notifyTaggedCoWorkers = async (
+    currentCoWorkers: string[],
+    previousCoWorkers: string[],
+    title: string,
+    messageBuilder: (name: string) => string,
+    activityId?: string,
+    tipo?: string,
+    rotaDestino?: string,
+    link?: string
+  ) => {
+    try {
+      const newlyAdded = currentCoWorkers.filter(val => !previousCoWorkers.includes(val));
+      for (const value of newlyAdded) {
+        // Find recipient in users or professionals
+        const recipientUser = users.find(u => u.id === value || u.email === value || u.name === value || (u.name && u.name.toLowerCase() === value.toLowerCase()));
+        if (recipientUser) {
+          await sendNotification({
+            title,
+            message: messageBuilder(recipientUser.name),
+            type: 'SYSTEM',
+            targetRole: recipientUser.role,
+            professionalName: recipientUser.name,
+            targetUserId: recipientUser.id,
+            targetEmail: recipientUser.email || undefined,
+            usuarioId: recipientUser.id,
+            atividadeId: activityId,
+            tipo,
+            rotaDestino,
+            mensagem: messageBuilder(recipientUser.name),
+            data: new Date().toISOString(),
+            lida: false,
+            link
+          });
+          continue;
+        }
+
+        const recipientProf = professionals.find(p => p.id === value || p.email === value || p.name === value || (p.name && p.name.toLowerCase() === value.toLowerCase()));
+        if (recipientProf) {
+          await sendNotification({
+            title,
+            message: messageBuilder(recipientProf.name),
+            type: 'SYSTEM',
+            targetRole: recipientProf.role,
+            professionalName: recipientProf.name,
+            targetUserId: recipientProf.id,
+            targetEmail: recipientProf.email || undefined,
+            usuarioId: recipientProf.id || value,
+            atividadeId: activityId,
+            tipo,
+            rotaDestino,
+            mensagem: messageBuilder(recipientProf.name),
+            data: new Date().toISOString(),
+            lida: false,
+            link
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error sending coWorker notifications:", err);
     }
   };
 
@@ -11377,6 +11802,157 @@ export default function App() {
       await updateDoc(doc(db, 'notifications', id), { read: true });
     } catch (err) {
       console.error("Error marking notification as read:", err);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (err) {
+      console.error("Error deleting notification:", err);
+    }
+  };
+
+  const openRecordFromNotification = (tipo: string, recordId: string) => {
+    let match: any = null;
+    let sector = '';
+    let subTab = '';
+    let title = '';
+    let sectorLabel = '';
+
+    if (tipo === 'nursingEvolutions') {
+      match = nursingEvolutions.find(e => e.id === recordId);
+      sector = 'nursing';
+      subTab = 'evolutions';
+      title = 'Evolução de Enfermagem';
+      sectorLabel = 'Enfermagem';
+    } else if (tipo === 'physioEvolutions') {
+      match = physioEvolutions.find(e => e.id === recordId);
+      sector = 'physio';
+      subTab = 'evolution';
+      title = 'Evolução de Fisioterapia';
+      sectorLabel = 'Fisioterapia';
+    } else if (tipo === 'psychEvolutions') {
+      match = psychEvolutions.find(e => e.id === recordId);
+      sector = 'psychology';
+      subTab = 'evolution';
+      title = 'Evolução de Psicologia';
+      sectorLabel = 'Psicologia';
+    } else if (tipo === 'pedagogyEvolutions') {
+      match = pedagogyEvolutions.find(e => e.id === recordId);
+      sector = 'pedagogy';
+      subTab = 'evolution';
+      title = 'Evolução de Pedagogia';
+      sectorLabel = 'Pedagogia';
+    } else if (tipo === 'socialEvolutions') {
+      match = socialEvolutions.find(e => e.id === recordId);
+      sector = 'socialWork';
+      subTab = 'evolution';
+      title = 'Evolução de Serviço Social';
+      sectorLabel = 'Serviço Social';
+    } else if (tipo === 'nutritionEvolutions') {
+      match = nutritionEvolutions.find(e => e.id === recordId);
+      sector = 'nutrition';
+      subTab = 'evolutions';
+      title = 'Evolução de Nutrição';
+      sectorLabel = 'Nutrição';
+    } else if (tipo === 'workshops') {
+      match = workshops.find(w => w.id === recordId);
+      sector = 'workshops';
+      subTab = '';
+      title = 'Oficina';
+      sectorLabel = 'Oficinas';
+    } else if (tipo === 'psychActivities') {
+      match = psychActivities.find(a => a.id === recordId);
+      sector = 'psychology';
+      subTab = 'activities';
+      title = 'Atividade Prática (Psicologia)';
+      sectorLabel = 'Psicologia';
+    } else if (tipo === 'pedagogyActivities') {
+      match = pedagogyActivities.find(a => a.id === recordId);
+      sector = 'pedagogy';
+      subTab = 'activities';
+      title = 'Atividade Pedagógica';
+      sectorLabel = 'Pedagogia';
+    }
+
+    if (match) {
+      setActiveTab(sector as any);
+      if (subTab) {
+        localStorage.setItem(`oami-${sector}-tab`, subTab);
+        setSectorDefaultTabs(prev => ({
+          ...prev,
+          [sector]: subTab
+        }));
+      }
+
+      setSelectedActivityForView({
+        id: match.id,
+        type: tipo.toUpperCase().includes('EVOLUTION') ? 'EVOLUÇÃO' : (tipo.toUpperCase().includes('WORKSHOP') ? 'OFICINA' : 'ATIVIDADE'),
+        title: match.title || match.activityTitle || title,
+        date: match.date || '',
+        isCreator: match.registeredBy === user?.id,
+        sector: sectorLabel,
+        coWorkers: match.coWorkers || [],
+        registeredBy: match.registeredBy || '',
+        rawItem: match
+      });
+    } else {
+      showToast('Registro não encontrado ou ainda sincronizando.', 'error');
+    }
+  };
+
+  const handleSaveSharedActivity = async (collectionName: string, id: string, updatedData: any) => {
+    try {
+      const docRef = doc(db, collectionName, id);
+      await updateDoc(docRef, cleanData(updatedData));
+      
+      // Instant snap update for fast responsiveness
+      if (collectionName === 'nursingEvolutions') {
+        setNursingEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'physioEvolutions') {
+        setPhysioEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'psychEvolutions') {
+        setPsychEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'pedagogyEvolutions') {
+        setPedagogyEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'socialEvolutions') {
+        setSocialEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'nutritionEvolutions') {
+        setNutritionEvolutions(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      } else if (collectionName === 'workshops') {
+        setWorkshops(prev => prev.map(e => e.id === id ? { ...e, ...updatedData } : e));
+      }
+    } catch (err) {
+      console.error("Error updating shared activity:", err);
+      throw err;
+    }
+  };
+
+  const handleDeleteSharedActivity = async (collectionName: string, id: string) => {
+    try {
+      const docRef = doc(db, collectionName, id);
+      await deleteDoc(docRef);
+      
+      // Instant snap delete
+      if (collectionName === 'nursingEvolutions') {
+        setNursingEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'physioEvolutions') {
+        setPhysioEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'psychEvolutions') {
+        setPsychEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'pedagogyEvolutions') {
+        setPedagogyEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'socialEvolutions') {
+        setSocialEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'nutritionEvolutions') {
+        setNutritionEvolutions(prev => prev.filter(e => e.id !== id));
+      } else if (collectionName === 'workshops') {
+        setWorkshops(prev => prev.filter(w => w.id !== id));
+      }
+    } catch (err) {
+      console.error("Error deleting shared activity:", err);
+      throw err;
     }
   };
 
@@ -11440,11 +12016,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(db, 'physioEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'physioEvolutions'), cleanedData);
+        const docRef = await addDoc(collection(db, 'physioEvolutions'), cleanedData);
+        recordId = docRef.id;
         showToast('Evolução registrada com sucesso');
       }
 
@@ -11453,22 +12031,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (physioEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Fisioterapia por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Fisioterapia por ${user?.name || 'um colega'}.`,
+          recordId,
+          'physioEvolutions',
+          'physio'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de fisioterapia:", notifErr);
       }
@@ -11672,11 +12244,13 @@ export default function App() {
   const handleSaveNursingEvolution = async (data: Omit<NursingEvolution, 'id'>, id?: string) => {
     try {
       const cleanedData = cleanData(data);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(db, 'nursingEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'nursingEvolutions'), cleanedData);
+        const docRef = await addDoc(collection(db, 'nursingEvolutions'), cleanedData);
+        recordId = docRef.id;
         showToast('Evolução registrada com sucesso');
       }
 
@@ -11685,22 +12259,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = data.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (nursingEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Enfermagem por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Enfermagem por ${user?.name || 'um colega'}.`,
+          recordId,
+          'nursingEvolutions',
+          'nursing'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de enfermagem:", notifErr);
       }
@@ -11933,11 +12501,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(db, 'psychEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychEvolutions'), cleanedData);
+        const docRef = await addDoc(collection(db, 'psychEvolutions'), cleanedData);
+        recordId = docRef.id;
         showToast('Evolução registrada com sucesso');
       }
 
@@ -11946,22 +12516,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (psychEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Psicologia por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Psicologia por ${user?.name || 'um colega'}.`,
+          recordId,
+          'psychEvolutions',
+          'psychology'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de psicologia:", notifErr);
       }
@@ -12036,11 +12600,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(doc(db, 'psychActivities', id).parent, id), cleanedData);
         showToast('Atividade atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'psychActivities'), cleanedData);
+        const docRef = await addDoc(collection(db, 'psychActivities'), cleanedData);
+        recordId = docRef.id;
         showToast('Atividade registrada com sucesso');
       }
 
@@ -12049,22 +12615,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (psychActivities.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Atividade em Conjunto',
-              message: `Você foi adicionado como colaborador na atividade de Psicologia "${rest.title}" por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Atividade em Conjunto',
+          (name) => `Você foi adicionado como colaborador na atividade de Psicologia "${rest.title}" por ${user?.name || 'um colega'}.`,
+          recordId,
+          'psychActivities',
+          'psychology'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de psicologia:", notifErr);
       }
@@ -12160,11 +12720,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(db, 'pedagogyEvolutions', id), cleanedData);
         showToast('Evolução atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyEvolutions'), cleanedData);
+        const docRef = await addDoc(collection(db, 'pedagogyEvolutions'), cleanedData);
+        recordId = docRef.id;
         showToast('Evolução registrada com sucesso');
       }
 
@@ -12173,22 +12735,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (pedagogyEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Pedagogia por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Pedagogia por ${user?.name || 'um colega'}.`,
+          recordId,
+          'pedagogyEvolutions',
+          'pedagogy'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de pedagogia:", notifErr);
       }
@@ -12202,11 +12758,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(doc(db, 'pedagogyActivities', id!).parent, id!), cleanedData);
         showToast('Atividade atualizada com sucesso');
       } else {
-        await addDoc(collection(db, 'pedagogyActivities'), cleanedData);
+        const docRef = await addDoc(collection(db, 'pedagogyActivities'), cleanedData);
+        recordId = docRef.id;
         showToast('Atividade registrada com sucesso');
       }
 
@@ -12215,22 +12773,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (pedagogyActivities.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Atividade em Conjunto',
-              message: `Você foi adicionado como colaborador na atividade de Pedagogia "${rest.title}" por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Atividade em Conjunto',
+          (name) => `Você foi adicionado como colaborador na atividade de Pedagogia "${rest.title}" por ${user?.name || 'um colega'}.`,
+          recordId,
+          'pedagogyActivities',
+          'pedagogy'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de pedagogia:", notifErr);
       }
@@ -12572,22 +13124,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (socialEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Serviço Social por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Serviço Social por ${user?.name || 'um colega'}.`,
+          evolutionId,
+          'socialEvolutions',
+          'socialWork'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de serviço social:", notifErr);
       }
@@ -12883,11 +13429,13 @@ export default function App() {
     try {
       const { id, ...rest } = data;
       const cleanedData = cleanData(rest);
+      let recordId = id || '';
       if (id) {
         await updateDoc(doc(db, 'nutritionEvolutions', id), cleanedData);
         showToast('Evolução nutricional atualizada');
       } else {
-        await addDoc(collection(db, 'nutritionEvolutions'), cleanedData);
+        const docRef = await addDoc(collection(db, 'nutritionEvolutions'), cleanedData);
+        recordId = docRef.id;
         showToast('Evolução nutricional registrada');
       }
 
@@ -12896,22 +13444,16 @@ export default function App() {
         const isNew = !id;
         const currentCoWorkers = rest.coWorkers || [];
         const previousCoWorkers = isNew ? [] : (nutritionEvolutions.find(a => a.id === id)?.coWorkers || []);
-        const newlyAdded = isNew 
-          ? currentCoWorkers 
-          : currentCoWorkers.filter(idOrEmail => !previousCoWorkers.includes(idOrEmail));
-
-        for (const value of newlyAdded) {
-          const prof = professionals.find(p => p.id === value || p.email === value || p.name === value);
-          if (prof) {
-            await sendNotification({
-              title: 'Nova Evolução em Conjunto',
-              message: `Você foi adicionado como colaborador na evolução de Nutrição por ${user?.name || 'um colega'}.`,
-              type: 'SYSTEM',
-              targetRole: prof.role,
-              professionalName: prof.name
-            });
-          }
-        }
+        
+        await notifyTaggedCoWorkers(
+          currentCoWorkers,
+          previousCoWorkers,
+          'Nova Evolução em Conjunto',
+          (name) => `Você foi adicionado como colaborador do atendimento de Nutrição por ${user?.name || 'um colega'}.`,
+          recordId,
+          'nutritionEvolutions',
+          'nutrition'
+        );
       } catch (notifErr) {
         console.error("Erro ao enviar notificações de nutrição:", notifErr);
       }
@@ -12982,6 +13524,7 @@ export default function App() {
         onCompleteProfile={handleCompleteProfile}
         needsProfile={needsProfile}
         error={loginError}
+        isLoggingIn={isLoggingIn}
       />
     );
   }
@@ -13034,10 +13577,24 @@ export default function App() {
           elderly={elderly}
           patients={physioPatientsList}
           assessments={physioAssessments}
-          evolutions={physioEvolutions}
+          evolutions={mergedPhysioEvolutions}
           exercises={physioExercises}
           appointments={physioAppointments}
           professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           showToast={showToast}
           onSavePatient={handleSavePhysioPatient}
           onDeletePatient={handleDeletePhysioPatient}
@@ -13062,13 +13619,26 @@ export default function App() {
           administrations={medicationAdministrations}
           vitalSigns={vitalSigns}
           dressings={dressingRecords}
-          evolutions={nursingEvolutions}
+          evolutions={mergedNursingEvolutions}
           incidents={incidentRecords}
           shifts={shiftSchedules}
           users={users}
           professionals={professionals}
           avds={avdRecords}
           diaperChanges={diaperChangeRecords}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           showToast={showToast}
           onSavePatient={handleSaveNursingPatient}
           onDeletePatient={handleDeleteNursingPatient}
@@ -13095,7 +13665,7 @@ export default function App() {
           elderly={elderly}
           patients={psychPatientsList}
           initialAssessments={psychInitialAssessments}
-          evolutions={psychEvolutions}
+          evolutions={mergedPsychEvolutions}
           appointments={psychAppointments}
           emotionalMonitorings={psychEmotionalMonitorings}
           familyBonds={psychFamilyBonds}
@@ -13103,6 +13673,20 @@ export default function App() {
           cognitionAssessments={psychCognitionAssessments}
           interventionPlans={psychInterventionPlans}
           professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           sendNotification={sendNotification}
           showToast={showToast}
           onSavePatient={handleSavePsychPatient}
@@ -13129,13 +13713,27 @@ export default function App() {
           elderly={elderly}
           patients={pedagogyPatientsList}
           assessments={pedagogyInitialAssessments}
-          evolutions={pedagogyEvolutions}
+          evolutions={mergedPedagogyEvolutions}
           activities={pedagogyActivities}
           stimulationTrackings={pedagogyStimulationTrackings}
           socialParticipations={pedagogySocialParticipations}
           individualPlans={pedagogyIndividualPlans}
           lifeHistories={pedagogyLifeHistories}
           professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           sendNotification={sendNotification}
           onSavePatient={handleSavePedagogyPatient}
           onSaveAssessment={handleSavePedagogyAssessment}
@@ -13164,12 +13762,26 @@ export default function App() {
           documentations={socialDocumentations}
           legalSituations={socialLegalSituations}
           socialStudies={socialStudies}
-          evolutions={socialEvolutions}
+          evolutions={mergedSocialEvolutions}
           referrals={socialReferrals}
           familyVisits={socialFamilyVisits}
           riskSituations={socialRiskSituations}
           pias={pias}
           professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           onSavePatient={handleSaveSocialPatient}
           onSaveFamilyTie={handleSaveSocialFamilyTie}
           onSaveDocumentation={handleSaveSocialDocumentation}
@@ -13195,10 +13807,24 @@ export default function App() {
           user={user}
           elderly={elderly}
           patients={nutritionPatientsList}
-          evolutions={nutritionEvolutions}
+          evolutions={mergedNutritionEvolutions}
           anthropometries={nutritionAnthropometries}
           mealPlans={nutritionMealPlans}
           professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveCollaborationEvolution={handleSaveSharedActivity}
+          onDeleteCollaborationEvolution={handleDeleteSharedActivity}
           showToast={showToast}
           onSavePatient={handleSaveNutritionPatient}
           onSaveEvolution={handleSaveNutritionEvolution}
@@ -13255,6 +13881,7 @@ export default function App() {
           showToast={showToast} 
           user={user!}
           sendNotification={sendNotification}
+          notifyTaggedCoWorkers={notifyTaggedCoWorkers}
         />
       );
       case 'monitoring': return (
@@ -13331,6 +13958,28 @@ export default function App() {
           onSaveFinal={handleSaveDiaperFinalPacking}
           onSaveGoal={handleSaveDiaperProductionGoal}
           onDeleteRecord={handleDeleteDiaperRecord}
+          showToast={showToast}
+        />
+      );
+      case 'productivity': return (
+        <ProductivitySection 
+          user={user}
+          professionals={professionals}
+          nursingEvolutions={nursingEvolutions}
+          physioEvolutions={physioEvolutions}
+          psychEvolutions={psychEvolutions}
+          pedagogyEvolutions={pedagogyEvolutions}
+          socialEvolutions={socialEvolutions}
+          nutritionEvolutions={nutritionEvolutions}
+          workshops={workshops}
+          notifications={notifications}
+          elderly={elderly}
+          onDeleteNotification={async (id, e) => {
+            e.stopPropagation();
+            await deleteNotification(id);
+          }}
+          onSaveEvolution={handleSaveSharedActivity}
+          onDeleteEvolution={handleDeleteSharedActivity}
           showToast={showToast}
         />
       );
@@ -13473,7 +14122,11 @@ export default function App() {
                               )}
                               onClick={() => {
                                 markNotificationAsRead(n.id);
-                                if (n.link) setActiveTab(n.link as any);
+                                if (n.tipo && n.atividadeId) {
+                                  openRecordFromNotification(n.tipo, n.atividadeId);
+                                } else if (n.link) {
+                                  setActiveTab(n.link as any);
+                                }
                                 setIsNotificationsOpen(false);
                               }}
                             >
@@ -13637,6 +14290,8 @@ export default function App() {
           socialEvolutions={socialEvolutions}
           nutritionEvolutions={nutritionEvolutions}
           professionals={professionals}
+          setSelectedActivityForView={setSelectedActivityForView}
+          users={users}
         />
       )}
 
@@ -13649,6 +14304,16 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {selectedActivityForView && (
+        <ActivityDetailsModal 
+          activity={selectedActivityForView}
+          onClose={() => setSelectedActivityForView(null)}
+          professionals={professionals}
+          elderly={elderly}
+          users={users}
+        />
+      )}
     </div>
   );
 }

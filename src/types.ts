@@ -320,6 +320,14 @@ export interface Professional {
   status: 'ATIVO' | 'INATIVO';
   observations?: string;
   createdAt: string;
+  sector?: string;
+  photoUrl?: string;
+  permissions?: string[];
+  uid?: string;
+  perfil?: string;
+  setor?: string;
+  permissões?: string[];
+  cargo?: string;
 }
 
 export interface ProfessionalEvaluation {
@@ -365,6 +373,7 @@ export interface PhysioPatient {
 export interface PhysioAssessment {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   complaint: string;
   hda?: string; // História da Doença Atual
@@ -395,6 +404,7 @@ export interface PhysioAssessment {
 export interface PhysioEvolution {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   procedures: string;
   evolution: string;
@@ -402,6 +412,7 @@ export interface PhysioEvolution {
   painLevel?: number;
   photos?: string[];
   coWorkers?: string[];
+  registeredBy?: string;
 }
 
 export interface PhysioExercise {
@@ -601,6 +612,7 @@ export interface PsychInitialAssessment {
 export interface PsychEvolution {
   id: string;
   patientId: string;
+  patientIds?: string[];
   targetName?: string;
   targetType?: string;
   date: string;
@@ -615,6 +627,7 @@ export interface PsychEvolution {
 export interface PsychAppointment {
   id: string;
   patientId: string;
+  patientIds?: string[];
   targetName?: string;
   targetType?: string;
   date: string;
@@ -628,6 +641,7 @@ export interface PsychAppointment {
 export interface PsychEmotionalMonitoring {
   id: string;
   patientId: string;
+  patientIds?: string[];
   targetName?: string;
   targetType?: string;
   date: string;
@@ -643,6 +657,7 @@ export interface PsychEmotionalMonitoring {
 export interface PsychFamilyBond {
   id: string;
   patientId: string;
+  patientIds?: string[];
   targetName?: string;
   targetType?: string;
   date: string;
@@ -660,6 +675,7 @@ export interface PsychActivity {
   type: 'OFICINA' | 'DINAMICA' | 'GRUPO';
   description: string;
   participants: string[]; // patientIds
+  patientIds?: string[];
   registeredBy: string;
   photos?: string[];
   coWorkers?: string[];
@@ -668,6 +684,7 @@ export interface PsychActivity {
 export interface PsychCognitionAssessment {
   id: string;
   patientId: string;
+  patientIds?: string[];
   targetName?: string;
   targetType?: string;
   date: string;
@@ -681,6 +698,7 @@ export interface PsychCognitionAssessment {
 export interface PsychInterventionPlan {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   objectives: string;
   strategies: string;
@@ -832,6 +850,7 @@ export interface FamilyMember {
 export interface SocialFamilyTie {
   id: string;
   patientId: string;
+  patientIds?: string[];
   hasFamily: boolean;
   members: FamilyMember[];
   observations: string;
@@ -843,6 +862,7 @@ export interface SocialFamilyTie {
 export interface SocialDocumentation {
   id: string;
   patientId: string;
+  patientIds?: string[];
   rg: 'COMPLETO' | 'PENDENTE' | 'INEXISTENTE';
   cpf: 'COMPLETO' | 'PENDENTE' | 'INEXISTENTE';
   sus: 'COMPLETO' | 'PENDENTE' | 'INEXISTENTE';
@@ -855,6 +875,7 @@ export interface SocialDocumentation {
 export interface SocialLegalSituation {
   id: string;
   patientId: string;
+  patientIds?: string[];
   hasCurator: boolean;
   curatorName?: string;
   isInterdicted: boolean;
@@ -868,6 +889,7 @@ export interface SocialLegalSituation {
 export interface SocialStudy {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   lifeHistory: string;
   socialConditions: string;
@@ -880,6 +902,7 @@ export interface SocialStudy {
 export interface SocialEvolution {
   id: string;
   patientId?: string;
+  patientIds?: string[];
   date: string;
   serviceType: string;
   observation: string;
@@ -893,6 +916,7 @@ export interface SocialEvolution {
 export interface SocialReferral {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   destination: 'CRAS' | 'CREAS' | 'INSS' | 'DEFENSORIA' | 'SAUDE' | 'OUTRO';
   description: string;
@@ -904,6 +928,7 @@ export interface SocialReferral {
 export interface SocialFamilyVisit {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   visitorName: string;
   kinship: string;
@@ -914,6 +939,7 @@ export interface SocialFamilyVisit {
 export interface SocialRiskSituation {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   type: 'ABANDONO' | 'NEGLIGENCIA' | 'VIOLACAO_DIREITOS' | 'OUTRO';
   description: string;
@@ -940,6 +966,7 @@ export interface NutritionPatient {
 export interface NutritionEvolution {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   time?: string;
   acceptance: 'BOA' | 'REGULAR' | 'RUIM';
@@ -957,6 +984,7 @@ export interface NutritionEvolution {
 export interface NutritionAnthropometry {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   weight: number;
   height: number;
@@ -971,6 +999,7 @@ export interface NutritionAnthropometry {
 export interface NutritionMealPlan {
   id: string;
   patientId: string;
+  patientIds?: string[];
   date: string;
   breakfast: string;
   morningSnack?: string;
@@ -992,5 +1021,14 @@ export interface AppNotification {
   targetRole?: Role | 'ALL';
   professionalName?: string;
   link?: string;
+  targetUserId?: string;
+  targetEmail?: string;
+  usuarioId?: string;
+  atividadeId?: string;
+  tipo?: string;
+  rotaDestino?: string;
+  mensagem?: string;
+  data?: string;
+  lida?: boolean;
 }
 

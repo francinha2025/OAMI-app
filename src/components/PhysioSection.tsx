@@ -21,14 +21,20 @@ import {
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
+import { MultiPatientSelector } from './MultiPatientSelector';
 import { ROLE_LABELS } from '../constants';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
-import { PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType, Elderly } from '../types';
+import { 
+  PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, User as UserType, Elderly, 
+  Professional, NursingEvolution, PsychEvolution, PedagogyEvolution, SocialEvolution, NutritionEvolution, Workshop, AppNotification 
+} from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
+import { ProductivitySection } from './ProductivitySection';
+import { Award } from 'lucide-react';
 
 interface PhysioSectionProps {
   user: UserType;
@@ -38,7 +44,22 @@ interface PhysioSectionProps {
   evolutions: PhysioEvolution[];
   exercises: PhysioExercise[];
   appointments: PhysioAppointment[];
-  professionals?: any[];
+  professionals?: Professional[];
+  nursingEvolutions?: NursingEvolution[];
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onSavePatient: (data: Omit<PhysioPatient, 'id'>, id?: string) => Promise<void>;
   onDeletePatient: (id: string) => Promise<void>;
@@ -63,6 +84,17 @@ export const PhysioSection = ({
   exercises, 
   appointments,
   professionals = [],
+  nursingEvolutions = [],
+  physioEvolutions = [],
+  psychEvolutions = [],
+  pedagogyEvolutions = [],
+  socialEvolutions = [],
+  nutritionEvolutions = [],
+  workshops = [],
+  notifications = [],
+  onDeleteNotification,
+  onSaveCollaborationEvolution,
+  onDeleteCollaborationEvolution,
   showToast,
   onSavePatient,
   onDeletePatient,
@@ -75,7 +107,11 @@ export const PhysioSection = ({
   theme,
   setTheme,
   onLogout,
-  onUpdateProfile
+  onUpdateProfile,
+  psychActivities = [],
+  pedagogyActivities = [],
+  onViewActivity,
+  defaultTab
 }: PhysioSectionProps) => {
   const [activeSubTab, setActiveSubTab] = useState(() => {
     const saved = localStorage.getItem('oami-physio-tab');
@@ -94,9 +130,25 @@ export const PhysioSection = ({
   const [assessmentPatientFilter, setAssessmentPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'assessment' | 'evolution' | 'exercise' | 'appointment' } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<PhysioEvolution | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+   const [searchQuery, setSearchQuery] = useState('');
   const [reportPatientId, setReportPatientId] = useState('');
   const [reportMonth, setReportMonth] = useState(format(new Date(), 'yyyy-MM'));
+  
+  // Integrated report states
+  const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'assessments', 'exercises', 'appointments'
+  ]);
 
   const filteredPatients = useMemo(() => {
     return (patients || []).filter(p => 
@@ -108,6 +160,12 @@ export const PhysioSection = ({
   useEffect(() => {
     localStorage.setItem('oami-physio-tab', activeSubTab);
   }, [activeSubTab]);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveSubTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -316,6 +374,481 @@ export const PhysioSection = ({
     });
   }, [evolutions]);
 
+  const renderReports = () => {
+    const isDateInSelectedRange = (dateStr: string) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
+      }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
+
+    // Filtered lists based on reportsPatientFilter
+    const matchedPatients = (patients || []).filter(p => {
+      const matchPatient = !reportsPatientFilter || p.id === reportsPatientFilter;
+      return matchPatient;
+    });
+
+    const isPatientInList = (pId: string) => {
+      return matchedPatients.some(p => p.id === pId);
+    };
+
+    // Filtered Evolutions
+    const filteredEvolutions = (evolutions || []).filter(e => {
+      return isPatientInList(e.patientId) && isDateInSelectedRange(e.date);
+    });
+
+    // Filtered Assessments
+    const filteredAssessments = (assessments || []).filter(as => {
+      return isPatientInList(as.patientId) && isDateInSelectedRange(as.date);
+    });
+
+    // Filtered Exercises (since exercise has no patientId, if reportsPatientFilter is active we could either list all or none, let's list all exercises if format is global or they are selected)
+    const filteredExercises = exercises || [];
+
+    // Filtered Appointments
+    const filteredAppointments = (appointments || []).filter(ap => {
+      return isPatientInList(ap.patientId) && isDateInSelectedRange(ap.date);
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
+      } else {
+        setReportSelectedSections([...reportSelectedSections, section]);
+      }
+    };
+
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(patients || []).find(p => p.id === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Fisioterapia | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Procedimentos Tratados', 'Evolução Clínica', 'Grau de Dor']
+          : ['Data', 'Idoso', 'Procedimentos Tratados', 'Evolução Clínica', 'Grau de Dor'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (patients || []).find(pt => pt.id === e.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, e.procedures, e.evolution, e.painLevel !== undefined ? `${e.painLevel}/10` : '-']
+            : [dtFmt, name, e.procedures, e.evolution, e.painLevel !== undefined ? `${e.painLevel}/10` : '-'];
+        });
+        
+        sections.push({ title: 'Evoluções Fisioterapêuticas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('assessments') && filteredAssessments.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Queixa Principal', 'Diagnóstico Funcional / Médico', 'Objetivos e Plano de Tratamento', 'Risco de Queda']
+          : ['Data', 'Idoso', 'Queixa Principal', 'Diagnóstico Funcional / Médico', 'Objetivos e Plano de Tratamento', 'Risco de Queda'];
+          
+        const data = filteredAssessments.map(as => {
+          const p = (patients || []).find(pt => pt.id === as.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(as.date), 'dd/MM/yyyy');
+          const treatmentInfo = `Objetivos: ${as.treatmentObjectives || '-'}\nPlano: ${as.treatmentPlan || '-'}`;
+          const diagInfo = `Médico: ${as.medicalDiagnosis || '-'}\nFuncional: ${as.functionalDiagnosis || '-'}`;
+          return reportsPatientFilter
+            ? [dtFmt, as.complaint, diagInfo, treatmentInfo, as.fallRisk || 'N/A']
+            : [dtFmt, name, as.complaint, diagInfo, treatmentInfo, as.fallRisk || 'N/A'];
+        });
+        
+        sections.push({ title: 'Avaliações de Fisioterapia', columns, data });
+      }
+
+      if (reportSelectedSections.includes('appointments') && filteredAppointments.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data / Hora', 'Status', 'Observações']
+          : ['Data / Hora', 'Idoso', 'Status', 'Observações'];
+          
+        const data = filteredAppointments.map(ap => {
+          const p = (patients || []).find(pt => pt.id === ap.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = `${format(parseISO(ap.date), 'dd/MM/yyyy')} às ${ap.time}`;
+          return reportsPatientFilter
+            ? [dtFmt, ap.status, ap.observations || '-']
+            : [dtFmt, name, ap.status, ap.observations || '-'];
+        });
+        
+        sections.push({ title: 'Histórico de Atendimentos', columns, data });
+      }
+
+      if (reportSelectedSections.includes('exercises') && filteredExercises.length > 0) {
+        const columns = ['Título do Exercício', 'Categoria', 'Descrição / Protocolo'];
+        const data = filteredExercises.map(ex => {
+          return [ex.title, ex.category, ex.description];
+        });
+        
+        sections.push({ title: 'Biblioteca de Protocolos e Exercícios de Reabilitação', columns, data });
+      }
+
+      if (sections.length === 0) {
+        showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário Fisioterapêutico - ${patients.find(p => p.id === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Atividades (Fisioterapia)';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_fisioterapia_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Categoria', 'Data/Período', 'Paciente/Idoso', 'Descrição / Registro'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = patients.find(p => p.id === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1).join(' | ')
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2).join(' | ')
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_fisioterapia_doc`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredAssessments.length === 0 && 
+      filteredAppointments.length === 0 &&
+      (!reportSelectedSections.includes('exercises') || filteredExercises.length === 0);
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de fisioterapia para impressão oficial. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Residente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {patients.map(p => {
+                    const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                    return (
+                      <option key={p.id} value={p.id}>{(linked?.name || p.name || '').toUpperCase()}</option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-855 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções Fisioterapêuticas', desc: 'Registros diários do progresso motor.', icon: Activity, color: 'text-emerald-500', count: filteredEvolutions.length },
+              { id: 'assessments', title: 'Avaliações Clínicas', desc: 'Queixas, exames e diagnóstico funcional.', icon: ClipboardList, color: 'text-blue-500', count: filteredAssessments.length },
+              { id: 'appointments', title: 'Histórico de Consultas', desc: 'Presenças, faltas e agendamentos.', icon: Calendar, color: 'text-yellow-500', count: filteredAppointments.length },
+              { id: 'exercises', title: 'Biblioteca de Protocolos', desc: 'Exercícios cadastrados e orientados.', icon: Dumbbell, color: 'text-pink-500', count: filteredExercises.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={14} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-250 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Pronta para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros cadastrados para os filtros selecionados. Cadastre evoluções ou mude as datas para habilitar relatórios."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'assessments') return filteredAssessments.length > 0;
+                      if (s === 'appointments') return filteredAppointments.length > 0;
+                      if (s === 'exercises') return filteredExercises.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-205 dark:shadow-none"
+              )}
+            >
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-205 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'patients', label: 'Pacientes', icon: Users },
@@ -323,6 +856,7 @@ export const PhysioSection = ({
     { id: 'evolution', label: 'Evolução', icon: LineChart },
     { id: 'exercises', label: 'Exercícios', icon: Dumbbell },
     { id: 'agenda', label: 'Agenda', icon: Calendar },
+    { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
     { id: 'reports', label: 'Relatórios', icon: FileText },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
@@ -596,7 +1130,7 @@ export const PhysioSection = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(assessments || []).filter(a => !assessmentPatientFilter || a.patientId === assessmentPatientFilter).map((a) => {
+                {(assessments || []).filter(a => !assessmentPatientFilter || a.patientId === assessmentPatientFilter || a.patientIds?.includes(assessmentPatientFilter)).map((a) => {
                   const patient = (patients || []).find(p => p.id === a.patientId);
                   return (
                     <div 
@@ -610,7 +1144,11 @@ export const PhysioSection = ({
                             <ClipboardList size={24} />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors line-clamp-1">{patient?.name || 'N/A'}</h4>
+                            <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors line-clamp-1">
+                              {a.patientIds && a.patientIds.length > 1
+                                ? a.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                                : (patient?.name || 'N/A')}
+                            </h4>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(a.date), 'dd/MM/yyyy')}</p>
                           </div>
                         </div>
@@ -708,7 +1246,7 @@ export const PhysioSection = ({
               </div>
 
               <div className="space-y-4">
-                {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).map((e) => {
+                {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).map((e) => {
                   const patient = (patients || []).find(p => p.id === e.patientId);
                   return (
                     <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
@@ -718,7 +1256,11 @@ export const PhysioSection = ({
                             <Activity size={20} />
                           </div>
                           <div>
-                            <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name || 'N/A'}</h4>
+                            <h4 className="font-bold text-gray-800 dark:text-white">
+                              {e.patientIds && e.patientIds.length > 1
+                                ? e.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                                : (patient?.name || 'N/A')}
+                            </h4>
                             <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(e.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
                           </div>
                         </div>
@@ -897,94 +1439,42 @@ export const PhysioSection = ({
             </motion.div>
           )}
 
-          {activeSubTab === 'reports' && (
+          {activeSubTab === 'reports' && renderReports()}
+
+          {activeSubTab === 'productivity' && (
             <motion.div
-              key="reports"
+              key="productivity"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="space-y-8"
             >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Relatórios e Documentos</h2>
-                  <p className="text-gray-500 dark:text-gray-400">Exportação de dados e prontuários em PDF</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center">
-                    <FileText size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">Prontuário Completo</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gere um PDF com todo o histórico, avaliações e evoluções do paciente.</p>
-                  </div>
-                  <div className="space-y-4">
-                    <select 
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white"
-                      value={reportPatientId}
-                      onChange={(e) => setReportPatientId(e.target.value)}
-                    >
-                      <option value="">Selecionar Paciente...</option>
-                      {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <div className="flex gap-4">
-                      <button 
-                        onClick={handleGeneratePatientPDF}
-                        className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all"
-                      >
-                        <Download size={20} />
-                        PDF
-                      </button>
-                      <button 
-                        onClick={handleGeneratePatientWord}
-                        className="flex-1 flex items-center justify-center gap-2 bg-blue-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-600 transition-all"
-                      >
-                        <FileText size={20} />
-                        Word
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-2xl flex items-center justify-center">
-                    <TrendingUp size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">Relatório de Atividades</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Resumo mensal de atendimentos, faltas e produtividade.</p>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <input 
-                        type="month" 
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white" 
-                        value={reportMonth}
-                        onChange={(e) => setReportMonth(e.target.value)}
-                      />
-                      <div className="flex gap-4">
-                        <button 
-                          onClick={handleGenerateActivityPDF}
-                          className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-green-700 transition-all"
-                        >
-                          <Download size={20} />
-                          PDF
-                        </button>
-                        <button 
-                          onClick={handleGenerateActivityWord}
-                          className="flex-1 flex items-center justify-center gap-2 bg-green-500 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-green-600 transition-all"
-                        >
-                          <FileText size={20} />
-                          Word
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ProductivitySection
+                user={user}
+                professionals={professionals}
+                nursingEvolutions={nursingEvolutions}
+                physioEvolutions={physioEvolutions}
+                psychEvolutions={psychEvolutions}
+                pedagogyEvolutions={pedagogyEvolutions}
+                socialEvolutions={socialEvolutions}
+                nutritionEvolutions={nutritionEvolutions}
+                workshops={workshops}
+                notifications={notifications}
+                elderly={elderly}
+                onDeleteNotification={async (id, e) => {
+                  e.stopPropagation();
+                  if (onDeleteNotification) {
+                    onDeleteNotification(id, e);
+                  }
+                }}
+                onSaveEvolution={onSaveCollaborationEvolution || (async () => {})}
+                onDeleteEvolution={onDeleteCollaborationEvolution || (async () => {})}
+                showToast={showToast}
+                targetSector="Fisioterapia"
+                targetRole="FISIOTERAPEUTA"
+                psychActivities={psychActivities}
+                pedagogyActivities={pedagogyActivities}
+                onViewActivity={onViewActivity}
+              />
             </motion.div>
           )}
 
@@ -1865,6 +2355,8 @@ const AssessmentForm = ({
     medicalHistory: initialData?.medicalHistory || '',
     photos: initialData?.photos || []
   });
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>(initialData?.patientId ? [initialData.patientId] : []);
+  const [isMulti, setIsMulti] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
   const handleDigitize = async (text: string) => {
@@ -1895,10 +2387,24 @@ const AssessmentForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { photos, ...data } = formData;
-    await onSave(data);
-    if (photos.length > 0) {
-      const patient = (patients || []).find(p => p.id === formData.patientId);
-      await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Avaliação Fisioterapêutica', formData.complaint);
+    
+    if (isMulti && selectedPatientIds.length > 0) {
+      const primaryPid = selectedPatientIds[0];
+      await onSave({ ...data, patientId: primaryPid, patientIds: selectedPatientIds });
+      if (photos.length > 0) {
+        const patient = (patients || []).find(p => p.id === primaryPid);
+        await onSavePhotos(photos, primaryPid, patient?.name || 'Paciente', 'Avaliação Fisioterapêutica', formData.complaint);
+      }
+    } else {
+      if (!formData.patientId) {
+        alert('Por favor, selecione pelo menos um idoso!');
+        return;
+      }
+      await onSave(data);
+      if (photos.length > 0) {
+        const patient = (patients || []).find(p => p.id === formData.patientId);
+        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Avaliação Fisioterapêutica', formData.complaint);
+      }
     }
   };
 
@@ -1928,18 +2434,19 @@ const AssessmentForm = ({
           <UserIcon size={14} />
           Identificação & Data
         </h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
-            <select 
-              value={formData.patientId}
-              onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-              disabled={isDetailView}
-              className="w-full p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white disabled:opacity-75"
-            >
-              <option value="">Selecionar Paciente...</option>
-              {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+          <div className="col-span-full">
+            <MultiPatientSelector 
+              patients={patients.map(p => ({ id: p.id, name: p.name }))}
+              selectedIds={selectedPatientIds}
+              onChange={setSelectedPatientIds}
+              singleValue={formData.patientId}
+              onSingleChange={id => setFormData({ ...formData, patientId: id })}
+              isMulti={isMulti}
+              onToggleMulti={setIsMulti}
+              accentColor="green"
+              label="Paciente(s) Avaliado(s)"
+            />
           </div>
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase ml-1">Data da Avaliação</label>
@@ -2290,6 +2797,8 @@ const EvolutionForm = ({
     photos: initialData?.photos || [],
     coWorkers: initialData?.coWorkers || []
   });
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>(initialData?.patientId ? [initialData.patientId] : []);
+  const [isMulti, setIsMulti] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [profSearch, setProfSearch] = useState('');
 
@@ -2313,10 +2822,24 @@ const EvolutionForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { photos, ...data } = formData;
-    await onSave(data);
-    if (photos.length > 0) {
-      const patient = (patients || []).find(p => p.id === formData.patientId);
-      await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Evolução Fisioterapêutica', formData.evolution);
+    
+    if (isMulti && selectedPatientIds.length > 0) {
+      const primaryPid = selectedPatientIds[0];
+      await onSave({ ...data, patientId: primaryPid, patientIds: selectedPatientIds });
+      if (photos.length > 0) {
+        const patient = (patients || []).find(p => p.id === primaryPid);
+        await onSavePhotos(photos, primaryPid, patient?.name || 'Paciente', 'Evolução Fisioterapêutica', formData.evolution);
+      }
+    } else {
+      if (!formData.patientId) {
+        alert('Por favor, selecione pelo menos um idoso!');
+        return;
+      }
+      await onSave(data);
+      if (photos.length > 0) {
+        const patient = (patients || []).find(p => p.id === formData.patientId);
+        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', 'Evolução Fisioterapêutica', formData.evolution);
+      }
     }
   };
 
@@ -2329,7 +2852,7 @@ const EvolutionForm = ({
       showToast('Texto corrigido com sucesso', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Erro ao corrigir texto', 'error');
+      showToast('Erro ao corrigir text', 'error');
     } finally {
       setIsExtracting(false);
     }
@@ -2337,16 +2860,18 @@ const EvolutionForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
-        <select 
-          value={formData.patientId}
-          onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-          className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
-        >
-          <option value="">Selecionar Paciente...</option>
-          {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+      <div className="space-y-2 animate-fade-in">
+        <MultiPatientSelector 
+          patients={patients.map(p => ({ id: p.id, name: p.name }))}
+          selectedIds={selectedPatientIds}
+          onChange={setSelectedPatientIds}
+          singleValue={formData.patientId}
+          onSingleChange={id => setFormData({ ...formData, patientId: id })}
+          isMulti={isMulti}
+          onToggleMulti={setIsMulti}
+          accentColor="green"
+          label="Paciente(s) em Atendimento"
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -2627,6 +3152,8 @@ const ExerciseForm = ({ onSave, onCancel, initialData }: { onSave: (data: Omit<P
 };
 
 const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients: PhysioPatient[], onSave: (data: Omit<PhysioAppointment, 'id'>) => Promise<void>, onCancel: () => void, initialData?: PhysioAppointment | null }) => {
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>(initialData?.patientId ? [initialData.patientId] : []);
+  const [isMulti, setIsMulti] = useState(false);
   const [formData, setFormData] = useState<Omit<PhysioAppointment, 'id'> & { photos: string[] }>({
     patientId: initialData?.patientId || '',
     date: initialData?.date || format(new Date(), 'yyyy-MM-dd'),
@@ -2640,24 +3167,35 @@ const AppointmentForm = ({ patients, onSave, onCancel, initialData }: { patients
     setFormData(prev => ({ ...prev, observations: prev.observations + '\n' + text }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { photos, ...data } = formData;
-    onSave(data);
+    if (isMulti && selectedPatientIds.length > 0) {
+      const primaryPid = selectedPatientIds[0];
+      await onSave({ ...data, patientId: primaryPid, patientIds: selectedPatientIds });
+    } else {
+      if (!formData.patientId) {
+        alert('Por favor, selecione pelo menos um idoso!');
+        return;
+      }
+      await onSave(data);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
-        <select 
-          value={formData.patientId}
-          onChange={e => setFormData({ ...formData, patientId: e.target.value })}
-          className="w-full p-4 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 transition-all text-gray-800 dark:text-white"
-        >
-          <option value="">Selecionar Paciente...</option>
-          {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+      <div className="space-y-2 animate-fade-in">
+        <MultiPatientSelector 
+          patients={patients.map(p => ({ id: p.id, name: p.name }))}
+          selectedIds={selectedPatientIds}
+          onChange={setSelectedPatientIds}
+          singleValue={formData.patientId}
+          onSingleChange={id => setFormData({ ...formData, patientId: id })}
+          isMulti={isMulti}
+          onToggleMulti={setIsMulti}
+          accentColor="green"
+          label="Paciente(s) do Agendamento"
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

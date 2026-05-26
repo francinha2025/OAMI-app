@@ -30,11 +30,15 @@ import {
   SocialPatient, SocialFamilyTie, SocialDocumentation,
   SocialLegalSituation, SocialStudy, SocialEvolution,
   SocialReferral, SocialFamilyVisit, SocialRiskSituation,
-  PIA, Elderly
+  PIA, Elderly,
+  NursingEvolution, PhysioEvolution, PsychEvolution, PedagogyEvolution, NutritionEvolution, Workshop, AppNotification, Professional
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
+import { ProductivitySection } from './ProductivitySection';
+import { MultiPatientSelector } from './MultiPatientSelector';
+import { Award } from 'lucide-react';
 
 interface SocialWorkSectionProps {
   user: UserType;
@@ -44,12 +48,27 @@ interface SocialWorkSectionProps {
   documentations: SocialDocumentation[];
   legalSituations: SocialLegalSituation[];
   socialStudies: SocialStudy[];
-  professionals?: any[];
+  professionals?: Professional[];
   evolutions: SocialEvolution[];
   referrals: SocialReferral[];
   familyVisits: SocialFamilyVisit[];
   riskSituations: SocialRiskSituation[];
   pias: PIA[];
+  nursingEvolutions?: NursingEvolution[];
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
   onSavePatient: (data: Partial<SocialPatient>) => Promise<void>;
   onSaveFamilyTie: (data: Partial<SocialFamilyTie>) => Promise<void>;
   onSaveDocumentation: (data: Partial<SocialDocumentation>) => Promise<void>;
@@ -73,7 +92,7 @@ interface SocialWorkSectionProps {
 type TabType = 
   | 'dashboard' | 'profile' | 'family' | 'docs' 
   | 'legal' | 'study' | 'evolution' | 'referrals' 
-  | 'visits' | 'risk' | 'benefits' | 'reports' | 'settings' | 'pia';
+  | 'visits' | 'risk' | 'benefits' | 'productivity' | 'reports' | 'settings' | 'pia';
 
 const safeFormat = (dateStr: string | undefined | null, formatStr: string, fallback = '--/--') => {
   if (!dateStr) return fallback;
@@ -103,39 +122,51 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
   </button>
 );
 
-export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
-  user,
-  elderly,
-  patients,
-  familyTies,
-  documentations,
-  legalSituations,
-  socialStudies,
-  professionals = [],
-  evolutions,
-  referrals,
-  familyVisits,
-  riskSituations,
-  pias,
-  onSavePatient,
-  onSaveFamilyTie,
-  onSaveDocumentation,
-  onSaveLegalSituation,
-  onSaveSocialStudy,
-  onSaveEvolution,
-  onSaveReferral,
-  onSaveFamilyVisit,
-  onSaveRiskSituation,
-  onSavePIA,
-  onSavePhotos,
-  onDeleteRecord,
-  onDeletePatient,
-  onUpdateProfile,
-  showToast,
-  theme,
-  setTheme,
-  onLogout
-}) => {
+export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
+  const {
+    user,
+    elderly,
+    patients,
+    familyTies,
+    documentations,
+    legalSituations,
+    socialStudies,
+    professionals = [],
+    evolutions,
+    referrals,
+    familyVisits,
+    riskSituations,
+    pias,
+    nursingEvolutions = [],
+    physioEvolutions = [],
+    psychEvolutions = [],
+    pedagogyEvolutions = [],
+    socialEvolutions = [],
+    nutritionEvolutions = [],
+    workshops = [],
+    notifications = [],
+    onDeleteNotification,
+    onSaveCollaborationEvolution,
+    onDeleteCollaborationEvolution,
+    onSavePatient,
+    onSaveFamilyTie,
+    onSaveDocumentation,
+    onSaveLegalSituation,
+    onSaveSocialStudy,
+    onSaveEvolution,
+    onSaveReferral,
+    onSaveFamilyVisit,
+    onSaveRiskSituation,
+    onSavePIA,
+    onSavePhotos,
+    onDeleteRecord,
+    onDeletePatient,
+    onUpdateProfile,
+    showToast,
+    theme,
+    setTheme,
+    onLogout
+  } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const saved = localStorage.getItem('oami-social-tab');
     if (saved === 'visits') return 'family';
@@ -167,6 +198,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
   const [selectedPatient, setSelectedPatient] = useState<SocialPatient | null>(null);
   const [formData, setFormData] = useState<any>({});
   const [isExtracting, setIsExtracting] = useState(false);
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [isMulti, setIsMulti] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
   const [profSearch, setProfSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
@@ -598,11 +631,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
     setFormData(initialData);
     setIsModalOpen(true);
     setSelectedPatient(null);
+    setSelectedPatientIds(initialData.patientId ? [initialData.patientId] : []);
+    setIsMulti(false);
   };
 
   useEffect(() => {
     localStorage.setItem('oami-social-tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (props.defaultTab) {
+      setActiveTab(props.defaultTab as any);
+    }
+  }, [props.defaultTab]);
 
   const handleDigitize = async (text: string) => {
     const type = modalType || activeTab;
@@ -661,55 +702,64 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       const { photos, ...data } = formData;
       const id = formData.id;
       
+      const targetPid = selectedPatientIds[0] || formData.patientId;
+      const finalData = { 
+        ...data, 
+        patientId: targetPid, 
+        patientIds: selectedPatientIds.length > 0 ? selectedPatientIds : (targetPid ? [targetPid] : []) 
+      };
+
       switch (type) {
         case 'patient':
         case 'profile':
           await onSavePatient(data, id);
           break;
         case 'family':
-          await onSaveFamilyTie(data, id);
+          await onSaveFamilyTie(finalData, id);
           break;
         case 'docs':
-          await onSaveDocumentation(data, id);
+          await onSaveDocumentation(finalData, id);
           break;
         case 'legal':
-          await onSaveLegalSituation(data, id);
+          await onSaveLegalSituation(finalData, id);
           break;
         case 'study':
-          await onSaveSocialStudy({ ...data, date: data.date || new Date().toISOString() }, id);
+          await onSaveSocialStudy({ ...finalData, date: finalData.date || new Date().toISOString() }, id);
           break;
         case 'evolution':
-          await onSaveEvolution({ ...data, date: data.date || new Date().toISOString() }, id);
+          await onSaveEvolution({ ...finalData, date: finalData.date || new Date().toISOString() }, id);
           break;
         case 'referral':
         case 'referrals':
-          await onSaveReferral({ ...data, date: data.date || new Date().toISOString() }, id);
+          await onSaveReferral({ ...finalData, date: finalData.date || new Date().toISOString() }, id);
           break;
         case 'visit':
         case 'visits':
-          await onSaveFamilyVisit({ ...data, date: data.date || new Date().toISOString() }, id);
+          await onSaveFamilyVisit({ ...finalData, date: finalData.date || new Date().toISOString() }, id);
           break;
         case 'risk':
-          await onSaveRiskSituation({ ...data, date: data.date || new Date().toISOString() }, id);
+          await onSaveRiskSituation({ ...finalData, date: finalData.date || new Date().toISOString() }, id);
           break;
         case 'pia':
-          await onSavePIA({ ...data, date: data.date || new Date().toISOString(), responsible: data.responsible || user.name }, id);
+          await onSavePIA({ ...finalData, date: finalData.date || new Date().toISOString(), responsible: finalData.responsible || user.name }, id);
           break;
       }
 
-      if (photos && photos.length > 0 && formData.patientId) {
-        const patient = (patients || []).find(p => p.id === formData.patientId);
+      if (photos && photos.length > 0 && targetPid) {
+        const patient = (patients || []).find(p => p.id === targetPid);
         const activityType = 
           type === 'evolution' ? 'Evolução Social' :
           type === 'docs' ? 'Documentação Social' :
           type === 'study' ? 'Estudo Social' : 'Atendimento Social';
         
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.description || formData.observations || formData.socialStudy);
+        await onSavePhotos(photos, targetPid, patient?.name || 'Paciente', activityType, formData.description || formData.observations || formData.socialStudy);
       }
 
       setIsModalOpen(false);
       setModalType('');
       setFormData({});
+      setSelectedPatientIds([]);
+      setIsMulti(false);
     } catch (err) {
       console.error(err);
     }
@@ -1179,21 +1229,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'evolution':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Fluxo de Atendimento Geral (Sem idoso específico)</option>
-                {patients.map(p => {
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
                   const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-                  return (
-                    <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-                  );
+                  return { id: p.id, name: linked?.name || p.name };
                 })}
-              </select>
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Data do Atendimento</label>
@@ -1386,16 +1436,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'referrals':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Destino</label>
@@ -1465,16 +1520,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'visits':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-900">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data da Visita (Selecione para data retroativa)</label>
@@ -1531,16 +1591,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'risk':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Risco</label>
@@ -1800,16 +1865,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-                <select
-                  className="w-full p-2 border border-gray-200 rounded-lg"
-                  value={formData.patientId || ''}
-                  onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-                >
-                  <option value="">Selecione o idoso</option>
-                  {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="col-span-2 animate-fade-in">
+                <MultiPatientSelector 
+                  patients={(patients || []).map(p => {
+                    const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                    return { id: p.id, name: linked?.name || p.name };
+                  })}
+                  selectedIds={selectedPatientIds}
+                  onChange={setSelectedPatientIds}
+                  singleValue={formData.patientId || ''}
+                  onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                  isMulti={isMulti}
+                  onToggleMulti={setIsMulti}
+                  accentColor="blue"
+                  label="Idoso(s) Vinculado(s)"
+                />
               </div>
               <div className="flex items-center gap-2 mt-4">
                 <input
@@ -1960,16 +2030,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'docs':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               {['rg', 'cpf', 'sus', 'birthCertificate', 'addressProof'].map((field) => (
@@ -2020,16 +2095,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'legal':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
@@ -2095,16 +2175,21 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       case 'study':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-200 rounded-lg"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => {
+                  const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                  return { id: p.id, name: linked?.name || p.name };
+                })}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Título do Estudo</label>
@@ -2726,8 +2811,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
 
       {familySubTab === 'ties' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {(familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).map((tie) => {
+          {(familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter || t.patientIds?.includes(familyPatientFilter)).map((tie) => {
             const patient = (patients || []).find(p => p.id === tie.patientId);
+            const displayName = tie.patientIds && tie.patientIds.length > 1
+              ? tie.patientIds.map(pid => {
+                  const pat = (patients || []).find(p => p.id === pid);
+                  const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                  return lk?.name || pat?.name;
+                }).filter(Boolean).join(', ')
+              : (patient?.name || 'Não cadastrado');
             return (
               <div key={tie.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
@@ -2736,7 +2828,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                       <Heart className="w-6 h-6 text-pink-500" />
                     </div>
                     <div>
-                      <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
+                      <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">{displayName}</h4>
                       <p className="text-sm text-gray-500 dark:text-gray-400 font-bold">{tie.hasFamily ? 'Possui Família' : 'Sem Vínculo Familiar'}</p>
                     </div>
                   </div>
@@ -2789,7 +2881,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
             );
           })}
-          {((familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter).length === 0) && (
+          {((familyTies || []).filter(t => !familyPatientFilter || t.patientId === familyPatientFilter || t.patientIds?.includes(familyPatientFilter)).length === 0) && (
             <div className="col-span-full py-12 text-center bg-gray-50 dark:bg-gray-800/20 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
               <p className="text-sm text-gray-400 dark:text-gray-500 font-bold">Nenhum vínculo familiar registrado para os filtros selecionados.</p>
             </div>
@@ -3015,7 +3107,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).map((visit) => {
+                  {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter || v.patientIds?.includes(visitPatientFilter)).map((visit) => {
                     const patient = (patients || []).find(p => p.id === visit.patientId);
                     const isEditing = editingVisitId === visit.id;
 
@@ -3075,7 +3167,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                               ))}
                             </select>
                           ) : (
-                            <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">{patient?.name || 'Não identificado'}</span>
+                            <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">
+                              {visit.patientIds && visit.patientIds.length > 1
+                                ? visit.patientIds.map(pid => {
+                                    const pat = (patients || []).find(p => p.id === pid);
+                                    const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                                    return lk?.name || pat?.name;
+                                  }).filter(Boolean).join(', ')
+                                : (patient?.name || 'Não identificado')}
+                            </span>
                           )}
                         </td>
 
@@ -3598,7 +3698,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="space-y-6">
-        {(socialStudies || []).filter(s => !studyPatientFilter || s.patientId === studyPatientFilter).map((study) => {
+        {(socialStudies || []).filter(s => !studyPatientFilter || s.patientId === studyPatientFilter || s.patientIds?.includes(studyPatientFilter)).map((study) => {
           const patient = (patients || []).find(p => p.id === study.patientId);
           return (
             <div key={study.id} className="bg-white dark:bg-gray-900 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:shadow-md">
@@ -3609,11 +3709,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-tight capitalize">
-                      {(() => {
-                        const patient = (patients || []).find(p => p.id === study.patientId);
-                        const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
-                        return linked?.name || patient?.name;
-                      })()}
+                      {study.patientIds && study.patientIds.length > 1
+                        ? study.patientIds.map(pid => {
+                            const pat = (patients || []).find(p => p.id === pid);
+                            const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                            return lk?.name || pat?.name;
+                          }).filter(Boolean).join(', ')
+                        : (() => {
+                            const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                            return linked?.name || patient?.name || 'Não cadastrado';
+                          })()}
                     </h4>
                     <p className="text-sm text-gray-500 dark:text-gray-400 font-bold mt-0.5">Realizado em {safeFormat(study.date, 'dd/MM/yyyy')}</p>
                   </div>
@@ -3722,11 +3827,19 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
         <div className="divide-y divide-gray-100 dark:divide-gray-800">
           {(evolutions || []).filter(e => {
             if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
-            return !evolutionPatientFilter || e.patientId === evolutionPatientFilter;
+            return !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
           }).map((evolution) => {
             const patient = (patients || []).find(p => p.id === evolution.patientId);
             const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
-            const displayName = linked?.name || patient?.name || 'Fluxo de Atendimento Geral';
+            const displayName = !evolution.patientId 
+              ? 'Fluxo de Atendimento Geral'
+              : (evolution.patientIds && evolution.patientIds.length > 1
+                  ? evolution.patientIds.map(pid => {
+                      const pat = (patients || []).find(p => p.id === pid);
+                      const lk = pat?.elderlyId ? (elderly || []).find(ed => ed.id === pat.elderlyId) : null;
+                      return lk?.name || pat?.name;
+                    }).filter(Boolean).join(', ')
+                  : (linked?.name || patient?.name || 'Idoso não encontrado'));
             
             return (
               <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -3828,7 +3941,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(referrals || []).filter(r => !referralPatientFilter || r.patientId === referralPatientFilter).map((referral) => {
+        {(referrals || []).filter(r => !referralPatientFilter || r.patientId === referralPatientFilter || r.patientIds?.includes(referralPatientFilter)).map((referral) => {
           const patient = (patients || []).find(p => p.id === referral.patientId);
           return (
             <div key={referral.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col hover:shadow-md transition-all">
@@ -3870,7 +3983,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
               </div>
               
               <h4 className="font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-tight">{referral.destination}</h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-black capitalize">{patient?.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 font-black capitalize">
+                {referral.patientIds && referral.patientIds.length > 1
+                  ? referral.patientIds.map(pid => {
+                      const pat = (patients || []).find(p => p.id === pid);
+                      const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                      return lk?.name || pat?.name;
+                    }).filter(Boolean).join(', ')
+                  : (patient?.name || 'Não cadastrado')}
+              </p>
               
               <div className="flex-1 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl mb-4 border border-gray-100 dark:border-gray-700">
                 <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3 font-medium leading-relaxed">{referral.description}</p>
@@ -3921,7 +4042,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
       </div>
 
       <div className="space-y-4">
-        {(riskSituations || []).filter(r => !riskPatientFilter || r.patientId === riskPatientFilter).map((risk) => {
+        {(riskSituations || []).filter(r => !riskPatientFilter || r.patientId === riskPatientFilter || r.patientIds?.includes(riskPatientFilter)).map((risk) => {
           const patient = (patients || []).find(p => p.id === risk.patientId);
           return (
             <div key={risk.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all">
@@ -3931,7 +4052,15 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
                     <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white capitalize text-lg">{patient?.name}</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white capitalize text-lg">
+                      {risk.patientIds && risk.patientIds.length > 1
+                        ? risk.patientIds.map(pid => {
+                            const pat = (patients || []).find(p => p.id === pid);
+                            const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                            return lk?.name || pat?.name;
+                          }).filter(Boolean).join(', ')
+                        : (patient?.name || 'Não cadastrado')}
+                    </h4>
                     <p className="text-sm font-black text-red-600 dark:text-red-400 uppercase tracking-widest">{risk.type}</p>
                   </div>
                 </div>
@@ -4439,6 +4568,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
           { id: 'referrals', label: 'Encaminhamentos', icon: Share2 },
           { id: 'risk', label: 'Situações de Risco', icon: ShieldAlert },
           { id: 'benefits', label: 'Benefícios', icon: Receipt },
+          { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
           { id: 'reports', label: 'Relatórios', icon: FileCheck },
           { id: 'settings', label: 'Configurações', icon: Settings },
         ].map((tab) => (
@@ -4475,6 +4605,35 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = ({
             {activeTab === 'referrals' && renderReferrals()}
             {activeTab === 'risk' && renderRiskSituations()}
             {activeTab === 'benefits' && renderBenefits()}
+            {activeTab === 'productivity' && (
+              <ProductivitySection
+                user={user}
+                professionals={professionals}
+                nursingEvolutions={nursingEvolutions}
+                physioEvolutions={physioEvolutions}
+                psychEvolutions={psychEvolutions}
+                pedagogyEvolutions={pedagogyEvolutions}
+                socialEvolutions={evolutions}
+                nutritionEvolutions={nutritionEvolutions}
+                workshops={workshops}
+                notifications={notifications}
+                elderly={elderly}
+                onDeleteNotification={async (id, e) => {
+                  e.stopPropagation();
+                  if (onDeleteNotification) {
+                    onDeleteNotification(id, e);
+                  }
+                }}
+                onSaveEvolution={onSaveCollaborationEvolution || (async () => {})}
+                onDeleteEvolution={onDeleteCollaborationEvolution || (async () => {})}
+                showToast={showToast}
+                targetSector="Serviço Social"
+                targetRole="ASSISTENTE_SOCIAL"
+                psychActivities={props.psychActivities}
+                pedagogyActivities={props.pedagogyActivities}
+                onViewActivity={props.onViewActivity}
+              />
+            )}
             {activeTab === 'reports' && renderReports()}
           </motion.div>
         </AnimatePresence>

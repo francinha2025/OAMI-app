@@ -27,7 +27,10 @@ import {
   Share2,
   Camera,
   X,
-  Eye
+  Eye,
+  Activity,
+  Info,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format, parseISO, differenceInYears } from 'date-fns';
@@ -37,11 +40,15 @@ import {
   NutritionAnthropometry, 
   NutritionMealPlan, 
   User as UserType,
-  Elderly
+  Elderly,
+  NursingEvolution, PhysioEvolution, PsychEvolution, PedagogyEvolution, SocialEvolution, Workshop, AppNotification, Professional
 } from '../types';
 import { cn, safeReplace } from '../lib/utils';
+import { ProductivitySection } from './ProductivitySection';
+import { MultiPatientSelector } from './MultiPatientSelector';
+import { Award } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 
 interface NutritionSectionProps {
@@ -51,7 +58,22 @@ interface NutritionSectionProps {
   evolutions: NutritionEvolution[];
   anthropometries: NutritionAnthropometry[];
   mealPlans: NutritionMealPlan[];
-  professionals?: any[];
+  professionals?: Professional[];
+  nursingEvolutions?: NursingEvolution[];
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onSavePatient: (data: Partial<NutritionPatient>) => Promise<void>;
   onSaveEvolution: (data: Partial<NutritionEvolution>) => Promise<void>;
@@ -65,26 +87,53 @@ interface NutritionSectionProps {
   onLogout: () => void;
 }
 
-export const NutritionSection: React.FC<NutritionSectionProps> = ({
-  user,
-  elderly,
-  patients,
-  evolutions,
-  anthropometries,
-  mealPlans,
-  professionals = [],
-  showToast,
-  onSavePatient,
-  onSaveEvolution,
-  onSaveAnthropometry,
-  onSaveMealPlan,
-  onDeleteRecord,
-  onSavePhotos,
-}) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'patients' | 'evolutions' | 'assessments' | 'mealPlans' | 'reports'>('dashboard');
+export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
+  const {
+    user,
+    elderly,
+    patients,
+    evolutions,
+    anthropometries,
+    mealPlans,
+    professionals = [],
+    nursingEvolutions = [],
+    physioEvolutions = [],
+    psychEvolutions = [],
+    pedagogyEvolutions = [],
+    socialEvolutions = [],
+    nutritionEvolutions = [],
+    workshops = [],
+    notifications = [],
+    onDeleteNotification,
+    onSaveCollaborationEvolution,
+    onDeleteCollaborationEvolution,
+    showToast,
+    onSavePatient,
+    onSaveEvolution,
+    onSaveAnthropometry,
+    onSaveMealPlan,
+    onDeleteRecord,
+    onSavePhotos,
+  } = props;
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'patients' | 'evolutions' | 'assessments' | 'mealPlans' | 'productivity' | 'reports'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [patientFilter, setPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  
+  // Integrated report states
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'anthropometries', 'mealPlans'
+  ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
@@ -92,6 +141,14 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
   const [profSearch, setProfSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<any | null>(null);
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [isMulti, setIsMulti] = useState(false);
+
+  useEffect(() => {
+    if (props.defaultTab) {
+      setActiveTab(props.defaultTab as any);
+    }
+  }, [props.defaultTab]);
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -125,7 +182,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       .filter(e => {
         const patient = patients.find(p => p.elderlyId === e.patientId || p.id === e.patientId);
         const nameMatch = patient?.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const patientMatch = !patientFilter || e.patientId === patientFilter;
+        const patientMatch = !patientFilter || e.patientId === patientFilter || e.patientIds?.includes(patientFilter);
         return nameMatch && patientMatch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -136,7 +193,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       .filter(a => {
         const patient = patients.find(p => p.elderlyId === a.patientId || p.id === a.patientId);
         const nameMatch = patient?.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const patientMatch = !patientFilter || a.patientId === patientFilter;
+        const patientMatch = !patientFilter || a.patientId === patientFilter || a.patientIds?.includes(patientFilter);
         return nameMatch && patientMatch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -147,97 +204,467 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       .filter(m => {
         const patient = patients.find(p => p.elderlyId === m.patientId || p.id === m.patientId);
         const nameMatch = patient?.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const patientMatch = !patientFilter || m.patientId === patientFilter;
+        const patientMatch = !patientFilter || m.patientId === patientFilter || m.patientIds?.includes(patientFilter);
         return nameMatch && patientMatch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [mealPlans, patients, searchTerm, patientFilter]);
 
   const renderReports = () => {
-    const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
-      if ((patients || []).length === 0) return;
-
-      let filteredPatients = (patients || []);
-      if (reportsPatientFilter) {
-        filteredPatients = filteredPatients.filter(p => (p.elderlyId || p.id) === reportsPatientFilter);
+    const isDateInSelectedRange = (dateStr: string) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
       }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
 
-      const data = filteredPatients.map((p: any) => {
-        const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === (p.elderlyId || p.id));
-        const lastWeight = (anthropometries || [])
-          .filter(a => a.patientId === (p.elderlyId || p.id))
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-          
-        return [
-          p.name,
-          p.dietType || 'N/A',
-          p.consistency || 'N/A',
-          lastWeight ? `${lastWeight.weight}kg (IMC: ${lastWeight.bmi})` : 'N/A',
-          patientEvolutions.length
-        ];
-      });
+    // Filtered lists based on reportsPatientFilter
+    const matchedPatients = (patients || []).filter(p => {
+      const pId = p.elderlyId || p.id;
+      return !reportsPatientFilter || pId === reportsPatientFilter;
+    });
 
-      const subtitle = `Relatório de Nutrição - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => (p.elderlyId || p.id) === reportsPatientFilter)?.name}` : ''}`;
+    const isPatientInList = (pId: string) => {
+      return matchedPatients.some(p => (p.elderlyId || p.id) === pId);
+    };
 
-      if (formatType === 'pdf') {
-        await generateModernPDF({
-          title,
-          subtitle,
-          columns: ['Paciente', 'Dieta', 'Consistência', 'Último Peso/IMC', 'Evoluções'],
-          data,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+    // Filtered Evolutions
+    const filteredEvolutions = (evolutions || []).filter(e => {
+      return isPatientInList(e.patientId) && isDateInSelectedRange(e.date);
+    });
+
+    // Filtered Anthropometries
+    const filteredAnthropometries = (anthropometries || []).filter(as => {
+      return isPatientInList(as.patientId) && isDateInSelectedRange(as.date);
+    });
+
+    // Filtered Meal Plans
+    const filteredMealPlans = (mealPlans || []).filter(m => {
+      return isPatientInList(m.patientId) && isDateInSelectedRange(m.date);
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
       } else {
-        await generateModernWord({
-          title,
-          subtitle,
-          columns: ['Paciente', 'Dieta', 'Consistência', 'Último Peso/IMC', 'Evoluções'],
-          data,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+        setReportSelectedSections([...reportSelectedSections, section]);
       }
     };
 
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(patients || []).find(p => (p.elderlyId || p.id) === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Nutricional | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Aceitabilidade Alimentar', 'Hidratação', 'Conduta / Observação', 'Responsável']
+          : ['Data', 'Idoso', 'Aceitabilidade Alimentar', 'Hidratação', 'Conduta / Observação', 'Responsável'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (patients || []).find(pt => (pt.elderlyId || pt.id) === e.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          const conductObs = `Conduta: ${e.conduct || '-'}\nObs: ${e.observations || '-'}`;
+          return reportsPatientFilter
+            ? [dtFmt, e.acceptance || 'BOA', e.hydrationLevel || 'BOM', conductObs, e.registeredBy || 'CRN']
+            : [dtFmt, name, e.acceptance || 'BOA', e.hydrationLevel || 'BOM', conductObs, e.registeredBy || 'CRN'];
+        });
+        
+        sections.push({ title: 'Evoluções Nutricionais', columns, data });
+      }
+
+      if (reportSelectedSections.includes('anthropometries') && filteredAnthropometries.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Peso (kg)', 'Altura (m)', 'IMC', 'Status Nutricional', 'Circunferências (Braço / Panturrilha)']
+          : ['Data', 'Idoso', 'Peso (kg)', 'Altura (m)', 'IMC', 'Status Nutricional', 'Circunferências (Braço / Panturrilha)'];
+          
+        const data = filteredAnthropometries.map(an => {
+          const p = (patients || []).find(pt => (pt.elderlyId || pt.id) === an.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(an.date), 'dd/MM/yyyy');
+          const circs = `Br: ${an.armCircumference !== undefined ? `${an.armCircumference}cm` : '-'} | Pa: ${an.calfCircumference !== undefined ? `${an.calfCircumference}cm` : '-'}`;
+          return reportsPatientFilter
+            ? [dtFmt, String(an.weight), String(an.height), String(an.bmi), an.nutritionalStatus || '-', circs]
+            : [dtFmt, name, String(an.weight), String(an.height), String(an.bmi), an.nutritionalStatus || '-', circs];
+        });
+        
+        sections.push({ title: 'Acompanhamento Antropométrico', columns, data });
+      }
+
+      if (reportSelectedSections.includes('mealPlans') && filteredMealPlans.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Plano Alimentar (Resumo)', 'Prescrições / Recomendações', 'Nutricionista']
+          : ['Data', 'Idoso', 'Plano Alimentar (Resumo)', 'Prescrições / Recomendações', 'Nutricionista'];
+          
+        const data = filteredMealPlans.map(m => {
+          const p = (patients || []).find(pt => (pt.elderlyId || pt.id) === m.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(m.date), 'dd/MM/yyyy');
+          const mealsRes = `Café: ${m.breakfast}\nAlmoço: ${m.lunch}\nLanche: ${m.afternoonSnack}\nJantar: ${m.dinner}`;
+          return reportsPatientFilter
+            ? [dtFmt, mealsRes, m.recommendations || '-', m.registeredBy || 'CRN']
+            : [dtFmt, name, mealsRes, m.recommendations || '-', m.registeredBy || 'CRN'];
+        });
+        
+        sections.push({ title: 'Planos Alimentares Cadastrados', columns, data });
+      }
+
+      if (sections.length === 0) {
+        showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário Nutricional - ${patients.find(p => (p.elderlyId || p.id) === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Atividades (Nutrição)';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_nutri_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Categoria', 'Data/Período', 'Paciente/Idoso', 'Descrição / Registro'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = patients.find(p => (p.elderlyId || p.id) === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1).join(' | ')
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2).join(' | ')
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_nutri_doc`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredAnthropometries.length === 0 && 
+      filteredMealPlans.length === 0;
+
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Relatórios de Nutrição</h2>
-          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <Filter size={16} className="text-gray-400 ml-2" />
-            <select 
-              value={reportsPatientFilter}
-              onChange={(e) => setReportsPatientFilter(e.target.value)}
-              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
-            >
-              <option value="">Todos os Idosos (Geral)</option>
-              {patients.map(p => (
-                <option key={p.id} value={p.elderlyId || p.id}>{p.name}</option>
-              ))}
-            </select>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de nutrição para consulta e prontuário. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento final.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Residente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-850 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {patients.map(p => {
+                    return (
+                      <option key={p.id} value={p.elderlyId || p.id}>{(p.name || '').toUpperCase()}</option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-850 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-850 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-850 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-855 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-855 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-855 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-855 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <ReportCard 
-            title="Relatório Nutricional" 
-            description="Gere um relatório detalhado do estado nutricional dos idosos." 
-            icon={<FileText className="text-blue-600" />} 
-            onDownloadPDF={() => downloadReport('Relatório Nutricional Geral', 'pdf')}
-            onDownloadWord={() => downloadReport('Relatório Nutricional Geral', 'word')}
-          />
-          <ReportCard 
-            title="Acompanhamento de Peso" 
-            description="Histórico de evolução ponderal e IMC dos últimos meses." 
-            icon={<TrendingUp className="text-green-600" />} 
-            onDownloadPDF={() => downloadReport('Acompanhamento Ponderal', 'pdf')}
-            onDownloadWord={() => downloadReport('Acompanhamento Ponderal', 'word')}
-          />
-          <ReportCard 
-            title="Prescrições Dietéticas" 
-            description="Relatório de tipos de dieta e consistências por idoso." 
-            icon={<Utensils className="text-orange-600" />} 
-            onDownloadPDF={() => downloadReport('Relatório de Dietas', 'pdf')}
-            onDownloadWord={() => downloadReport('Relatório de Dietas', 'word')}
-          />
+
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-855 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções Nutricionais', desc: 'Registros de hidratação, aceitação e observações.', icon: Activity, color: 'text-emerald-500', count: filteredEvolutions.length },
+              { id: 'anthropometries', title: 'Medições Antropométricas', desc: 'Controle de evolução de peso, altura e IMC.', icon: ClipboardList, color: 'text-blue-500', count: filteredAnthropometries.length },
+              { id: 'mealPlans', title: 'Dieta e Planos Alimentares', desc: 'Refeições fracionadas e condutas prescritas.', icon: Utensils, color: 'text-orange-500', count: filteredMealPlans.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={14} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-250 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Prona para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros cadastrados para os filtros selecionados. Cadastre evoluções ou mude as datas para habilitar relatórios."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'anthropometries') return filteredAnthropometries.length > 0;
+                      if (s === 'mealPlans') return filteredMealPlans.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-205 dark:shadow-none"
+              )}
+            >
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-205 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -479,6 +906,9 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       <div className="space-y-4">
         {filteredEvolutions.map(e => {
           const patient = patients.find(p => p.elderlyId === e.patientId || p.id === e.patientId);
+          const displayName = e.patientIds && e.patientIds.length > 1
+            ? e.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+            : (patient?.name || 'N/A');
           return (
             <motion.div 
               key={e.id}
@@ -492,7 +922,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                     <ClipboardList size={24} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{displayName}</h4>
                     <p className="text-xs text-gray-500 flex items-center gap-1"><Calendar size={12} /> {format(parseISO(e.date), 'dd/MM/yyyy')} {e.time && `às ${e.time}`}</p>
                   </div>
                 </div>
@@ -588,6 +1018,9 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredAnthropometries.map(a => {
           const patient = patients.find(p => p.elderlyId === a.patientId || p.id === a.patientId);
+          const displayName = a.patientIds && a.patientIds.length > 1
+            ? a.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+            : (patient?.name || 'N/A');
           return (
             <motion.div 
               key={a.id}
@@ -601,7 +1034,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                     <Scale size={20} />
                   </div>
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white">{patient?.name}</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white">{displayName}</h4>
                     <p className="text-[10px] text-gray-500 uppercase tracking-tighter">{format(parseISO(a.date), 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
@@ -686,6 +1119,9 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
       <div className="space-y-6">
         {filteredMealPlans.map(m => {
           const patient = patients.find(p => p.elderlyId === m.patientId || p.id === m.patientId);
+          const displayName = m.patientIds && m.patientIds.length > 1
+            ? m.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+            : (patient?.name || 'N/A');
           return (
             <motion.div 
               key={m.id}
@@ -699,7 +1135,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                     <Apple size={24} />
                   </div>
                   <div>
-                    <h4 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">{patient?.name}</h4>
+                    <h4 className="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">{displayName}</h4>
                     <p className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} /> Prescrito em {format(parseISO(m.date), 'dd/MM/yyyy')}</p>
                   </div>
                 </div>
@@ -755,23 +1191,38 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
     setEditingRecord(record);
     if (record) {
       setLocalFormData(record);
+      setSelectedPatientIds(record.patientId ? [record.patientId] : []);
     } else {
       setLocalFormData({
         date: new Date().toISOString().split('T')[0],
         patientId: patientFilter || '',
         registeredBy: user.name
       });
+      setSelectedPatientIds(patientFilter ? [patientFilter] : []);
     }
+    setIsMulti(false);
     setIsModalOpen(true);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (modalType === 'profile') await onSavePatient(localFormData);
-    else if (modalType === 'evolution') await onSaveEvolution(localFormData);
-    else if (modalType === 'assessment') await onSaveAnthropometry(localFormData);
-    else if (modalType === 'mealPlan') await onSaveMealPlan(localFormData);
+    if (isMulti && selectedPatientIds.length > 1 && !editingRecord && modalType !== 'profile') {
+      const primaryPid = selectedPatientIds[0];
+      const itemData = { ...localFormData, patientId: primaryPid, patientIds: selectedPatientIds };
+      if (modalType === 'evolution') await onSaveEvolution(itemData);
+      else if (modalType === 'assessment') await onSaveAnthropometry(itemData);
+      else if (modalType === 'mealPlan') await onSaveMealPlan(itemData);
+    } else {
+      const finalPid = selectedPatientIds[0] || localFormData.patientId;
+      const finalData = { ...localFormData, patientId: finalPid, patientIds: [finalPid] };
+      if (modalType === 'profile') await onSavePatient(localFormData);
+      else if (modalType === 'evolution') await onSaveEvolution(finalData);
+      else if (modalType === 'assessment') await onSaveAnthropometry(finalData);
+      else if (modalType === 'mealPlan') await onSaveMealPlan(finalData);
+    }
     setIsModalOpen(false);
+    setSelectedPatientIds([]);
+    setIsMulti(false);
   };
 
   return (
@@ -794,6 +1245,7 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
           { id: 'evolutions', label: 'Evoluções', icon: ClipboardList },
           { id: 'assessments', label: 'Peso/IMC', icon: Scale },
           { id: 'mealPlans', label: 'Planos Alimentares', icon: Utensils },
+          { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
           { id: 'reports', label: 'Relatórios', icon: FileText }
         ].map(tab => (
           <button
@@ -819,6 +1271,35 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
         {activeTab === 'evolutions' && renderEvolutions()}
         {activeTab === 'assessments' && renderAssessments()}
         {activeTab === 'mealPlans' && renderMealPlans()}
+        {activeTab === 'productivity' && (
+          <ProductivitySection
+            user={user}
+            professionals={professionals}
+            nursingEvolutions={nursingEvolutions}
+            physioEvolutions={physioEvolutions}
+            psychEvolutions={psychEvolutions}
+            pedagogyEvolutions={pedagogyEvolutions}
+            socialEvolutions={socialEvolutions}
+            nutritionEvolutions={evolutions}
+            workshops={workshops}
+            notifications={notifications}
+            elderly={elderly}
+            onDeleteNotification={async (id, e) => {
+              e.stopPropagation();
+              if (onDeleteNotification) {
+                onDeleteNotification(id, e);
+              }
+            }}
+            onSaveEvolution={onSaveCollaborationEvolution || (async () => {})}
+            onDeleteEvolution={onDeleteCollaborationEvolution || (async () => {})}
+            showToast={showToast}
+            targetSector="Nutrição"
+            targetRole="NUTRICIONISTA"
+            psychActivities={props.psychActivities}
+            pedagogyActivities={props.pedagogyActivities}
+            onViewActivity={props.onViewActivity}
+          />
+        )}
         {activeTab === 'reports' && renderReports()}
       </div>
 
@@ -878,21 +1359,22 @@ export const NutritionSection: React.FC<NutritionSectionProps> = ({
                         disabled={!!localFormData.elderlyId}
                       />
                     ) : (
-                      <select 
-                        required
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-800 border-none rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-bold"
-                        value={localFormData.patientId || localFormData.id}
-                        onChange={e => setLocalFormData({...localFormData, patientId: e.target.value})}
-                      >
-                        <option value="">Selecione...</option>
-                        {patients.map(p => {
-                          const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-                          const name = linked?.name || p.name;
-                          return (
-                            <option key={p.id} value={p.elderlyId || p.id}>{name}</option>
-                          );
-                        })}
-                      </select>
+                      <div className="animate-fade-in">
+                        <MultiPatientSelector 
+                          patients={(patients || []).map(p => {
+                            const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                            return { id: p.elderlyId || p.id, name: linked?.name || p.name };
+                          })}
+                          selectedIds={selectedPatientIds}
+                          onChange={setSelectedPatientIds}
+                          singleValue={localFormData.patientId || localFormData.id || ''}
+                          onSingleChange={id => setLocalFormData({ ...localFormData, patientId: id })}
+                          isMulti={isMulti}
+                          onToggleMulti={setIsMulti}
+                          accentColor="orange"
+                          label=""
+                        />
+                      </div>
                     )}
                   </div>
                   <div>

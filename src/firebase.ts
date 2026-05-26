@@ -1,5 +1,11 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { 
+  initializeAuth, 
+  browserLocalPersistence, 
+  browserPopupRedirectResolver, 
+  getAuth, 
+  GoogleAuthProvider 
+} from 'firebase/auth';
 import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -19,8 +25,18 @@ export const db = initializeFirestore(app,
 
 console.log(`📡 Firebase Inicializado. Projeto: ${firebaseConfig.projectId} | Banco: ${targetDatabaseId}`);
 
-// ✅ Auth
-export const auth = getAuth(app);
+// ✅ Auth (safely handle already-initialized cases, common during HMR or multiple imports)
+let authInstance;
+try {
+  authInstance = initializeAuth(app, {
+    persistence: browserLocalPersistence,
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
+} catch (error: any) {
+  authInstance = getAuth(app);
+}
+
+export const auth = authInstance;
 export const googleProvider = new GoogleAuthProvider();
 
 // 🔎 Teste de conexão com Firestore

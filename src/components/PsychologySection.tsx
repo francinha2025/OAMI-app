@@ -15,11 +15,14 @@ import {
   PsychPatient, PsychInitialAssessment, PsychEvolution, 
   PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, 
   PsychActivity, PsychCognitionAssessment, PsychInterventionPlan,
-  User as UserType, Elderly 
+  User as UserType, Elderly,
+  NursingEvolution, PhysioEvolution, PedagogyEvolution, SocialEvolution, NutritionEvolution, Workshop, AppNotification, Professional
 } from '../types';
+import { ProductivitySection } from './ProductivitySection';
+import { Award } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn, safeReplace } from '../lib/utils';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { ROLE_LABELS } from '../constants';
@@ -30,6 +33,7 @@ import {
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
+import { MultiPatientSelector } from './MultiPatientSelector';
 
 interface PsychologySectionProps {
   user: UserType;
@@ -60,7 +64,22 @@ interface PsychologySectionProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
-  professionals?: any[];
+  professionals?: Professional[];
+  nursingEvolutions?: NursingEvolution[];
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
   sendNotification?: any;
 }
 
@@ -68,7 +87,7 @@ type PsychTab =
   | 'dashboard' | 'patients' | 'initial' 
   | 'evolution' | 'appointments' | 'emotions' 
   | 'family' | 'activities' | 'cognition' 
-  | 'alerts' | 'reports' | 'settings';
+  | 'alerts' | 'productivity' | 'reports' | 'settings';
 
 export const PsychologySection = (props: PsychologySectionProps) => {
   const { 
@@ -100,6 +119,19 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   const [activityPatientFilter, setActivityPatientFilter] = useState('');
   const [cognitionPatientFilter, setCognitionPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'emotions', 'bonds', 'activities', 'cognition', 'plans', 'appointments'
+  ]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<PsychEvolution | null>(null);
   const [viewingAct, setViewingAct] = useState<PsychActivity | null>(null);
@@ -107,6 +139,12 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   useEffect(() => {
     localStorage.setItem('oami-psychology-tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (props.defaultTab) {
+      setActiveTab(props.defaultTab as any);
+    }
+  }, [props.defaultTab]);
 
   const filteredPatients = useMemo(() => {
     return (patients || []).filter(p => {
@@ -122,88 +160,555 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   );
 
   const renderReports = () => {
-    const downloadReport = async (title: string, formatType: 'pdf' | 'word') => {
-      if ((patients || []).length === 0) return;
-
-      let filteredPatients = (patients || []);
-      if (reportsPatientFilter) {
-        filteredPatients = filteredPatients.filter(p => p.id === reportsPatientFilter);
+    const isDateInSelectedRange = (dateStr: string) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
       }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
 
-      const data = filteredPatients.map((p: any) => {
-        const patientEvolutions = (evolutions || []).filter((e: any) => e.patientId === p.id);
-        const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-        return [
-          linked?.name || p.name,
-          linked ? (new Date().getFullYear() - new Date(linked.birthDate).getFullYear()) : p.age,
-          patientEvolutions.length,
-          patientEvolutions[0]?.intervention || 'Sem intervenção recente'
-        ];
-      });
+    // Filter Evolutions
+    const filteredEvolutions = (evolutions || []).filter(e => {
+      const matchPatient = !reportsPatientFilter || e.patientId === reportsPatientFilter || e.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(e.date);
+    });
 
-      if (formatType === 'pdf') {
-        await generateModernPDF({
-          title,
-          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
-          columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
-          data,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+    // Filter Emotions
+    const filteredEmotions = (emotionalMonitorings || []).filter(m => {
+      const matchPatient = !reportsPatientFilter || m.patientId === reportsPatientFilter || m.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(m.date);
+    });
+
+    // Filter Activities
+    const filteredActivities = (activities || []).filter(a => {
+      const matchPatient = !reportsPatientFilter || (a.participants || []).includes(reportsPatientFilter) || a.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(a.date);
+    });
+
+    // Filter Cognition
+    const filteredCognitions = (cognitionAssessments || []).filter(c => {
+      const matchPatient = !reportsPatientFilter || c.patientId === reportsPatientFilter || c.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(c.date);
+    });
+
+    // Filter Family Bonds
+    const filteredBonds = (familyBonds || []).filter(b => {
+      const matchPatient = !reportsPatientFilter || b.patientId === reportsPatientFilter || b.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(b.date);
+    });
+
+    // Filter Appointments
+    const filteredAppointments = (appointments || []).filter(ap => {
+      const matchPatient = !reportsPatientFilter || ap.patientId === reportsPatientFilter || ap.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(ap.date);
+    });
+
+    // Filter Plans
+    const filteredPlans = (interventionPlans || []).filter(ip => {
+      const matchPatient = !reportsPatientFilter || ip.patientId === reportsPatientFilter || ip.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(ip.date);
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
       } else {
-        await generateModernWord({
-          title,
-          subtitle: `Relatório de Psicologia - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`,
-          columns: ['Paciente', 'Idade', 'Total Evoluções', 'Última Intervenção'],
-          data,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+        setReportSelectedSections([...reportSelectedSections, section]);
       }
     };
 
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(patients || []).find(p => p.id === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Psicologia | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data/Hora', 'Evolução / Observação', 'Conduta / Intervenção', 'Responsável']
+          : ['Data', 'Idoso', 'Evolução / Observação', 'Conduta / Intervenção', 'Responsável'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (patients || []).find(pt => pt.id === e.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [`${dtFmt} às ${e.time || '--:--'}`, e.observation, e.intervention, e.registeredBy || 'N/A']
+            : [dtFmt, name || 'Geral', e.observation, e.intervention, e.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Evoluções Psicológicas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('emotions') && filteredEmotions.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Estado Geral', 'Nível Tristeza / Ansiedade', 'Nível Solidão / Irritabilidade', 'Observações']
+          : ['Data', 'Idoso', 'Estado Geral', 'Tristeza / Ansiedade', 'Solidão / Irritabilidade', 'Observações'];
+          
+        const data = filteredEmotions.map(m => {
+          const p = (patients || []).find(pt => pt.id === m.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(m.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, m.wellBeing || 'NEUTRO', `Tristeza: ${m.sadness || 'NENHUM'}\nAnsiedade: ${m.anxiety || 'NENHUM'}`, `Solidão: ${m.loneliness || 'NENHUM'}\nIrritabilidade: ${m.irritability || 'NENHUM'}`, m.observations || '-']
+            : [dtFmt, name || 'Geral', m.wellBeing || 'NEUTRO', `Tristeza: ${m.sadness || 'NENHUM'} / Ansiedade: ${m.anxiety || 'NENHUM'}`, `Solidão: ${m.loneliness || 'NENHUM'} / Irritabilidade: ${m.irritability || 'NENHUM'}`, m.observations || '-'];
+        });
+        
+        sections.push({ title: 'Acompanhamento Emocional', columns, data });
+      }
+
+      if (reportSelectedSections.includes('cognition') && filteredCognitions.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Memória', 'Atenção', 'Orientação Espacial/Temporal', 'Observações']
+          : ['Data', 'Idoso', 'Memória', 'Atenção', 'Orientação Espacial/Temporal', 'Observações'];
+          
+        const data = filteredCognitions.map(c => {
+          const p = (patients || []).find(pt => pt.id === c.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(c.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, c.memory || 'PRESERVADO', c.attention || 'PRESERVADO', c.orientation || 'ORIENTADO', c.observations || '-']
+            : [dtFmt, name || 'Geral', c.memory || 'PRESERVADO', c.attention || 'PRESERVADO', c.orientation || 'ORIENTADO', c.observations || '-'];
+        });
+        
+        sections.push({ title: 'Avaliação Cognitiva', columns, data });
+      }
+
+      if (reportSelectedSections.includes('activities') && filteredActivities.length > 0) {
+        const columns = ['Data', 'Título da Oficina', 'Tipo', 'Descrição das Atividades', 'Participantes'];
+        const data = filteredActivities.map(a => {
+          const parts = (a.participants || []).map(pid => {
+            const pt = (patients || []).find(p => p.id === pid);
+            return pt?.elderlyId ? (elderly || []).find(ed => ed.id === pt.elderlyId)?.name : pt?.name;
+          }).filter(Boolean).join(', ');
+          const dtFmt = format(parseISO(a.date), 'dd/MM/yyyy');
+          return [dtFmt, a.title, a.type, a.description, parts || 'Nenhum'];
+        });
+        
+        sections.push({ title: 'Oficinas e Dinâmicas em Grupo', columns, data });
+      }
+
+      if (reportSelectedSections.includes('bonds') && filteredBonds.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Recebe Visitas?', 'Frequência de Visitas', 'Qualidade do Vínculo Familiar', 'Observações']
+          : ['Data', 'Idoso', 'Recebe Visitas?', 'Frequência Visitas', 'Vínculo Familiar', 'Observações'];
+          
+        const data = filteredBonds.map(b => {
+          const p = (patients || []).find(pt => pt.id === b.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(b.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, b.receivesVisits ? 'Sim' : 'Não', b.frequency || 'N/A', b.familyRelationship || 'N/A', b.observations || '-']
+            : [dtFmt, name || 'Geral', b.receivesVisits ? 'Sim' : 'Não', b.frequency || 'N/A', b.familyRelationship || 'N/A', b.observations || '-'];
+        });
+        
+        sections.push({ title: 'Vínculos Familiares e Visitas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('appointments') && filteredAppointments.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Horário', 'Tipo de Atendimento', 'Situação', 'Observações']
+          : ['Data', 'Idoso', 'Tipo de Atendimento', 'Situação', 'Observações'];
+          
+        const data = filteredAppointments.map(ap => {
+          const p = (patients || []).find(pt => pt.id === ap.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(ap.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, ap.time || '--:--', ap.type || 'INDIVIDUAL', ap.status || 'REALIZADO', ap.observations || '-']
+            : [dtFmt, name || 'Geral', ap.type || 'INDIVIDUAL', ap.status || 'REALIZADO', ap.observations || '-'];
+        });
+        
+        sections.push({ title: 'Prontuário de Consultas e Agendamentos', columns, data });
+      }
+
+      if (reportSelectedSections.includes('plans') && filteredPlans.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Objetivos Planejados', 'Estratégias Clínicas', 'Acompanhamento Recorrente']
+          : ['Data', 'Idoso', 'Objetivos Planejados', 'Estratégias Clínicas', 'Acompanhamento Recorrente'];
+          
+        const data = filteredPlans.map(ip => {
+          const p = (patients || []).find(pt => pt.id === ip.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(ip.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, ip.objectives, ip.strategies, ip.followUp]
+            : [dtFmt, name || 'Geral', ip.objectives, ip.strategies, ip.followUp];
+        });
+        
+        sections.push({ title: 'Planos de Intervenção Terapêutica', columns, data });
+      }
+
+      if (sections.length === 0) {
+        showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário Psicológico - ${patients.find(p => p.id === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Atividades (Psicologia)';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_psicologia_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Categoria', 'Data/Período', 'Paciente/Idoso', 'Descrição / Registro', 'Profissional Responsável'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = patients.find(p => p.id === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_psicologia_doc`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredEmotions.length === 0 && 
+      filteredCognitions.length === 0 && 
+      filteredActivities.length === 0 && 
+      filteredBonds.length === 0 && 
+      filteredAppointments.length === 0 && 
+      filteredPlans.length === 0;
+
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Relatórios de Psicologia</h2>
-          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <Filter size={16} className="text-gray-400 ml-2" />
-            <select 
-              value={reportsPatientFilter}
-              onChange={(e) => setReportsPatientFilter(e.target.value)}
-              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
-            >
-              <option value="">Todos os Idosos (Geral)</option>
-              {patients.map(p => {
-                const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
-                return (
-                  <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
-                );
-              })}
-              <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
-            </select>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de psicologia para impressão oficial. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Paciente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {patients.map(p => {
+                    const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                    return (
+                      <option key={p.id} value={p.id}>{(linked?.name || p.name || '').toUpperCase()}</option>
+                    );
+                  })}
+                  <option value="OUTRO">OUTROS (COMUNIDADE/CUIDADOR)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <ReportCard 
-            title="Relatório Psicológico" 
-            description="Gere um relatório detalhado do estado emocional do idoso." 
-            icon={<FileText className="text-blue-600" />} 
-            onDownloadPDF={() => downloadReport('Relatório Psicológico Geral', 'pdf')}
-            onDownloadWord={() => downloadReport('Relatório Psicológico Geral', 'word')}
-          />
-          <ReportCard 
-            title="Evolução Semestral" 
-            description="Resumo das evoluções e intervenções dos últimos 6 meses." 
-            icon={<TrendingUp className="text-green-600" />} 
-            onDownloadPDF={() => downloadReport('Evolução Semestral', 'pdf')}
-            onDownloadWord={() => downloadReport('Evolução Semestral', 'word')}
-          />
-          <ReportCard 
-            title="Parecer Técnico" 
-            description="Documento oficial para fins jurídicos ou familiares." 
-            icon={<ClipboardList className="text-purple-600" />} 
-            onDownloadPDF={() => downloadReport('Parecer Técnico', 'pdf')}
-            onDownloadWord={() => downloadReport('Parecer Técnico', 'word')}
-          />
+
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções Psicológicas', desc: 'Registros diários e semanais de terapia.', icon: ClipboardList, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/20', count: filteredEvolutions.length },
+              { id: 'emotions', title: 'Aconchego Emocional', desc: 'Evolução de humor, tristeza, ansiedade.', icon: Smile, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/20', count: filteredEmotions.length },
+              { id: 'cognition', title: 'Avaliação Cognitiva', desc: 'Preservação de memória, atenção e orientação.', icon: Brain, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/20', count: filteredCognitions.length },
+              { id: 'activities', title: 'Oficinas e Oficinas de Grupo', desc: 'Encontros, dinâmicas e interação social.', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/20', count: filteredActivities.length },
+              { id: 'bonds', title: 'Vínculos Familiares', desc: 'Frequência de visits e convivência familiar.', icon: Heart, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/20', count: filteredBonds.length },
+              { id: 'appointments', title: 'Consultas e Sessões', desc: 'Faltas, agendamentos e atendimentos realizados.', icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/20', count: filteredAppointments.length },
+              { id: 'plans', title: 'Planos de Intervenção', desc: 'Objetivos e estratégias terapêuticas estabelecidas.', icon: CheckCircle2, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-950/20', count: filteredPlans.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={14} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Pronta para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros cadastrados para os filtros selecionados. Cadastre evoluções ou mude as datas para habilitar relatórios."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'emotions') return filteredEmotions.length > 0;
+                      if (s === 'cognition') return filteredCognitions.length > 0;
+                      if (s === 'activities') return filteredActivities.length > 0;
+                      if (s === 'bonds') return filteredBonds.length > 0;
+                      if (s === 'appointments') return filteredAppointments.length > 0;
+                      if (s === 'plans') return filteredPlans.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 dark:shadow-none"
+              )}
+            >
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -430,6 +935,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
           { id: 'activities', label: 'Atividades', icon: Puzzle },
           { id: 'cognition', label: 'Cognição', icon: Activity },
           { id: 'alerts', label: 'Alertas', icon: AlertCircle },
+          { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
           { id: 'reports', label: 'Relatórios', icon: FileText },
           { id: 'settings', label: 'Configurações', icon: Settings },
         ].map((tab) => (
@@ -584,6 +1090,35 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 elderly={elderly}
                 monitorings={emotionalMonitorings}
                 bonds={familyBonds}
+              />
+            )}
+            {activeTab === 'productivity' && (
+              <ProductivitySection
+                user={props.user}
+                professionals={professionals}
+                nursingEvolutions={props.nursingEvolutions}
+                physioEvolutions={props.physioEvolutions}
+                psychEvolutions={evolutions}
+                pedagogyEvolutions={props.pedagogyEvolutions}
+                socialEvolutions={props.socialEvolutions}
+                nutritionEvolutions={props.nutritionEvolutions}
+                workshops={props.workshops}
+                notifications={props.notifications}
+                elderly={elderly}
+                onDeleteNotification={async (id, e) => {
+                  e.stopPropagation();
+                  if (props.onDeleteNotification) {
+                    props.onDeleteNotification(id, e);
+                  }
+                }}
+                onSaveEvolution={props.onSaveCollaborationEvolution || (async () => {})}
+                onDeleteEvolution={props.onDeleteCollaborationEvolution || (async () => {})}
+                showToast={showToast}
+                targetSector="Psicologia"
+                targetRole="PSICOLOGA"
+                psychActivities={props.psychActivities}
+                pedagogyActivities={props.pedagogyActivities}
+                onViewActivity={props.onViewActivity}
               />
             )}
             {activeTab === 'reports' && renderReports()}
@@ -1196,12 +1731,18 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
       </button>
     </div>
     <div className="space-y-6">
-      {(evolutions || []).filter((e: any) => !filter || e.patientId === filter).map((e: PsychEvolution) => {
+      {(evolutions || []).filter((e: any) => !filter || e.patientId === filter || e.patientIds?.includes(filter)).map((e: PsychEvolution | any) => {
         const patient = (patients || []).find((p: any) => p.id === e.patientId);
         const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
         const displayName = e.patientId === 'OUTRO' 
           ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : (linked?.name || patient?.name);
+          : (e.patientIds && e.patientIds.length > 1 
+              ? e.patientIds.map((pid: string) => {
+                  const pat = (patients || []).find((p: any) => p.id === pid);
+                  const lk = pat?.elderlyId ? (elderly || []).find((ed: any) => ed.id === pat.elderlyId) : null;
+                  return lk?.name || pat?.name;
+                }).filter(Boolean).join(', ')
+              : (linked?.name || patient?.name || 'N/A'));
 
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
@@ -1727,6 +2268,8 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
   });
   const [isExtracting, setIsExtracting] = useState(false);
   const [profSearch, setProfSearch] = useState('');
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>(editingData?.patientId ? [editingData.patientId] : []);
+  const [isMulti, setIsMulti] = useState(false);
 
   // Sync formData when editingData changes or when modal opens
   React.useEffect(() => {
@@ -1739,6 +2282,8 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
         coWorkers: editingData?.coWorkers || []
       });
       setProfSearch('');
+      setSelectedPatientIds(editingData?.patientId ? [editingData.patientId] : []);
+      setIsMulti(false);
     }
   }, [isOpen, editingData]);
 
@@ -1802,15 +2347,36 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
     e.preventDefault();
     try {
       const { photos, ...data } = formData;
-      await onSave(data, editingData?.id);
 
-      if (photos && photos.length > 0 && formData.patientId) {
-        const patient = (patients || []).find((p: any) => p.id === formData.patientId);
-        const activityType = 
-          type === 'evolution' ? 'Evolução Psicológica' :
-          type === 'activity' ? 'Atividade Psicológica' : 'Atendimento Psicológico';
-        
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.observation || formData.description);
+      if (isMulti && selectedPatientIds.length > 0 && !editingData && type !== 'patient') {
+        const primaryPid = selectedPatientIds[0];
+        const currentData = { ...data, patientId: primaryPid, patientIds: selectedPatientIds };
+        await onSave(currentData, editingData?.id);
+
+        if (photos && photos.length > 0) {
+          const patient = (patients || []).find((p: any) => p.id === primaryPid);
+          const activityType = 
+            type === 'evolution' ? 'Evolução Psicológica' :
+            type === 'activity' ? 'Atividade Psicológica' : 'Atendimento Psicológico';
+          
+          await onSavePhotos(photos, primaryPid, patient?.name || 'Paciente', activityType, formData.observation || formData.description);
+        }
+      } else {
+        if (!formData.patientId && type !== 'patient') {
+          alert('Por favor, selecione pelo menos um idoso!');
+          return;
+        }
+
+        await onSave(data, editingData?.id);
+
+        if (photos && photos.length > 0 && formData.patientId) {
+          const patient = (patients || []).find((p: any) => p.id === formData.patientId);
+          const activityType = 
+            type === 'evolution' ? 'Evolução Psicológica' :
+            type === 'activity' ? 'Atividade Psicológica' : 'Atendimento Psicológico';
+          
+          await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.observation || formData.description);
+        }
       }
       onClose();
     } catch (err) {
@@ -1922,7 +2488,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'initial' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={patientOptions.map(p => ({ id: p.value, name: p.label }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 
                 {formData.patientId === 'OUTRO' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -1966,7 +2544,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'evolution' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={patientOptions.map(p => ({ id: p.value, name: p.label }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 
                 {formData.patientId === 'OUTRO' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -2041,7 +2631,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'appointment' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={patientOptions.map(p => ({ id: p.value, name: p.label }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 
                 {formData.patientId === 'OUTRO' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -2084,7 +2686,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'emotion' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={patientOptions.map(p => ({ id: p.value, name: p.label }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 
                 {formData.patientId === 'OUTRO' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -2127,7 +2741,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'family' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={patientOptions} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={patientOptions.map(p => ({ id: p.value, name: p.label }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 
                 {formData.patientId === 'OUTRO' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-800">
@@ -2304,7 +2930,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
 
             {type === 'cognition' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 <Input label="Data da Avaliação" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                 <div className="grid grid-cols-3 gap-6">
                   <Select label="Memória" value={formData.memory} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
@@ -2328,7 +2966,19 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
             
             {type === 'plan' && (
               <div className="space-y-6">
-                <Select label="Idoso" value={formData.patientId} options={(patients || []).map((p: any) => ({ value: p.id, label: p.name }))} onChange={(v) => setFormData({ ...formData, patientId: v })} />
+                <div className="animate-fade-in">
+                  <MultiPatientSelector 
+                    patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                    selectedIds={selectedPatientIds}
+                    onChange={setSelectedPatientIds}
+                    singleValue={formData.patientId || ''}
+                    onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                    isMulti={isMulti}
+                    onToggleMulti={setIsMulti}
+                    accentColor="blue"
+                    label="Idoso(s) Selecionado(s)"
+                  />
+                </div>
                 <Input label="Data do Plano" value={formData.date} type="date" onChange={(v) => setFormData({ ...formData, date: v })} />
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">

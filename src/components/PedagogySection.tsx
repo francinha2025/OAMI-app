@@ -19,7 +19,7 @@ import {
 import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { ROLE_LABELS } from '../constants';
@@ -27,11 +27,15 @@ import {
   PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, 
   PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, 
   PedagogyIndividualPlan, PedagogyLifeHistory,
-  User as UserType, Elderly 
+  User as UserType, Elderly,
+  NursingEvolution, PhysioEvolution, PsychEvolution, SocialEvolution, NutritionEvolution, Workshop, AppNotification, Professional
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
+import { MultiPatientSelector } from './MultiPatientSelector';
+import { ProductivitySection } from './ProductivitySection';
+import { Award } from 'lucide-react';
 
 // Movendo componentes auxiliares para o topo para evitar problemas de inicialização
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
@@ -95,10 +99,25 @@ interface PedagogySectionProps {
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
-  professionals?: any[];
+  professionals?: Professional[];
+  nursingEvolutions?: NursingEvolution[];
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
 }
 
-type TabType = 'dashboard' | 'residents' | 'activities' | 'monitoring' | 'reports' | 'settings';
+type TabType = 'dashboard' | 'residents' | 'activities' | 'monitoring' | 'productivity' | 'reports' | 'settings';
 
 const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string }> = ({ active, onClick, icon: Icon, label }) => (
   <button
@@ -117,34 +136,46 @@ const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, lab
   </button>
 );
 
-export const PedagogySection: React.FC<PedagogySectionProps> = ({
-  user,
-  elderly,
-  patients,
-  assessments,
-  evolutions,
-  activities,
-  stimulationTrackings,
-  socialParticipations,
-  individualPlans,
-  lifeHistories,
-  onSavePatient,
-  onSaveAssessment,
-  onSaveEvolution,
-  onSaveActivity,
-  onSaveStimulation,
-  onSaveSocial,
-  onSavePlan,
-  onSaveLifeHistory,
-  onSavePhotos,
-  onDeleteRecord,
-  onDeletePatient,
-  showToast,
-  theme,
-  setTheme,
-  onLogout,
-  professionals = []
-}) => {
+export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
+  const {
+    user,
+    elderly,
+    patients,
+    assessments,
+    evolutions,
+    activities,
+    stimulationTrackings,
+    socialParticipations,
+    individualPlans,
+    lifeHistories,
+    onSavePatient,
+    onSaveAssessment,
+    onSaveEvolution,
+    onSaveActivity,
+    onSaveStimulation,
+    onSaveSocial,
+    onSavePlan,
+    onSaveLifeHistory,
+    onSavePhotos,
+    onDeleteRecord,
+    onDeletePatient,
+    showToast,
+    theme,
+    setTheme,
+    onLogout,
+    professionals = [],
+    nursingEvolutions = [],
+    physioEvolutions = [],
+    psychEvolutions = [],
+    pedagogyEvolutions = [],
+    socialEvolutions = [],
+    nutritionEvolutions = [],
+    workshops = [],
+    notifications = [],
+    onDeleteNotification,
+    onSaveCollaborationEvolution,
+    onDeleteCollaborationEvolution
+  } = props;
   if (!user || !user.role) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-6">
@@ -177,7 +208,22 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const [viewingAct, setViewingAct] = useState<any | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'stimulation', 'social', 'activities', 'individualPlans', 'assessments'
+  ]);
   const [profSearch, setProfSearch] = useState('');
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
+  const [isMulti, setIsMulti] = useState(false);
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -206,6 +252,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   useEffect(() => {
     localStorage.setItem('oami-pedagogy-tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (props.defaultTab) {
+      setActiveTab(props.defaultTab as any);
+    }
+  }, [props.defaultTab]);
 
   const onClose = () => setIsModalOpen(false);
 
@@ -266,45 +318,90 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       const type = modalType || activeTab;
       const { photos, ...data } = formData;
       const id = editingData?.id;
-      
-      const payload = { ...data, id };
 
-      switch (type) {
-        case 'patient':
-        case 'residents':
-          await onSavePatient(payload);
-          break;
-        case 'assessment':
-          await onSaveAssessment({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'evolution':
-          await onSaveEvolution({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'activity':
-        case 'activities':
-          await onSaveActivity({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'stimulation':
-          await onSaveStimulation({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'social':
-          await onSaveSocial({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'plan':
-          await onSavePlan({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-        case 'history':
-          await onSaveLifeHistory({ ...payload, date: payload.date || new Date().toISOString() });
-          break;
-      }
+      if (isMulti && selectedPatientIds.length > 0 && !editingData && type !== 'patient' && type !== 'residents') {
+        const primaryPid = selectedPatientIds[0];
+        const payload = { ...data, patientId: primaryPid, patientIds: selectedPatientIds, id };
 
-      if (photos && photos.length > 0 && formData.patientId) {
-        const patient = (patients || []).find(p => p.id === formData.patientId);
-        const activityType = 
-          type === 'evolution' ? 'Evolução Pedagógica' :
-          type === 'activity' || type === 'activities' ? 'Atividade Pedagógica' : 'Atendimento Pedagógico';
-        
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description);
+        switch (type) {
+          case 'assessment':
+            await onSaveAssessment({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'evolution':
+            await onSaveEvolution({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'activity':
+          case 'activities':
+            await onSaveActivity({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'stimulation':
+            await onSaveStimulation({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'social':
+            await onSaveSocial({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'plan':
+            await onSavePlan({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'history':
+            await onSaveLifeHistory({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+        }
+
+        if (photos && photos.length > 0) {
+          const patient = (patients || []).find(p => p.id === primaryPid);
+          const activityType = 
+            type === 'evolution' ? 'Evolução Pedagógica' :
+            type === 'activity' || type === 'activities' ? 'Atividade Pedagógica' : 'Atendimento Pedagógico';
+          
+          await onSavePhotos(photos, primaryPid, patient?.name || 'Paciente', activityType, data.evolution || data.description);
+        }
+      } else {
+        if (!formData.patientId && type !== 'patient' && type !== 'residents' && type !== 'activity' && type !== 'activities') {
+          alert('Por favor, selecione pelo menos um idoso!');
+          setIsLoading(false);
+          return;
+        }
+
+        const payload = { ...data, id };
+
+        switch (type) {
+          case 'patient':
+          case 'residents':
+            await onSavePatient(payload);
+            break;
+          case 'assessment':
+            await onSaveAssessment({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'evolution':
+            await onSaveEvolution({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'activity':
+          case 'activities':
+            await onSaveActivity({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'stimulation':
+            await onSaveStimulation({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'social':
+            await onSaveSocial({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'plan':
+            await onSavePlan({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+          case 'history':
+            await onSaveLifeHistory({ ...payload, date: payload.date || new Date().toISOString() });
+            break;
+        }
+
+        if (photos && photos.length > 0 && formData.patientId) {
+          const patient = (patients || []).find(p => p.id === formData.patientId);
+          const activityType = 
+            type === 'evolution' ? 'Evolução Pedagógica' :
+            type === 'activity' || type === 'activities' ? 'Atividade Pedagógica' : 'Atendimento Pedagógico';
+          
+          await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description);
+        }
       }
 
       setIsModalOpen(false);
@@ -323,6 +420,12 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
   const openModal = (type: string, initialData: any = null) => {
     setModalType(type);
     setProfSearch('');
+    if (initialData?.patientId) {
+      setSelectedPatientIds([initialData.patientId]);
+    } else {
+      setSelectedPatientIds([]);
+    }
+    setIsMulti(false);
     if (!initialData) {
       const now = new Date();
       setFormData({
@@ -507,16 +610,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'assessment':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto text-gray-900 dark:text-gray-100">
-            <div>
-              <label className="block text-sm font-black text-gray-700 dark:text-gray-300 mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in col-span-2">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Avaliado(s)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               {['memory', 'attention', 'language', 'comprehension', 'orientation', 'praxis', 'gnosis'].map((field) => (
@@ -575,16 +680,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'evolution':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
-            <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) em Evolução"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider">Título da Atividade</label>
@@ -896,16 +1003,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'stimulation':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
-            <div>
-              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Monitorado(s)"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -986,16 +1095,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'social':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
-            <div>
-              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) em Atividade"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1093,16 +1204,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'plan':
         return (
           <form onSubmit={handleSave} className="p-6 space-y-4 text-gray-900 dark:text-gray-100">
-            <div>
-              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
@@ -1162,16 +1275,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
       case 'history':
         return (
           <form onSubmit={handleSave} className="p-5 md:p-8 space-y-6 md:space-y-8 text-gray-900 dark:text-gray-100">
-            <div className="space-y-6">
-              <label className="block text-sm font-black text-gray-900 dark:text-white mb-1">Idoso</label>
-              <select
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-black"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o idoso</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="blue"
+                label="Idoso(s) Vinculado(s)"
+              />
             </div>
             <div>
               <div className="flex justify-between items-center mb-1">
@@ -2071,7 +2186,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             </select>
           </div>
         <div className="space-y-3">
-          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter).slice().sort((a, b) => {
+          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).slice().sort((a, b) => {
             const dateDiff = b.date.localeCompare(a.date);
             if (dateDiff !== 0) return dateDiff;
             return (b.time || '').localeCompare(a.time || '');
@@ -2084,7 +2199,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                     {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
                   </div>
                     <div>
-                      <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                      <p className="text-sm font-black text-gray-900 dark:text-white">
+                        {evolution.patientIds && evolution.patientIds.length > 1 
+                          ? evolution.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                          : (patient?.name || 'N/A')}
+                      </p>
                       <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">
                         {evolution.activityTitle} • {safeDateFormat(evolution.date, 'dd/MM')}{evolution.time ? ` às ${evolution.time}` : ''}
                       </p>
@@ -2195,7 +2314,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Histórico de Estimulação</h5>
             <div className="space-y-3">
               {(stimulationTrackings || [])
-                .filter(stim => !stimulationPatientFilter || stim.patientId === stimulationPatientFilter)
+                .filter(stim => !stimulationPatientFilter || stim.patientId === stimulationPatientFilter || stim.patientIds?.includes(stimulationPatientFilter))
                 .slice().sort((a, b) => {
                   const dateDiff = b.date.localeCompare(a.date);
                   if (dateDiff !== 0) return dateDiff;
@@ -2205,7 +2324,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   return (
                     <div key={stim.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800/50 flex items-center justify-between group hover:shadow-md transition-all">
                       <div>
-                        <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">
+                          {stim.patientIds && stim.patientIds.length > 1 
+                            ? stim.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                            : (patient?.name || 'N/A')}
+                        </p>
                         <p className="text-xs text-gray-500">{safeDateFormat(stim.date)}{stim.time ? ` às ${stim.time}` : ''} • Cognição: {Math.round(((stim.memoryScore || 0) + (stim.attentionScore || 0) + (stim.reasoningScore || 0) + (stim.languageScore || 0)) / 4)}/10</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2275,7 +2398,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
             <h5 className="text-sm font-black text-gray-400 dark:text-gray-500 uppercase tracking-wider">Histórico de Participações</h5>
             <div className="space-y-3">
               {(socialParticipations || [])
-                .filter(soc => !socialPatientFilter || soc.patientId === socialPatientFilter)
+                .filter(soc => !socialPatientFilter || soc.patientId === socialPatientFilter || soc.patientIds?.includes(socialPatientFilter))
                 .slice().sort((a, b) => {
                   const dateDiff = b.date.localeCompare(a.date);
                   if (dateDiff !== 0) return dateDiff;
@@ -2285,7 +2408,11 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                   return (
                     <div key={soc.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800/50 flex items-center justify-between group hover:shadow-md transition-all">
                       <div>
-                        <p className="text-sm font-black text-gray-900 dark:text-white">{patient?.name}</p>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">
+                          {soc.patientIds && soc.patientIds.length > 1 
+                            ? soc.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                            : (patient?.name || 'N/A')}
+                        </p>
                         <p className="text-xs text-gray-500">{safeDateFormat(soc.date)}{soc.time ? ` às ${soc.time}` : ''} • Interação: <span className={cn(
                           "font-bold",
                           soc.interactionLevel === 'ALTO' ? "text-green-600" : soc.interactionLevel === 'MEDIO' ? "text-yellow-600" : "text-red-600"
@@ -2315,6 +2442,577 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
     </div>
   );
 
+  const renderReports = () => {
+    const isDateInSelectedRange = (dateStr: string) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
+      }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
+
+    // Filtered lists based on search and selected patient filter
+    const matchedPatients = (patients || []).filter(p => {
+      const matchSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchPatient = !reportsPatientFilter || p.id === reportsPatientFilter;
+      return matchSearch && matchPatient;
+    });
+
+    const isPatientInList = (pId: string) => {
+      return matchedPatients.some(p => p.id === pId);
+    };
+
+    // Filtered Evolutions
+    const filteredEvolutions = (evolutions || []).filter(e => {
+      return isPatientInList(e.patientId) && isDateInSelectedRange(e.date);
+    });
+
+    // Filtered Stimulation Trackings (Estimulações Cognitivas)
+    const filteredStimulation = (stimulationTrackings || []).filter(s => {
+      return isPatientInList(s.patientId) && isDateInSelectedRange(s.date);
+    });
+
+    // Filtered Social Participations (Participação Social)
+    const filteredSocial = (socialParticipations || []).filter(sp => {
+      return isPatientInList(sp.patientId) && isDateInSelectedRange(sp.date);
+    });
+
+    // Filtered Activities (Oficinas Integradas)
+    const filteredActivitiesList = (activities || []).filter(a => {
+      const isDateValid = isDateInSelectedRange(a.date);
+      if (!isDateValid) return false;
+      
+      if (!reportsPatientFilter) {
+        // Se nenhum idoso específico estiver selecionado, exibe TODAS as oficinas no período
+        return true;
+      }
+      
+      // Se um idoso específico estiver selecionado, exibe as oficinas que ele participou
+      // ou oficinas coletivas gerais (que não possuem lista delimitada de residentes)
+      return !a.participants || a.participants.length === 0 || a.participants.includes(reportsPatientFilter);
+    });
+
+    // Filtered Individual Plans (Planos de Metas)
+    const filteredPlans = (individualPlans || []).filter(ip => {
+      return isPatientInList(ip.patientId) && isDateInSelectedRange(ip.date);
+    });
+
+    // Filtered Assessments (Avaliações Iniciais)
+    const filteredAssessments = (assessments || []).filter(as => {
+      return isPatientInList(as.patientId) && isDateInSelectedRange(as.date);
+    });
+
+    // Filtered Life Histories (Histórias de Vida)
+    const filteredLifeHistories = (lifeHistories || []).filter(lh => {
+      return isPatientInList(lh.patientId);
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
+      } else {
+        setReportSelectedSections([...reportSelectedSections, section]);
+      }
+    };
+
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(patients || []).find(p => p.id === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Pedagogia | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data/Hora', 'Atividade Realizada', 'Participação', 'Resposta / Observação', 'Responsável']
+          : ['Data', 'Idoso', 'Atividade Realizada', 'Participação', 'Resposta / Observação', 'Responsável'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (patients || []).find(pt => pt.id === e.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          const timeText = e.time ? ` às ${e.time}` : '';
+          return reportsPatientFilter
+            ? [`${dtFmt}${timeText}`, e.activityTitle, e.participation || 'ATIVO', `${e.response || ''}\n${e.observations || ''}`.trim() || '-', e.registeredBy || 'N/A']
+            : [dtFmt, name || 'Geral', e.activityTitle, e.participation || 'ATIVO', `${e.response || ''}\n${e.observations || ''}`.trim() || '-', e.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Evoluções Pedagógicas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('stimulation') && filteredStimulation.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Memória', 'Atenção', 'Raciocínio', 'Linguagem', 'Observações']
+          : ['Data', 'Idoso', 'Memória', 'Atenção', 'Raciocínio', 'Linguagem', 'Observações'];
+          
+        const data = filteredStimulation.map(s => {
+          const p = (patients || []).find(pt => pt.id === s.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(s.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, `${s.memoryScore || 0}/10`, `${s.attentionScore || 0}/10`, `${s.reasoningScore || 0}/10`, `${s.languageScore || 0}/10`, s.observations || '-']
+            : [dtFmt, name || 'Geral', `${s.memoryScore || 0}/10`, `${s.attentionScore || 0}/10`, `${s.reasoningScore || 0}/10`, `${s.languageScore || 0}/10`, s.observations || '-'];
+        });
+        
+        sections.push({ title: 'Estimulação Cognitiva', columns, data });
+      }
+
+      if (reportSelectedSections.includes('social') && filteredSocial.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Nível Interação', 'Estado de Isolamento', 'Comunicação', 'Observações']
+          : ['Data', 'Idoso', 'Nível Interação', 'Estado de Isolamento', 'Comunicação', 'Observações'];
+          
+        const data = filteredSocial.map(sp => {
+          const p = (patients || []).find(pt => pt.id === sp.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(sp.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, sp.interactionLevel || 'MÉDIO', sp.isIsolated ? 'Sim (Isolado)' : 'Não', sp.isCommunicative ? 'Comunicativo' : 'Pouco comunicativo', sp.observations || '-']
+            : [dtFmt, name || 'Geral', sp.interactionLevel || 'MÉDIO', sp.isIsolated ? 'Sim (Isolado)' : 'Não', sp.isCommunicative ? 'Comunicativo' : 'Pouco comunicativo', sp.observations || '-'];
+        });
+        
+        sections.push({ title: 'Participação e Socialização', columns, data });
+      }
+
+      if (reportSelectedSections.includes('activities') && filteredActivitiesList.length > 0) {
+        const columns = ['Data/Hora', 'Oficina / Atividade', 'Estratégia / Tipo', 'Desenvolvimento', 'Residentes Participantes'];
+        const data = filteredActivitiesList.map(a => {
+          const parts = (a.participants || []).map(pid => {
+            const pt = (patients || []).find(p => p.id === pid);
+            return pt?.elderlyId ? (elderly || []).find(ed => ed.id === pt.elderlyId)?.name : pt?.name;
+          }).filter(Boolean).join(', ');
+          const dtFmt = format(parseISO(a.date), 'dd/MM/yyyy');
+          const timeText = a.time ? ` às ${a.time}` : '';
+          return [`${dtFmt}${timeText}`, a.title, a.type, a.description, parts || 'Nenhum'];
+        });
+        
+        sections.push({ title: 'Oficinas e Oficinas de Grupo', columns, data });
+      }
+
+      if (reportSelectedSections.includes('individualPlans') && filteredPlans.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Objetivos Pedagógicos', 'Atividades Indicadas', 'Estratégias de Intervenção']
+          : ['Data', 'Idoso', 'Objetivos Pedagógicos', 'Atividades Indicadas', 'Estratégias de Intervenção'];
+          
+        const data = filteredPlans.map(ip => {
+          const p = (patients || []).find(pt => pt.id === ip.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(ip.date), 'dd/MM/yyyy');
+          const indicatedText = (ip.indicatedActivities || []).join(', ') || '-';
+          return reportsPatientFilter
+            ? [dtFmt, ip.objectives, indicatedText, ip.strategies]
+            : [dtFmt, name || 'Geral', ip.objectives, indicatedText, ip.strategies];
+        });
+        
+        sections.push({ title: 'Planos Individuais de Metas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('assessments') && filteredAssessments.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Cognição & Linguagem', 'Praxia & Gnosia', 'Observações Detalhadas']
+          : ['Data', 'Idoso', 'Cognição & Linguagem', 'Praxia & Gnosia', 'Observações Detalhadas'];
+          
+        const data = filteredAssessments.map(as => {
+          const p = (patients || []).find(pt => pt.id === as.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const dtFmt = format(parseISO(as.date), 'dd/MM/yyyy');
+          const cogText = `Memória: ${as.memory || 'PRESERVADO'}\nAtenção: ${as.attention || 'PRESERVADO'}\nLinguagem: ${as.language || 'PRESERVADO'}\nCompreensão: ${as.comprehension || 'PRESERVADO'}\nOrientação: ${as.orientation || 'PRESERVADO'}`;
+          const pgText = `Praxia: ${as.praxis || 'PRESERVADO'}\nGnosia: ${as.gnosis || 'PRESERVADO'}`;
+          return reportsPatientFilter
+            ? [dtFmt, cogText, pgText, as.observations || '-']
+            : [dtFmt, name || 'Geral', cogText, pgText, as.observations || '-'];
+        });
+        
+        sections.push({ title: 'Avaliações Iniciais Pedagógicas', columns, data });
+      }
+
+      if (reportSelectedSections.includes('lifeHistories') && filteredLifeHistories.length > 0) {
+        const columns = ['Idoso', 'Lembranças Relatadas', 'Histórias Gravadas', 'Linha do Tempo de Destaques'];
+        const data = filteredLifeHistories.map(lh => {
+          const p = (patients || []).find(pt => pt.id === lh.patientId);
+          const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
+          const timelineText = (lh.timelineEvents || [])
+            .map(t => `[${t.date}] ${t.event}`)
+            .join('\n') || '-';
+
+          return [name || 'N/A', lh.memories || '-', lh.stories || '-', timelineText];
+        });
+        
+        sections.push({ title: 'Histórico de Vida e Lembranças', columns, data });
+      }
+
+      if (sections.length === 0) {
+        showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário Pedagógico - ${patients.find(p => p.id === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Atividades (Pedagogia)';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_pedagogia_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Categoria', 'Data/Período', 'Paciente/Idoso', 'Descrição / Registro', 'Profissional Responsável'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = patients.find(p => p.id === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_pedagogia_doc`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredStimulation.length === 0 && 
+      filteredSocial.length === 0 && 
+      filteredActivitiesList.length === 0 && 
+      filteredPlans.length === 0 && 
+      filteredAssessments.length === 0 && 
+      filteredLifeHistories.length === 0;
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de pedagogia para impressão oficial. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Residente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {patients.map(p => {
+                    const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                    return (
+                      <option key={p.id} value={p.id}>{(linked?.name || p.name || '').toUpperCase()}</option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções Pedagógicas', desc: 'Registros diários de evolução e atividades.', icon: ClipboardList, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/20', count: filteredEvolutions.length },
+              { id: 'stimulation', title: 'Estimulação Cognitiva', desc: 'Acompanhamento de pontuação cognitiva (0 a 10).', icon: Brain, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/20', count: filteredStimulation.length },
+              { id: 'social', title: 'Participação Social', desc: 'Nível de integração e socialização.', icon: Smile, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/20', count: filteredSocial.length },
+              { id: 'activities', title: 'Oficinas e Oficinas de Grupo', desc: 'Dinâmicas coletivas e projetos realizados.', icon: Users, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/20', count: filteredActivitiesList.length },
+              { id: 'individualPlans', title: 'Plano Individual de Metas', desc: 'Planejamento e estratégias pedagógicas.', icon: Target, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-950/20', count: filteredPlans.length },
+              { id: 'assessments', title: 'Avaliação Inicial', desc: 'Avaliação dos aspectos intelectuais e de compreensão.', icon: CheckCircle2, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/20', count: filteredAssessments.length },
+              { id: 'lifeHistories', title: 'Histórico de Lembranças', desc: 'Eventos cronológicos marcantes e histórias gravadas.', icon: History, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/20', count: filteredLifeHistories.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={14} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Pronta para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros cadastrados para os filtros selecionados. Cadastre evoluções ou mude as datas para habilitar relatórios."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'stimulation') return filteredStimulation.length > 0;
+                      if (s === 'social') return filteredSocial.length > 0;
+                      if (s === 'activities') return filteredActivitiesList.length > 0;
+                      if (s === 'individualPlans') return filteredPlans.length > 0;
+                      if (s === 'assessments') return filteredAssessments.length > 0;
+                      if (s === 'lifeHistories') return filteredLifeHistories.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 dark:shadow-none"
+              )}
+            >
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
       <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
@@ -2323,6 +3021,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
           { id: 'residents', label: 'Residentes', icon: Users },
           { id: 'activities', label: 'Oficinas & Atividades', icon: Palette },
           { id: 'monitoring', label: 'Monitoramento', icon: TrendingUp },
+          { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
           { id: 'reports', label: 'Relatórios', icon: FileText },
           { id: 'settings', label: 'Configurações', icon: Settings },
         ].map((tab) => (
@@ -2461,140 +3160,38 @@ export const PedagogySection: React.FC<PedagogySectionProps> = ({
                 </div>
               )
             )}
+            {activeTab === 'productivity' && (
+              <ProductivitySection
+                user={user}
+                professionals={professionals}
+                nursingEvolutions={nursingEvolutions}
+                physioEvolutions={physioEvolutions}
+                psychEvolutions={psychEvolutions}
+                pedagogyEvolutions={evolutions}
+                socialEvolutions={socialEvolutions}
+                nutritionEvolutions={nutritionEvolutions}
+                workshops={workshops}
+                notifications={notifications}
+                elderly={elderly}
+                onDeleteNotification={async (id, e) => {
+                  e.stopPropagation();
+                  if (onDeleteNotification) {
+                    onDeleteNotification(id, e);
+                  }
+                }}
+                onSaveEvolution={onSaveCollaborationEvolution || (async () => {})}
+                onDeleteEvolution={onDeleteCollaborationEvolution || (async () => {})}
+                showToast={showToast}
+                targetSector="Pedagogia"
+                targetRole="PEDAGOGA"
+                psychActivities={props.psychActivities}
+                pedagogyActivities={props.pedagogyActivities}
+                onViewActivity={props.onViewActivity}
+              />
+            )}
             {activeTab === 'activities' && renderActivitiesTab()}
             {activeTab === 'monitoring' && renderMonitoring()}
-            {activeTab === 'reports' && (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                      type="text" 
-                      placeholder="Buscar por nome do idoso..." 
-                      className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <div className="w-full md:w-64 relative">
-                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <select 
-                      className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium appearance-none"
-                      value={evolutionPatientFilter}
-                      onChange={(e) => setEvolutionPatientFilter(e.target.value)}
-                    >
-                      <option value="">Todos os Idosos</option>
-                      {patients.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="bg-white dark:bg-gray-900 p-8 md:p-12 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 text-center shadow-sm">
-                  <FileText className="w-16 h-16 mx-auto mb-6 text-blue-500/20" />
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2 uppercase tracking-tighter">Módulo de Relatórios</h3>
-                  <p className="text-gray-500 max-w-md mx-auto font-medium mb-8">
-                    Gere relatórios pedagógicos detalhados para os idosos selecionados.
-                  </p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-4 max-w-xl mx-auto">
-                    <button 
-                      onClick={async () => {
-                        const targets = patients.filter(p => 
-                          p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                          (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                        );
-                        if (targets.length === 0) {
-                          showToast('Nenhum idoso encontrado para os filtros selecionados', 'error');
-                          return;
-                        }
-                        
-                        const data = targets.map(p => {
-                          const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
-                          return [p.name, p.age, patientEvolutions.length, p.status];
-                        });
-                        
-                        await generateModernPDF({
-                          title: 'Relatório Pedagógico',
-                          subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
-                          columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
-                          data,
-                          fileName: 'relatorio_pedagogico'
-                        });
-                      }}
-                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-all font-black uppercase tracking-widest text-xs shadow-xl shadow-blue-100 dark:shadow-none"
-                    >
-                      <Download className="w-5 h-5" />
-                      Exportar PDF
-                    </button>
-                    
-                    <button 
-                      onClick={async () => {
-                        const targets = patients.filter(p => 
-                          p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                          (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                        );
-                        if (targets.length === 0) {
-                          showToast('Nenhum idoso encontrado para os filtros selecionados', 'error');
-                          return;
-                        }
-                        
-                        const data = targets.map(p => {
-                          const patientEvolutions = (evolutions || []).filter(e => e.patientId === p.id);
-                          return [p.name, p.age, patientEvolutions.length, p.status];
-                        });
-                        
-                        await generateModernWord({
-                          title: 'Relatório Pedagógico',
-                          subtitle: `Acompanhamento Pedagógico - ${format(new Date(), "dd/MM/yyyy")}`,
-                          columns: ['Residente', 'Idade', 'Evoluções', 'Status'],
-                          data,
-                          fileName: 'relatorio_pedagogico'
-                        });
-                      }}
-                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition-all font-black uppercase tracking-widest text-xs shadow-xl shadow-green-100 dark:shadow-none"
-                    >
-                      <FileText className="w-5 h-5" />
-                      Exportar Word
-                    </button>
-                  </div>
-
-                  <div className="mt-12 text-left">
-                    <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Itens Inclusos na Seleção ({
-                      patients.filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                      ).length
-                    })</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {patients.filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                      ).slice(0, 12).map(p => (
-                        <div key={p.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-800">
-                          <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600 font-black">
-                            {p.name.charAt(0)}
-                          </div>
-                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate">{p.name}</span>
-                        </div>
-                      ))}
-                      {patients.filter(p => 
-                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                        (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                      ).length > 12 && (
-                        <div className="flex items-center justify-center p-2 text-xs font-bold text-gray-400 italic">
-                          + {patients.filter(p => 
-                            p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                            (!evolutionPatientFilter || p.id === evolutionPatientFilter)
-                          ).length - 12} idosos
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab === 'reports' && renderReports()}
           </motion.div>
         </AnimatePresence>
       </div>

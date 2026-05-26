@@ -20,18 +20,22 @@ import { format, isToday, parseISO, startOfToday, isSameDay, addDays } from 'dat
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
 import { ROLE_LABELS } from '../constants';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
   NursingPatient, Medication, MedicationAdministration, 
   VitalSigns, DressingRecord, NursingEvolution, 
   IncidentRecord, ShiftSchedule, StaffMember, AVDRecord, 
-  DiaperChangeRecord, User as UserType, Professional, Elderly
+  DiaperChangeRecord, User as UserType, Professional, Elderly,
+  PhysioEvolution, PsychEvolution, PedagogyEvolution, SocialEvolution, NutritionEvolution, Workshop, AppNotification
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
+import { MultiPatientSelector } from './MultiPatientSelector';
+import { ProductivitySection } from './ProductivitySection';
+import { Award } from 'lucide-react';
 
 interface NursingSectionProps {
   user: UserType;
@@ -63,6 +67,20 @@ interface NursingSectionProps {
   onDeleteRecord: (collection: string, id: string) => Promise<void>;
   onSavePhotos: (photos: string[], patientId: string, patientName: string, activityType: string, description?: string) => Promise<void>;
   onUpdateProfile?: (data: Partial<UserType>) => Promise<void>;
+  physioEvolutions?: PhysioEvolution[];
+  psychEvolutions?: PsychEvolution[];
+  pedagogyEvolutions?: PedagogyEvolution[];
+  socialEvolutions?: SocialEvolution[];
+  nutritionEvolutions?: NutritionEvolution[];
+  workshops?: Workshop[];
+  notifications?: AppNotification[];
+  onDeleteNotification?: (id: string, e: React.MouseEvent) => void;
+  onSaveCollaborationEvolution?: (collectionName: string, id: string, updatedData: any) => Promise<void>;
+  onDeleteCollaborationEvolution?: (collectionName: string, id: string) => Promise<void>;
+  psychActivities?: any[];
+  pedagogyActivities?: any[];
+  onViewActivity?: (activity: any) => void;
+  defaultTab?: string;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
   onLogout: () => void;
@@ -71,13 +89,14 @@ interface NursingSectionProps {
 type NursingTab = 
   | 'dashboard' | 'patients' | 'medication' 
   | 'vitals' | 'dressings' | 'evolutions' 
-  | 'incidents' | 'shift' | 'reports' | 'settings';
+  | 'incidents' | 'shift' | 'productivity' | 'reports' | 'settings';
 
 export const NursingSection = (props: NursingSectionProps) => {
   const { 
     patients, medications, administrations, vitalSigns, 
     dressings, evolutions, incidents, shifts, 
-    users, professionals, avds, diaperChanges, elderly 
+    users, professionals, avds, diaperChanges, elderly,
+    showToast
   } = props;
   const [activeTab, setActiveTab] = useState<NursingTab>(() => {
     const saved = localStorage.getItem('oami-nursing-tab');
@@ -96,11 +115,32 @@ export const NursingSection = (props: NursingSectionProps) => {
   const [dressingsPatientFilter, setDressingsPatientFilter] = useState('');
   const [incidentsPatientFilter, setIncidentsPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
+
+  // Integrated report states
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'medications', 'vitalSigns', 'incidents'
+  ]);
   const [medicationsPatientFilter, setMedicationsPatientFilter] = useState('');
 
   useEffect(() => {
     localStorage.setItem('oami-nursing-tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (props.defaultTab) {
+      setActiveTab(props.defaultTab as any);
+    }
+  }, [props.defaultTab]);
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -149,168 +189,485 @@ export const NursingSection = (props: NursingSectionProps) => {
   }, [props.patients, props.administrations, props.dressings, props.incidents, props.vitalSigns]);
 
   const renderReports = () => {
-    const downloadReport = async (title: string, data: any[], formatType: 'pdf' | 'word') => {
-      const filteredData = reportsPatientFilter 
-        ? data.filter(item => {
-            const patientNameValue = item.Paciente;
-            const selectedPatientName = (props.patients || []).find(p => p.id === reportsPatientFilter)?.name;
-            return patientNameValue === selectedPatientName;
-          })
-        : data;
-
-      if (filteredData.length === 0) {
-        props.showToast('Nenhum dado encontrado para o filtro selecionado', 'error');
-        return;
+    const isDateInSelectedRange = (dateStr: string) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
       }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
 
-      const columns = Object.keys(filteredData[0]);
-      const body = filteredData.map(item => Object.values(item));
+    // Filtered lists based on reportsPatientFilter
+    const matchedPatients = (props.patients || []).filter(p => {
+      return !reportsPatientFilter || p.id === reportsPatientFilter;
+    });
 
-      const subtitle = `Relatório de Enfermagem - ${format(new Date(), "dd/MM/yyyy")}${reportsPatientFilter ? ` - Paciente: ${props.patients.find(p => p.id === reportsPatientFilter)?.name}` : ''}`;
+    const isPatientInList = (pId: string) => {
+      return matchedPatients.some(p => p.id === pId);
+    };
 
-      if (formatType === 'pdf') {
-        await generateModernPDF({
-          title,
-          subtitle,
-          columns,
-          data: body,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+    // Filtered Evolutions
+    const filteredEvolutions = (props.evolutions || []).filter(e => {
+      return isPatientInList(e.patientId) && isDateInSelectedRange(e.date);
+    });
+
+    // Filtered Administrations
+    const filteredAdministrations = (props.administrations || []).filter(ad => {
+      return isPatientInList(ad.patientId) && isDateInSelectedRange(ad.date);
+    });
+
+    // Filtered Vital Signs
+    const filteredVitalSigns = (props.vitalSigns || []).filter(v => {
+      return isPatientInList(v.patientId) && isDateInSelectedRange(v.date);
+    });
+
+    // Filtered Incidents
+    const filteredIncidents = (props.incidents || []).filter(i => {
+      return isPatientInList(i.patientId) && isDateInSelectedRange(i.date);
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
       } else {
-        await generateModernWord({
-          title,
-          subtitle,
-          columns,
-          data: body,
-          fileName: safeReplace(title.toLowerCase(), /\s/g, '_')
-        });
+        setReportSelectedSections([...reportSelectedSections, section]);
       }
     };
 
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(props.patients || []).find(p => p.id === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Enfermagem | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Evolução de Enfermagem', 'Responsável']
+          : ['Data', 'Idoso', 'Evolução de Enfermagem', 'Responsável'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (props.patients || []).find(pt => pt.id === e.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, e.content || '-', e.registeredBy || 'COREN']
+            : [dtFmt, name, e.content || '-', e.registeredBy || 'COREN'];
+        });
+        
+        sections.push({ title: 'Evoluções de Enfermagem', columns, data });
+      }
+
+      if (reportSelectedSections.includes('medications') && filteredAdministrations.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Hora', 'Medicamento', 'Status da Dose', 'Responsável']
+          : ['Data', 'Idoso', 'Hora', 'Medicamento', 'Status da Dose', 'Responsável'];
+          
+        const data = filteredAdministrations.map(ad => {
+          const p = (props.patients || []).find(pt => pt.id === ad.patientId);
+          const name = p?.name || 'N/A';
+          const med = (props.medications || []).find(m => m.id === ad.medicationId);
+          const medName = med ? `${med.name} (${med.dosage})` : 'Medicamento Desconhecido';
+          const dtFmt = format(parseISO(ad.date), 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, ad.scheduledTime || '-', medName, ad.status || '-', ad.administeredBy || 'Membro da Equipe']
+            : [dtFmt, name, ad.scheduledTime || '-', medName, ad.status || '-', ad.administeredBy || 'Membro da Equipe'];
+        });
+        
+        sections.push({ title: 'Administração de Medicamentos', columns, data });
+      }
+
+      if (reportSelectedSections.includes('vitalSigns') && filteredVitalSigns.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Hora', 'P.A. (mmHg)', 'FC (bpm)', 'T. (°C)', 'SPO₂ (%)', 'Enfermeiro']
+          : ['Data', 'Idoso', 'Hora', 'P.A. (mmHg)', 'FC (bpm)', 'T. (°C)', 'SPO₂ (%)', 'Enfermeiro'];
+          
+        const data = filteredVitalSigns.map(v => {
+          const p = (props.patients || []).find(pt => pt.id === v.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(v.date), 'dd/MM/yyyy');
+          const paStr = `${v.systolicBP}/${v.diastolicBP}`;
+          return reportsPatientFilter
+            ? [dtFmt, v.time || '-', paStr, String(v.heartRate), `${v.temperature}°C`, `${v.saturation}%`, v.registeredBy || '-']
+            : [dtFmt, name, v.time || '-', paStr, String(v.heartRate), `${v.temperature}°C`, `${v.saturation}%`, v.registeredBy || '-'];
+        });
+        
+        sections.push({ title: 'Acompanhamento de Sinais Vitais', columns, data });
+      }
+
+      if (reportSelectedSections.includes('incidents') && filteredIncidents.length > 0) {
+        const columns = reportsPatientFilter
+          ? ['Data', 'Hora', 'Tipo de Ocorrência', 'Descrição / Conduta']
+          : ['Data', 'Idoso', 'Hora', 'Tipo de Ocorrência', 'Descrição / Conduta'];
+          
+        const data = filteredIncidents.map(i => {
+          const p = (props.patients || []).find(pt => pt.id === i.patientId);
+          const name = p?.name || 'N/A';
+          const dtFmt = format(parseISO(i.date), 'dd/MM/yyyy');
+          const descCond = `${i.description || '-'}\nConduta: ${i.conduct || '-'}`;
+          return reportsPatientFilter
+            ? [dtFmt, i.time || '-', i.type || 'Geral', descCond]
+            : [dtFmt, name, i.time || '-', i.type || 'Geral', descCond];
+        });
+        
+        sections.push({ title: 'Registros de Intercorrências', columns, data });
+      }
+
+      if (sections.length === 0) {
+        props.showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário de Enfermagem - ${props.patients.find(p => p.id === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Enfermagem';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_enfermagem_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          props.showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          props.showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Categoria', 'Data/Período', 'Paciente/Idoso', 'Descrição / Registro'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = props.patients.find(p => p.id === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1).join(' | ')
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2).join(' | ')
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_enfermagem_doc`
+          });
+          props.showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          props.showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredAdministrations.length === 0 && 
+      filteredVitalSigns.length === 0 &&
+      filteredIncidents.length === 0;
+
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Relatórios de Enfermagem</h2>
-          <div className="flex items-center gap-3 bg-white dark:bg-gray-900 p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <Filter size={16} className="text-gray-400 ml-2" />
-            <select 
-              value={reportsPatientFilter}
-              onChange={(e) => setReportsPatientFilter(e.target.value)}
-              className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-600 dark:text-gray-400 min-w-[200px]"
-            >
-              <option value="">Todos os Idosos (Geral)</option>
-              {props.patients.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios (Enfermagem)
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de enfermagem. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento final.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Residente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-850 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportsPatientFilter}
+                  onChange={(e) => setReportsPatientFilter(e.target.value)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                >
+                  <option value="">TODOS OS IDOSOS (GERAL)</option>
+                  {props.patients.map(p => {
+                    return (
+                      <option key={p.id} value={p.id}>{(p.name || '').toUpperCase()}</option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-855 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-855 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-855 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-855 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-855 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-855 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-855 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ReportCard 
-            title="Evolução Mensal" 
-            description="Resumo de todas as evoluções registradas no mês atual."
-            icon={<ClipboardList className="text-blue-600" />}
-            onDownloadPDF={() => {
-              const data = (props.evolutions || []).map(e => ({
-                Data: e.date,
-                Paciente: (props.patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
-                Conteúdo: e.content,
-                Responsável: e.registeredBy
-              }));
-              downloadReport("Relatório de Evoluções", data, 'pdf');
-            }}
-            onDownloadWord={() => {
-              const data = (props.evolutions || []).map(e => ({
-                Data: e.date,
-                Paciente: (props.patients || []).find(p => p.id === e.patientId)?.name || 'N/A',
-                Conteúdo: e.content,
-                Responsável: e.registeredBy
-              }));
-              downloadReport("Relatório de Evoluções", data, 'word');
-            }}
-          />
-          <ReportCard 
-            title="Histórico de Medicação" 
-            description="Relatório detalhado de administrações e intercorrências."
-            icon={<Pill className="text-amber-600" />}
-            onDownloadPDF={() => {
-              const data = (props.administrations || []).map(a => ({
-                Data: a.date,
-                Hora: a.scheduledTime,
-                Paciente: (props.patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
-                Medicamento: (props.medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
-                Status: a.status
-              }));
-              downloadReport("Histórico de Medicação", data, 'pdf');
-            }}
-            onDownloadWord={() => {
-              const data = (props.administrations || []).map(a => ({
-                Data: a.date,
-                Hora: a.scheduledTime,
-                Paciente: (props.patients || []).find(p => p.id === a.patientId)?.name || 'N/A',
-                Medicamento: (props.medications || []).find(m => m.id === a.medicationId)?.name || 'N/A',
-                Status: a.status
-              }));
-              downloadReport("Histórico de Medicação", data, 'word');
-            }}
-          />
-          <ReportCard 
-            title="Sinais Vitais" 
-            description="Relatório de monitoramento de sinais vitais."
-            icon={<Activity className="text-green-600" />}
-            onDownloadPDF={() => {
-              const data = (props.vitalSigns || []).map(v => ({
-                Data: v.date,
-                Hora: v.time,
-                Paciente: (props.patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
-                PA: `${v.systolicBP}/${v.diastolicBP}`,
-                FC: v.heartRate,
-                Temp: v.temperature,
-                Sat: v.saturation
-              }));
-              downloadReport("Relatório de Sinais Vitais", data, 'pdf');
-            }}
-            onDownloadWord={() => {
-              const data = (props.vitalSigns || []).map(v => ({
-                Data: v.date,
-                Hora: v.time,
-                Paciente: (props.patients || []).find(p => p.id === v.patientId)?.name || 'N/A',
-                PA: `${v.systolicBP}/${v.diastolicBP}`,
-                FC: v.heartRate,
-                Temp: v.temperature,
-                Sat: v.saturation
-              }));
-              downloadReport("Relatório de Sinais Vitais", data, 'word');
-            }}
-          />
-          <ReportCard 
-            title="Intercorrências" 
-            description="Resumo de intercorrências registradas."
-            icon={<AlertTriangle className="text-red-600" />}
-            onDownloadPDF={() => {
-              const data = (props.incidents || []).map(i => ({
-                Data: i.date,
-                Hora: i.time,
-                Paciente: (props.patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
-                Tipo: i.type,
-                Descrição: i.description,
-                Conduta: i.conduct
-              }));
-              downloadReport("Relatório de Intercorrências", data, 'pdf');
-            }}
-            onDownloadWord={() => {
-              const data = (props.incidents || []).map(i => ({
-                Data: i.date,
-                Hora: i.time,
-                Paciente: (props.patients || []).find(p => p.id === i.patientId)?.name || 'N/A',
-                Tipo: i.type,
-                Descrição: i.description,
-                Conduta: i.conduct
-              }));
-              downloadReport("Relatório de Intercorrências", data, 'word');
-            }}
-          />
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-855 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções de Enfermagem', desc: 'Sistematização da assistência de enfermagem.', icon: ClipboardList, color: 'text-emerald-500', count: filteredEvolutions.length },
+              { id: 'medications', title: 'Medicação / Dose', desc: 'Histórico de administração de remédios e horários.', icon: Pill, color: 'text-amber-500', count: filteredAdministrations.length },
+              { id: 'vitalSigns', title: 'Sinais Vitais', desc: 'Controle de P.A., pressão, saturação, pulso.', icon: Activity, color: 'text-blue-500', count: filteredVitalSigns.length },
+              { id: 'incidents', title: 'Intercorrências', desc: 'Incidentes, quedas, sintomas agudos, conduta.', icon: AlertTriangle, color: 'text-red-500', count: filteredIncidents.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-2.5",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
+                  />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={13} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[9px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-250 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Pronta para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros de enfermagem cadastrados para os filtros selecionados. Altere as datas ou selecione outros idosos para gerar."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'medications') return filteredAdministrations.length > 0;
+                      if (s === 'vitalSigns') return filteredVitalSigns.length > 0;
+                      if (s === 'incidents') return filteredIncidents.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-205 dark:shadow-none"
+              )}
+            >
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-205 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -557,6 +914,7 @@ export const NursingSection = (props: NursingSectionProps) => {
         <NavButton active={activeTab === 'evolutions'} onClick={() => { setActiveTab('evolutions'); setEditingData(null); }} icon={<ClipboardList size={18} />} label="Evolução" />
         <NavButton active={activeTab === 'incidents'} onClick={() => { setActiveTab('incidents'); setEditingData(null); }} icon={<AlertTriangle size={18} />} label="Alertas" />
         <NavButton active={activeTab === 'shift'} onClick={() => { setActiveTab('shift'); setEditingData(null); }} icon={<Calendar size={18} />} label="Plantão" />
+        <NavButton active={activeTab === 'productivity'} onClick={() => { setActiveTab('productivity'); setEditingData(null); }} icon={<Award size={18} />} label="Painel e Colaboração" />
         <NavButton active={activeTab === 'reports'} onClick={() => { setActiveTab('reports'); setEditingData(null); }} icon={<FileText size={18} />} label="Relatórios" />
         <NavButton active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setEditingData(null); }} icon={<Settings size={18} />} label="Ajustes" />
       </aside>
@@ -596,6 +954,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onDeleteVital={(id) => setDeleteConfirm({ id, type: 'vital' })}
                 onEditEvolution={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDeleteEvolution={(id) => setDeleteConfirm({ id, type: 'evolution' })}
+                onViewEvolution={setViewingEvo}
               />
             )}
             {activeTab === 'medication' && (
@@ -668,6 +1027,35 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onAdd={() => { setModalType('shift'); setIsModalOpen(true); }}
                 onEdit={(s) => { setEditingData(s); setModalType('shift'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'shift' })}
+              />
+            )}
+            {activeTab === 'productivity' && (
+              <ProductivitySection
+                user={props.user}
+                professionals={professionals}
+                nursingEvolutions={evolutions}
+                physioEvolutions={props.physioEvolutions}
+                psychEvolutions={props.psychEvolutions}
+                pedagogyEvolutions={props.pedagogyEvolutions}
+                socialEvolutions={props.socialEvolutions}
+                nutritionEvolutions={props.nutritionEvolutions}
+                workshops={props.workshops}
+                notifications={props.notifications}
+                elderly={elderly}
+                onDeleteNotification={async (id, e) => {
+                  e.stopPropagation();
+                  if (props.onDeleteNotification) {
+                    props.onDeleteNotification(id, e);
+                  }
+                }}
+                onSaveEvolution={props.onSaveCollaborationEvolution || (async () => {})}
+                onDeleteEvolution={props.onDeleteCollaborationEvolution || (async () => {})}
+                showToast={showToast}
+                targetSector="Enfermagem"
+                targetRole="ENFERMEIRA"
+                psychActivities={props.psychActivities}
+                pedagogyActivities={props.pedagogyActivities}
+                onViewActivity={props.onViewActivity}
               />
             )}
             {activeTab === 'reports' && renderReports()}
@@ -1177,6 +1565,8 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
   const [isExtracting, setIsExtracting] = useState(false);
   const [showVitalsForm, setShowVitalsForm] = useState(true);
   const [profSearch, setProfSearch] = useState('');
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>(initialPatientId ? [initialPatientId] : []);
+  const [isMulti, setIsMulti] = useState(false);
   const [quickVitals, setQuickVitals] = useState<Partial<VitalSigns>>({
     systolicBP: '',
     diastolicBP: '',
@@ -1275,40 +1665,85 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
       const { photos, ...data } = formData;
       const id = editingData?.id;
 
-      // Quick Vitals Save in Evolution Flow
-      if (type === 'evolution' && showVitalsForm && quickVitals.systolicBP) {
-        await onSaveVitalSigns({
-          ...quickVitals,
-          patientId: formData.patientId,
-          date: data.date || new Date().toISOString().split('T')[0],
-          time: data.time || new Date().toTimeString().slice(0, 5),
-          registeredBy: user.name
-        });
-        
-        const vitalsSummary = `\n[Sinais Vitais Registrados: PA ${quickVitals.systolicBP}/${quickVitals.diastolicBP}, FC ${quickVitals.heartRate}, T ${quickVitals.temperature}ºC, Sat ${quickVitals.saturation}%, Glic ${quickVitals.bloodGlucose}]`;
-        data.content = (data.content || '') + vitalsSummary;
-      }
+      if (isMulti && selectedPatientIds.length > 0 && !editingData) {
+        const primaryPid = selectedPatientIds[0];
+        const currentData = { ...data, patientId: primaryPid, patientIds: selectedPatientIds };
 
-      switch (type) {
-        case 'patient': await onSavePatient(data, id); break;
-        case 'medication': await onSaveMedication({ ...data, registeredBy: user.name }, id); break;
-        case 'vital': await onSaveVitalSigns({ ...data, registeredBy: user.name }, id); break;
-        case 'dressing': await onSaveDressing({ ...data, registeredBy: user.name }, id); break;
-        case 'evolution': await onSaveEvolution({ ...data, registeredBy: data.registeredBy || user.name }, id); break;
-        case 'incident': await onSaveIncident({ ...data, registeredBy: user.name }, id); break;
-        case 'shift': await onSaveShift(data, id); break;
-        case 'avd': await onSaveAVD(data, id); break;
-        case 'diaper': await onSaveDiaperChange(data, id); break;
-      }
+        if (type === 'evolution' && showVitalsForm && quickVitals.systolicBP) {
+          await onSaveVitalSigns({
+            ...quickVitals,
+            patientId: primaryPid,
+            patientIds: selectedPatientIds,
+            date: data.date || new Date().toISOString().split('T')[0],
+            time: data.time || new Date().toTimeString().slice(0, 5),
+            registeredBy: user.name
+          });
+          const vitalsSummary = `\n[Sinais Vitais Registrados: PA ${quickVitals.systolicBP}/${quickVitals.diastolicBP}, FC ${quickVitals.heartRate}, T ${quickVitals.temperature}ºC, Sat ${quickVitals.saturation}%, Glic ${quickVitals.bloodGlucose}]`;
+          currentData.content = (currentData.content || '') + vitalsSummary;
+        }
 
-      if (photos && photos.length > 0 && formData.patientId) {
-        const patient = (patients || []).find(p => p.id === formData.patientId);
-        const activityType = 
-          type === 'evolution' ? 'Evolução de Enfermagem' :
-          type === 'dressing' ? 'Curativo' :
-          type === 'incident' ? 'Intercorrência' : 'Atividade de Enfermagem';
-        
-        await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description || formData.aspect || formData.content);
+        switch (type) {
+          case 'patient': await onSavePatient(currentData, id); break;
+          case 'medication': await onSaveMedication({ ...currentData, registeredBy: user.name }, id); break;
+          case 'vital': await onSaveVitalSigns({ ...currentData, registeredBy: user.name }, id); break;
+          case 'dressing': await onSaveDressing({ ...currentData, registeredBy: user.name }, id); break;
+          case 'evolution': await onSaveEvolution({ ...currentData, registeredBy: currentData.registeredBy || user.name }, id); break;
+          case 'incident': await onSaveIncident({ ...currentData, registeredBy: user.name }, id); break;
+          case 'shift': await onSaveShift(currentData, id); break;
+          case 'avd': await onSaveAVD(currentData, id); break;
+          case 'diaper': await onSaveDiaperChange(currentData, id); break;
+        }
+
+        if (photos && photos.length > 0) {
+          const patient = (patients || []).find(p => p.id === primaryPid);
+          const activityType = 
+            type === 'evolution' ? 'Evolução de Enfermagem' :
+            type === 'dressing' ? 'Curativo' :
+            type === 'incident' ? 'Intercorrência' : 'Atividade de Enfermagem';
+          
+          await onSavePhotos(photos, primaryPid, patient?.name || 'Paciente', activityType, currentData.evolution || currentData.description || currentData.aspect || currentData.content);
+        }
+      } else {
+        if (!formData.patientId && type !== 'patient' && type !== 'shift') {
+          alert('Por favor, selecione pelo menos um idoso!');
+          return;
+        }
+
+        // Quick Vitals Save in Evolution Flow
+        if (type === 'evolution' && showVitalsForm && quickVitals.systolicBP) {
+          await onSaveVitalSigns({
+            ...quickVitals,
+            patientId: formData.patientId,
+            date: data.date || new Date().toISOString().split('T')[0],
+            time: data.time || new Date().toTimeString().slice(0, 5),
+            registeredBy: user.name
+          });
+          
+          const vitalsSummary = `\n[Sinais Vitais Registrados: PA ${quickVitals.systolicBP}/${quickVitals.diastolicBP}, FC ${quickVitals.heartRate}, T ${quickVitals.temperature}ºC, Sat ${quickVitals.saturation}%, Glic ${quickVitals.bloodGlucose}]`;
+          data.content = (data.content || '') + vitalsSummary;
+        }
+
+        switch (type) {
+          case 'patient': await onSavePatient(data, id); break;
+          case 'medication': await onSaveMedication({ ...data, registeredBy: user.name }, id); break;
+          case 'vital': await onSaveVitalSigns({ ...data, registeredBy: user.name }, id); break;
+          case 'dressing': await onSaveDressing({ ...data, registeredBy: user.name }, id); break;
+          case 'evolution': await onSaveEvolution({ ...data, registeredBy: data.registeredBy || user.name }, id); break;
+          case 'incident': await onSaveIncident({ ...data, registeredBy: user.name }, id); break;
+          case 'shift': await onSaveShift(data, id); break;
+          case 'avd': await onSaveAVD(data, id); break;
+          case 'diaper': await onSaveDiaperChange(data, id); break;
+        }
+
+        if (photos && photos.length > 0 && formData.patientId) {
+          const patient = (patients || []).find(p => p.id === formData.patientId);
+          const activityType = 
+            type === 'evolution' ? 'Evolução de Enfermagem' :
+            type === 'dressing' ? 'Curativo' :
+            type === 'incident' ? 'Intercorrência' : 'Atividade de Enfermagem';
+          
+          await onSavePhotos(photos, formData.patientId, patient?.name || 'Paciente', activityType, formData.evolution || formData.description || formData.aspect || formData.content);
+        }
       }
       onClose();
     } catch (err) {
@@ -1375,16 +1810,18 @@ const NursingModal = ({ type, patients, medications, users, professionals, elder
         <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
           <form id="nursing-form" onSubmit={handleSubmit} className="space-y-8 pb-32">
             {type !== 'patient' && type !== 'shift' && (
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-gray-400 uppercase ml-1">Paciente</label>
-              <select 
-                className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-2xl px-6 py-5 text-sm focus:ring-2 focus:ring-green-500 transition-all font-bold"
-                value={formData.patientId || ''}
-                onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
-              >
-                <option value="">Selecione o paciente</option>
-                {(patients || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <div className="space-y-3 animate-fade-in">
+              <MultiPatientSelector 
+                patients={(patients || []).map(p => ({ id: p.id, name: p.name }))}
+                selectedIds={selectedPatientIds}
+                onChange={setSelectedPatientIds}
+                singleValue={formData.patientId || ''}
+                onSingleChange={id => setFormData({ ...formData, patientId: id })}
+                isMulti={isMulti}
+                onToggleMulti={setIsMulti}
+                accentColor="green"
+                label="Paciente(s) Selecionado(s)"
+              />
             </div>
           )}
 
@@ -2074,12 +2511,15 @@ const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete, filter, set
             </tr>
           </thead>
           <tbody className="text-sm divide-y divide-gray-50 dark:divide-gray-800">
-            {(vitals || []).filter(v => !filter || v.patientId === filter).map(v => {
+            {(vitals || []).filter(v => !filter || v.patientId === filter || (v as any).patientIds?.includes(filter)).map(v => {
               const patient = (patients || []).find(p => p.id === v.patientId);
+              const displayName = (v as any).patientIds && (v as any).patientIds.length > 1
+                ? (v as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                : (patient?.name || 'N/A');
               const isAltered = v.systolicBP > 140 || v.systolicBP < 90 || v.temperature > 37.5 || v.saturation < 92;
               return (
                 <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                  <td className="px-6 py-4 font-bold">{patient?.name}</td>
+                  <td className="px-6 py-4 font-bold">{displayName}</td>
                   <td className="px-6 py-4 text-gray-500">{(v.date || (v as any).createdAt || '').split('T')[0]} {v.time || ''}</td>
                   <td className="px-6 py-4 font-bold">{v.systolicBP}/{v.diastolicBP}</td>
                   <td className="px-6 py-4">{v.heartRate} bpm</td>
@@ -2149,8 +2589,11 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, s
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(dressings || []).filter(d => !filter || d.patientId === filter).map(d => {
+      {(dressings || []).filter(d => !filter || d.patientId === filter || (d as any).patientIds?.includes(filter)).map(d => {
         const patient = (patients || []).find(p => p.id === d.patientId);
+        const displayName = (d as any).patientIds && (d as any).patientIds.length > 1
+          ? (d as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+          : (patient?.name || 'N/A');
         return (
           <div key={d.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4 group">
             <div className="flex justify-between items-start">
@@ -2159,7 +2602,7 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, s
                   <Bandage size={20} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
+                  <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
                   <p className="text-xs text-gray-500">{d.woundType} • {d.location}</p>
                 </div>
               </div>
@@ -2229,7 +2672,7 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter,
       </button>
     </div>
     <div className="space-y-4">
-      {(evolutions || []).filter(e => !filter || e.patientId === filter).map(e => {
+      {(evolutions || []).filter(e => !filter || e.patientId === filter || (e as any).patientIds?.includes(filter)).map(e => {
         const patient = (patients || []).find(p => p.id === e.patientId);
         return (
           <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
@@ -2239,7 +2682,11 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter,
                   {patient?.name.charAt(0)}
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
+                  <h4 className="font-bold text-gray-800 dark:text-white">
+                    {(e as any).patientIds && (e as any).patientIds.length > 1
+                      ? (e as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                      : (patient?.name || 'N/A')}
+                  </h4>
                   <p className="text-xs text-gray-500">{(e.date || (e as any).createdAt || '').split('T')[0]} às {e.time || '--:--'} • Enf. Responsável</p>
                 </div>
               </div>
@@ -2299,8 +2746,11 @@ const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete, filter, s
       </button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {(incidents || []).filter(i => !filter || i.patientId === filter).map(i => {
+      {(incidents || []).filter(i => !filter || i.patientId === filter || (i as any).patientIds?.includes(filter)).map(i => {
         const patient = (patients || []).find(p => p.id === i.patientId);
+        const displayName = (i as any).patientIds && (i as any).patientIds.length > 1
+          ? (i as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+          : (patient?.name || 'N/A');
         return (
           <div key={i.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-red-100 dark:border-red-900/30 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-1 h-full bg-red-500" />
@@ -2310,7 +2760,7 @@ const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete, filter, s
                   <AlertTriangle size={20} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-800 dark:text-white">{patient?.name}</h4>
+                  <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
                   <p className="text-xs font-bold text-red-600 uppercase">{i.type}</p>
                 </div>
               </div>
@@ -2365,7 +2815,8 @@ const PatientDetailView = ({
   onEditVital,
   onDeleteVital,
   onEditEvolution,
-  onDeleteEvolution
+  onDeleteEvolution,
+  onViewEvolution
 }: { 
   patient: NursingPatient, 
   medications: Medication[], 
@@ -2387,7 +2838,8 @@ const PatientDetailView = ({
   onEditVital: (vital: VitalSigns) => void,
   onDeleteVital: (id: string) => void,
   onEditEvolution: (evo: NursingEvolution) => void,
-  onDeleteEvolution: (id: string) => void
+  onDeleteEvolution: (id: string) => void,
+  onViewEvolution: (evo: NursingEvolution) => void
 }) => {
   const latestAVD = (avds || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
@@ -2623,7 +3075,7 @@ const PatientDetailView = ({
                   <span className="text-[10px] font-bold text-gray-400 uppercase">{evo.date} às {evo.time}</span>
                   <div className="flex gap-2 transition-opacity">
                     <button 
-                      onClick={() => setViewingEvo(evo)}
+                      onClick={() => onViewEvolution?.(evo)}
                       className="p-1 text-gray-400 hover:text-green-600 transition-colors"
                       title="Visualizar 👁️"
                     >
