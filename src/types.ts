@@ -1032,3 +1032,27 @@ export interface AppNotification {
   lida?: boolean;
 }
 
+export interface PresidencySupportDocument {
+  id: string;
+  title: string;
+  category: 'ATA' | 'OFICIO' | 'MINUTA' | 'REGIMENTO' | 'OUTRO';
+  date: string;
+  description: string;
+  url?: string;
+  status: 'EM_ELABORACAO' | 'APROVADO' | 'ARQUIVADO';
+  author: string;
+  createdAt: string;
+}
+
+export interface InstitutionalSupportRecord {
+  id: string;
+  title: string;
+  type: 'OFICIO_RECEBIDO' | 'OFICIO_EXPEDIDO' | 'CONTATO_EXTERNO' | 'PARCERIA';
+  recipientSender: string;
+  date: string;
+  description: string;
+  status: 'PENDENTE' | 'RESPONDIDO' | 'CONCLUIDO' | 'ATIVO';
+  createdAt: string;
+}
+
+

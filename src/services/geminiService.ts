@@ -154,3 +154,69 @@ export async function fixGrammar(text: string): Promise<string> {
     return text;
   }
 }
+
+export interface AnalyzedInvoiceResult {
+  description: string;
+  amount: number;
+  type: 'RECEITA' | 'DESPESA';
+  category: string;
+  date: string;
+}
+
+export async function analyzeInvoice(base64Image: string, mimeType: string): Promise<AnalyzedInvoiceResult | null> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("Erro: GEMINI_API_KEY não configurada.");
+      return null;
+    }
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Clean up base64 prefix if it exists to pass pure base64 data to inlineData.
+    const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+    const imagePart = {
+      inlineData: {
+        mimeType: mimeType || "image/jpeg",
+        data: cleanBase64,
+      },
+    };
+
+    const prompt = `Analise a imagem desta nota fiscal ou recibo de pagamento e extraia os dados abaixo para contabilidade.
+    A data atual do sistema é ${format(new Date(), 'yyyy-MM-dd')}. Se a nota não tiver o ano, assuma que é o ano atual.
+    Preencha os seguintes campos com a maior precisão possível:
+    1. description (Ex: "Supermercado - Alimentos", "Material de limpeza", "Serviço de Pintura", etc. Seja descritivo baseado no nome da empresa ou itens comprados).
+    2. amount (O valor total cobrado/pago na nota, como um número decimal. Certifique-se de obter o valor final correto).
+    3. type (Sempre retorne "DESPESA" para notas fiscais de compra/pagamento, a menos que seja um comprovante de entrada/receita).
+    4. category (Classifique em uma categoria de despesa lógica curta em maiúsculas de até 2 palavras, ex: "ALIMENTAÇÃO", "MATERIAL DE LIMPEZA", "MANUTENÇÃO", "CONSULTAS", "UTILIDADES", "EVENTOS", "OUTROS").
+    5. date (A data de emissão expressa na nota no formato YYYY-MM-DD. Se não for especificado ou não encontrar, use a data atual ${format(new Date(), 'yyyy-MM-dd')}).
+
+    Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [imagePart, { text: prompt }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            description: { type: Type.STRING },
+            amount: { type: Type.NUMBER },
+            type: { type: Type.STRING, enum: ["RECEITA", "DESPESA"] },
+            category: { type: Type.STRING },
+            date: { type: Type.STRING }
+          },
+          required: ["description", "amount", "type", "category", "date"]
+        }
+      }
+    });
+
+    if (!response.text) return null;
+    return JSON.parse(response.text) as AnalyzedInvoiceResult;
+  } catch (error) {
+    console.error("Error analyzing invoice with Gemini:", error);
+    return null;
+  }
+}
+

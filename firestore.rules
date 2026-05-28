@@ -486,7 +486,7 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'];
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'];
     }
 
     function isValidElderly(data) {
@@ -508,7 +508,7 @@ service cloud.firestore {
              data.professionalId is string &&
              data.professionalName is string &&
              data.professionalRole is string &&
-             data.professionalRole in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'] &&
+             data.professionalRole in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'] &&
              data.activityType is string &&
              data.category in ['MULTIDISCIPLINAR', 'OFICINA', 'REUNIAO', 'OUTROS'] &&
              (!('patientId' in data) || data.patientId is string) &&
@@ -566,7 +566,7 @@ service cloud.firestore {
 
     function isValidProfessional(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
-             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA'] &&
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'] &&
              data.registrationNumber is string &&
              data.phone is string &&
              data.admissionDate is string &&
@@ -659,7 +659,7 @@ service cloud.firestore {
     }
 
     match /donors/{donorId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || hasAnyRole(['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA']);
     }
 
     match /diaperDonations/{donationId} {
@@ -726,7 +726,15 @@ service cloud.firestore {
     }
 
     match /financial/{recordId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || hasAnyRole(['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA']);
+    }
+
+    match /presidency_support/{docId} {
+      allow read, write: if isAdmin() || hasAnyRole(['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA']);
+    }
+
+    match /institutional_support/{recordId} {
+      allow read, write: if isAdmin() || hasAnyRole(['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA']);
     }
 
     match /communityElderly/{elderlyId} {
