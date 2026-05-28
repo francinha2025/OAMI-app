@@ -9396,24 +9396,33 @@ const ProfileModal = ({
   };
 
   const handleDeleteAccount = async () => {
-    showConfirm('TEM CERTEZA? Esta ação é irreversível e todos os seus dados de acesso serão excluídos.', async () => {
-      setLoading(true);
-      try {
-        if (auth.currentUser) {
-          await deleteUser(auth.currentUser);
-          window.location.reload();
+    showConfirm(
+      'TEM CERTEZA? Esta ação irá desvincular seu perfil corporativo deste e-mail de acesso e fazer o logout de forma que você possa acessar o sistema com outro e-mail.',
+      async () => {
+        setLoading(true);
+        try {
+          if (auth.currentUser) {
+            // Delete Firestore profile so the user is fully unlinked and reference is cleared
+            await deleteDoc(doc(db, 'profiles', auth.currentUser.uid));
+            
+            // Clean logout
+            await signOut(auth);
+            
+            showToast('Perfil desvinculado com sucesso!', 'success');
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else {
+            showToast('Nenhum usuário ativo para desvincular.', 'error');
+          }
+        } catch (err: any) {
+          console.error("Error unlinking account:", err);
+          showToast('Erro ao desvincular o perfil. Tente novamente.', 'error');
+        } finally {
+          setLoading(false);
         }
-      } catch (err: any) {
-        if (err.code === 'auth/requires-recent-login') {
-          showToast('Para excluir sua conta, você precisa ter feito login recentemente. Por favor, saia e entre novamente.', 'error');
-        } else {
-          console.error("Error deleting account:", err);
-          showToast('Erro ao excluir conta.', 'error');
-        }
-      } finally {
-        setLoading(false);
       }
-    });
+    );
   };
 
   return (
@@ -9658,9 +9667,9 @@ const ProfileModal = ({
               className="w-full p-4 text-red-600 dark:text-red-400 font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-2xl transition-all"
             >
               <Trash2 size={18} />
-              Desvincular Minha Conta
+              Desvincular Meu Perfil / Trocar E-mail
             </button>
-            <p className="text-[10px] text-gray-400 text-center mt-2 uppercase">Atenção: Esta ação excluirá permanentemente seu acesso.</p>
+            <p className="text-[10px] text-gray-400 text-center mt-2 uppercase">Atenção: Seu perfil atual será desvinculado e você será desconectado(a) para entrar com outro e-mail.</p>
           </div>
         </div>
       </motion.div>
@@ -9700,6 +9709,65 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
       setInstData(institutionalInfo);
     }
   }, [institutionalInfo]);
+
+  const [isLinkingPresident, setIsLinkingPresident] = useState(false);
+  const [selectedNewPresidentId, setSelectedNewPresidentId] = useState('');
+
+  const currentPresident = users.find(u => u.role === 'PRESIDENTE');
+
+  const handleUnlinkPresident = async () => {
+    if (!currentPresident) {
+      showToast('Nenhum presidente vinculado atualmente.', 'error');
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja desvincular o cargo de Presidente de "${currentPresident.name}"? A função deste de usuário retornará para a de Coordenadora.`)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'profiles', currentPresident.id), {
+        role: 'COORDENADORA'
+      });
+      showToast('Presidente desvinculado com sucesso!', 'success');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `profiles/${currentPresident.id}`);
+      showToast('Erro ao desvincular presidente', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkNewPresident = async (newPresidentId: string) => {
+    if (!newPresidentId) {
+      showToast('Selecione um profissional para vincular como Presidente.', 'error');
+      return;
+    }
+    const targetUser = users.find(u => u.id === newPresidentId);
+    if (!targetUser) return;
+
+    if (!window.confirm(`Tem certeza que deseja vincular "${targetUser.name}" como a nova Presidente?`)) {
+      return;
+    }
+    setLoading(true);
+    try {
+      if (currentPresident) {
+        await updateDoc(doc(db, 'profiles', currentPresident.id), {
+          role: 'COORDENADORA'
+        });
+      }
+      await updateDoc(doc(db, 'profiles', newPresidentId), {
+        role: 'PRESIDENTE'
+      });
+      showToast(`"${targetUser.name}" vinculada com sucesso como Presidente!`, 'success');
+      setIsLinkingPresident(false);
+      setSelectedNewPresidentId('');
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `profiles/${newPresidentId}`);
+      showToast('Erro ao vincular nova presidente', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleUpdateInstitutional = async () => {
     setLoading(true);
@@ -9775,6 +9843,126 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
 
         {activeSubTab === 'users' && (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Widget de Gestão da Presidência (Swiss/Modern Design) */}
+            <div className="bg-slate-50 dark:bg-gray-850 p-6 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 space-y-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <Award className="w-5 h-5 text-amber-500 animate-pulse" />
+                    Gestão do Cargo de Presidente
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Gerencie o perfil vinculado ao cargo máximo de Presidente (OAMI). O sistema permite desvincular o cargo atual e atribuí-lo a outro membro da equipe de forma segura.
+                  </p>
+                </div>
+                {!isLinkingPresident && (
+                  <button
+                    type="button"
+                    onClick={() => setIsLinkingPresident(true)}
+                    className="px-4 py-2 bg-slate-850 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Vincular Nova Presidente
+                  </button>
+                )}
+              </div>
+
+              {/* Info of currently linked President */}
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row items-center md:items-center justify-between gap-4">
+                {currentPresident ? (
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-amber-500 bg-gray-100 dark:bg-gray-800 shrink-0">
+                      {currentPresident.photoUrl ? (
+                        <img src={currentPresident.photoUrl} alt={currentPresident.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                          <UserCircle size={24} />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-800 dark:text-white text-sm">{currentPresident.name}</span>
+                        <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-950/30 text-amber-800 dark:text-amber-400 font-extrabold text-[9px] rounded uppercase tracking-wider">
+                          Presidente Atual
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{currentPresident.email || 'Sem e-mail cadastrado'}</p>
+                      <p className="text-[9px] font-mono text-gray-400 dark:text-gray-500 mt-0.5">UID / ID de Perfil: {currentPresident.id}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-red-500 dark:text-red-400">
+                    <AlertCircle size={20} />
+                    <span className="text-xs font-black uppercase tracking-wider">Nenhum perfil de Presidente vinculado ao sistema</span>
+                  </div>
+                )}
+
+                {currentPresident && (
+                  <button
+                    type="button"
+                    onClick={handleUnlinkPresident}
+                    disabled={loading}
+                    className="p-2.5 text-red-655 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/40 text-xs font-bold flex items-center gap-1.5 self-stretch md:self-auto justify-center"
+                    title="Desvincular Presidente"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Desvincular Presidente
+                  </button>
+                )}
+              </div>
+
+              {/* Mini form to link a new President */}
+              {isLinkingPresident && (
+                <div className="bg-gradient-to-r from-amber-50/20 to-orange-50/10 dark:from-amber-955/10 dark:to-orange-950/5 p-4 rounded-2xl border border-amber-100/50 dark:border-amber-900/35 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <h5 className="text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+                    Vincular Novo(a) Presidente OAMI
+                  </h5>
+                  <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 leading-relaxed">
+                    Selecione um dos profissionais abaixo para assumir o cargo máximo de Presidente. Caso já exista um Presidente ativo, ele será automaticamente redefinido para a função de Coordenadora.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <select
+                      value={selectedNewPresidentId}
+                      onChange={(e) => setSelectedNewPresidentId(e.target.value)}
+                      className="flex-1 text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">-- SELECIONE O PROFISSIONAL (LISTA DE PERFIS) --</option>
+                      {users
+                        .filter(u => u.role !== 'PRESIDENTE')
+                        .map(u => (
+                          <option key={u.id} value={u.id}>
+                            {u.name.toUpperCase()} ({ROLE_LABELS[u.role] || u.role}) - ID: {u.id}
+                          </option>
+                        ))}
+                    </select>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsLinkingPresident(false);
+                          setSelectedNewPresidentId('');
+                        }}
+                        className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all w-1/2 sm:w-auto text-center"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleLinkNewPresident(selectedNewPresidentId)}
+                        disabled={loading || !selectedNewPresidentId}
+                        className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-md shadow-amber-100 dark:shadow-none flex-1 sm:flex-none text-center"
+                      >
+                        Confirmar Cargo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Equipe header & trigger to manually add users */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
               <div>
@@ -10870,16 +11058,16 @@ export default function App() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             const isFranciara = firebaseUser.email === 'franciaraeabreucoelho@gmail.com';
-            const finalRole = isFranciara ? 'COORDENADORA' : (data?.role || 'COORDENADORA');
-            const finalName = isFranciara ? 'Franciara de Abreú Coelho' : (data?.name || firebaseUser.displayName || 'Usuário');
+            const finalRole = data?.role || (isFranciara ? 'COORDENADORA' : 'COORDENADORA');
+            const finalName = data?.name || firebaseUser.displayName || (isFranciara ? 'Franciara de Abreú Coelho' : 'Usuário');
             const finalEmail = firebaseUser.email || data?.email || '';
 
-            if (isFranciara && (data?.role !== 'COORDENADORA' || data?.name !== 'Franciara de Abreú Coelho')) {
+            if (isFranciara && !data?.role) {
               updateDoc(userDocRef, {
                 role: 'COORDENADORA',
                 name: 'Franciara de Abreú Coelho',
                 email: 'franciaraeabreucoelho@gmail.com'
-              }).catch(e => console.error("Error auto-fixing admin profile doc:", e));
+              }).catch(e => console.error("Error auto-creating admin profile doc:", e));
             }
 
             setUser({

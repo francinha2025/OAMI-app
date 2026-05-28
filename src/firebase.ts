@@ -38,6 +38,9 @@ try {
 
 export const auth = authInstance;
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // 🔎 Teste de conexão com Firestore
 export async function testConnection() {
