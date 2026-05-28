@@ -11294,6 +11294,59 @@ export default function App() {
     };
     seedFranciscoRequest();
 
+    // --- Automatic Purge for Deleted User fernandakellenfk378@gmail.com ---
+    const deleteFernandaKellenRequest = async () => {
+      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
+      
+      const targetEmail = 'fernandakellenfk378@gmail.com';
+      try {
+        let deletedSome = false;
+
+        // 1. Delete matching documents from 'profiles'
+        const qProfiles = query(collection(db, 'profiles'), where('email', '==', targetEmail));
+        const snapProfiles = await getDocs(qProfiles);
+        for (const d of snapProfiles.docs) {
+          await deleteDoc(doc(db, 'profiles', d.id));
+          deletedSome = true;
+          console.log(`Perfil deletado para ${targetEmail}: ${d.id}`);
+        }
+
+        // Also check if any profile exists with document ID matching the email itself
+        const directProfileRef = doc(db, 'profiles', targetEmail);
+        const directProfileSnap = await getDoc(directProfileRef);
+        if (directProfileSnap.exists()) {
+          await deleteDoc(directProfileRef);
+          deletedSome = true;
+          console.log(`Perfil de ID direto deletado para ${targetEmail}`);
+        }
+
+        // 2. Delete matching documents from 'users'
+        const qUsers = query(collection(db, 'users'), where('email', '==', targetEmail));
+        const snapUsers = await getDocs(qUsers);
+        for (const d of snapUsers.docs) {
+          await deleteDoc(doc(db, 'users', d.id));
+          deletedSome = true;
+          console.log(`Documento deletado em 'users' para ${targetEmail}: ${d.id}`);
+        }
+
+        // 3. Delete matching documents from 'professionals'
+        const qProfessionals = query(collection(db, 'professionals'), where('email', '==', targetEmail));
+        const snapProfessionals = await getDocs(qProfessionals);
+        for (const d of snapProfessionals.docs) {
+          await deleteDoc(doc(db, 'professionals', d.id));
+          deletedSome = true;
+          console.log(`Profissional deletado para ${targetEmail}: ${d.id}`);
+        }
+
+        if (deletedSome) {
+          showToast(`Registros de ${targetEmail} foram excluídos permanentemente da base de dados e do sistema!`, 'success');
+        }
+      } catch (error) {
+        console.error("Erro ao deletar registros de fernandakellen:", error);
+      }
+    };
+    deleteFernandaKellenRequest();
+
     // Replaced fetchStaticData with real-time listeners
     unsubElderly = onSnapshot(query(collection(db, 'elderly'), orderBy('name'), limit(300)), (snapshot) => {
       console.log(`📦 Firestore: ${snapshot.size} idosos encontrados.`);
