@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Loader2, FileSearch, Image as ImageIcon } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { cn } from '../lib/utils';
 import { CameraModal } from './CameraModal';
 
@@ -18,20 +17,20 @@ export const TranscriptionButton: React.FC<TranscriptionButtonProps> = ({ onTran
   const processImage = async (base64Data: string, mimeType: string = 'image/jpeg') => {
     setIsTranscribing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { text: "Transcreva o texto manuscrito ou impresso desta imagem de um documento institucional (como um relatório de evolução, visita ou plano de atendimento). Retorne apenas o texto transcrito, sem comentários adicionais. Se houver campos específicos, tente manter a estrutura se possível, mas foque no conteúdo textual principal." },
-              { inlineData: { data: base64Data, mimeType } }
-            ]
-          }
-        ]
+      const response = await fetch("/api/gemini/transcribe-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ base64Data, mimeType }),
       });
 
-      const transcribedText = response.text;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const transcribedText = result.text;
       if (transcribedText) {
         onTranscribe(transcribedText);
       }

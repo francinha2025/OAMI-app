@@ -115,7 +115,6 @@ import { generateModernWord } from './lib/wordUtils';
 import { generateModernExcel } from './lib/excelUtils';
 import { Table as TableIcon } from 'lucide-react';
 import { processSmartIA, AISmartCommandResult, analyzeInvoice } from './services/geminiService';
-import { GoogleGenAI } from "@google/genai";
 import { db, auth, testConnection } from './firebase';
 import { PhysioSection } from './components/PhysioSection';
 import { NursingSection } from './components/NursingSection';
@@ -147,7 +146,8 @@ import {
   orderBy, 
   setDoc,
   getDoc,
-  getDocs
+  getDocs,
+  deleteField
 } from 'firebase/firestore';
 import { 
   signInWithPopup,
@@ -278,32 +278,27 @@ const AIAssistant = ({ user, elderly, onCommandParsed, isVisible, setIsVisible }
     setIsProcessingMedia(true);
     setLoading(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        console.error("Erro: GEMINI_API_KEY não configurada.");
-        setMessages(prev => [...prev, { role: 'ai', content: "⚠️ Erro: IA não configurada (API Key ausente)." }]);
-        return;
-      }
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { text: "Analise esta imagem que pode ser um documento institucional, relatório ou foto de atividade em uma ILPI. Transcreva qualquer texto relevante e descreva o que está acontecendo se for uma foto de atividade. Retorne um texto que possa ser usado para criar um registro evolutivo ou de atividade logo em seguida." },
-              { inlineData: { data: base64Data, mimeType } }
-            ]
-          }
-        ]
+      const response = await fetch("/api/gemini/process-media", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ base64Data, mimeType }),
       });
 
-      const extractedText = response.text;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const extractedText = result.text;
       if (extractedText) {
         setInput(extractedText);
         setMessages(prev => [...prev, { role: 'ai', content: "📄 Texto extraído do anexo/câmera. Você pode revisar e enviar agora para processamento inteligente." }]);
       }
     } catch (error) {
       console.error("Media processing error:", error);
+      setMessages(prev => [...prev, { role: 'ai', content: "⚠️ Erro ao processar imagem via IA." }]);
     } finally {
       setIsProcessingMedia(false);
       setLoading(false);
@@ -4503,17 +4498,68 @@ const ProfessionalArea = ({
   );
 };
 
+const EXPENSE_CATEGORIES = [
+  { value: 'OFICINAS', label: 'Oficinas', color: 'bg-emerald-505', colorTailwind: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-900/40', icon: Briefcase },
+  { value: 'CAPACITACAO', label: 'Capacitação', color: 'bg-blue-505', colorTailwind: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-900/40', icon: Award },
+  { value: 'ESCRITORIO', label: 'Mat. Escritório', color: 'bg-indigo-505', colorTailwind: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-200 dark:border-indigo-900/40', icon: Paperclip },
+  { value: 'CAMPANHA', label: 'Lembrancinhas/Campanhas', color: 'bg-purple-505', colorTailwind: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-900/40', icon: Gift },
+  { value: 'VIAGENS', label: 'Viagens e Diárias', color: 'bg-amber-505', colorTailwind: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-900/40', icon: TrendingUp },
+  { value: 'PROFISSIONAIS', label: 'Profissionais e Serviços', color: 'bg-rose-505', colorTailwind: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-900/40', icon: Users },
+  { value: 'ROTINA', label: 'Gastos de Rotina', color: 'bg-orange-505', colorTailwind: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-200 dark:border-orange-900/40', icon: Clock },
+  { value: 'GASOLINA', label: 'Gasolina', color: 'bg-yellow-505', colorTailwind: 'bg-yellow-500', text: 'text-amber-750 dark:text-amber-400', bg: 'bg-yellow-50/50 dark:bg-yellow-950/20', border: 'border-yellow-200 dark:border-yellow-905_40', icon: Activity },
+  { value: 'OUTROS', label: 'Outras Despesas', color: 'bg-gray-400', text: 'text-gray-700 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-950/40', border: 'border-gray-200 dark:border-gray-900/40', icon: DollarSign }
+];
+
+const INCOME_CATEGORIES = [
+  { value: 'DOACAO', label: 'Doação', color: 'bg-green-500', text: 'text-green-700 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-950/40', border: 'border-green-200 dark:border-green-900/40' },
+  { value: 'SOCIO', label: 'Sócio Mensal', color: 'bg-teal-500', text: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-200 dark:border-teal-900/40' },
+  { value: 'SUBVENCAO', label: 'Subvenção Pública', color: 'bg-cyan-500', text: 'text-cyan-700 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-950/44', border: 'border-cyan-200 dark:border-cyan-900/40' },
+  { value: 'OUTROS', label: 'Outras Receitas', color: 'bg-gray-400', text: 'text-gray-700 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-950/40', border: 'border-gray-200 dark:border-gray-900/40' }
+];
+
+const getCategoryInfo = (categoryStr: string, type: 'RECEITA' | 'DESPESA') => {
+  const normalized = (categoryStr || '').toUpperCase().trim();
+  if (type === 'DESPESA') {
+    const found = EXPENSE_CATEGORIES.find(c => c.value === normalized || c.label.toUpperCase() === normalized);
+    return found || { label: categoryStr || 'Despesa', color: 'bg-gray-400', text: 'text-gray-750 dark:text-gray-300', bg: 'bg-gray-100 dark:bg-gray-800/60', border: 'border-gray-200 dark:border-gray-800' };
+  } else {
+    const found = INCOME_CATEGORIES.find(c => c.value === normalized || c.label.toUpperCase() === normalized);
+    return found || { label: categoryStr || 'Receita', color: 'bg-green-500', text: 'text-green-700 dark:text-green-300', bg: 'bg-green-105 dark:bg-green-800/60', border: 'border-green-200 dark:border-green-800' };
+  }
+};
+
 const FinancialSection = ({ financialRecords, user, showToast }: { 
   financialRecords?: FinancialRecord[], 
   user: User,
   showToast: (msg: string, type?: 'success' | 'error') => void 
 }) => {
   const records = financialRecords || [];
+
+  // Helper to format stored date string to Brazilian layout without timezone shifting issues
+  const formatFinancialDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = dateOnly.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // Helper to get present client local date as YYYY-MM-DD
+  const getTodayLocalDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayLocalDate(),
     description: '',
     amount: '',
     type: 'RECEITA' as 'RECEITA' | 'DESPESA',
@@ -4529,13 +4575,14 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
   const [analyzingStatus, setAnalyzingStatus] = useState('');
   const [selectedInvoiceImage, setSelectedInvoiceImage] = useState<string | null>(null);
   const [selectedInvoiceTitle, setSelectedInvoiceTitle] = useState('');
+  const [selectedInvoiceRecord, setSelectedInvoiceRecord] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingRecord(null);
     setFormData({
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocalDate(),
       description: '',
       amount: '',
       type: 'RECEITA',
@@ -4550,7 +4597,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
       description: item.description,
       amount: String(item.amount),
       type: item.type as 'RECEITA' | 'DESPESA',
-      category: item.category
+      category: item.category || ''
     });
     setIsModalOpen(true);
   };
@@ -4570,6 +4617,27 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
     }
   };
 
+  const handleRemoveInvoiceImage = async (record: any) => {
+    if (!window.confirm("Deseja realmente remover a Nota Fiscal anexa a este lançamento?")) return;
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'financial', record.id), {
+        invoiceImage: deleteField(),
+        invoiceFileName: deleteField(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      });
+      showToast('Nota Fiscal removida com sucesso!');
+      setSelectedInvoiceImage(null);
+      setSelectedInvoiceRecord(null);
+    } catch (err) {
+      console.error("Remove invoice error:", err);
+      showToast('Erro ao remover nota fiscal.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description || !formData.amount || !formData.category) {
@@ -4580,16 +4648,19 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
     setLoading(true);
     try {
       if (editingRecord) {
-        const financialData = cleanData({
+        const cleaned = cleanData({
           ...formData,
           amount: Number(formData.amount),
-          invoiceImage: editingRecord.invoiceImage || null,
-          invoiceFileName: editingRecord.invoiceFileName || null,
           createdBy: editingRecord.createdBy || user.id,
           createdAt: editingRecord.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           updatedBy: user.id
         });
+        const financialData = {
+          ...cleaned,
+          invoiceImage: editingRecord.invoiceImage ? editingRecord.invoiceImage : deleteField(),
+          invoiceFileName: editingRecord.invoiceFileName ? editingRecord.invoiceFileName : deleteField()
+        };
         await updateDoc(doc(db, 'financial', editingRecord.id), financialData);
         showToast('Lançamento financeiro atualizado com sucesso!');
       } else {
@@ -4646,7 +4717,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
 
       setAnalyzingStatus('Lançando despesa automaticamente no sistema...');
       const financialData = cleanData({
-        date: analysisResult.date || new Date().toISOString().split('T')[0],
+        date: analysisResult.date || getTodayLocalDate(),
         description: analysisResult.description,
         amount: Number(analysisResult.amount),
         type: analysisResult.type || 'DESPESA',
@@ -4692,11 +4763,40 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
     return last6Months;
   }, [records]);
 
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState('all');
+
+  const availableMonths = useMemo(() => {
+    const list = new Set<string>();
+    records.forEach(r => {
+      if (r.date && r.date.length >= 7) {
+        list.add(r.date.substring(0, 7)); // YYYY-MM
+      }
+    });
+    const currentCal = format(new Date(), 'yyyy-MM');
+    list.add(currentCal);
+    list.add("2025-12");
+
+    const sorted = Array.from(list).sort().reverse();
+    return sorted;
+  }, [records]);
+
+  const filteredRecords = useMemo(() => {
+    if (selectedMonthFilter === 'all') {
+      return records;
+    }
+    return records.filter(r => r.date && r.date.startsWith(selectedMonthFilter));
+  }, [records, selectedMonthFilter]);
+
   const monthlySummary = useMemo(() => {
-    const currentMonth = format(new Date(), 'yyyy-MM');
-    const monthRecords = records.filter(r => r.date.startsWith(currentMonth));
-    const receitas = monthRecords.filter(r => r.type === 'RECEITA').reduce((acc, curr) => acc + curr.amount, 0);
-    const despesas = monthRecords.filter(r => r.type === 'DESPESA').reduce((acc, curr) => acc + curr.amount, 0);
+    const targetRecords = selectedMonthFilter === 'all' ? records : filteredRecords;
+    const receitas = targetRecords.filter(r => r.type === 'RECEITA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    const despesas = targetRecords.filter(r => r.type === 'DESPESA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    return { receitas, despesas, saldo: receitas - despesas };
+  }, [records, selectedMonthFilter, filteredRecords]);
+
+  const overallBalance = useMemo(() => {
+    const receitas = records.filter(r => r.type === 'RECEITA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    const despesas = records.filter(r => r.type === 'DESPESA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
     return { receitas, despesas, saldo: receitas - despesas };
   }, [records]);
 
@@ -4707,16 +4807,59 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
   const generateFinancialDoc = async (fileFormat: 'pdf' | 'doc' | 'xls') => {
     setExporting(true);
     try {
-      const columns = ['Mês', 'Receitas', 'Despesas', 'Saldo'];
-      const data = chartData.map(d => [
-        d.month,
-        `R$ ${d.receitas}`,
-        `R$ ${d.despesas}`,
-        `R$ ${d.receitas - d.despesas}`
+      const activeMonthName = selectedMonthFilter === 'all' 
+        ? 'Todos os Períodos' 
+        : (() => {
+            const parts = selectedMonthFilter.split('-');
+            const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+            const formatted = format(dateObj, 'MMMM \'de\' yyyy', { locale: ptBR });
+            return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+          })();
+
+      const columns = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
+      const sortedRecords = [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date));
+
+      const data = sortedRecords.map(r => {
+        const catInfo = getCategoryInfo(r.category, r.type);
+        return [
+          formatFinancialDate(r.date),
+          r.description,
+          catInfo.label,
+          r.type === 'RECEITA' ? 'RECEITA (+)' : 'DESPESA (-)',
+          `R$ ${Number(r.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        ];
+      });
+
+      const sReceitas = filteredRecords.filter(r => r.type === 'RECEITA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+      const sDespesas = filteredRecords.filter(r => r.type === 'DESPESA').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+      const sSaldo = sReceitas - sDespesas;
+
+      data.push([]); // spacer row
+      data.push([
+        'TOTAIS',
+        'Resumo do Período',
+        '-',
+        '-',
+        `R$ ${sSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
-      const title = 'Relatório Financeiro';
-      const subtitle = `Resumo do Fluxo de Caixa (Últimos 6 Meses) - Gerado em ${new Date().toLocaleDateString('pt-BR')}`;
-      const fileName = 'relatorio_financeiro';
+      data.push([
+        '-',
+        'Total Receitas',
+        '-',
+        '-',
+        `R$ ${sReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+      data.push([
+        '-',
+        'Total Despesas',
+        '-',
+        '-',
+        `R$ ${sDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      ]);
+
+      const title = 'Livro Caixa - Relatório Financeiro';
+      const subtitle = `Livro de Registros - Período: ${activeMonthName} - Gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+      const fileName = `livro_caixa_financeiro_${selectedMonthFilter}`;
 
       if (fileFormat === 'pdf') {
         await generateModernPDF({ title, subtitle, columns, data, fileName });
@@ -4783,25 +4926,135 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
         </div>
       </div>
 
+      {/* Dashboard de Despesas por Categoria */}
+      {(() => {
+        const targetRecordsForDashboard = filteredRecords;
+        const totalDespesas = targetRecordsForDashboard
+          .filter(r => r.type === 'DESPESA')
+          .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+        const categorySums: Record<string, number> = {
+          OFICINAS: 0,
+          CAPACITACAO: 0,
+          ESCRITORIO: 0,
+          CAMPANHA: 0,
+          VIAGENS: 0,
+          PROFISSIONAIS: 0,
+          ROTINA: 0,
+          GASOLINA: 0,
+          OUTROS: 0
+        };
+
+        targetRecordsForDashboard.forEach(r => {
+          if (r.type === 'DESPESA') {
+            const cat = (r.category || '').toUpperCase().trim();
+            const amt = Number(r.amount || 0);
+            if (categorySums[cat] !== undefined) {
+              categorySums[cat] += amt;
+            } else {
+              // try to match friendly names or fall back to OUTROS
+              const matched = EXPENSE_CATEGORIES.find(c => c.label.toUpperCase() === cat);
+              if (matched) {
+                categorySums[matched.value] += amt;
+              } else {
+                categorySums.OUTROS += amt;
+              }
+            }
+          }
+        });
+
+        return (
+          <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
+                  <LayoutDashboard className="text-indigo-600" size={24} />
+                  Dashboard de Despesas por Categoria
+                </h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Percentual de impacto e somas acumuladas de todas as categorias ativas.</p>
+              </div>
+              <div className="px-4 py-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold border border-red-100 dark:border-red-900/30">
+                Total Geral Saídas: R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {EXPENSE_CATEGORIES.map(cat => {
+                const sum = categorySums[cat.value] || 0;
+                const pct = totalDespesas > 0 ? (sum / totalDespesas) * 100 : 0;
+                const IconComp = cat.icon;
+
+                return (
+                  <div key={cat.value} className="p-5 rounded-3xl border border-gray-150/50 dark:border-gray-800 bg-gray-50/40 dark:bg-gray-950/20 hover:border-gray-250 dark:hover:border-gray-700 hover:shadow-sm transition-all flex flex-col justify-between" id={`cat-card-${cat.value}`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className={`p-2.5 rounded-2xl ${cat.bg} ${cat.text}`}>
+                        <IconComp size={18} />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 font-mono">
+                        {pct.toFixed(1)}% das saídas
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-extrabold text-gray-400 dark:text-gray-500 uppercase tracking-widest truncate" title={cat.label}>
+                        {cat.label}
+                      </p>
+                      <h4 className={`text-lg font-black mt-1 ${sum > 0 ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-gray-600'}`}>
+                        R$ {sum.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h4>
+
+                      {/* Progress bar */}
+                      <div className="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full mt-3 overflow-hidden">
+                        <div 
+                          className={`h-full ${cat.colorTailwind || cat.color} rounded-full transition-all duration-500`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Gestão Financeira</h2>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => generateFinancialDoc('pdf')}
-                disabled={exporting}
-                className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50"
-              >
-                <FileDown size={18} />
-                Exportar PDF
-              </button>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-4 border-b border-gray-50 dark:border-gray-800">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Gestão Financeira</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Filtrado por período ou consolidado.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {/* Filtro de Mês/Período */}
+              <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-850 px-3 py-2 rounded-xl border border-gray-250/50 dark:border-gray-700">
+                <Calendar size={14} className="text-gray-500" />
+                <select
+                  value={selectedMonthFilter}
+                  onChange={e => setSelectedMonthFilter(e.target.value)}
+                  className="bg-transparent border-none text-xs font-bold text-gray-750 dark:text-gray-250 outline-none cursor-pointer focus:ring-0"
+                >
+                  <option value="all">Todos os Meses</option>
+                  {availableMonths.map(m => {
+                    const parts = m.split('-');
+                    const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+                    const formatted = format(dateObj, "MMMM 'de' yyyy", { locale: ptBR });
+                    const capitalized = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                    return (
+                      <option key={m} value={m}>
+                        {capitalized}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
               <button 
                 onClick={() => {
                   setEditingRecord(null);
                   setIsModalOpen(true);
                 }}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-green-700 transition-colors"
               >
                 <Plus size={18} />
                 Novo Lançamento
@@ -4887,14 +5140,81 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
 
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Categoria</label>
-                      <input 
-                        type="text" 
-                        placeholder="Ex: Doação, Saúde, Manutenção"
-                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      <select
+                        className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-850 dark:text-white"
                         value={formData.category}
                         onChange={e => setFormData({...formData, category: e.target.value})}
-                      />
+                      >
+                        <option value="">Selecione uma categoria...</option>
+                        {formData.type === 'RECEITA' ? (
+                          <>
+                            <option value="DOACAO">Doação</option>
+                            <option value="SOCIO">Sócio Mensal</option>
+                            <option value="SUBVENCAO">Subvenção Pública</option>
+                            <option value="OUTROS">Outras Receitas</option>
+                            {formData.category && !['DOACAO', 'SOCIO', 'SUBVENCAO', 'OUTROS'].includes(formData.category.toUpperCase()) && (
+                              <option value={formData.category}>{formData.category}</option>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <option value="OFICINAS">Oficinas / Gastos com Oficinas</option>
+                            <option value="CAPACITACAO">Capacitação</option>
+                            <option value="ESCRITORIO">Materiais de Escritório</option>
+                            <option value="CAMPANHA">Lembrancinhas / Campanhas</option>
+                            <option value="VIAGENS">Viagens e Diárias</option>
+                            <option value="PROFISSIONAIS">Profissionais e Serviços</option>
+                            <option value="ROTINA">Gastos de Rotina / Manutenção</option>
+                            <option value="GASOLINA">Gasolina / Combustível</option>
+                            <option value="OUTROS">Outras Despesas</option>
+                            {formData.category && !['OFICINAS', 'CAPACITACAO', 'ESCRITORIO', 'CAMPANHA', 'VIAGENS', 'PROFISSIONAIS', 'ROTINA', 'GASOLINA', 'OUTROS'].includes(formData.category.toUpperCase()) && (
+                              <option value={formData.category}>{formData.category}</option>
+                            )}
+                          </>
+                        )}
+                      </select>
                     </div>
+
+                    {editingRecord && editingRecord.invoiceImage && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-400 dark:text-gray-500">Nota Fiscal em Anexo</label>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-150 dark:border-gray-700/60 rounded-xl flex items-center justify-between">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <Paperclip size={14} className="text-green-600 flex-shrink-0" />
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                              {editingRecord.invoiceFileName || 'Comprovante anexo'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm("Remover o anexo de Nota Fiscal associado a este lançamento?")) {
+                                try {
+                                  await updateDoc(doc(db, 'financial', editingRecord.id), {
+                                    invoiceImage: deleteField(),
+                                    invoiceFileName: deleteField(),
+                                    updatedAt: new Date().toISOString(),
+                                    updatedBy: user.id
+                                  });
+                                  showToast('Nota Fiscal removida!');
+                                  setEditingRecord({
+                                    ...editingRecord,
+                                    invoiceImage: null,
+                                    invoiceFileName: null
+                                  });
+                                } catch(e) {
+                                  showToast('Erro ao remover nota fiscal.', 'error');
+                                }
+                              }
+                            }}
+                            className="p-1 text-red-650 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded transition-colors"
+                            title="Remover Nota Fiscal"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-gray-600 dark:text-gray-400">Valor (R$)</label>
@@ -4941,57 +5261,66 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                {records.map((item: any) => (
-                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <td className="py-4 text-sm text-gray-600 dark:text-gray-400">{new Date(item.date).toLocaleDateString('pt-BR')}</td>
-                    <td className="py-4 text-sm font-medium text-gray-800 dark:text-white">
-                      <div className="flex items-center gap-2">
-                        <span>{item.description}</span>
-                        {item.invoiceImage && (
+                {filteredRecords.map((item: any) => {
+                  const catInfo = getCategoryInfo(item.category, item.type);
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <td className="py-4 text-sm text-gray-600 dark:text-gray-400">{formatFinancialDate(item.date)}</td>
+                      <td className="py-4 text-sm font-medium text-gray-800 dark:text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{item.description}</span>
+                          {item.invoiceImage && (
+                            <button
+                              onClick={() => {
+                                setSelectedInvoiceImage(item.invoiceImage);
+                                setSelectedInvoiceTitle(`${item.description} - R$ ${item.amount.toLocaleString('pt-BR')}`);
+                                setSelectedInvoiceRecord(item);
+                              }}
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-green-600 hover:text-green-700 flex items-center"
+                              title="Ver Nota Fiscal Anexa (Presidente & Auxiliar)"
+                            >
+                              <Paperclip size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-4">
+                        <span className={cn(
+                          "px-2.5 py-1 text-[10px] font-bold rounded-full border uppercase tracking-wider",
+                          catInfo.text,
+                          catInfo.bg,
+                          catInfo.border || 'border-transparent'
+                        )}>
+                          {catInfo.label}
+                        </span>
+                      </td>
+                      <td className={cn(
+                        "py-4 text-sm font-bold text-right",
+                        item.type === 'RECEITA' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                      )}>
+                        {item.type === 'RECEITA' ? '+' : '-'} R$ {item.amount.toLocaleString('pt-BR')}
+                      </td>
+                      <td className="py-4 text-right">
+                        <div className="flex justify-end items-center gap-1.5">
                           <button
-                            onClick={() => {
-                              setSelectedInvoiceImage(item.invoiceImage);
-                              setSelectedInvoiceTitle(`${item.description} - R$ ${item.amount.toLocaleString('pt-BR')}`);
-                            }}
-                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-green-600 hover:text-green-700 flex items-center"
-                            title="Ver Nota Fiscal Anexa (Presidente & Auxiliar)"
+                            onClick={() => handleEditClick(item)}
+                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-blue-600 hover:text-blue-700 transition-colors flex items-center justify-center"
+                            title="Editar"
                           >
-                            <Paperclip size={13} />
+                            <Edit2 size={14} />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-bold rounded-full uppercase">
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className={cn(
-                      "py-4 text-sm font-bold text-right",
-                      item.type === 'RECEITA' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                    )}>
-                      {item.type === 'RECEITA' ? '+' : '-'} R$ {item.amount.toLocaleString('pt-BR')}
-                    </td>
-                    <td className="py-4 text-right">
-                      <div className="flex justify-end items-center gap-1.5">
-                        <button
-                          onClick={() => handleEditClick(item)}
-                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-blue-600 hover:text-blue-700 transition-colors flex items-center justify-center"
-                          title="Editar"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        <button
-                          onClick={() => setDeletingRecord(item)}
-                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-red-600 hover:text-red-750 transition-colors flex items-center justify-center"
-                          title="Excluir"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            onClick={() => setDeletingRecord(item)}
+                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-red-600 hover:text-red-750 transition-colors flex items-center justify-center"
+                            title="Excluir"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {records.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-8 text-center text-gray-400 dark:text-gray-500 italic">Nenhum registro financeiro encontrado.</td>
@@ -5077,31 +5406,56 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
           </div>
 
           <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <h3 className="font-bold text-gray-800 dark:text-white mb-6">Resumo do Mês</h3>
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-xl">
-                  <TrendingUp size={20} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Receitas</p>
-                  <p className="text-xl font-bold text-green-600 dark:text-green-400">R$ {monthlySummary.receitas.toLocaleString('pt-BR')}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl">
-                  <TrendingUp size={20} className="rotate-180" />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Despesas</p>
-                  <p className="text-xl font-bold text-red-600 dark:text-red-400">R$ {monthlySummary.despesas.toLocaleString('pt-BR')}</p>
-                </div>
-              </div>
-              <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Saldo Projetado</p>
-                <p className="text-3xl font-bold text-gray-800 dark:text-white">R$ {monthlySummary.saldo.toLocaleString('pt-BR')}</p>
-              </div>
-            </div>
+            {(() => {
+              const activeMonthLabel = selectedMonthFilter === 'all' 
+                ? 'Todos os Meses' 
+                : (() => {
+                    const parts = selectedMonthFilter.split('-');
+                    const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+                    const formatted = format(dateObj, "MMMM 'de' yyyy", { locale: ptBR });
+                    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                  })();
+              return (
+                <>
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-6">Resumo - {activeMonthLabel}</h3>
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-xl">
+                        <TrendingUp size={20} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Receitas</p>
+                        <p className="text-xl font-bold text-green-600 dark:text-green-400">R$ {monthlySummary.receitas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-xl">
+                        <TrendingUp size={20} className="rotate-180" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Despesas</p>
+                        <p className="text-xl font-bold text-red-600 dark:text-red-400">R$ {monthlySummary.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+                    <div className="pt-6 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider font-extrabold">Saldo do Período</p>
+                        <p className={cn(
+                          "text-2xl font-black mt-1",
+                          monthlySummary.saldo >= 0 ? "text-green-600 dark:text-green-400" : "text-red-650"
+                        )}>R$ {monthlySummary.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      {selectedMonthFilter !== 'all' && (
+                        <div className="text-right">
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider font-extrabold">Fluxo Acumulado Geral</p>
+                          <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mt-1">R$ {overallBalance.saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div className="bg-green-600 p-8 rounded-3xl shadow-lg text-white">
@@ -5200,8 +5554,34 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="mt-4 text-center">
+              <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">Visualização restrita ao setor financeiro (Presidente & Auxiliar Administrativo)</p>
+                {selectedInvoiceRecord && (
+                  <button
+                    onClick={async () => {
+                      if (confirm("Deseja realmente excluir a nota fiscal anexa a este lançamento financeiro? A imagem será desvinculada permanentemente.")) {
+                        try {
+                          await updateDoc(doc(db, 'financial', selectedInvoiceRecord.id), {
+                            invoiceImage: deleteField(),
+                            invoiceFileName: deleteField(),
+                            updatedAt: new Date().toISOString(),
+                            updatedBy: user.id
+                          });
+                          showToast('Nota fiscal excluída com sucesso!');
+                          setSelectedInvoiceImage(null);
+                          setSelectedInvoiceRecord(null);
+                        } catch (err) {
+                          console.error("Erro ao remover nota fiscal:", err);
+                          showToast('Erro ao remover nota fiscal', 'error');
+                        }
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:text-red-400 rounded-xl text-xs font-bold transition-all"
+                  >
+                    <Trash2 size={13} />
+                    Excluir Nota Fiscal
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -5362,11 +5742,11 @@ const DonorsSection = ({ donors, showToast }: { donors: Donor[]; showToast: any 
 
   // Cálculos automáticos de soma por categoria e total geral
   const totalMensal = donors
-    .filter(d => d.type === 'SOCIO_MENSAL' && d.status === 'ATIVO')
+    .filter(d => d.type === 'SOCIO_MENSAL')
     .reduce((acc, d) => acc + (d.amount || 0), 0);
 
   const totalEventual = donors
-    .filter(d => d.type === 'DOADOR' && d.status === 'ATIVO')
+    .filter(d => d.type === 'DOADOR')
     .reduce((acc, d) => acc + (d.amount || 0), 0);
 
   const totalGeral = totalMensal + totalEventual;
@@ -5602,7 +5982,7 @@ const DonorsSection = ({ donors, showToast }: { donors: Donor[]; showToast: any 
               R$ {totalMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
             <p className="text-xs text-blue-500 dark:text-blue-400 font-medium mt-1">
-              {donors.filter(d => d.type === 'SOCIO_MENSAL' && d.status === 'ATIVO').length} sócios ativos cadastrados
+              {donors.filter(d => d.type === 'SOCIO_MENSAL').length} sócios cadastrados
             </p>
           </div>
           <div className="p-4 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl">
@@ -5613,11 +5993,11 @@ const DonorsSection = ({ donors, showToast }: { donors: Donor[]; showToast: any 
         <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-3xl border border-emerald-100/50 dark:border-emerald-900/20 flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wider mb-1">Doação Eventual</p>
-            <h3 className="text-2xl font-black text-emerald-900 dark:text-emerald-300">
+            <h3 className="text-2xl font-black text-emerald-950 dark:text-emerald-350">
               R$ {totalEventual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
             <p className="text-xs text-emerald-500 dark:text-emerald-400 font-medium mt-1">
-              {donors.filter(d => d.type === 'DOADOR' && d.status === 'ATIVO').length} doadores eventuais ativos
+              {donors.filter(d => d.type === 'DOADOR').length} doadores eventuais cadastrados
             </p>
           </div>
           <div className="p-4 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl">
@@ -5627,12 +6007,12 @@ const DonorsSection = ({ donors, showToast }: { donors: Donor[]; showToast: any 
 
         <div className="bg-purple-50/50 dark:bg-purple-900/10 p-6 rounded-3xl border border-purple-100/50 dark:border-purple-900/20 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-purple-600/70 dark:text-purple-400/70 uppercase tracking-wider mb-1">Total Geral (Ativos)</p>
+            <p className="text-xs font-bold text-purple-600/70 dark:text-purple-400/70 uppercase tracking-wider mb-1">Total Geral</p>
             <h3 className="text-2xl font-black text-purple-900 dark:text-purple-300">
               R$ {totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h3>
             <p className="text-xs text-purple-500 dark:text-purple-400 font-medium mt-1">
-              {donors.filter(d => d.status === 'ATIVO').length} registros ativos somados
+              {donors.length} registros somados
             </p>
           </div>
           <div className="p-4 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-2xl">
