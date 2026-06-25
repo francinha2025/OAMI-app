@@ -1839,17 +1839,17 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative group flex items-center gap-4"
               >
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1 bg-gray-50/90 dark:bg-gray-800/90 p-1 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/50">
                   <button 
                     onClick={() => handleEditConviver(p)}
-                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-blue-600 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all"
                     title="Editar ✏️"
                   >
                     <Edit2 size={14} />
                   </button>
                   <button 
                     onClick={() => handleDelete(p.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-red-650 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all"
                     title="Excluir 🗑️"
                   >
                     <Trash2 size={14} />
@@ -1859,7 +1859,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                   <Briefcase size={24} />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{p.name}</h4>
+                  <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight pr-14">{p.name}</h4>
                   <p className="text-[10px] text-blue-600 dark:text-blue-400 font-black uppercase tracking-wider mt-1">{ROLE_LABELS[p.role]}</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><IdCard size={10} /> {p.registrationNumber}</span>
@@ -1896,17 +1896,17 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                 animate={{ opacity: 1, x: 0 }}
                 className="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative group flex items-center gap-4"
               >
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex gap-1 bg-gray-50/90 dark:bg-gray-800/90 p-1 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700/50">
                   <button 
                     onClick={() => handleEditInstituicao(s)}
-                    className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-green-600 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all"
                     title="Editar ✏️"
                   >
                     <Edit2 size={14} />
                   </button>
                   <button 
                     onClick={() => handleDeleteStaff(s.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    className="p-1 text-gray-500 hover:text-red-650 hover:bg-white dark:hover:bg-gray-700 rounded-lg transition-all"
                     title="Excluir 🗑️"
                   >
                     <Trash2 size={14} />
@@ -1916,7 +1916,7 @@ const ProfessionalsSection = ({ professionals, users, onSaveStaff, onDeleteStaff
                   <Heart size={24} />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight">{s.name}</h4>
+                  <h4 className="font-bold text-gray-900 dark:text-white text-base leading-tight pr-14">{s.name}</h4>
                   <p className="text-[10px] text-green-600 dark:text-green-400 font-black uppercase tracking-wider mt-1">{safeReplace(s.role, '_', ' ') || 'FUNÇÃO'}</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                     <span className="text-[10px] text-gray-400 font-bold flex items-center gap-1"><UserIcon size={10} /> CPF: {s.cpf || 'N/A'}</span>
@@ -4499,14 +4499,14 @@ const ProfessionalArea = ({
 };
 
 const EXPENSE_CATEGORIES = [
-  { value: 'OFICINAS', label: 'Oficinas', color: 'bg-emerald-505', colorTailwind: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-900/40', icon: Briefcase },
-  { value: 'CAPACITACAO', label: 'Capacitação', color: 'bg-blue-505', colorTailwind: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-900/40', icon: Award },
-  { value: 'ESCRITORIO', label: 'Mat. Escritório', color: 'bg-indigo-505', colorTailwind: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-200 dark:border-indigo-900/40', icon: Paperclip },
-  { value: 'CAMPANHA', label: 'Lembrancinhas/Campanhas', color: 'bg-purple-505', colorTailwind: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-900/40', icon: Gift },
-  { value: 'VIAGENS', label: 'Viagens e Diárias', color: 'bg-amber-505', colorTailwind: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-900/40', icon: TrendingUp },
-  { value: 'PROFISSIONAIS', label: 'Profissionais e Serviços', color: 'bg-rose-505', colorTailwind: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-900/40', icon: Users },
-  { value: 'ROTINA', label: 'Gastos de Rotina', color: 'bg-orange-505', colorTailwind: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-200 dark:border-orange-900/40', icon: Clock },
-  { value: 'GASOLINA', label: 'Gasolina', color: 'bg-yellow-505', colorTailwind: 'bg-yellow-500', text: 'text-amber-750 dark:text-amber-400', bg: 'bg-yellow-50/50 dark:bg-yellow-950/20', border: 'border-yellow-200 dark:border-yellow-905_40', icon: Activity },
+  { value: 'OFICINAS', label: 'Oficinas', color: 'bg-emerald-500', colorTailwind: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-900/40', icon: Briefcase },
+  { value: 'CAPACITACAO', label: 'Capacitação', color: 'bg-blue-500', colorTailwind: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-900/40', icon: Award },
+  { value: 'ESCRITORIO', label: 'Mat. Escritório', color: 'bg-indigo-500', colorTailwind: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-200 dark:border-indigo-900/40', icon: Paperclip },
+  { value: 'CAMPANHA', label: 'Lembrancinhas/Campanhas', color: 'bg-purple-500', colorTailwind: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40', border: 'border-purple-200 dark:border-purple-900/40', icon: Gift },
+  { value: 'VIAGENS', label: 'Viagens e Diárias', color: 'bg-amber-500', colorTailwind: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-200 dark:border-amber-900/40', icon: TrendingUp },
+  { value: 'PROFISSIONAIS', label: 'Profissionais e Serviços', color: 'bg-rose-500', colorTailwind: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-200 dark:border-rose-900/40', icon: Users },
+  { value: 'ROTINA', label: 'Gastos de Rotina', color: 'bg-orange-500', colorTailwind: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-950/40', border: 'border-orange-200 dark:border-orange-900/40', icon: Clock },
+  { value: 'GASOLINA', label: 'Gasolina', color: 'bg-yellow-500', colorTailwind: 'bg-yellow-500', text: 'text-amber-750 dark:text-amber-400', bg: 'bg-yellow-50/50 dark:bg-yellow-950/20', border: 'border-yellow-200 dark:border-yellow-900/40', icon: Activity },
   { value: 'OUTROS', label: 'Outras Despesas', color: 'bg-gray-400', text: 'text-gray-700 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-950/40', border: 'border-gray-200 dark:border-gray-900/40', icon: DollarSign }
 ];
 
@@ -4524,7 +4524,7 @@ const getCategoryInfo = (categoryStr: string, type: 'RECEITA' | 'DESPESA') => {
     return found || { label: categoryStr || 'Despesa', color: 'bg-gray-400', text: 'text-gray-750 dark:text-gray-300', bg: 'bg-gray-100 dark:bg-gray-800/60', border: 'border-gray-200 dark:border-gray-800' };
   } else {
     const found = INCOME_CATEGORIES.find(c => c.value === normalized || c.label.toUpperCase() === normalized);
-    return found || { label: categoryStr || 'Receita', color: 'bg-green-500', text: 'text-green-700 dark:text-green-300', bg: 'bg-green-105 dark:bg-green-800/60', border: 'border-green-200 dark:border-green-800' };
+    return found || { label: categoryStr || 'Receita', color: 'bg-green-500', text: 'text-green-700 dark:text-green-300', bg: 'bg-green-100 dark:bg-green-800/60', border: 'border-green-200 dark:border-green-800' };
   }
 };
 
@@ -4593,10 +4593,10 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
   const handleEditClick = (item: any) => {
     setEditingRecord(item);
     setFormData({
-      date: item.date,
-      description: item.description,
-      amount: String(item.amount),
-      type: item.type as 'RECEITA' | 'DESPESA',
+      date: item.date || getTodayLocalDate(),
+      description: item.description || '',
+      amount: String(item.amount || ''),
+      type: (item.type || 'RECEITA') as 'RECEITA' | 'DESPESA',
       category: item.category || ''
     });
     setIsModalOpen(true);
@@ -4752,6 +4752,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
     }).reverse();
 
     records.forEach(r => {
+      if (!r.date || typeof r.date !== 'string') return;
       const monthKey = r.date.substring(0, 7);
       const monthData = last6Months.find(m => m.monthKey === monthKey);
       if (monthData) {
@@ -4817,7 +4818,7 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
           })();
 
       const columns = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
-      const sortedRecords = [...filteredRecords].sort((a, b) => a.date.localeCompare(b.date));
+      const sortedRecords = [...filteredRecords].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
       const data = sortedRecords.map(r => {
         const catInfo = getCategoryInfo(r.category, r.type);
@@ -4933,38 +4934,258 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
           .filter(r => r.type === 'DESPESA')
           .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
-        const categorySums: Record<string, number> = {
-          OFICINAS: 0,
-          CAPACITACAO: 0,
-          ESCRITORIO: 0,
-          CAMPANHA: 0,
-          VIAGENS: 0,
-          PROFISSIONAIS: 0,
-          ROTINA: 0,
-          GASOLINA: 0,
-          OUTROS: 0
+        // Auditoria de erros e inconsistencias nos lancamentos
+        const auditErrors: Array<{
+          id: string;
+          description: string;
+          date: string;
+          amount: number;
+          type: string;
+          message: string;
+          field: string;
+        }> = [];
+
+        filteredRecords.forEach(r => {
+          const amt = Number(r.amount);
+          const desc = (r.description || '').trim();
+          const cat = (r.category || '').trim();
+          
+          if (!desc) {
+            auditErrors.push({
+              id: r.id || '',
+              description: '(Sem Descrição)',
+              date: r.date || 'N/A',
+              amount: amt || 0,
+              type: r.type || 'DESPESA',
+              message: 'Lançamento sem descrição descritiva.',
+              field: 'description'
+            });
+          }
+          
+          if (isNaN(amt) || amt <= 0) {
+            auditErrors.push({
+              id: r.id || '',
+              description: desc || 'Sem descrição',
+              date: r.date || 'N/A',
+              amount: amt || 0,
+              type: r.type || 'DESPESA',
+              message: `Valor inválido, zerado ou negativo: R$ ${r.amount || 0}.`,
+              field: 'amount'
+            });
+          }
+
+          if (!r.date || r.date.trim() === '') {
+            auditErrors.push({
+              id: r.id || '',
+              description: desc || 'Sem descrição',
+              date: 'Data ausente',
+              amount: amt || 0,
+              type: r.type || 'DESPESA',
+              message: 'Data não informada no lançamento.',
+              field: 'date'
+            });
+          }
+
+          if (r.type !== 'RECEITA' && r.type !== 'DESPESA') {
+            auditErrors.push({
+              id: r.id || '',
+              description: desc || 'Sem descrição',
+              date: r.date || 'N/A',
+              amount: amt || 0,
+              type: r.type || 'DESPESA',
+              message: `Tipo inválido (${r.type || 'N/A'}). Deve ser RECEITA ou DESPESA.`,
+              field: 'type'
+            });
+          }
+        });
+
+        // Agrupador inteligente de categorias de Despesas solicitadas
+        const getGroupForKey = (r: any) => {
+          const cat = (r.category || '').toLowerCase();
+          const desc = (r.description || '').toLowerCase();
+          
+          // 1. SALARIOS (Pagamento de salário)
+          if (
+            cat.includes('salário') || cat.includes('salario') || cat.includes('vencimento') || cat.includes('pagamento de salário') || cat.includes('pagamento de salario') || cat.includes('profissionais') ||
+            desc.includes('salário') || desc.includes('salario') || desc.includes('vencimento') || desc.includes('pagamento de salário') || desc.includes('pagamento de salario') ||
+            desc.includes('enfermeira') || desc.includes('psicóloga') || desc.includes('psicologa') || desc.includes('assistente social') || desc.includes('fisioterapeuta') || 
+            desc.includes('técnico de produção') || desc.includes('tecnico de producao') || desc.includes('coordenadora') || desc.includes('social média') || desc.includes('social media') || 
+            desc.includes('auxiliar administrativo') || desc.includes('motorista') || desc.includes('pedagoga') || desc.includes('projetista') || desc.includes('esteticista') ||
+            desc.includes('auxiliar de produção') || desc.includes('auxiliar de producao')
+          ) {
+            return {
+              key: 'SALARIOS',
+              label: 'Pagamento de Salário',
+              icon: Users,
+              color: 'bg-rose-500',
+              text: 'text-rose-700 dark:text-rose-400',
+              bg: 'bg-rose-50 dark:bg-rose-950/40',
+              border: 'border-rose-200 dark:border-rose-900/40'
+            };
+          }
+          
+          // 2. TRIBUTOS (Tributos e ISS)
+          if (
+            cat.includes('iss') || cat.includes('tributo') || cat.includes('encargo') || cat.includes('tarifa') || cat.includes('imposto') || cat.includes('banco') || cat.includes('taxa') ||
+            desc.includes('iss') || desc.includes('tributo') || desc.includes('encargo') || desc.includes('tarifa') || desc.includes('imposto') || desc.includes('banco') || desc.includes('taxa') || desc.includes('pix')
+          ) {
+            return {
+              key: 'TRIBUTOS',
+              label: 'Tributos, ISS e Tarifas',
+              icon: FileText,
+              color: 'bg-amber-500',
+              text: 'text-amber-700 dark:text-amber-400',
+              bg: 'bg-amber-50 dark:bg-amber-950/40',
+              border: 'border-amber-200 dark:border-amber-900/40'
+            };
+          }
+
+          // 3. FORMACOES (Formações e Viagens)
+          if (
+            cat.includes('viagem') || cat.includes('passagem') || cat.includes('hospedagem') || cat.includes('hotel') || cat.includes('formação') || cat.includes('formacao') || cat.includes('capacitação') || cat.includes('capacitacao') ||
+            desc.includes('viagem') || desc.includes('passagem') || desc.includes('hospedagem') || desc.includes('hotel') || desc.includes('formação') || desc.includes('formacao') || desc.includes('capacitação') || desc.includes('capacitacao') || desc.includes('vôo') || desc.includes('voo')
+          ) {
+            return {
+              key: 'FORMACOES',
+              label: 'Formações e Viagens',
+              icon: Award,
+              color: 'bg-blue-500',
+              text: 'text-blue-700 dark:text-blue-400',
+              bg: 'bg-blue-50 dark:bg-blue-950/40',
+              border: 'border-blue-200 dark:border-blue-900/40'
+            };
+          }
+
+          // 4. COMPRAS (Compras e Insumos)
+          if (
+            cat.includes('compra') || cat.includes('insumo') || cat.includes('material') || cat.includes('escritório') || cat.includes('escritorio') || cat.includes('móvel') || cat.includes('movel') || cat.includes('equipamento') || cat.includes('vidro') || cat.includes('oficina') || cat.includes('personalizado') || cat.includes('camiseta') || cat.includes('folders') ||
+            desc.includes('compra') || desc.includes('insumo') || desc.includes('material') || desc.includes('escritório') || desc.includes('escritorio') || desc.includes('móvel') || desc.includes('movel') || desc.includes('equipamento') || desc.includes('vidro') || desc.includes('oficina') || desc.includes('personalizado') || desc.includes('camiseta') || desc.includes('folder') || desc.includes('folders')
+          ) {
+            return {
+              key: 'COMPRAS',
+              label: 'Compras e Insumos',
+              icon: Package,
+              color: 'bg-indigo-500',
+              text: 'text-indigo-700 dark:text-indigo-400',
+              bg: 'bg-indigo-50 dark:bg-indigo-950/40',
+              border: 'border-indigo-200 dark:border-indigo-900/40'
+            };
+          }
+
+          // 5. SERVICOS (Serviços e Manutenção)
+          if (
+            cat.includes('serviço') || cat.includes('servico') || cat.includes('assessoria') || cat.includes('consultoria') || cat.includes('projeto') || cat.includes('manutenção') || cat.includes('manutencao') || cat.includes('reforma') || cat.includes('conta') || cat.includes('pacote') || cat.includes('frete') ||
+            desc.includes('serviço') || desc.includes('servico') || desc.includes('assessoria') || desc.includes('consultoria') || desc.includes('projeto') || desc.includes('manutenção') || desc.includes('manutencao') || desc.includes('reforma') || desc.includes('conta') || desc.includes('pacote') || desc.includes('frete')
+          ) {
+            return {
+              key: 'SERVICOS',
+              label: 'Serviços e Manutenção',
+              icon: Briefcase,
+              color: 'bg-emerald-500',
+              text: 'text-emerald-700 dark:text-emerald-400',
+              bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+              border: 'border-emerald-200 dark:border-emerald-900/40'
+            };
+          }
+
+          // 6. OUTROS
+          return {
+            key: 'OUTROS',
+            label: 'Outras Despesas',
+            icon: DollarSign,
+            color: 'bg-gray-400',
+            text: 'text-gray-700 dark:text-gray-400',
+            bg: 'bg-gray-50 dark:bg-gray-950/40',
+            border: 'border-gray-200 dark:border-gray-900/40'
+          };
         };
+
+        const dynamicCategoriesMap = new Map<string, { label: string, amount: number, style: any }>();
 
         targetRecordsForDashboard.forEach(r => {
           if (r.type === 'DESPESA') {
-            const cat = (r.category || '').toUpperCase().trim();
             const amt = Number(r.amount || 0);
-            if (categorySums[cat] !== undefined) {
-              categorySums[cat] += amt;
+            const styleInfo = getGroupForKey(r);
+            
+            if (dynamicCategoriesMap.has(styleInfo.key)) {
+              const existing = dynamicCategoriesMap.get(styleInfo.key)!;
+              existing.amount += amt;
             } else {
-              // try to match friendly names or fall back to OUTROS
-              const matched = EXPENSE_CATEGORIES.find(c => c.label.toUpperCase() === cat);
-              if (matched) {
-                categorySums[matched.value] += amt;
-              } else {
-                categorySums.OUTROS += amt;
-              }
+              dynamicCategoriesMap.set(styleInfo.key, {
+                label: styleInfo.label,
+                amount: amt,
+                style: styleInfo
+              });
             }
           }
         });
 
+        let displayCategories: Array<{
+          value: string,
+          label: string,
+          amount: number,
+          icon: any,
+          color: string,
+          text: string,
+          bg: string,
+          border: string,
+          colorTailwind?: string
+        }> = [];
+
+        dynamicCategoriesMap.forEach((data, key) => {
+          displayCategories.push({
+            value: key,
+            label: data.label,
+            amount: data.amount,
+            icon: data.style.icon,
+            color: data.style.color,
+            text: data.style.text,
+            bg: data.style.bg,
+            border: data.style.border,
+            colorTailwind: data.style.color
+          });
+        });
+
+        // Ordenar por maior valor para dar destaque aos principais custos
+        displayCategories.sort((a, b) => b.amount - a.amount);
+
         return (
           <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+            {/* Panel de Auditoria e Erros se houver inconsistencias */}
+            {auditErrors.length > 0 && (
+              <div className="p-5 bg-amber-50/70 dark:bg-amber-950/15 border border-amber-200 dark:border-amber-900/40 rounded-3xl space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 bg-amber-500 text-white rounded-lg">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                      ⚠️ {auditErrors.length} inconsistência(s) detectada(s) para correção
+                    </h4>
+                    <p className="text-xs text-amber-600/90 dark:text-amber-400/80">
+                      Alguns registros possuem problemas de preenchimento que podem distorcer as somas e o balanço financeiro. Corrija-os na tabela de lançamentos abaixo.
+                    </p>
+                  </div>
+                </div>
+                <div className="max-h-40 overflow-y-auto divide-y divide-amber-100 dark:divide-amber-900/30 text-xs pl-8">
+                  {auditErrors.map((err, idx) => (
+                    <div key={idx} className="py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1">
+                      <div>
+                        <span className="font-mono text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 px-1.5 py-0.5 rounded mr-2">
+                          {err.date}
+                        </span>
+                        <strong className="text-gray-700 dark:text-gray-300">{err.description}</strong>
+                        <span className="text-amber-600 dark:text-amber-400 ml-1.5">• {err.message}</span>
+                      </div>
+                      <div className="text-gray-500 font-mono text-[10px]">
+                        ID: {err.id ? err.id.slice(0, 8) + '...' : 'Sem ID'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div>
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
@@ -4979,8 +5200,8 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {EXPENSE_CATEGORIES.map(cat => {
-                const sum = categorySums[cat.value] || 0;
+              {displayCategories.map(cat => {
+                const sum = cat.amount;
                 const pct = totalDespesas > 0 ? (sum / totalDespesas) * 100 : 0;
                 const IconComp = cat.icon;
 
@@ -9479,7 +9700,7 @@ const WorkshopsSection = ({
   );
 };
 
-const StaffManagementSection = ({ staff, onSave, showToast }: { staff: StaffMember[], onSave: (data: Omit<StaffMember, 'id'>, id?: string) => Promise<void>, showToast: (m: string, t?: 'success' | 'error') => void }) => {
+const StaffManagementSection = ({ staff, onSave, onDelete, showToast }: { staff: StaffMember[], onSave: (data: Omit<StaffMember, 'id'>, id?: string) => Promise<void>, onDelete?: (id: string) => Promise<void>, showToast: (m: string, t?: 'success' | 'error') => void }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState<Omit<StaffMember, 'id'>>({
@@ -9527,16 +9748,35 @@ const StaffManagementSection = ({ staff, onSave, showToast }: { staff: StaffMemb
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {staff.map((s) => (
           <div key={s.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-center mb-4">
               <div className={cn(
                 "px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase",
                 s.status === 'ATIVO' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
               )}>
                 {s.status}
               </div>
-              <button onClick={() => handleEdit(s)} className="text-gray-400 hover:text-green-600 p-1">
-                <Edit2 size={18} />
-              </button>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => handleEdit(s)} 
+                  className="text-gray-400 hover:text-green-600 hover:bg-gray-150 dark:hover:bg-gray-800 p-1.5 rounded-xl transition-all"
+                  title="Editar ✏️"
+                >
+                  <Edit2 size={16} />
+                </button>
+                {onDelete && (
+                  <button 
+                    onClick={async () => {
+                      if (window.confirm(`Tem certeza que deseja excluir o funcionário "${s.name}"? Esta ação removerá o registro permanentemente do banco de dados.`)) {
+                        await onDelete(s.id);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-red-650 hover:bg-gray-150 dark:hover:bg-gray-800 p-1.5 rounded-xl transition-all"
+                    title="Excluir 🗑️"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
             </div>
             <h4 className="font-bold text-gray-900 dark:text-white text-lg mb-1">{s.name}</h4>
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
@@ -11759,6 +11999,39 @@ export default function App() {
 
   const mergedPsychEvolutions = useMemo(() => {
     const list = [...psychEvolutions];
+    
+    // Unify activities under evolution
+    (psychActivities || []).forEach(act => {
+      list.push({
+        id: `act-${act.id}`,
+        patientId: act.participants && act.participants.length === 1 ? act.participants[0] : (act.patientIds && act.patientIds.length === 1 ? act.patientIds[0] : 'GERAL'),
+        patientIds: act.participants || act.patientIds || [],
+        date: act.date,
+        time: '12:00',
+        observation: `[Atividade: ${act.type || 'OFICINA'}] ${act.title || ''}\nDescrição: ${act.description || ''}`,
+        intervention: `Conduzido por: ${act.registeredBy || 'Psicóloga'}`,
+        registeredBy: act.registeredBy || 'Psicóloga',
+        photos: act.photos || [],
+        coWorkers: act.coWorkers || []
+      });
+    });
+
+    // Unify appointments under evolution
+    (psychAppointments || []).forEach(appt => {
+      list.push({
+        id: `appt-${appt.id}`,
+        patientId: appt.patientId || (appt.patientIds && appt.patientIds.length === 1 ? appt.patientIds[0] : 'GERAL'),
+        patientIds: appt.patientIds || (appt.patientId ? [appt.patientId] : []),
+        date: appt.date,
+        time: appt.time || '12:00',
+        observation: `[Atendimento: ${appt.type || 'INDIVIDUAL'}] [Status: ${appt.status || 'REALIZADO'}]\nObservações: ${appt.observations || ''}`,
+        intervention: `Conduzido por: ${appt.registeredBy || 'Psicóloga'}`,
+        registeredBy: appt.registeredBy || 'Psicóloga',
+        photos: [],
+        coWorkers: []
+      });
+    });
+
     const registeredIds = new Set(list.map(e => e.id));
     const others = [
       ...nursingEvolutions.map(e => ({ ...e, sectorName: 'Enfermagem' })),
@@ -11783,7 +12056,7 @@ export default function App() {
       }
     });
     return list;
-  }, [psychEvolutions, nursingEvolutions, physioEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
+  }, [psychEvolutions, psychActivities, psychAppointments, nursingEvolutions, physioEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions, isRoleOrUserTagged]);
 
   const mergedPedagogyEvolutions = useMemo(() => {
     const list = [...pedagogyEvolutions];
@@ -12333,7 +12606,6 @@ export default function App() {
     if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
       const qFinancial = query(
         collection(db, 'financial'), 
-        where('date', '>=', farPastStr),
         orderBy('date', 'desc'),
         limit(500)
       );
@@ -13561,7 +13833,46 @@ export default function App() {
 
   const handleDeletePsychRecord = async (collectionName: string, id: string) => {
     try {
-      await deleteDoc(doc(db, collectionName, id));
+      if (collectionName === 'psychEvolutions' && id.startsWith('act-')) {
+        const actId = id.substring(4);
+        await deleteDoc(doc(db, 'psychActivities', actId));
+      } else if (collectionName === 'psychEvolutions' && id.startsWith('appt-')) {
+        const apptId = id.substring(4);
+        await deleteDoc(doc(db, 'psychAppointments', apptId));
+      } else if (collectionName === 'psychInitialAssessments') {
+        const assessmentSnap = await getDoc(doc(db, 'psychInitialAssessments', id));
+        if (assessmentSnap.exists()) {
+          const assessmentData = assessmentSnap.data();
+          if (assessmentData.patientId && assessmentData.date) {
+            // Delete linked emotional monitorings
+            const emotionalColl = collection(db, 'psychEmotionalMonitorings');
+            const q = query(
+              emotionalColl,
+              where('patientId', '==', assessmentData.patientId),
+              where('date', '==', assessmentData.date)
+            );
+            const snapshot = await getDocs(q);
+            for (const docSnap of snapshot.docs) {
+              await deleteDoc(doc(db, 'psychEmotionalMonitorings', docSnap.id));
+            }
+
+            // Delete linked cognition assessments
+            const cognitionColl = collection(db, 'psychCognitionAssessments');
+            const qCognition = query(
+              cognitionColl,
+              where('patientId', '==', assessmentData.patientId),
+              where('date', '==', assessmentData.date)
+            );
+            const snapshotCognition = await getDocs(qCognition);
+            for (const docSnap of snapshotCognition.docs) {
+              await deleteDoc(doc(db, 'psychCognitionAssessments', docSnap.id));
+            }
+          }
+        }
+        await deleteDoc(doc(db, 'psychInitialAssessments', id));
+      } else {
+        await deleteDoc(doc(db, collectionName, id));
+      }
       showToast('Registro removido com sucesso');
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `${collectionName}/${id}`);
@@ -13659,6 +13970,66 @@ export default function App() {
         await addDoc(collection(db, 'psychInitialAssessments'), cleanedData);
         showToast('Avaliação inicial salva com sucesso');
       }
+
+      // Automatically sync to psychEmotionalMonitorings collection
+      if (cleanedData.wellBeing) {
+        const emotionalColl = collection(db, 'psychEmotionalMonitorings');
+        const q = query(
+          emotionalColl,
+          where('patientId', '==', cleanedData.patientId),
+          where('date', '==', cleanedData.date)
+        );
+        const snapshot = await getDocs(q);
+        const monitoringPayload = {
+          patientId: cleanedData.patientId,
+          targetName: cleanedData.targetName || '',
+          targetType: cleanedData.targetType || 'IDOSO_COMUNIDADE',
+          date: cleanedData.date,
+          wellBeing: cleanedData.wellBeing,
+          sadness: cleanedData.sadness || 'NENHUM',
+          anxiety: cleanedData.anxiety || 'NENHUM',
+          loneliness: cleanedData.loneliness || 'NENHUM',
+          irritability: cleanedData.irritability || 'NENHUM',
+          registeredBy: cleanedData.registeredBy || 'Psicóloga',
+          observations: cleanedData.observations || ''
+        };
+
+        if (!snapshot.empty) {
+          const matchId = snapshot.docs[0].id;
+          await updateDoc(doc(db, 'psychEmotionalMonitorings', matchId), cleanData(monitoringPayload));
+        } else {
+          await addDoc(emotionalColl, cleanData(monitoringPayload));
+        }
+      }
+
+      // Automatically sync to psychCognitionAssessments collection
+      if (cleanedData.memory) {
+        const cognitionColl = collection(db, 'psychCognitionAssessments');
+        const q = query(
+          cognitionColl,
+          where('patientId', '==', cleanedData.patientId),
+          where('date', '==', cleanedData.date)
+        );
+        const snapshot = await getDocs(q);
+        const cognitionPayload = {
+          patientId: cleanedData.patientId,
+          targetName: cleanedData.targetName || '',
+          targetType: cleanedData.targetType || 'IDOSO_COMUNIDADE',
+          date: cleanedData.date,
+          memory: cleanedData.memory || 'PRESERVADO',
+          attention: cleanedData.attention || 'PRESERVADO',
+          orientation: cleanedData.orientation || 'PRESERVADO',
+          registeredBy: cleanedData.registeredBy || 'Psicóloga',
+          observations: cleanedData.cognitionObservations || ''
+        };
+
+        if (!snapshot.empty) {
+          const matchId = snapshot.docs[0].id;
+          await updateDoc(doc(db, 'psychCognitionAssessments', matchId), cleanData(cognitionPayload));
+        } else {
+          await addDoc(cognitionColl, cleanData(cognitionPayload));
+        }
+      }
     } catch (err) {
       handleFirestoreError(err, data.id ? OperationType.UPDATE : OperationType.CREATE, 'psychInitialAssessments');
       showToast('Erro ao salvar avaliação inicial', 'error');
@@ -13671,8 +14042,40 @@ export default function App() {
       const cleanedData = cleanData(rest);
       let recordId = id || '';
       if (id) {
-        await updateDoc(doc(db, 'psychEvolutions', id), cleanedData);
-        showToast('Evolução atualizada com sucesso');
+        if (id.startsWith('act-')) {
+          const actId = id.substring(4);
+          const activityPayload: any = {
+            date: rest.date,
+            description: rest.observation,
+            participants: rest.patientIds || (rest.patientId ? [rest.patientId] : []),
+            coWorkers: rest.coWorkers || [],
+            photos: rest.photos || [],
+            registeredBy: rest.registeredBy || 'Psicóloga',
+            title: 'Atividade Integrada',
+            type: 'OFICINA'
+          };
+          await updateDoc(doc(db, 'psychActivities', actId), cleanData(activityPayload));
+          showToast('Atividade atualizada com sucesso');
+          recordId = actId;
+        } else if (id.startsWith('appt-')) {
+          const apptId = id.substring(4);
+          const apptPayload: any = {
+            date: rest.date,
+            time: rest.time || '12:00',
+            observations: rest.observation,
+            patientId: rest.patientId || (rest.patientIds && rest.patientIds[0]) || '',
+            patientIds: rest.patientIds || (rest.patientId ? [rest.patientId] : []),
+            registeredBy: rest.registeredBy || 'Psicóloga',
+            type: 'INDIVIDUAL',
+            status: 'REALIZADO'
+          };
+          await updateDoc(doc(db, 'psychAppointments', apptId), cleanData(apptPayload));
+          showToast('Atendimento atualizado com sucesso');
+          recordId = apptId;
+        } else {
+          await updateDoc(doc(db, 'psychEvolutions', id), cleanedData);
+          showToast('Evolução atualizada com sucesso');
+        }
       } else {
         const docRef = await addDoc(collection(db, 'psychEvolutions'), cleanedData);
         recordId = docRef.id;
@@ -15039,7 +15442,21 @@ export default function App() {
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
       case 'volunteers': return <VolunteersSection volunteers={volunteers} showToast={showToast} user={user} />;
       case 'family': return <FamilySection engagements={familyEngagements} elderly={elderly} showToast={showToast} />;
-      case 'staff': return <StaffManagementSection staff={users} onSave={handleSaveStaffMember} showToast={showToast} />;
+      case 'staff': return (
+        <StaffManagementSection 
+          staff={users} 
+          onSave={handleSaveStaffMember} 
+          onDelete={async (id) => {
+            try {
+              await deleteDoc(doc(db, 'users', id));
+              showToast('Funcionário institucional excluído!', 'success');
+            } catch (err) {
+              showToast('Erro ao excluir funcionário', 'error');
+            }
+          }}
+          showToast={showToast} 
+        />
+      );
       case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} sendNotification={sendNotification} />;
       case 'workshops': return (
         <WorkshopsSection 

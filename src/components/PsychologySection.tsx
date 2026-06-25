@@ -8,7 +8,7 @@ import {
   Download, Printer, X, Info, ArrowLeft,
   TrendingUp, UserCircle, LogOut, Moon, Sun,
   Smile, Meh, Frown, History, Lightbulb, Loader2, Zap,
-  Calendar
+  Calendar, ClipboardCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -86,7 +86,7 @@ interface PsychologySectionProps {
 type PsychTab = 
   | 'dashboard' | 'patients' | 'initial' 
   | 'evolution' | 'appointments' | 'emotions' 
-  | 'family' | 'activities' | 'cognition' 
+  | 'activities' | 'cognition' 
   | 'alerts' | 'productivity' | 'reports' | 'settings';
 
 export const PsychologySection = (props: PsychologySectionProps) => {
@@ -130,7 +130,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
   });
   const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
-    'evolutions', 'emotions', 'bonds', 'activities', 'cognition', 'plans', 'appointments'
+    'evolutions', 'emotions', 'initial', 'activities', 'cognition', 'plans', 'appointments'
   ]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'initial' | 'evolution' | 'appointment' | 'emotion' | 'family' | 'activity' | 'cognition' | 'plan' } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<PsychEvolution | null>(null);
@@ -214,10 +214,10 @@ export const PsychologySection = (props: PsychologySectionProps) => {
       return matchPatient && isDateInSelectedRange(c.date);
     });
 
-    // Filter Family Bonds
-    const filteredBonds = (familyBonds || []).filter(b => {
-      const matchPatient = !reportsPatientFilter || b.patientId === reportsPatientFilter || b.patientIds?.includes(reportsPatientFilter);
-      return matchPatient && isDateInSelectedRange(b.date);
+    // Filter Initial Assessments (Avaliação Inicial)
+    const filteredInitialAssessments = (initialAssessments || []).filter(a => {
+      const matchPatient = !reportsPatientFilter || a.patientId === reportsPatientFilter;
+      return matchPatient && isDateInSelectedRange(a.date);
     });
 
     // Filter Appointments
@@ -334,21 +334,46 @@ export const PsychologySection = (props: PsychologySectionProps) => {
         sections.push({ title: 'Oficinas e Dinâmicas em Grupo', columns, data });
       }
 
-      if (reportSelectedSections.includes('bonds') && filteredBonds.length > 0) {
+      if (reportSelectedSections.includes('initial') && filteredInitialAssessments.length > 0) {
         const columns = reportsPatientFilter
-          ? ['Data', 'Recebe Visitas?', 'Frequência de Visitas', 'Qualidade do Vínculo Familiar', 'Observações']
-          : ['Data', 'Idoso', 'Recebe Visitas?', 'Frequência Visitas', 'Vínculo Familiar', 'Observações'];
+          ? ['Data', 'Estado Emocional', 'Cognição', 'Humor', 'Adaptação', 'Observações / Dados Detalhados']
+          : ['Data', 'Idoso', 'Estado Emocional', 'Cognição', 'Humor', 'Adaptação', 'Observações / Dados Detalhados'];
           
-        const data = filteredBonds.map(b => {
-          const p = (patients || []).find(pt => pt.id === b.patientId);
+        const data = filteredInitialAssessments.map((a: any) => {
+          const p = (patients || []).find(pt => pt.id === a.patientId);
           const name = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId)?.name : p?.name;
-          const dtFmt = format(parseISO(b.date), 'dd/MM/yyyy');
+          const dtFmt = format(parseISO(a.date), 'dd/MM/yyyy');
+          
+          const linkedEmotion = (emotionalMonitorings || []).find((m: any) => m.patientId === a.patientId && m.date === a.date);
+          const wellBeing = a.wellBeing || linkedEmotion?.wellBeing;
+          const sadness = a.sadness || linkedEmotion?.sadness;
+          const anxiety = a.anxiety || linkedEmotion?.anxiety;
+          const loneliness = a.loneliness || linkedEmotion?.loneliness;
+          const irritability = a.irritability || linkedEmotion?.irritability;
+          
+          const linkedCognition = (cognitionAssessments || []).find((c: any) => c.patientId === a.patientId && c.date === a.date);
+          const memory = a.memory || linkedCognition?.memory;
+          const attention = a.attention || linkedCognition?.attention;
+          const orientation = a.orientation || linkedCognition?.orientation;
+          const cognitionObservations = a.cognitionObservations || linkedCognition?.observations;
+
+          let detailsStr = a.observations || '';
+          if (wellBeing || sadness || anxiety || loneliness || irritability) {
+            detailsStr += `\n\nMonitoramento Emocional:\n- Bem-estar: ${wellBeing || 'NEUTRO'}\n- Tristeza: ${sadness || 'NENHUM'}\n- Ansiedade: ${anxiety || 'NENHUM'}\n- Solidão: ${loneliness || 'NENHUM'}\n- Irritabilidade: ${irritability || 'NENHUM'}`;
+          }
+          if (memory || attention || orientation) {
+            detailsStr += `\n\nAvaliação Cognitiva:\n- Memória: ${memory || 'PRESERVADO'}\n- Atenção: ${attention || 'PRESERVADO'}\n- Orientação: ${orientation || 'PRESERVADO'}`;
+            if (cognitionObservations) {
+              detailsStr += `\n- Obs. Cognição: ${cognitionObservations}`;
+            }
+          }
+
           return reportsPatientFilter
-            ? [dtFmt, b.receivesVisits ? 'Sim' : 'Não', b.frequency || 'N/A', b.familyRelationship || 'N/A', b.observations || '-']
-            : [dtFmt, name || 'Geral', b.receivesVisits ? 'Sim' : 'Não', b.frequency || 'N/A', b.familyRelationship || 'N/A', b.observations || '-'];
+            ? [dtFmt, a.emotionalState || '-', a.cognition || '-', a.mood || '-', a.adaptationLevel || '-', detailsStr || '-']
+            : [dtFmt, name || 'Geral', a.emotionalState || '-', a.cognition || '-', a.mood || '-', a.adaptationLevel || '-', detailsStr || '-'];
         });
         
-        sections.push({ title: 'Vínculos Familiares e Visitas', columns, data });
+        sections.push({ title: 'Avaliações Iniciais (com Cognição e Humor)', columns, data });
       }
 
       if (reportSelectedSections.includes('appointments') && filteredAppointments.length > 0) {
@@ -455,7 +480,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
       filteredEmotions.length === 0 && 
       filteredCognitions.length === 0 && 
       filteredActivities.length === 0 && 
-      filteredBonds.length === 0 && 
+      filteredInitialAssessments.length === 0 && 
       filteredAppointments.length === 0 && 
       filteredPlans.length === 0;
 
@@ -602,7 +627,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
               { id: 'emotions', title: 'Aconchego Emocional', desc: 'Evolução de humor, tristeza, ansiedade.', icon: Smile, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-950/20', count: filteredEmotions.length },
               { id: 'cognition', title: 'Avaliação Cognitiva', desc: 'Preservação de memória, atenção e orientação.', icon: Brain, color: 'text-pink-500', bg: 'bg-pink-50 dark:bg-pink-950/20', count: filteredCognitions.length },
               { id: 'activities', title: 'Oficinas e Oficinas de Grupo', desc: 'Encontros, dinâmicas e interação social.', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/20', count: filteredActivities.length },
-              { id: 'bonds', title: 'Vínculos Familiares', desc: 'Frequência de visits e convivência familiar.', icon: Heart, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/20', count: filteredBonds.length },
+              { id: 'initial', title: 'Avaliação Inicial', desc: 'Avaliações de saúde mental, humor e cognição.', icon: ClipboardCheck, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-950/20', count: filteredInitialAssessments.length },
               { id: 'appointments', title: 'Consultas e Sessões', desc: 'Faltas, agendamentos e atendimentos realizados.', icon: Calendar, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/20', count: filteredAppointments.length },
               { id: 'plans', title: 'Planos de Intervenção', desc: 'Objetivos e estratégias terapêuticas estabelecidas.', icon: CheckCircle2, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-950/20', count: filteredPlans.length },
             ].map((sec) => {
@@ -670,7 +695,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                       if (s === 'emotions') return filteredEmotions.length > 0;
                       if (s === 'cognition') return filteredCognitions.length > 0;
                       if (s === 'activities') return filteredActivities.length > 0;
-                      if (s === 'bonds') return filteredBonds.length > 0;
+                      if (s === 'initial') return filteredInitialAssessments.length > 0;
                       if (s === 'appointments') return filteredAppointments.length > 0;
                       if (s === 'plans') return filteredPlans.length > 0;
                       return false;
@@ -718,7 +743,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const todayAppointments = (appointments || []).filter(a => a.date === today);
     const sadPatients = (emotionalMonitorings || []).filter(m => m.date === today && m.wellBeing === 'TRISTE').length;
-    const isolatedPatients = (familyBonds || []).filter(f => !f.receivesVisits).length;
+    const isolatedPatients = (patients || []).filter(p => p.hasVisits === false).length;
 
     return {
       totalPatients: (patients || []).length,
@@ -726,7 +751,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
       sadPatients,
       isolatedPatients
     };
-  }, [patients, appointments, emotionalMonitorings, familyBonds]);
+  }, [patients, appointments, emotionalMonitorings]);
 
   const renderSettings = () => (
     <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -777,146 +802,601 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     </div>
   );
 
+  const cognitionStats = useMemo(() => {
+    const total = (cognitionAssessments || []).length;
+    if (total === 0) return { memory: 100, attention: 100, orientation: 100 };
+    const preservedMemory = (cognitionAssessments || []).filter(c => c.memory === 'PRESERVADO').length;
+    const preservedAttention = (cognitionAssessments || []).filter(c => c.attention === 'PRESERVADO').length;
+    const preservedOrientation = (cognitionAssessments || []).filter(c => c.orientation === 'PRESERVADO').length;
+    return {
+      memory: Math.round((preservedMemory / total) * 100),
+      attention: Math.round((preservedAttention / total) * 100),
+      orientation: Math.round((preservedOrientation / total) * 100),
+    };
+  }, [cognitionAssessments]);
+
+  const alertDetails = useMemo(() => {
+    // Latest emotional monitoring for each patient
+    const latestEmotionsMap: Record<string, any> = {};
+    (emotionalMonitorings || []).forEach(m => {
+      if (!latestEmotionsMap[m.patientId] || m.date > latestEmotionsMap[m.patientId].date) {
+        latestEmotionsMap[m.patientId] = m;
+      }
+    });
+    
+    const sadSeniors = (patients || []).filter(p => {
+      const emo = latestEmotionsMap[p.id];
+      return emo && emo.wellBeing === 'TRISTE';
+    }).map(p => {
+      const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+      return { id: p.id, name: linked?.name || p.name, date: latestEmotionsMap[p.id].date };
+    });
+
+    // Isolated patients
+    const isolatedSeniors = (patients || []).filter(p => p.hasVisits === false).map(p => {
+      const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+      return { id: p.id, name: linked?.name || p.name };
+    });
+
+    // Compromised cognition
+    const latestCognitionMap: Record<string, any> = {};
+    (cognitionAssessments || []).forEach(c => {
+      if (!latestCognitionMap[c.patientId] || c.date > latestCognitionMap[c.patientId].date) {
+        latestCognitionMap[c.patientId] = c;
+      }
+    });
+
+    const compromisedSeniors = (patients || []).filter(p => {
+      const cog = latestCognitionMap[p.id];
+      return cog && (cog.memory === 'COMPROMETIDO' || cog.attention === 'COMPROMETIDO' || cog.orientation === 'COMPROMETIDO');
+    }).map(p => {
+      const cog = latestCognitionMap[p.id];
+      const items: string[] = [];
+      if (cog.memory === 'COMPROMETIDO') items.push('Memória');
+      if (cog.attention === 'COMPROMETIDO') items.push('Atenção');
+      if (cog.orientation === 'COMPROMETIDO') items.push('Orientação');
+      const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+      return { id: p.id, name: linked?.name || p.name, fields: items.join(', '), date: cog.date };
+    });
+
+    return {
+      sadSeniors,
+      isolatedSeniors,
+      compromisedSeniors
+    };
+  }, [patients, emotionalMonitorings, cognitionAssessments, elderly]);
+
   const renderDashboard = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          icon={<Users className="text-blue-600" />} 
-          label="Idosos Acompanhados" 
-          value={stats.totalPatients.toString()} 
-          color="blue"
-        />
-        <StatCard 
-          icon={<Calendar className="text-green-600" />} 
-          label="Atendimentos Hoje" 
-          value={stats.todayAppointments.toString()} 
-          color="green"
-        />
-        <StatCard 
-          icon={<AlertCircle className="text-amber-600" />} 
-          label="Idosos Isolados" 
-          value={stats.isolatedPatients.toString()} 
-          color="amber"
-          alert={stats.isolatedPatients > 0}
-        />
-        <StatCard 
-          icon={<Frown className="text-red-600" />} 
-          label="Sinais de Tristeza" 
-          value={stats.sadPatients.toString()} 
-          color="red"
-          alert={stats.sadPatients > 0}
-        />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Welcome & Quick Action Hero Banner */}
+      <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 translate-x-1/4 -translate-y-1/4 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute left-0 bottom-0 -translate-x-1/4 translate-y-1/4 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10">
+          <div className="max-w-2xl">
+            <span className="px-3 py-1 bg-white/20 text-xs font-black tracking-widest uppercase rounded-full backdrop-blur-md">
+              Setor de Psicologia
+            </span>
+            <h2 className="text-2xl md:text-3xl font-black mt-3 tracking-tight">
+              Olá, {user.name || 'Profissional'} 👋
+            </h2>
+            <p className="text-sm text-blue-100/90 font-medium mt-2 leading-relaxed">
+              Bem-vindo ao painel unificado de saúde mental e cognitiva. Monitore indicadores de humor, gerencie consultas, registre as oficinas de estimulação e exporte relatórios integrados.
+            </p>
+          </div>
+        </div>
       </div>
 
+      {/* Grid of Interactive KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between hover:border-blue-500/30 transition-all group cursor-pointer" onClick={() => setActiveTab('patients')}>
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <Users size={22} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Residentes</p>
+              <p className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{stats.totalPatients}</p>
+            </div>
+          </div>
+          <div className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between hover:border-violet-500/30 transition-all group cursor-pointer" onClick={() => setActiveTab('initial')}>
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 bg-violet-50 dark:bg-violet-950/30 text-violet-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <Brain size={22} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Avaliações Iniciais</p>
+              <p className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{(initialAssessments || []).length}</p>
+            </div>
+          </div>
+          <div className="text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between hover:border-emerald-500/30 transition-all group cursor-pointer" onClick={() => setActiveTab('evolution')}>
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <ClipboardList size={22} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Evoluções Ativas</p>
+              <p className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{(evolutions || []).length}</p>
+            </div>
+          </div>
+          <div className="text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight size={18} />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between hover:border-amber-500/30 transition-all group cursor-pointer" onClick={() => setActiveTab('cognition')}>
+          <div className="flex items-center gap-4">
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
+              <Activity size={22} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Avaliações Cognitivas</p>
+              <p className="text-2xl font-black text-gray-800 dark:text-white mt-0.5">{(cognitionAssessments || []).length}</p>
+            </div>
+          </div>
+          <div className="text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ChevronRight size={18} />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid: Bento Style (2:1 Columns) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Span (2 Columns) - Clinical Modules */}
         <div className="lg:col-span-2 space-y-6">
+          
+          {/* Card 1: Avaliações Iniciais de Saúde Mental */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <TrendingUp className="text-blue-600" size={20} />
-              Monitoramento de Bem-estar
-            </h3>
-            <div style={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={(emotionalMonitorings || []).slice(-7).map(m => ({
-                  date: m.date,
-                  score: m.wellBeing === 'FELIZ' ? 3 : m.wellBeing === 'NEUTRO' ? 2 : 1
-                }))}>
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="date" hide />
-                  <YAxis hide domain={[0, 4]} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Area type="monotone" dataKey="score" stroke="#3b82f6" fillOpacity={1} fill="url(#colorScore)" strokeWidth={3} />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div className="flex justify-between items-center mb-5 border-b border-gray-100 dark:border-gray-800/80 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
+                  <ClipboardCheck className="text-violet-600" size={22} />
+                  Avaliações Iniciais de Saúde Mental
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">Análise psicossocial e de adaptação dos idosos recém-ingressados.</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('initial')}
+                className="text-xs text-violet-600 dark:text-violet-400 font-extrabold hover:underline"
+              >
+                Ver Todas
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {(initialAssessments || [])
+                .slice(-3)
+                .reverse()
+                .map((assessment: any) => {
+                  const patient = (patients || []).find(p => p.id === assessment.patientId);
+                  const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                  const displayName = linked?.name || patient?.name || assessment.patientId;
+                  
+                  return (
+                    <div key={assessment.id} className="p-4 bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800/60 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-all">
+                      <div className="flex justify-between items-start flex-wrap gap-2">
+                        <div>
+                          <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200">{displayName}</p>
+                          <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                            Realizada em {format(parseISO(assessment.date), 'dd/MM/yyyy')} por {assessment.registeredBy || 'Psicólogo'}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="px-2.5 py-0.5 bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400 text-[10px] font-black rounded-full uppercase">
+                            Humor: {assessment.mood || '-'}
+                          </span>
+                          <span className={cn(
+                            "px-2.5 py-0.5 text-[10px] font-black rounded-full uppercase",
+                            assessment.cognition === 'ORIENTADO' 
+                              ? "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400" 
+                              : "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400"
+                          )}>
+                            Cognição: {assessment.cognition || '-'}
+                          </span>
+                          <span className="px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-black rounded-full uppercase">
+                            Estado: {assessment.emotionalState || '-'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2.5 bg-white dark:bg-gray-900/60 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40 line-clamp-2 italic leading-relaxed">
+                        " {assessment.observations || 'Nenhuma observação descrita.'} "
+                      </p>
+                    </div>
+                  );
+                })}
+              {(initialAssessments || []).length === 0 && (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <p className="text-gray-400 text-xs italic">Nenhuma avaliação inicial cadastrada.</p>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Card 2: Evoluções Clínicas Recentes */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <Clock className="text-amber-600" size={20} />
-              Próximos Atendimentos
-            </h3>
+            <div className="flex justify-between items-center mb-5 border-b border-gray-100 dark:border-gray-800/80 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
+                  <ClipboardList className="text-emerald-600" size={22} />
+                  Últimas Evoluções Clínicas
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">Acompanhamento contínuo dos atendimentos individuais e oficinas cognitivas.</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('evolution')}
+                className="text-xs text-emerald-600 dark:text-emerald-400 font-extrabold hover:underline"
+              >
+                Ver Todas
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {(evolutions || [])
+                .slice(-3)
+                .reverse()
+                .map((evo: any) => {
+                  const isMultiPatient = evo.patientIds && evo.patientIds.length > 1;
+                  const patient = (patients || []).find(p => p.id === evo.patientId);
+                  const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                  const displayName = isMultiPatient 
+                    ? "Evolução em Grupo"
+                    : (linked?.name || patient?.name || evo.patientId);
+                  
+                  return (
+                    <div key={evo.id} className="p-4 bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800/60 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-all">
+                      <div className="flex justify-between items-start flex-wrap gap-2">
+                        <div>
+                          <p className="text-sm font-extrabold text-gray-800 dark:text-gray-200">{displayName}</p>
+                          <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                            Data: {format(parseISO(evo.date), 'dd/MM/yyyy')} às {evo.time || 'N/A'} • Psicólogo: {evo.registeredBy || 'Clínico'}
+                          </p>
+                          {isMultiPatient && (
+                            <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Idosos:</span>
+                              {evo.patientIds.map((pid: string) => {
+                                const p = (patients || []).find(pat => pat.id === pid);
+                                const l = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId) : null;
+                                return (
+                                  <span key={pid} className="px-2 py-0.5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 text-[10px] rounded-lg font-bold shadow-xs">
+                                    {l?.name || p?.name || 'N/A'}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                        <div className="bg-white dark:bg-gray-900/60 p-3 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                          <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Comportamento & Observação</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-3 leading-relaxed">
+                            {evo.observation || 'Não informado'}
+                          </p>
+                        </div>
+                        <div className="bg-white dark:bg-gray-900/60 p-3 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Conduta & Intervenção</span>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-3 leading-relaxed">
+                            {evo.intervention || 'Não informado'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              {(evolutions || []).length === 0 && (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <p className="text-gray-400 text-xs italic">Nenhuma evolução clínica registrada.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 3: Cognição e Preservação Mental */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex justify-between items-center mb-5 border-b border-gray-100 dark:border-gray-800/80 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-800 dark:text-white flex items-center gap-2">
+                  <Activity className="text-amber-500" size={22} />
+                  Saúde Cognitiva & Rastreamento
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">Acompanhamento de preservação cognitiva e exercícios de neuroestimulação.</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('cognition')}
+                className="text-xs text-amber-600 dark:text-amber-400 font-extrabold hover:underline"
+              >
+                Ver Todas
+              </button>
+            </div>
+
+            {/* Circular preservation meters & Progress counters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="p-4 bg-blue-50/40 dark:bg-blue-950/10 rounded-2xl border border-blue-100/30">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-black text-blue-800 dark:text-blue-300">Memória Preservada</span>
+                  <span className="text-xs font-extrabold text-blue-600">{cognitionStats.memory}%</span>
+                </div>
+                <div className="w-full bg-gray-200/60 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${cognitionStats.memory}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Capacidade de resgate de fatos e eventos recentes.</p>
+              </div>
+              
+              <div className="p-4 bg-emerald-50/40 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100/30">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">Atenção Preservada</span>
+                  <span className="text-xs font-extrabold text-emerald-600">{cognitionStats.attention}%</span>
+                </div>
+                <div className="w-full bg-gray-200/60 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${cognitionStats.attention}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Foco contínuo e habilidade de processamento.</p>
+              </div>
+
+              <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100/30">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-xs font-black text-indigo-800 dark:text-indigo-300">Orientação Preservada</span>
+                  <span className="text-xs font-extrabold text-indigo-600">{cognitionStats.orientation}%</span>
+                </div>
+                <div className="w-full bg-gray-200/60 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden">
+                  <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${cognitionStats.orientation}%` }} />
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Reconhecimento espacial, temporal e pessoal.</p>
+              </div>
+            </div>
+
+            {/* List of 3 recent cognition assessments */}
             <div className="space-y-3">
+              <p className="text-xs font-extrabold text-gray-400 uppercase tracking-widest">Testes Cognitivos Recentes</p>
+              {(cognitionAssessments || [])
+                .slice(-3)
+                .reverse()
+                .map((cog: any) => {
+                  const patient = (patients || []).find(p => p.id === cog.patientId);
+                  const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+                  const displayName = linked?.name || patient?.name || cog.patientId;
+                  
+                  return (
+                    <div key={cog.id} className="p-3.5 bg-gray-50/30 dark:bg-gray-800/10 border border-gray-100 dark:border-gray-800/50 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200">{displayName}</p>
+                        <p className="text-[10px] text-gray-400">Data do Rastreio: {format(parseISO(cog.date), 'dd/MM/yyyy')}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className={cn(
+                          "px-2 py-0.5 text-[9px] font-black rounded-lg uppercase",
+                          cog.memory === 'PRESERVADO' ? "bg-green-50 text-green-600 border border-green-200/40" : "bg-red-50 text-red-600 border border-red-200/40"
+                        )}>
+                          Memória: {cog.memory}
+                        </span>
+                        <span className={cn(
+                          "px-2 py-0.5 text-[9px] font-black rounded-lg uppercase",
+                          cog.attention === 'PRESERVADO' ? "bg-green-50 text-green-600 border border-green-200/40" : "bg-red-50 text-red-600 border border-red-200/40"
+                        )}>
+                          Atenção: {cog.attention}
+                        </span>
+                        <span className={cn(
+                          "px-2 py-0.5 text-[9px] font-black rounded-lg uppercase",
+                          cog.orientation === 'PRESERVADO' ? "bg-green-50 text-green-600 border border-green-200/40" : "bg-red-50 text-red-600 border border-red-200/40"
+                        )}>
+                          Orientação: {cog.orientation}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              {(cognitionAssessments || []).length === 0 && (
+                <div className="text-center py-4 text-gray-400 text-xs italic">Nenhum teste de cognição cadastrado.</div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Right Span (1 Column) - Alerts, Workshops & Agenda */}
+        <div className="space-y-6">
+          
+          {/* Card 4: Alertas e Vulnerabilidade Clínica */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="text-red-600" size={22} />
+              <h3 className="text-base font-black text-gray-800 dark:text-white">
+                Alertas e Pontos de Atenção
+              </h3>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Sad Patients list details */}
+              {alertDetails.sadSeniors.length > 0 && (
+                <div className="p-4 bg-red-50/50 dark:bg-red-950/10 rounded-2xl border border-red-100 dark:border-red-900/20">
+                  <div className="flex gap-2 text-red-600">
+                    <Frown className="shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider">Tristeza e Desânimo</p>
+                      <p className="text-[11px] text-red-700 dark:text-red-300 mt-1">Identificada tristeza recente no monitoramento emocional:</p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {alertDetails.sadSeniors.map(sen => (
+                      <span key={sen.id} className="text-[10px] font-extrabold px-2.5 py-1 bg-red-100/50 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-lg">
+                        {sen.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cognitive Alert details */}
+              {alertDetails.compromisedSeniors.length > 0 && (
+                <div className="p-4 bg-orange-50/50 dark:bg-orange-950/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
+                  <div className="flex gap-2 text-orange-600">
+                    <Brain className="shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider">Comprometimento Cognitivo</p>
+                      <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-1">Sinais detectados nos rastreios cognitivos recentes:</p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 space-y-1.5">
+                    {alertDetails.compromisedSeniors.map(sen => (
+                      <div key={sen.id} className="text-[10px] font-bold text-orange-900 dark:text-orange-200">
+                        • <span className="font-extrabold">{sen.name}</span>: {sen.fields}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Isolated residents list details */}
+              {alertDetails.isolatedSeniors.length > 0 && (
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-2xl border border-amber-100 dark:border-amber-900/20">
+                  <div className="flex gap-2 text-amber-600">
+                    <Users className="shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider">Isolamento Social</p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">Residentes com ausência ou baixo fluxo de visitas familiares:</p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
+                    {alertDetails.isolatedSeniors.map(sen => (
+                      <span key={sen.id} className="text-[10px] font-extrabold px-2.5 py-1 bg-amber-100/50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 rounded-lg">
+                        {sen.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {alertDetails.sadSeniors.length === 0 && alertDetails.isolatedSeniors.length === 0 && alertDetails.compromisedSeniors.length === 0 && (
+                <div className="flex flex-col items-center justify-center text-center py-8 bg-green-50/30 dark:bg-green-950/5 rounded-2xl border border-green-100/40">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-950 text-green-600 rounded-full flex items-center justify-center mb-2">
+                    <CheckCircle2 size={22} />
+                  </div>
+                  <p className="text-xs font-extrabold text-green-800 dark:text-green-300">Residentes Estáveis</p>
+                  <p className="text-[10px] text-gray-400 mt-1 max-w-[200px]">Nenhum sinal crítico de isolamento, desânimo ou declínio cognitivo agudo.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 5: Oficinas, Dinâmicas e Grupos */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-gray-800 dark:text-white flex items-center gap-2">
+                <Users2 className="text-indigo-600" size={18} />
+                Oficinas de Reabilitação
+              </h3>
+              <button 
+                onClick={() => { setEditingData(null); setModalType('activity'); setIsModalOpen(true); }}
+                className="text-xs text-indigo-600 dark:text-indigo-400 font-extrabold hover:underline"
+              >
+                + Registrar
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {(activities || []).slice(-2).reverse().map((act: any) => (
+                <div key={act.id} className="p-3 bg-gray-50/50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800 rounded-xl space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-extrabold text-indigo-950 dark:text-indigo-300">{act.title}</span>
+                    <span className="text-[9px] font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded-full uppercase">
+                      {act.type}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                    {act.description}
+                  </p>
+                  <div className="flex justify-between items-center text-[10px] text-gray-400 pt-1">
+                    <span>Participantes: {act.participants?.length || 0}</span>
+                    <span>{format(parseISO(act.date), 'dd/MM/yyyy')}</span>
+                  </div>
+                </div>
+              ))}
+              {(activities || []).length === 0 && (
+                <p className="text-center text-xs text-gray-400 italic py-4">Nenhuma oficina de grupo cadastrada.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Card 6: Próximos Atendimentos Agenda */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-gray-800 dark:text-white flex items-center gap-2">
+                <Clock className="text-amber-600" size={18} />
+                Agenda e Consultas
+              </h3>
+              <button 
+                onClick={() => { setEditingData(null); setModalType('appointment'); setIsModalOpen(true); }}
+                className="text-xs text-blue-600 font-bold hover:underline"
+              >
+                + Agendar
+              </button>
+            </div>
+
+            <div className="space-y-2.5">
               {(appointments || [])
                 .filter(a => a.status === 'PENDENTE')
-                .slice(0, 5)
+                .slice(0, 3)
                 .map(app => {
                   const patient = (patients || []).find(p => p.id === app.patientId);
                   const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
-                  const displayName = linked?.name || patient?.name;
+                  const displayName = linked?.name || patient?.name || app.patientId;
+                  
                   return (
-                    <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600">
-                          <MessageSquare size={20} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">{displayName}</p>
-                          <p className="text-xs text-gray-500">{app.type} • {app.time}</p>
-                        </div>
+                    <div key={app.id} className="flex items-center justify-between p-3 bg-gray-50/50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 transition-all">
+                      <div>
+                        <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200 leading-snug">{displayName}</p>
+                        <p className="text-[10px] text-gray-400 font-medium">
+                          {app.type} • <span className="font-extrabold text-blue-600">{app.time}</span>
+                        </p>
                       </div>
-                      <button className="px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors">
+                      <button 
+                        onClick={() => {
+                          setEditingData(app);
+                          setModalType('appointment');
+                          setIsModalOpen(true);
+                        }}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black rounded-lg transition-colors cursor-pointer"
+                      >
                         Iniciar
                       </button>
                     </div>
                   );
                 })}
               {(appointments || []).filter(a => a.status === 'PENDENTE').length === 0 && (
-                <p className="text-center text-gray-400 py-4 text-sm italic">Nenhum atendimento pendente.</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <AlertCircle className="text-red-600" size={20} />
-              Alertas Importantes
-            </h3>
-            <div className="space-y-4">
-              {stats.sadPatients > 0 && (
-                <div className="flex gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30">
-                  <Frown className="text-red-600 shrink-0" size={20} />
-                  <div>
-                    <p className="text-sm font-bold text-red-900 dark:text-red-200">Tristeza Persistente</p>
-                    <p className="text-xs text-red-700 dark:text-red-300">{stats.sadPatients} idosos apresentaram sinais de tristeza hoje.</p>
-                  </div>
-                </div>
-              )}
-              {stats.isolatedPatients > 0 && (
-                <div className="flex gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-900/30">
-                  <AlertCircle className="text-amber-600 shrink-0" size={20} />
-                  <div>
-                    <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Isolamento Social</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300">{stats.isolatedPatients} idosos não recebem visitas frequentes.</p>
-                  </div>
-                </div>
+                <p className="text-center text-xs text-gray-400 italic py-4">Nenhum atendimento individual pendente.</p>
               )}
             </div>
           </div>
 
-          <div className="bg-blue-600 rounded-3xl p-6 text-white shadow-lg shadow-blue-200 dark:shadow-none">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-white/20 rounded-xl">
-                <Brain size={20} />
+          {/* Clincal wisdom card */}
+          <div className="bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 rounded-3xl p-5 relative overflow-hidden">
+            <div className="flex gap-3">
+              <div className="p-2 bg-indigo-600 text-white rounded-xl shrink-0 h-9 w-9 flex items-center justify-center">
+                <Lightbulb size={18} />
               </div>
-              <h3 className="font-bold">Saúde Cognitiva</h3>
+              <div>
+                <p className="text-xs font-extrabold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider">Insight Clínico</p>
+                <p className="text-xs text-indigo-700 dark:text-indigo-400/90 mt-1 leading-relaxed">
+                  Estimular lembranças autobiográficas através de fotografias antigas e músicas da juventude fortalece a sensação de identidade e atenua sintomas de desorientação.
+                </p>
+              </div>
             </div>
-            <p className="text-sm opacity-90 mb-4">Lembre-se de realizar as oficinas de memória semanais para estimular a cognição.</p>
-            <button className="w-full py-2 bg-white text-blue-600 rounded-xl text-sm font-bold hover:bg-blue-50 transition-colors">
-              Ver Atividades
-            </button>
           </div>
+
         </div>
+
       </div>
     </div>
   );
@@ -929,10 +1409,6 @@ export const PsychologySection = (props: PsychologySectionProps) => {
           { id: 'patients', label: 'Idosos', icon: Users },
           { id: 'initial', label: 'Avaliação Inicial', icon: Brain },
           { id: 'evolution', label: 'Evolução', icon: ClipboardList },
-          { id: 'appointments', label: 'Atendimentos', icon: MessageSquare },
-          { id: 'emotions', label: 'Emoções', icon: Heart },
-          { id: 'family', label: 'Família', icon: Users2 },
-          { id: 'activities', label: 'Atividades', icon: Puzzle },
           { id: 'cognition', label: 'Cognição', icon: Activity },
           { id: 'alerts', label: 'Alertas', icon: AlertCircle },
           { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
@@ -1002,10 +1478,29 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 patients={patients}
                 elderly={elderly}
                 assessments={initialAssessments}
+                monitorings={emotionalMonitorings}
+                cognitionAssessments={cognitionAssessments}
                 filter={initialPatientFilter}
                 setFilter={setInitialPatientFilter}
                 onAdd={() => { setModalType('initial'); setIsModalOpen(true); }}
-                onEdit={(a: any) => { setEditingData(a); setModalType('initial'); setIsModalOpen(true); }}
+                onEdit={(a: any) => {
+                  const linkedEmotion = (emotionalMonitorings || []).find((m: any) => m.patientId === a.patientId && m.date === a.date);
+                  const linkedCognition = (cognitionAssessments || []).find((c: any) => c.patientId === a.patientId && c.date === a.date);
+                  setEditingData({
+                    ...a,
+                    wellBeing: a.wellBeing || linkedEmotion?.wellBeing || 'NEUTRO',
+                    sadness: a.sadness || linkedEmotion?.sadness || 'NENHUM',
+                    anxiety: a.anxiety || linkedEmotion?.anxiety || 'NENHUM',
+                    loneliness: a.loneliness || linkedEmotion?.loneliness || 'NENHUM',
+                    irritability: a.irritability || linkedEmotion?.irritability || 'NENHUM',
+                    memory: a.memory || linkedCognition?.memory || 'PRESERVADO',
+                    attention: a.attention || linkedCognition?.attention || 'PRESERVADO',
+                    orientation: a.orientation || linkedCognition?.orientation || 'PRESERVADO',
+                    cognitionObservations: a.cognitionObservations || linkedCognition?.observations || ''
+                  });
+                  setModalType('initial');
+                  setIsModalOpen(true);
+                }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'initial' })}
               />
             )}
@@ -1020,56 +1515,6 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onEdit={(e: any) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
                 onView={setViewingEvo}
-              />
-            )}
-            {activeTab === 'appointments' && (
-              <AppointmentsView 
-                patients={patients}
-                elderly={elderly}
-                appointments={appointments}
-                filter={appointmentPatientFilter}
-                setFilter={setAppointmentPatientFilter}
-                onAdd={() => { setModalType('appointment'); setIsModalOpen(true); }}
-                onEdit={(a: any) => { setEditingData(a); setModalType('appointment'); setIsModalOpen(true); }}
-                onDelete={(id: string) => setDeleteConfirm({ id, type: 'appointment' })}
-              />
-            )}
-            {activeTab === 'emotions' && (
-              <EmotionsView 
-                patients={patients}
-                elderly={elderly}
-                monitorings={emotionalMonitorings}
-                filter={emotionPatientFilter}
-                setFilter={setEmotionPatientFilter}
-                onAdd={() => { setModalType('emotion'); setIsModalOpen(true); }}
-                onEdit={(e: any) => { setEditingData(e); setModalType('emotion'); setIsModalOpen(true); }}
-                onDelete={(id: string) => setDeleteConfirm({ id, type: 'emotion' })}
-              />
-            )}
-            {activeTab === 'family' && (
-              <FamilyView 
-                patients={patients}
-                elderly={elderly}
-                bonds={familyBonds}
-                filter={familyPatientFilter}
-                setFilter={setFamilyPatientFilter}
-                onAdd={() => { setModalType('family'); setIsModalOpen(true); }}
-                onEdit={(f: any) => { setEditingData(f); setModalType('family'); setIsModalOpen(true); }}
-                onDelete={(id: string) => setDeleteConfirm({ id, type: 'family' })}
-              />
-            )}
-            {activeTab === 'activities' && (
-              <ActivitiesView 
-                patients={patients}
-                elderly={elderly}
-                activities={activities}
-                filter={activityPatientFilter}
-                setFilter={setActivityPatientFilter}
-                onAdd={() => { setModalType('activity'); setIsModalOpen(true); }}
-                onEdit={(a: any) => { setEditingData(a); setModalType('activity'); setIsModalOpen(true); }}
-                onDelete={(id: string) => setDeleteConfirm({ id, type: 'activity' })}
-                professionals={professionals}
-                onView={setViewingAct}
               />
             )}
             {activeTab === 'cognition' && (
@@ -1225,7 +1670,9 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                   <p className="text-base font-bold text-gray-800 dark:text-white">
                     {viewingEvo.patientId === 'OUTRO' 
                       ? `${viewingEvo.targetName || 'Outro'} (${viewingEvo.targetType?.replace('_', ' ') || 'Comunidade'})`
-                      : ((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
+                      : viewingEvo.patientId === 'GERAL'
+                        ? 'Geral'
+                        : ((patients || []).find(p => p.id === viewingEvo.patientId)?.name || 'N/A')}
                   </p>
                 </div>
 
@@ -1634,7 +2081,122 @@ const PatientsView = ({ patients, elderly, searchQuery, setSearchQuery, onSelect
   </div>
 );
 
-const InitialAssessmentView = ({ patients, elderly, assessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
+const EmotionIndicator = ({ label, level }: { label: string, level: string }) => {
+  const getColorTheme = () => {
+    switch (label.toLowerCase()) {
+      case 'tristeza':
+        return {
+          activeColor: 'bg-blue-500 dark:bg-blue-400',
+          textColor: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-950/25',
+          borderColor: 'border-blue-100 dark:border-blue-900/40'
+        };
+      case 'ansiedade':
+        return {
+          activeColor: 'bg-amber-500 dark:bg-amber-400',
+          textColor: 'text-amber-600 dark:text-amber-400',
+          bgColor: 'bg-amber-50 dark:bg-amber-950/25',
+          borderColor: 'border-amber-100 dark:border-amber-900/40'
+        };
+      case 'solidão':
+      case 'solidao':
+        return {
+          activeColor: 'bg-indigo-500 dark:bg-indigo-400',
+          textColor: 'text-indigo-600 dark:text-indigo-400',
+          bgColor: 'bg-indigo-50 dark:bg-indigo-950/25',
+          borderColor: 'border-indigo-100 dark:border-indigo-900/40'
+        };
+      case 'irritabilidade':
+        return {
+          activeColor: 'bg-red-500 dark:bg-red-400',
+          textColor: 'text-red-600 dark:text-red-400',
+          bgColor: 'bg-red-50 dark:bg-red-950/25',
+          borderColor: 'border-red-100 dark:border-red-900/40'
+        };
+      default:
+        return {
+          activeColor: 'bg-blue-500 dark:bg-blue-400',
+          textColor: 'text-blue-600 dark:text-blue-400',
+          bgColor: 'bg-blue-50 dark:bg-blue-950/25',
+          borderColor: 'border-blue-100 dark:border-blue-900/40'
+        };
+    }
+  };
+
+  const theme = getColorTheme();
+  const activeCount = 
+    level === 'LEVE' ? 1 : 
+    level === 'MODERADO' ? 2 : 
+    level === 'INTENSO' ? 3 : 0;
+
+  return (
+    <div className={cn(
+      "p-3 rounded-2xl border transition-all flex flex-col justify-between h-full min-h-[76px]",
+      activeCount > 0 ? `${theme.bgColor} ${theme.borderColor}` : "bg-gray-50 dark:bg-gray-800/30 border-transparent"
+    )}>
+      <div className="flex justify-between items-center mb-1.5">
+        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</p>
+        {activeCount > 0 && (
+          <span className={cn("text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase", theme.textColor, theme.bgColor)}>
+            {level}
+          </span>
+        )}
+      </div>
+      <div className="space-y-1">
+        <div className="flex gap-1">
+          {[1, 2, 3].map(i => {
+            const isActive = i <= activeCount;
+            return (
+              <div 
+                key={i} 
+                className={cn(
+                  "h-1.5 flex-1 rounded-full transition-all",
+                  isActive ? theme.activeColor : "bg-gray-200/50 dark:bg-gray-800/80"
+                )}
+              />
+            );
+          })}
+        </div>
+        {activeCount === 0 && (
+          <p className="text-[9px] text-right font-medium text-gray-400 dark:text-gray-500">Nenhum</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CognitionIndicator = ({ label, status }: { label: string, status: string }) => {
+  const isPreserved = status === 'PRESERVADO';
+  return (
+    <div className={cn(
+      "p-3 rounded-2xl border transition-all flex flex-col justify-between h-full min-h-[76px]",
+      isPreserved 
+        ? "bg-green-50/50 dark:bg-green-950/10 border-green-100/40 dark:border-green-900/20" 
+        : "bg-red-50/50 dark:bg-red-950/10 border-red-100/40 dark:border-red-900/20"
+    )}>
+      <div className="flex justify-between items-center mb-1.5">
+        <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</p>
+        <span className={cn(
+          "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase",
+          isPreserved ? "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20" : "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20"
+        )}>
+          {status || 'PRESERVADO'}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <div className={cn(
+          "w-2 h-2 rounded-full",
+          isPreserved ? "bg-green-500" : "bg-red-500"
+        )} />
+        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
+          {isPreserved ? 'Preservado' : 'Comprometido'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const InitialAssessmentView = ({ patients, elderly, assessments, monitorings, cognitionAssessments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
     <div className="flex justify-between items-center mb-6">
       <div className="flex items-center gap-4">
@@ -1660,12 +2222,25 @@ const InitialAssessmentView = ({ patients, elderly, assessments, onAdd, onEdit, 
       </button>
     </div>
     <div className="space-y-4">
-      {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment & { targetName?: string, targetType?: string }) => {
+      {(assessments || []).filter((a: any) => !filter || a.patientId === filter).map((a: PsychInitialAssessment & { targetName?: string, targetType?: string, wellBeing?: string, sadness?: string, anxiety?: string, loneliness?: string, irritability?: string, memory?: string, attention?: string, orientation?: string, cognitionObservations?: string }) => {
         const patient = (patients || []).find((p: any) => p.id === a.patientId);
         const linked = patient?.elderlyId ? (elderly || []).find((e: any) => e.id === patient.elderlyId) : null;
         const displayName = a.patientId === 'OUTRO' 
           ? `${a.targetName || 'Outro'} (${a.targetType?.replace('_', ' ') || 'Comunidade'})`
           : (linked?.name || patient?.name);
+
+        const linkedEmotion = (monitorings || []).find((m: any) => m.patientId === a.patientId && m.date === a.date);
+        const wellBeing = a.wellBeing || linkedEmotion?.wellBeing;
+        const sadness = a.sadness || linkedEmotion?.sadness;
+        const anxiety = a.anxiety || linkedEmotion?.anxiety;
+        const loneliness = a.loneliness || linkedEmotion?.loneliness;
+        const irritability = a.irritability || linkedEmotion?.irritability;
+
+        const linkedCognition = (cognitionAssessments || []).find((c: any) => c.patientId === a.patientId && c.date === a.date);
+        const memory = a.memory || linkedCognition?.memory;
+        const attention = a.attention || linkedCognition?.attention;
+        const orientation = a.orientation || linkedCognition?.orientation;
+        const cognitionObservations = a.cognitionObservations || linkedCognition?.observations;
 
         return (
           <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
@@ -1680,24 +2255,66 @@ const InitialAssessmentView = ({ patients, elderly, assessments, onAdd, onEdit, 
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs mb-3">
-              <div>
-                <p className="text-gray-400 uppercase font-bold">Estado Emocional</p>
-                <p className="font-medium">{a.emotionalState}</p>
+              <div className="p-3 bg-pink-50/40 dark:bg-pink-950/10 border border-pink-100/40 dark:border-pink-900/10 rounded-2xl">
+                <p className="text-pink-600 dark:text-pink-400 uppercase font-bold text-[10px] tracking-wider mb-0.5">Estado Emocional</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-200">{a.emotionalState}</p>
               </div>
-              <div>
-                <p className="text-gray-400 uppercase font-bold">Cognição</p>
-                <p className="font-medium">{a.cognition}</p>
+              <div className="p-3 bg-red-50/40 dark:bg-red-950/10 border border-red-100/40 dark:border-red-900/10 rounded-2xl">
+                <p className="text-red-600 dark:text-red-400 uppercase font-bold text-[10px] tracking-wider mb-0.5">Cognição</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-200">{a.cognition}</p>
               </div>
-              <div>
-                <p className="text-gray-400 uppercase font-bold">Humor</p>
-                <p className="font-medium">{a.mood}</p>
+              <div className="p-3 bg-green-50/40 dark:bg-green-950/10 border border-green-100/40 dark:border-green-900/10 rounded-2xl">
+                <p className="text-green-600 dark:text-green-400 uppercase font-bold text-[10px] tracking-wider mb-0.5">Humor</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-200">{a.mood}</p>
               </div>
-              <div>
-                <p className="text-gray-400 uppercase font-bold">Adaptação</p>
-                <p className="font-medium">{a.adaptationLevel}</p>
+              <div className="p-3 bg-purple-50/40 dark:bg-purple-950/10 border border-purple-100/40 dark:border-purple-900/10 rounded-2xl">
+                <p className="text-purple-600 dark:text-purple-400 uppercase font-bold text-[10px] tracking-wider mb-0.5">Adaptação</p>
+                <p className="font-semibold text-gray-800 dark:text-gray-200">{a.adaptationLevel}</p>
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">{a.observations}</p>
+
+            {wellBeing && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700/60 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "p-1.5 rounded-lg",
+                    wellBeing === 'FELIZ' ? "bg-green-100 text-green-600" :
+                    wellBeing === 'NEUTRO' ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"
+                  )}>
+                    {wellBeing === 'FELIZ' ? <Smile size={14} /> : wellBeing === 'NEUTRO' ? <Meh size={14} /> : <Frown size={14} />}
+                  </div>
+                  <span className="text-xs font-bold text-gray-500 uppercase">Aconchego Emocional ({wellBeing})</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <EmotionIndicator label="Tristeza" level={sadness || 'NENHUM'} />
+                  <EmotionIndicator label="Ansiedade" level={anxiety || 'NENHUM'} />
+                  <EmotionIndicator label="Solidão" level={loneliness || 'NENHUM'} />
+                  <EmotionIndicator label="Irritabilidade" level={irritability || 'NENHUM'} />
+                </div>
+              </div>
+            )}
+
+            {memory && (
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700/60 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg">
+                    <Brain size={14} />
+                  </div>
+                  <span className="text-xs font-bold text-gray-500 uppercase">Avaliação Cognitiva</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <CognitionIndicator label="Memória" status={memory || 'PRESERVADO'} />
+                  <CognitionIndicator label="Atenção" status={attention || 'PRESERVADO'} />
+                  <CognitionIndicator label="Orientação" status={orientation || 'PRESERVADO'} />
+                </div>
+                {cognitionObservations && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
+                    <span className="font-bold">Observações:</span> {cognitionObservations}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -1724,6 +2341,7 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
             );
           })}
           <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
+          <option value="GERAL">Geral</option>
         </select>
       </div>
       <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
@@ -1732,17 +2350,16 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
     </div>
     <div className="space-y-6">
       {(evolutions || []).filter((e: any) => !filter || e.patientId === filter || e.patientIds?.includes(filter)).map((e: PsychEvolution | any) => {
+        const isMultiPatient = e.patientIds && e.patientIds.length > 1;
         const patient = (patients || []).find((p: any) => p.id === e.patientId);
         const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
         const displayName = e.patientId === 'OUTRO' 
           ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : (e.patientIds && e.patientIds.length > 1 
-              ? e.patientIds.map((pid: string) => {
-                  const pat = (patients || []).find((p: any) => p.id === pid);
-                  const lk = pat?.elderlyId ? (elderly || []).find((ed: any) => ed.id === pat.elderlyId) : null;
-                  return lk?.name || pat?.name;
-                }).filter(Boolean).join(', ')
-              : (linked?.name || patient?.name || 'N/A'));
+          : e.patientId === 'GERAL'
+            ? 'Geral'
+            : isMultiPatient 
+              ? "Evolução em Grupo"
+              : (linked?.name || patient?.name || 'N/A');
 
         return (
           <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
@@ -1751,6 +2368,20 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
               <div>
                 <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
                 <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
+                {isMultiPatient && (
+                  <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Idosos:</span>
+                    {e.patientIds.map((pid: string) => {
+                      const p = (patients || []).find(pat => pat.id === pid);
+                      const l = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId) : null;
+                      return (
+                        <span key={pid} className="px-1.5 py-0.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800/80 text-gray-600 dark:text-gray-400 text-[10px] rounded font-bold shadow-2xs">
+                          {l?.name || p?.name || 'N/A'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => onView(e)} className="p-1 text-green-600 hover:bg-green-50 rounded-md transition-colors" title="Visualizar 👁️"><Eye size={14} /></button>
@@ -1802,6 +2433,7 @@ const AppointmentsView = ({ patients, elderly, appointments, onAdd, onEdit, onDe
             <th className="pb-4">Data/Hora</th>
             <th className="pb-4">Tipo</th>
             <th className="pb-4">Status</th>
+            <th className="pb-4">Observações</th>
             <th className="pb-4">Ações</th>
           </tr>
         </thead>
@@ -1831,10 +2463,13 @@ const AppointmentsView = ({ patients, elderly, appointments, onAdd, onEdit, onDe
                     {app.status}
                   </span>
                 </td>
+                <td className="py-4 text-xs text-gray-600 dark:text-gray-400 max-w-xs truncate" title={app.observations || ''}>
+                  {app.observations || <span className="text-gray-300 italic">Sem observações</span>}
+                </td>
                 <td className="py-4">
                   <div className="flex gap-2">
-                    <button onClick={() => onEdit(app)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Edit2 size={14} /></button>
-                    <button onClick={() => onDelete(app.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors"><Trash2 size={14} /></button>
+                    <button onClick={() => onEdit(app)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Editar ✏️"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(app.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir 🗑️"><Trash2 size={14} /></button>
                   </div>
                 </td>
               </tr>
@@ -1910,26 +2545,6 @@ const EmotionsView = ({ patients, elderly, monitorings, onAdd, onEdit, onDelete,
         );
       })}
     </div>
-  </div>
-);
-
-const EmotionIndicator = ({ label, level }: { label: string, level: string }) => (
-  <div className="space-y-1">
-    <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
-    <div className="flex gap-1">
-      {[1, 2, 3].map(i => (
-        <div 
-          key={i} 
-          className={cn(
-            "h-1.5 flex-1 rounded-full",
-            i === 1 && level !== 'NENHUM' ? "bg-blue-400" :
-            i === 2 && (level === 'MODERADO' || level === 'INTENSO') ? "bg-blue-500" :
-            i === 3 && level === 'INTENSO' ? "bg-blue-600" : "bg-gray-100 dark:bg-gray-800"
-          )}
-        />
-      ))}
-    </div>
-    <p className="text-[10px] text-right text-gray-500">{level}</p>
   </div>
 );
 
@@ -2279,13 +2894,24 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
         time: format(new Date(), 'HH:mm'),
         photos: [],
         elderlyId: editingData?.elderlyId || '',
-        coWorkers: editingData?.coWorkers || []
+        coWorkers: editingData?.coWorkers || [],
+        ...(type === 'initial' ? {
+          wellBeing: 'NEUTRO',
+          sadness: 'NENHUM',
+          anxiety: 'NENHUM',
+          loneliness: 'NENHUM',
+          irritability: 'NENHUM',
+          memory: 'PRESERVADO',
+          attention: 'PRESERVADO',
+          orientation: 'PRESERVADO',
+          cognitionObservations: ''
+        } : {})
       });
       setProfSearch('');
       setSelectedPatientIds(editingData?.patientId ? [editingData.patientId] : []);
       setIsMulti(false);
     }
-  }, [isOpen, editingData]);
+  }, [isOpen, editingData, type]);
 
   // Sincronização automática com Cadastro Geral
   const linkedElderly = useMemo(() => 
@@ -2389,7 +3015,8 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
       const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
       return { value: p.id, label: linked?.name || p.name };
     }),
-    { value: 'OUTRO', label: 'OUTRO (Comunidade / Cuidador)' }
+    { value: 'OUTRO', label: 'OUTRO (Comunidade / Cuidador)' },
+    { value: 'GERAL', label: 'Geral' }
   ], [patients, elderly]);
 
   return (
@@ -2538,6 +3165,38 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none" 
                   />
+                </div>
+
+                <div className="border-t border-gray-100 dark:border-gray-800/80 pt-6 space-y-6">
+                  <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Aconchego Emocional (Emoção Vinculada)</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Select label="Tristeza" value={formData.sadness || 'NENHUM'} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, sadness: v })} />
+                    <Select label="Ansiedade" value={formData.anxiety || 'NENHUM'} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, anxiety: v })} />
+                    <Select label="Solidão" value={formData.loneliness || 'NENHUM'} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, loneliness: v })} />
+                    <Select label="Irritabilidade" value={formData.irritability || 'NENHUM'} options={[{value: 'NENHUM', label: 'Nenhum'}, {value: 'LEVE', label: 'Leve'}, {value: 'MODERADO', label: 'Moderado'}, {value: 'INTENSO', label: 'Intenso'}]} onChange={(v) => setFormData({ ...formData, irritability: v })} />
+                  </div>
+                  <Select label="Bem-estar Geral" value={formData.wellBeing || 'NEUTRO'} options={[{value: 'FELIZ', label: 'Feliz 😊'}, {value: 'NEUTRO', label: 'Neutro 😐'}, {value: 'TRISTE', label: 'Triste 😔'}]} onChange={(v) => setFormData({ ...formData, wellBeing: v })} />
+                </div>
+
+                <div className="border-t border-gray-100 dark:border-gray-800/80 pt-6 space-y-6">
+                  <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Avaliação Cognitiva (Cognição Vinculada)</h4>
+                  <div className="grid grid-cols-3 gap-6">
+                    <Select label="Memória" value={formData.memory || 'PRESERVADO'} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, memory: v })} />
+                    <Select label="Atenção" value={formData.attention || 'PRESERVADO'} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, attention: v })} />
+                    <Select label="Orientação" value={formData.orientation || 'PRESERVADO'} options={[{value: 'PRESERVADO', label: 'Preservado'}, {value: 'COMPROMETIDO', label: 'Comprometido'}]} onChange={(v) => setFormData({ ...formData, orientation: v })} />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-gray-400 uppercase">Observações da Cognição</label>
+                      <VoiceTranscriptionButton onTranscribe={(t) => setFormData({ ...formData, cognitionObservations: (formData.cognitionObservations || '') + ' ' + t })} />
+                    </div>
+                    <textarea 
+                      rows={3}
+                      value={formData.cognitionObservations || ''}
+                      onChange={(e) => setFormData({ ...formData, cognitionObservations: e.target.value })}
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none text-sm" 
+                    />
+                  </div>
                 </div>
               </div>
             )}
