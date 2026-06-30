@@ -398,6 +398,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function incoming() {
+      return request.resource.data;
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -486,7 +490,7 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'];
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA', 'TECNICO_ENFERMAGEM'];
     }
 
     function isValidElderly(data) {
@@ -508,7 +512,7 @@ service cloud.firestore {
              data.professionalId is string &&
              data.professionalName is string &&
              data.professionalRole is string &&
-             data.professionalRole in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'] &&
+             data.professionalRole in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA', 'TECNICO_ENFERMAGEM'] &&
              data.activityType is string &&
              data.category in ['MULTIDISCIPLINAR', 'OFICINA', 'REUNIAO', 'OUTROS'] &&
              (!('patientId' in data) || data.patientId is string) &&
@@ -566,7 +570,7 @@ service cloud.firestore {
 
     function isValidProfessional(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
-             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA'] &&
+             data.role is string && data.role in ['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA', 'ENFERMEIRA', 'FISIOTERAPEUTA', 'FABRICANTE_FRALDAS', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'NUTRICIONISTA', 'TECNICO_ENFERMAGEM'] &&
              data.registrationNumber is string &&
              data.phone is string &&
              data.admissionDate is string &&
@@ -627,10 +631,7 @@ service cloud.firestore {
     }
 
     match /profiles/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow delete: if isAuthenticated() && isAdmin();
+      allow read, write: if isAuthenticated();
     }
 
     match /users/{memberId} {

@@ -1007,6 +1007,7 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onAdd={() => { setModalType('evolution'); setIsModalOpen(true); }}
                 onEdit={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'evolution' })}
+                showToast={props.showToast}
               />
             )}
             {activeTab === 'incidents' && (
@@ -2642,79 +2643,187 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, s
   </div>
 );
 
-const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter }: { 
+const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter, showToast }: { 
   patients: NursingPatient[], 
   evolutions: NursingEvolution[], 
   onAdd: () => void,
   onEdit: (e: NursingEvolution) => void,
   onDelete: (id: string) => void,
   filter: string,
-  setFilter: (f: string) => void
-}) => (
-  <div className="space-y-6 animate-in fade-in duration-500">
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Evoluções de Enfermagem</h2>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-        >
-          <option value="">Todos os Idosos</option>
-          {(patients || []).map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+  setFilter: (f: string) => void,
+  showToast?: (msg: string, type?: 'success' | 'error') => void
+}) => {
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      if (showToast) showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+    const filtered = (evolutions || []).filter(e => selectedEvolutionIds.includes(e.id));
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      const patientName = (evo as any).patientIds && (evo as any).patientIds.length > 1
+        ? (evo as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+        : (patient?.name || 'N/A');
+
+      return [
+        `${(evo.date || (evo as any).createdAt || '').split('T')[0]} ${evo.time || '--:--'}`,
+        patientName,
+        evo.content,
+        evo.registeredBy || 'N/A'
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções de Enfermagem Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros`,
+      columns: ['Data/Hora', 'Paciente(s)', 'Conteúdo / Evolução', 'Registrado Por'],
+      data,
+      fileName: `evolucoes_enfermagem_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
+
+  const displayedEvolutions = (evolutions || []).filter(e => !filter || e.patientId === filter || (e as any).patientIds?.includes(filter));
+  const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
+  const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-black text-gray-800 dark:text-white">Evoluções de Enfermagem</h2>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+          >
+            <option value="">Todos os Idosos</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
+          <Plus size={20} />
+          Nova Evolução
+        </button>
       </div>
-      <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
-        <Plus size={20} />
-        Nova Evolução
-      </button>
-    </div>
-    <div className="space-y-4">
-      {(evolutions || []).filter(e => !filter || e.patientId === filter || (e as any).patientIds?.includes(filter)).map(e => {
-        const patient = (patients || []).find(p => p.id === e.patientId);
-        return (
-          <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600 font-bold">
-                  {patient?.name.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800 dark:text-white">
-                    {(e as any).patientIds && (e as any).patientIds.length > 1
-                      ? (e as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-                      : (patient?.name || 'N/A')}
-                  </h4>
-                  <p className="text-xs text-gray-500">{(e.date || (e as any).createdAt || '').split('T')[0]} às {e.time || '--:--'} • Enf. Responsável</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => onEdit(e)}
-                  className="p-2 text-gray-400 hover:text-green-600 transition-colors"
-                >
-                  <Edit2 size={18} />
-                </button>
-                <button 
-                  onClick={() => onDelete(e.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{e.content}</p>
-            <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800 flex gap-4">
-              <div className="text-[10px] font-bold text-gray-400 uppercase">Registrado por: {e.registeredBy}</div>
-            </div>
+
+      {/* Barra de Seleção em Lote */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <input 
+            type="checkbox"
+            checked={allSelected}
+            ref={el => {
+              if (el) {
+                el.indeterminate = someSelected && !allSelected;
+              }
+            }}
+            onChange={() => handleSelectAllEvolutions(displayedEvolutions)}
+            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+          />
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+            {selectedEvolutionIds.length === 0 
+              ? 'Nenhuma evolução selecionada' 
+              : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+          </span>
+        </div>
+        {selectedEvolutionIds.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedEvolutionIds([])}
+              className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Limpar Seleção
+            </button>
+            <button
+              onClick={handleDownloadSelectedEvolutions}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+            >
+              <Printer size={14} />
+              Imprimir Selecionadas
+            </button>
           </div>
-        );
-      })}
+        )}
+      </div>
+
+      <div className="space-y-4">
+        {displayedEvolutions.map(e => {
+          const patient = (patients || []).find(p => p.id === e.patientId);
+          const isSelected = selectedEvolutionIds.includes(e.id);
+          return (
+            <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 flex gap-4 items-start">
+              <div className="pt-2 shrink-0">
+                <input 
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelectEvolution(e.id)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600 font-bold">
+                      {patient?.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-800 dark:text-white">
+                        {(e as any).patientIds && (e as any).patientIds.length > 1
+                          ? (e as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                          : (patient?.name || 'N/A')}
+                      </h4>
+                      <p className="text-xs text-gray-500">{(e.date || (e as any).createdAt || '').split('T')[0]} às {e.time || '--:--'} • Enf. Responsável</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onEdit(e)}
+                      className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button 
+                      onClick={() => onDelete(e.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{e.content}</p>
+                <div className="mt-4 pt-4 border-t border-gray-50 dark:border-gray-800 flex gap-4">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase">Registrado por: {e.registeredBy}</div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const IncidentsView = ({ patients, incidents, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 

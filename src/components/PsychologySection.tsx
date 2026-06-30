@@ -1515,6 +1515,7 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onEdit={(e: any) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
                 onView={setViewingEvo}
+                showToast={showToast}
               />
             )}
             {activeTab === 'cognition' && (
@@ -2322,83 +2323,193 @@ const InitialAssessmentView = ({ patients, elderly, assessments, monitorings, co
   </div>
 );
 
-const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, onView, filter, setFilter }: any) => (
-  <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
-    <div className="flex justify-between items-center mb-6">
-      <div className="flex items-center gap-4">
-        <h3 className="text-lg font-bold">Evoluções Psicológicas</h3>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
-        >
-          <option value="">Filtrar p/ Idoso</option>
-          {(patients || []).map((p: any) => {
-            const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
-            const name = linked?.name || p.name;
-            return (
-              <option key={p.id} value={p.id}>{name}</option>
-            );
-          })}
-          <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
-          <option value="GERAL">Geral</option>
-        </select>
-      </div>
-      <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
-        <Plus size={18} /> Nova Evolução
-      </button>
-    </div>
-    <div className="space-y-6">
-      {(evolutions || []).filter((e: any) => !filter || e.patientId === filter || e.patientIds?.includes(filter)).map((e: PsychEvolution | any) => {
-        const isMultiPatient = e.patientIds && e.patientIds.length > 1;
-        const patient = (patients || []).find((p: any) => p.id === e.patientId);
-        const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
-        const displayName = e.patientId === 'OUTRO' 
-          ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
-          : e.patientId === 'GERAL'
-            ? 'Geral'
-            : isMultiPatient 
-              ? "Evolução em Grupo"
-              : (linked?.name || patient?.name || 'N/A');
+const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, onView, filter, setFilter, showToast }: any) => {
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
 
-        return (
-          <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800">
-            <div className="absolute left-[-4px] top-0 w-2 h-2 rounded-full bg-blue-600" />
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
-                <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
-                {isMultiPatient && (
-                  <div className="flex flex-wrap gap-1 mt-1.5 items-center">
-                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Idosos:</span>
-                    {e.patientIds.map((pid: string) => {
-                      const p = (patients || []).find(pat => pat.id === pid);
-                      const l = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId) : null;
-                      return (
-                        <span key={pid} className="px-1.5 py-0.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800/80 text-gray-600 dark:text-gray-400 text-[10px] rounded font-bold shadow-2xs">
-                          {l?.name || p?.name || 'N/A'}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => onView(e)} className="p-1 text-green-600 hover:bg-green-50 rounded-md transition-colors" title="Visualizar 👁️"><Eye size={14} /></button>
-                <button onClick={() => onEdit(e)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Editar ✏️"><Edit2 size={14} /></button>
-                <button onClick={() => onDelete(e.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir 🗑️"><Trash2 size={14} /></button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-gray-600 dark:text-gray-400"><span className="font-bold text-blue-600">Obs:</span> {e.observation}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400"><span className="font-bold text-green-600">Intervenção:</span> {e.intervention}</p>
-            </div>
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+    const filtered = (evolutions || []).filter((e: any) => selectedEvolutionIds.includes(e.id));
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find((p: any) => p.id === evo.patientId);
+      const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
+      const name = evo.patientId === 'OUTRO' 
+        ? `${evo.targetName || 'Outro'} (${evo.targetType?.replace('_', ' ') || 'Comunidade'})`
+        : evo.patientId === 'GERAL'
+          ? 'Geral'
+          : (linked?.name || patient?.name || 'N/A');
+
+      return [
+        `${evo.date} ${evo.time}`,
+        name,
+        evo.observation,
+        evo.intervention
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções Psicológicas Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros`,
+      columns: ['Data/Hora', 'Paciente/Destinatário', 'Observação', 'Intervenção/Conduta'],
+      data,
+      fileName: `evolucoes_psicologia_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
+
+  const displayedEvolutions = (evolutions || []).filter((e: any) => !filter || e.patientId === filter || e.patientIds?.includes(filter));
+  const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
+  const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 space-y-6">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold">Evoluções Psicológicas</h3>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+          >
+            <option value="">Filtrar p/ Idoso</option>
+            {(patients || []).map((p: any) => {
+              const linked = p.elderlyId ? (elderly || []).find((e: any) => e.id === p.elderlyId) : null;
+              const name = linked?.name || p.name;
+              return (
+                <option key={p.id} value={p.id}>{name}</option>
+              );
+            })}
+            <option value="OUTRO">Outros (Comunidade/Cuidador)</option>
+            <option value="GERAL">Geral</option>
+          </select>
+        </div>
+        <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
+          <Plus size={18} /> Nova Evolução
+        </button>
+      </div>
+
+      {/* Barra de Seleção em Lote */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-3">
+          <input 
+            type="checkbox"
+            checked={allSelected}
+            ref={el => {
+              if (el) {
+                el.indeterminate = someSelected && !allSelected;
+              }
+            }}
+            onChange={() => handleSelectAllEvolutions(displayedEvolutions)}
+            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+          />
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+            {selectedEvolutionIds.length === 0 
+              ? 'Nenhuma evolução selecionada' 
+              : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+          </span>
+        </div>
+        {selectedEvolutionIds.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedEvolutionIds([])}
+              className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            >
+              Limpar Seleção
+            </button>
+            <button
+              onClick={handleDownloadSelectedEvolutions}
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+            >
+              <Printer size={14} />
+              Imprimir Selecionadas
+            </button>
           </div>
-        );
-      })}
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {displayedEvolutions.map((e: PsychEvolution | any) => {
+          const isMultiPatient = e.patientIds && e.patientIds.length > 1;
+          const patient = (patients || []).find((p: any) => p.id === e.patientId);
+          const linked = patient?.elderlyId ? (elderly || []).find((ed: any) => ed.id === patient.elderlyId) : null;
+          const displayName = e.patientId === 'OUTRO' 
+            ? `${e.targetName || 'Outro'} (${e.targetType?.replace('_', ' ') || 'Comunidade'})`
+            : e.patientId === 'GERAL'
+              ? 'Geral'
+              : isMultiPatient 
+                ? "Evolução em Grupo"
+                : (linked?.name || patient?.name || 'N/A');
+          const isSelected = selectedEvolutionIds.includes(e.id);
+
+          return (
+            <div key={e.id} className="relative pl-8 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-px before:bg-gray-100 dark:before:bg-gray-800 flex gap-4 items-start">
+              <div className="pt-1 shrink-0">
+                <input 
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelectEvolution(e.id)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="absolute left-[-4px] top-2 w-2 h-2 rounded-full bg-blue-600" />
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-bold text-gray-800 dark:text-white">{displayName}</h4>
+                    <p className="text-xs text-gray-500">{e.date} às {e.time}</p>
+                    {isMultiPatient && (
+                      <div className="flex flex-wrap gap-1 mt-1.5 items-center">
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Idosos:</span>
+                        {e.patientIds.map((pid: string) => {
+                          const p = (patients || []).find(pat => pat.id === pid);
+                          const l = p?.elderlyId ? (elderly || []).find(ed => ed.id === p.elderlyId) : null;
+                          return (
+                            <span key={pid} className="px-1.5 py-0.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800/80 text-gray-600 dark:text-gray-400 text-[10px] rounded font-bold shadow-2xs">
+                              {l?.name || p?.name || 'N/A'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => onView(e)} className="p-1 text-green-600 hover:bg-green-50 rounded-md transition-colors" title="Visualizar 👁️"><Eye size={14} /></button>
+                    <button onClick={() => onEdit(e)} className="p-1 text-blue-600 hover:bg-blue-50 rounded-md transition-colors" title="Editar ✏️"><Edit2 size={14} /></button>
+                    <button onClick={() => onDelete(e.id)} className="p-1 text-red-600 hover:bg-red-50 rounded-md transition-colors" title="Excluir 🗑️"><Trash2 size={14} /></button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400"><span className="font-bold text-blue-600">Obs:</span> {e.observation}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400"><span className="font-bold text-green-600">Intervenção:</span> {e.intervention}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const AppointmentsView = ({ patients, elderly, appointments, onAdd, onEdit, onDelete, filter, setFilter }: any) => (
   <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">

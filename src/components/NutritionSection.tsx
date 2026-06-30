@@ -135,6 +135,56 @@ export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
     'evolutions', 'anthropometries', 'mealPlans'
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+    const filtered = (props.evolutions || []).filter(e => selectedEvolutionIds.includes(e.id));
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = patients.find(p => p.elderlyId === evo.patientId || p.id === evo.patientId);
+      const displayName = evo.patientIds && evo.patientIds.length > 1
+        ? evo.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+        : (patient?.name || 'N/A');
+
+      return [
+        format(parseISO(evo.date), 'dd/MM/yyyy') + (evo.time ? ` às ${evo.time}` : ''),
+        displayName,
+        evo.diagnosisNutritional || 'N/A',
+        evo.dietaryPrescription || 'N/A',
+        evo.evolution || 'N/A'
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções de Nutrição Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros`,
+      columns: ['Data/Hora', 'Idoso(s)', 'Diag. Nutricional', 'Conduta/Prescrição', 'Evolução'],
+      data,
+      fileName: `evolucoes_nutricao_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [modalType, setModalType] = useState<'profile' | 'evolution' | 'assessment' | 'mealPlan'>('profile');
   const [localFormData, setLocalFormData] = useState<any>({});
@@ -869,117 +919,172 @@ export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
     </div>
   );
 
-  const renderEvolutions = () => (
-    <div className="space-y-4">
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-            type="text" 
-            placeholder="Filtrar por nome ou conteúdo..." 
-            className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="w-full md:w-64 relative">
-          <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <select 
-            className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium appearance-none"
-            value={patientFilter}
-            onChange={(e) => setPatientFilter(e.target.value)}
-          >
-            <option value="">Todos os Idosos</option>
-            {patients.map(p => (
-              <option key={p.id} value={p.elderlyId || p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-        <button 
-          onClick={() => { setEditingRecord(null); setModalType('evolution'); setIsModalOpen(true); }}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-100 dark:shadow-none"
-        >
-          <Plus size={20} /> Nova Evolução
-        </button>
-      </div>
+  const renderEvolutions = () => {
+    const allSelected = filteredEvolutions.length > 0 && filteredEvolutions.every(e => selectedEvolutionIds.includes(e.id));
+    const someSelected = filteredEvolutions.some(e => selectedEvolutionIds.includes(e.id));
 
+    return (
       <div className="space-y-4">
-        {filteredEvolutions.map(e => {
-          const patient = patients.find(p => p.elderlyId === e.patientId || p.id === e.patientId);
-          const displayName = e.patientIds && e.patientIds.length > 1
-            ? e.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-            : (patient?.name || 'N/A');
-          return (
-            <motion.div 
-              key={e.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 group"
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="Filtrar por nome ou conteúdo..." 
+              className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="w-full md:w-64 relative">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <select 
+              className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl outline-none focus:ring-2 focus:ring-orange-500 text-sm font-medium appearance-none"
+              value={patientFilter}
+              onChange={(e) => setPatientFilter(e.target.value)}
             >
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-orange-600">
-                    <ClipboardList size={24} />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{displayName}</h4>
-                    <p className="text-xs text-gray-500 flex items-center gap-1"><Calendar size={12} /> {format(parseISO(e.date), 'dd/MM/yyyy')} {e.time && `às ${e.time}`}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setViewingEvo(e)}
-                    className="p-2 text-gray-400 hover:text-green-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
-                    title="Visualizar 👁️"
-                  >
-                    <Eye size={16} />
-                  </button>
-                  <button 
-                    onClick={() => { setEditingRecord(e); setModalType('evolution'); setIsModalOpen(true); }}
-                    className="p-2 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
-                    title="Editar ✏️"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => setDeleteConfirm({ id: e.id, collection: 'nutritionEvolutions', label: `Evolução de ${patient?.name}` })}
-                    className="p-2 text-gray-400 hover:text-red-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
-                    title="Excluir 🗑️"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
+              <option value="">Todos os Idosos</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.elderlyId || p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <button 
+            onClick={() => { setEditingRecord(null); setModalType('evolution'); setIsModalOpen(true); }}
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-600 text-white rounded-2xl font-bold hover:bg-orange-700 transition-all shadow-lg shadow-orange-100 dark:shadow-none"
+          >
+            <Plus size={20} /> Nova Evolução
+          </button>
+        </div>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Aceitação Alimentar</p>
-                  <p className="text-xs font-black text-gray-700 dark:text-gray-300">{e.acceptance}</p>
-                </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Droplets size={10} /> Hidratação</p>
-                  <p className="text-xs font-black text-gray-700 dark:text-gray-300">{e.hydrationLevel}</p>
-                </div>
-              </div>
+        {/* Barra de Seleção em Lote */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox"
+              checked={allSelected}
+              ref={el => {
+                if (el) {
+                  el.indeterminate = someSelected && !allSelected;
+                }
+              }}
+              onChange={() => handleSelectAllEvolutions(filteredEvolutions)}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {selectedEvolutionIds.length === 0 
+                ? 'Nenhuma evolução selecionada' 
+                : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+            </span>
+          </div>
+          {selectedEvolutionIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedEvolutionIds([])}
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Limpar Seleção
+              </button>
+              <button
+                onClick={handleDownloadSelectedEvolutions}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+              >
+                <Printer size={14} />
+                Imprimir Selecionadas
+              </button>
+            </div>
+          )}
+        </div>
 
-              <div className="mt-4 p-4 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100/50 dark:border-orange-900/20">
-                <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Observações e Conduta</p>
-                <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                  {e.observations}
+        <div className="space-y-4">
+          {filteredEvolutions.map(e => {
+            const patient = patients.find(p => p.elderlyId === e.patientId || p.id === e.patientId);
+            const displayName = e.patientIds && e.patientIds.length > 1
+              ? e.patientIds.map(pid => patients.find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+              : (patient?.name || 'N/A');
+            const isSelected = selectedEvolutionIds.includes(e.id);
+            return (
+              <motion.div 
+                key={e.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-white dark:bg-gray-900 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-800 flex gap-4 items-start"
+              >
+                <div className="pt-2 shrink-0">
+                  <input 
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectEvolution(e.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                  />
                 </div>
-                {e.conduct && (
-                  <div className="mt-2 pt-2 border-t border-orange-100/50 dark:border-orange-900/20">
-                    <p className="text-[10px] font-bold text-orange-400 uppercase">Conduta:</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 italic">{e.conduct}</p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-orange-600">
+                        <ClipboardList size={24} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 dark:text-white uppercase tracking-tight">{displayName}</h4>
+                        <p className="text-xs text-gray-500 flex items-center gap-1"><Calendar size={12} /> {format(parseISO(e.date), 'dd/MM/yyyy')} {e.time && `às ${e.time}`}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setViewingEvo(e)}
+                        className="p-2 text-gray-400 hover:text-green-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                        title="Visualizar 👁️"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => { setEditingRecord(e); setModalType('evolution'); setIsModalOpen(true); }}
+                        className="p-2 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                        title="Editar ✏️"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: e.id, collection: 'nutritionEvolutions', label: `Evolução de ${patient?.name}` })}
+                        className="p-2 text-gray-400 hover:text-red-500 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                        title="Excluir 🗑️"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Utensils size={10} /> Aceitação Alimentar</p>
+                      <p className="text-xs font-black text-gray-700 dark:text-gray-300">{e.acceptance}</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Droplets size={10} /> Hidratação</p>
+                      <p className="text-xs font-black text-gray-700 dark:text-gray-300">{e.hydrationLevel}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100/50 dark:border-orange-900/20">
+                    <p className="text-[10px] font-bold text-orange-400 uppercase mb-2">Observações e Conduta</p>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {e.observations}
+                    </div>
+                    {e.conduct && (
+                      <div className="mt-2 pt-2 border-t border-orange-100/50 dark:border-orange-900/20">
+                        <p className="text-[10px] font-bold text-orange-400 uppercase">Conduta:</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 italic">{e.conduct}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAssessments = () => (
     <div className="space-y-4">

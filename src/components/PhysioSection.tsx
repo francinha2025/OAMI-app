@@ -120,6 +120,143 @@ export const PhysioSection = ({
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [isEvolutionModalOpen, setIsEvolutionModalOpen] = useState(false);
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+    const filtered = (evolutions || []).filter(e => selectedEvolutionIds.includes(e.id));
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      return [
+        format(parseISO(evo.date), 'dd/MM/yyyy'),
+        patient?.name || 'N/A',
+        evo.procedures,
+        evo.evolution
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções Fisioterapêuticas Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros`,
+      columns: ['Data', 'Paciente', 'Procedimentos Tratados', 'Evolução Clínica'],
+      data,
+      fileName: `evolucoes_fisioterapia_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
+
+  const [selectedAssessmentIds, setSelectedAssessmentIds] = useState<string[]>([]);
+
+  const toggleSelectAssessment = (id: string) => {
+    setSelectedAssessmentIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllAssessments = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedAssessmentIds.includes(id));
+    if (areAllSelected) {
+      setSelectedAssessmentIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedAssessmentIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedAssessments = async (specifiedAssessments?: PhysioAssessment[]) => {
+    const listToProcess = specifiedAssessments || (assessments || []).filter(a => selectedAssessmentIds.includes(a.id));
+    if (listToProcess.length === 0) {
+      showToast('Selecione ao menos uma avaliação para baixar/imprimir', 'error');
+      return;
+    }
+
+    listToProcess.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    if (listToProcess.length === 1) {
+      const a = listToProcess[0];
+      const patient = (patients || []).find(p => p.id === a.patientId);
+      const data: any[] = [
+        ['Paciente', a.patientIds && a.patientIds.length > 1
+          ? a.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+          : (patient?.name || 'N/A')
+        ],
+        ['Data da Avaliação', format(parseISO(a.date), 'dd/MM/yyyy')],
+        ['Queixa Principal', a.complaint || 'N/A'],
+        ['HDA (História Doença Atual)', a.hda || 'N/A'],
+        ['HPP (História Patológica Pregressa)', a.hpp || 'N/A'],
+        ['Medicamentos em Uso', a.currentMedications || 'N/A'],
+        ['Exames Complementares', a.complementaryExams || 'N/A'],
+        ['Sinais Vitais', `FC: ${a.vitals?.heartRate || '--'} bpm | FR: ${a.vitals?.respRate || '--'} irpm | P.A: ${a.vitals?.bloodPressure || '--/--'}`],
+        ['Escala de Dor', `${a.painScale || 0}/10`],
+        ['Risco de Queda', a.fallRisk || 'N/A'],
+        ['Nível de Mobilidade', a.mobilityLevel || 'N/A'],
+        ['Independência em AVDS', a.independenceADLs || 'N/A'],
+        ['Limitação de ADM', a.motionLimitation || 'N/A'],
+        ['Inspeção / Palpação', a.inspectionPalpation || 'N/A'],
+        ['Testes Físicos', a.physicalTests || a.specificTests || 'N/A'],
+        ['Diagnóstico Médico', a.medicalDiagnosis || 'N/A'],
+        ['Diagnóstico Cinético-Funcional', a.functionalDiagnosis || 'N/A'],
+        ['Objetivos Terapêuticos', a.treatmentObjectives || 'N/A'],
+        ['Plano de Tratamento', a.treatmentPlan || 'N/A'],
+      ];
+
+      await generateModernPDF({
+        title: 'Ficha de Avaliação Fisioterapêutica',
+        subtitle: `Ficha de Registro Individual`,
+        columns: ['Campo', 'Detalhes'],
+        data,
+        fileName: `avaliacao_fisioterapica_${patient?.name ? safeReplace(patient.name.toLowerCase(), /\s/g, '_') : 'registro'}_${new Date().getTime()}`
+      });
+      return;
+    }
+
+    const data = listToProcess.map(a => {
+      const patient = (patients || []).find(p => p.id === a.patientId);
+      const displayName = a.patientIds && a.patientIds.length > 1
+        ? a.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+        : (patient?.name || 'N/A');
+
+      return [
+        format(parseISO(a.date), 'dd/MM/yyyy'),
+        displayName,
+        a.complaint || 'N/A',
+        `Dor: ${a.painScale || 0}/10 | Queda: ${a.fallRisk || 'N/A'}`,
+        a.functionalDiagnosis || 'N/A',
+        a.treatmentPlan || 'N/A'
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Avaliações Fisioterapêuticas Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${listToProcess.length} registros`,
+      columns: ['Data', 'Paciente', 'Queixa Principal', 'Indicadores', 'Diagnóstico Funcional', 'Conduta / Plano'],
+      data,
+      fileName: `avaliacoes_fisioterapia_selecionadas_${new Date().getTime()}`,
+      orientation: 'landscape'
+    });
+  };
+
   const [isExerciseModalOpen, setIsExerciseModalOpen] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
@@ -377,8 +514,16 @@ export const PhysioSection = ({
   const renderReports = () => {
     const isDateInSelectedRange = (dateStr: string) => {
       if (!dateStr) return false;
-      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      let dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
       
+      // Convert Brazilian dd/MM/yyyy to yyyy-MM-dd for correct comparison
+      if (dateOnly.includes('/') && dateOnly.split('/').length === 3) {
+        const parts = dateOnly.split('/');
+        if (parts[2].length === 4) {
+          dateOnly = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+      }
+
       if (reportFilterType === 'month') {
         return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
       }
@@ -405,24 +550,22 @@ export const PhysioSection = ({
       return true;
     };
 
-    // Filtered lists based on reportsPatientFilter
-    const matchedPatients = (patients || []).filter(p => {
-      const matchPatient = !reportsPatientFilter || p.id === reportsPatientFilter;
-      return matchPatient;
-    });
-
-    const isPatientInList = (pId: string) => {
-      return matchedPatients.some(p => p.id === pId);
+    // Robust patient filtering supporting single and multi-patient properties
+    const isPatientInList = (item: any) => {
+      if (!reportsPatientFilter) return true;
+      if (item.patientId === reportsPatientFilter) return true;
+      if (item.patientIds && item.patientIds.includes(reportsPatientFilter)) return true;
+      return false;
     };
 
     // Filtered Evolutions
     const filteredEvolutions = (evolutions || []).filter(e => {
-      return isPatientInList(e.patientId) && isDateInSelectedRange(e.date);
+      return isPatientInList(e) && isDateInSelectedRange(e.date);
     });
 
     // Filtered Assessments
     const filteredAssessments = (assessments || []).filter(as => {
-      return isPatientInList(as.patientId) && isDateInSelectedRange(as.date);
+      return isPatientInList(as) && isDateInSelectedRange(as.date);
     });
 
     // Filtered Exercises (since exercise has no patientId, if reportsPatientFilter is active we could either list all or none, let's list all exercises if format is global or they are selected)
@@ -430,7 +573,7 @@ export const PhysioSection = ({
 
     // Filtered Appointments
     const filteredAppointments = (appointments || []).filter(ap => {
-      return isPatientInList(ap.patientId) && isDateInSelectedRange(ap.date);
+      return isPatientInList(ap) && isDateInSelectedRange(ap.date);
     });
 
     const toggleSection = (section: string) => {
@@ -438,6 +581,18 @@ export const PhysioSection = ({
         setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
       } else {
         setReportSelectedSections([...reportSelectedSections, section]);
+      }
+    };
+
+    const safeFormat = (dateStr: string, formatStr: string = 'dd/MM/yyyy') => {
+      if (!dateStr) return 'N/A';
+      try {
+        const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+        const d = parseISO(dateOnly);
+        if (isNaN(d.getTime())) return dateOnly;
+        return format(d, formatStr);
+      } catch (err) {
+        return dateStr;
       }
     };
 
@@ -455,7 +610,7 @@ export const PhysioSection = ({
       } else if (reportFilterType === 'semester') {
         period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
       } else if (reportFilterType === 'days') {
-        const fmt = (d: string) => d ? format(parseISO(d), 'dd/MM/yyyy') : '...';
+        const fmt = (d: string) => d ? safeFormat(d, 'dd/MM/yyyy') : '...';
         period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
       }
       
@@ -477,11 +632,13 @@ export const PhysioSection = ({
           
         const data = filteredEvolutions.map(e => {
           const p = (patients || []).find(pt => pt.id === e.patientId);
-          const name = p?.name || 'N/A';
-          const dtFmt = format(parseISO(e.date), 'dd/MM/yyyy');
+          const name = e.patientIds && e.patientIds.length > 1
+            ? e.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+            : (p?.name || 'N/A');
+          const dtFmt = safeFormat(e.date, 'dd/MM/yyyy');
           return reportsPatientFilter
-            ? [dtFmt, e.procedures, e.evolution, e.painLevel !== undefined ? `${e.painLevel}/10` : '-']
-            : [dtFmt, name, e.procedures, e.evolution, e.painLevel !== undefined ? `${e.painLevel}/10` : '-'];
+            ? [dtFmt, e.procedures || 'N/A', e.evolution || 'N/A', e.painLevel !== undefined ? `${e.painLevel}/10` : '-']
+            : [dtFmt, name, e.procedures || 'N/A', e.evolution || 'N/A', e.painLevel !== undefined ? `${e.painLevel}/10` : '-'];
         });
         
         sections.push({ title: 'Evoluções Fisioterapêuticas', columns, data });
@@ -494,13 +651,15 @@ export const PhysioSection = ({
           
         const data = filteredAssessments.map(as => {
           const p = (patients || []).find(pt => pt.id === as.patientId);
-          const name = p?.name || 'N/A';
-          const dtFmt = format(parseISO(as.date), 'dd/MM/yyyy');
+          const name = as.patientIds && as.patientIds.length > 1
+            ? as.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+            : (p?.name || 'N/A');
+          const dtFmt = safeFormat(as.date, 'dd/MM/yyyy');
           const treatmentInfo = `Objetivos: ${as.treatmentObjectives || '-'}\nPlano: ${as.treatmentPlan || '-'}`;
           const diagInfo = `Médico: ${as.medicalDiagnosis || '-'}\nFuncional: ${as.functionalDiagnosis || '-'}`;
           return reportsPatientFilter
-            ? [dtFmt, as.complaint, diagInfo, treatmentInfo, as.fallRisk || 'N/A']
-            : [dtFmt, name, as.complaint, diagInfo, treatmentInfo, as.fallRisk || 'N/A'];
+            ? [dtFmt, as.complaint || 'N/A', diagInfo, treatmentInfo, as.fallRisk || 'N/A']
+            : [dtFmt, name, as.complaint || 'N/A', diagInfo, treatmentInfo, as.fallRisk || 'N/A'];
         });
         
         sections.push({ title: 'Avaliações de Fisioterapia', columns, data });
@@ -514,10 +673,10 @@ export const PhysioSection = ({
         const data = filteredAppointments.map(ap => {
           const p = (patients || []).find(pt => pt.id === ap.patientId);
           const name = p?.name || 'N/A';
-          const dtFmt = `${format(parseISO(ap.date), 'dd/MM/yyyy')} às ${ap.time}`;
+          const dtFmt = `${safeFormat(ap.date, 'dd/MM/yyyy')} às ${ap.time || '--:--'}`;
           return reportsPatientFilter
-            ? [dtFmt, ap.status, ap.observations || '-']
-            : [dtFmt, name, ap.status, ap.observations || '-'];
+            ? [dtFmt, ap.status || 'N/A', ap.observations || '-']
+            : [dtFmt, name, ap.status || 'N/A', ap.observations || '-'];
         });
         
         sections.push({ title: 'Histórico de Atendimentos', columns, data });
@@ -526,7 +685,7 @@ export const PhysioSection = ({
       if (reportSelectedSections.includes('exercises') && filteredExercises.length > 0) {
         const columns = ['Título do Exercício', 'Categoria', 'Descrição / Protocolo'];
         const data = filteredExercises.map(ex => {
-          return [ex.title, ex.category, ex.description];
+          return [ex.title || 'N/A', ex.category || 'N/A', ex.description || 'N/A'];
         });
         
         sections.push({ title: 'Biblioteca de Protocolos e Exercícios de Reabilitação', columns, data });
@@ -1129,71 +1288,140 @@ export const PhysioSection = ({
                 </button>
               </div>
 
+              {/* Barra de Seleção em Lote */}
+              {(() => {
+                const displayedAssessments = (assessments || []).filter(a => !assessmentPatientFilter || a.patientId === assessmentPatientFilter || a.patientIds?.includes(assessmentPatientFilter));
+                const allSelected = displayedAssessments.length > 0 && displayedAssessments.every(a => selectedAssessmentIds.includes(a.id));
+                const someSelected = displayedAssessments.some(a => selectedAssessmentIds.includes(a.id));
+
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={el => {
+                          if (el) {
+                            el.indeterminate = someSelected && !allSelected;
+                          }
+                        }}
+                        onChange={() => handleSelectAllAssessments(displayedAssessments)}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                        {selectedAssessmentIds.length === 0 
+                          ? 'Nenhuma avaliação selecionada' 
+                          : `${selectedAssessmentIds.length} avaliação(ões) selecionada(s)`}
+                      </span>
+                    </div>
+                    {selectedAssessmentIds.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedAssessmentIds([])}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          Limpar Seleção
+                        </button>
+                        <button
+                          onClick={() => handleDownloadSelectedAssessments()}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md animate-fade-in"
+                        >
+                          <Printer size={14} />
+                          Imprimir Selecionadas
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {(assessments || []).filter(a => !assessmentPatientFilter || a.patientId === assessmentPatientFilter || a.patientIds?.includes(assessmentPatientFilter)).map((a) => {
                   const patient = (patients || []).find(p => p.id === a.patientId);
+                  const isSelected = selectedAssessmentIds.includes(a.id);
                   return (
                     <div 
                       key={a.id} 
-                      className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900/30 transition-all group cursor-pointer"
+                      className={cn(
+                        "bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border transition-all group cursor-pointer flex gap-4 items-start",
+                        isSelected ? "border-green-600 dark:border-green-650" : "border-gray-100 dark:border-gray-800 hover:border-green-200 dark:hover:border-green-900/30"
+                      )}
                       onClick={() => { setEditingData(a); setIsDetailView(true); setIsAssessmentModalOpen(true); }}
                     >
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400">
-                            <ClipboardList size={24} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors line-clamp-1">
-                              {a.patientIds && a.patientIds.length > 1
-                                ? a.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-                                : (patient?.name || 'N/A')}
-                            </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(a.date), 'dd/MM/yyyy')}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                          <button onClick={() => { setEditingData(a); setIsDetailView(true); setIsAssessmentModalOpen(true); }} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-                            <FileText size={18} />
-                          </button>
-                          <button onClick={() => { setEditingData(a); setIsDetailView(false); setIsAssessmentModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
-                            <Edit2 size={18} />
-                          </button>
-                          <button onClick={() => setDeleteConfirm({ id: a.id, type: 'assessment' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
+                      <div className="pt-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectAssessment(a.id)}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                        />
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Escala de Dor</p>
-                          <div className="flex items-center gap-2">
-                             <span className={cn(
-                              "text-sm font-bold",
-                              a.painScale >= 7 ? "text-red-600" : a.painScale >= 4 ? "text-orange-600" : "text-green-600"
-                            )}>
-                              {a.painScale}/10
-                            </span>
-                            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                              <div 
-                                className={cn(
-                                  "h-full rounded-full transition-all",
-                                  a.painScale >= 7 ? "bg-red-600" : a.painScale >= 4 ? "bg-orange-600" : "bg-green-600"
-                                )}
-                                style={{ width: `${a.painScale * 10}%` }}
-                              />
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start mb-4 gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
+                              <ClipboardList size={24} />
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-gray-800 dark:text-white group-hover:text-green-600 transition-colors line-clamp-1">
+                                {a.patientIds && a.patientIds.length > 1
+                                  ? a.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                                  : (patient?.name || 'N/A')}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(a.date), 'dd/MM/yyyy')}</p>
                             </div>
                           </div>
+                          <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                            <button 
+                              onClick={() => handleDownloadSelectedAssessments([a])} 
+                              className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                              title="Imprimir Avaliação 🖨️"
+                            >
+                              <Printer size={18} />
+                            </button>
+                            <button onClick={() => { setEditingData(a); setIsDetailView(true); setIsAssessmentModalOpen(true); }} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" title="Visualizar Detalhes 👁️">
+                              <FileText size={18} />
+                            </button>
+                            <button onClick={() => { setEditingData(a); setIsDetailView(false); setIsAssessmentModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors" title="Editar ✏️">
+                              <Edit2 size={18} />
+                            </button>
+                            <button onClick={() => setDeleteConfirm({ id: a.id, type: 'assessment' })} className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors" title="Excluir 🗑️">
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Risco de Queda</p>
-                          <span className={cn(
-                            "text-xs font-bold uppercase",
-                            a.fallRisk === 'ALTO' ? "text-red-600" : a.fallRisk === 'MEDIO' ? "text-orange-600" : "text-green-600"
-                          )}>
-                            {a.fallRisk || 'N/A'}
-                          </span>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Escala de Dor</p>
+                            <div className="flex items-center gap-2">
+                               <span className={cn(
+                                "text-sm font-bold",
+                                a.painScale >= 7 ? "text-red-600" : a.painScale >= 4 ? "text-orange-600" : "text-green-600"
+                              )}>
+                                {a.painScale}/10
+                              </span>
+                              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div 
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    a.painScale >= 7 ? "bg-red-600" : a.painScale >= 4 ? "bg-orange-600" : "bg-green-600"
+                                  )}
+                                  style={{ width: `${a.painScale * 10}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Risco de Queda</p>
+                            <span className={cn(
+                              "text-xs font-bold uppercase",
+                              a.fallRisk === 'ALTO' ? "text-red-600" : a.fallRisk === 'MEDIO' ? "text-orange-600" : "text-green-600"
+                            )}>
+                              {a.fallRisk || 'N/A'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1245,67 +1473,128 @@ export const PhysioSection = ({
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).map((e) => {
-                  const patient = (patients || []).find(p => p.id === e.patientId);
-                  return (
-                    <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                            <Activity size={20} />
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-800 dark:text-white">
-                              {e.patientIds && e.patientIds.length > 1
-                                ? e.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-                                : (patient?.name || 'N/A')}
-                            </h4>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(e.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setViewingEvo(e)} 
-                            className="p-2 text-green-650 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
-                            title="Visualizar 👁️"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors" title="Editar ✏️">
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setDeleteConfirm({ id: e.id, type: 'evolution' });
-                            }} 
-                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                            title="Excluir 🗑️"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                        {e.painLevel !== undefined && (
-                          <div className="text-right">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Dor Relatada</p>
-                            <p className="text-sm font-bold text-red-600">{e.painLevel}/10</p>
-                          </div>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Procedimentos</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{e.procedures}</p>
-                        </div>
-                        <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/20">
-                          <p className="text-[10px] font-bold text-green-600 uppercase mb-2">Evolução</p>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{e.evolution}</p>
-                        </div>
-                      </div>
+              {/* Barra de Seleção em Lote */}
+              {(() => {
+                const displayedEvolutions = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter));
+                const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
+                const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
+
+                return (
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={el => {
+                          if (el) {
+                            el.indeterminate = someSelected && !allSelected;
+                          }
+                        }}
+                        onChange={() => handleSelectAllEvolutions(displayedEvolutions)}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                        {selectedEvolutionIds.length === 0 
+                          ? 'Nenhuma evolução selecionada' 
+                          : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+                      </span>
                     </div>
-                  );
-                })}
+                    {selectedEvolutionIds.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedEvolutionIds([])}
+                          className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          Limpar Seleção
+                        </button>
+                        <button
+                          onClick={handleDownloadSelectedEvolutions}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+                        >
+                          <Printer size={14} />
+                          Imprimir Selecionadas
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-4">
+                {(() => {
+                  const displayed = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter));
+                  return displayed.map((e) => {
+                    const patient = (patients || []).find(p => p.id === e.patientId);
+                    const isSelected = selectedEvolutionIds.includes(e.id);
+                    return (
+                      <div key={e.id} className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4 flex gap-4 items-start">
+                        <div className="pt-2 shrink-0">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectEvolution(e.id)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                <Activity size={20} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-gray-800 dark:text-white">
+                                  {e.patientIds && e.patientIds.length > 1
+                                    ? e.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                                    : (patient?.name || 'N/A')}
+                                </h4>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{format(parseISO(e.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setViewingEvo(e)} 
+                                className="p-2 text-green-650 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors"
+                                title="Visualizar 👁️"
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button onClick={() => { setEditingData(e); setIsEvolutionModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors" title="Editar ✏️">
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setDeleteConfirm({ id: e.id, type: 'evolution' });
+                                }} 
+                                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                title="Excluir 🗑️"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                            {e.painLevel !== undefined && (
+                              <div className="text-right">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase">Dor Relatada</p>
+                                <p className="text-sm font-bold text-red-600">{e.painLevel}/10</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-700/50">
+                              <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Procedimentos</p>
+                              <p className="text-sm text-gray-700 dark:text-gray-300">{e.procedures}</p>
+                            </div>
+                            <div className="p-4 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/20">
+                              <p className="text-[10px] font-bold text-green-600 uppercase mb-2">Evolução</p>
+                              <p className="text-sm text-gray-700 dark:text-gray-300">{e.evolution}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </motion.div>
           )}
@@ -2110,6 +2399,38 @@ const AssessmentDetail = ({
   onDelete: () => void,
   onCancel: () => void
 }) => {
+  const handlePrint = async () => {
+    const data: any[] = [
+      ['Paciente', patient?.name || 'N/A'],
+      ['Data da Avaliação', format(parseISO(assessment.date), 'dd/MM/yyyy')],
+      ['Queixa Principal', assessment.complaint || 'N/A'],
+      ['HDA (História Doença Atual)', assessment.hda || 'N/A'],
+      ['HPP (História Patológica Pregressa)', assessment.hpp || 'N/A'],
+      ['Medicamentos em Uso', assessment.currentMedications || 'N/A'],
+      ['Exames Complementares', assessment.complementaryExams || 'N/A'],
+      ['Sinais Vitais', `FC: ${assessment.vitals?.heartRate || '--'} bpm | FR: ${assessment.vitals?.respRate || '--'} irpm | P.A: ${assessment.vitals?.bloodPressure || '--/--'}`],
+      ['Escala de Dor', `${assessment.painScale || 0}/10`],
+      ['Risco de Queda', assessment.fallRisk || 'N/A'],
+      ['Nível de Mobilidade', assessment.mobilityLevel || 'N/A'],
+      ['Independência em AVDS', assessment.independenceADLs || 'N/A'],
+      ['Limitação de ADM', assessment.motionLimitation || 'N/A'],
+      ['Inspeção / Palpação', assessment.inspectionPalpation || 'N/A'],
+      ['Testes Físicos', assessment.physicalTests || assessment.specificTests || 'N/A'],
+      ['Diagnóstico Médico', assessment.medicalDiagnosis || 'N/A'],
+      ['Diagnóstico Cinético-Funcional', assessment.functionalDiagnosis || 'N/A'],
+      ['Objetivos Terapêuticos', assessment.treatmentObjectives || 'N/A'],
+      ['Plano de Tratamento', assessment.treatmentPlan || 'N/A'],
+    ];
+
+    await generateModernPDF({
+      title: 'Ficha de Avaliação Fisioterapêutica',
+      subtitle: `Ficha de Registro Individual`,
+      columns: ['Campo', 'Detalhes'],
+      data,
+      fileName: `avaliacao_fisioterapica_${patient?.name ? safeReplace(patient.name.toLowerCase(), /\s/g, '_') : 'registro'}_${new Date().getTime()}`
+    });
+  };
+
   return (
     <div className="space-y-8 p-1">
       {/* Header com Nome do Paciente */}
@@ -2127,6 +2448,13 @@ const AssessmentDetail = ({
           </div>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={handlePrint}
+            className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-2xl hover:bg-green-100 transition-colors border border-green-100 dark:border-green-800"
+            title="Imprimir Avaliação"
+          >
+            <Printer size={20} />
+          </button>
           <button 
             onClick={onEdit}
             className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl hover:bg-blue-100 transition-colors border border-blue-100 dark:border-blue-800"

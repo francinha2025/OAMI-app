@@ -22,7 +22,7 @@ import { format, isToday, parseISO, startOfToday, isSameDay, subMonths, differen
 import { ptBR } from 'date-fns/locale';
 import { cn, safeReplace } from '../lib/utils';
 import { ROLE_LABELS } from '../constants';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
 import { 
@@ -204,6 +204,60 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
   const [profSearch, setProfSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<any | null>(null);
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: SocialEvolution[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => {
+        const union = new Set([...prev, ...allIds]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+
+    let filtered = (evolutions || []).filter(e => selectedEvolutionIds.includes(e.id));
+
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+      const name = linked?.name || patient?.name || 'Fluxo de Atendimento Geral';
+      
+      return [
+        safeFormat(evo.date, 'dd/MM/yy HH:mm'),
+        name,
+        evo.serviceType,
+        `Obs: ${evo.observation}\nConduta: ${evo.conduct}`
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções Sociais Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros selecionados`,
+      columns: ['Data/Hora', 'Idoso/Fluxo', 'Tipo', 'Detalhamento (Obs/Conduta)'],
+      data: data,
+      fileName: `evolucoes_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
 
   // States for Editable table & multi-select deletion in Documentation & Visit Control tabs
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
@@ -273,8 +327,20 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
   const [riskPatientFilter, setRiskPatientFilter] = useState('');
   const [piaPatientFilter, setPiaPatientFilter] = useState('');
 
-  const [reportStartDate, setReportStartDate] = useState(format(subMonths(new Date(), 1), 'yyyy-MM-dd'));
-  const [reportEndDate, setReportEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Integrated report states
+  const [reportFilterType, setReportFilterType] = useState<'month' | 'year' | 'semester' | 'days'>('month');
+  const [reportSelectedMonth, setReportSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [reportSelectedYear, setReportSelectedYear] = useState(() => String(new Date().getFullYear()));
+  const [reportSelectedSemester, setReportSelectedSemester] = useState<'1' | '2'>('1');
+  const [reportStartDate, setReportStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [reportEndDate, setReportEndDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [reportSelectedSections, setReportSelectedSections] = useState<string[]>([
+    'evolutions', 'familyVisits', 'riskSituations', 'referrals', 'pias', 'socialStudies', 'documentations'
+  ]);
 
   const handleDownloadBulkEvolutions = async () => {
     let filtered = (evolutions || []).filter(e => {
@@ -315,7 +381,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
       columns: ['Data/Hora', 'Idoso', 'Tipo', 'Detalhamento Técnico'],
       data: data,
       fileName: `relatorio_evolucoes_${reportStartDate}_a_${reportEndDate}`,
-      orientation: 'landscape'
+      orientation: 'portrait'
     });
   };
 
@@ -355,7 +421,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
       columns: ['Data/Hora', 'Idoso/Fluxo', 'Tipo', 'Detalhamento (Obs/Conduta)'],
       data: data,
       fileName: `evolucoes_sociais_${new Date().getTime()}`,
-      orientation: 'landscape'
+      orientation: 'portrait'
     });
   };
 
@@ -3777,140 +3843,195 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
     </div>
   );
 
-  const renderEvolution = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Evolução Social</h3>
-          <select
-            value={evolutionPatientFilter}
-            onChange={(e) => setEvolutionPatientFilter(e.target.value)}
-            className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
-          >
-            <option value="">Ver Todas</option>
-            <option value="GENERAL">Fluxo de Atendimento Geral</option>
-            {(patients || []).map((p: any) => {
-              const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+  const renderEvolution = () => {
+    const displayedEvolutions = (evolutions || []).filter(e => {
+      if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
+      return !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+    });
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Evolução Social</h3>
+            <select
+              value={evolutionPatientFilter}
+              onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+              className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+            >
+              <option value="">Ver Todas</option>
+              <option value="GENERAL">Fluxo de Atendimento Geral</option>
+              {(patients || []).map((p: any) => {
+                const linked = p.elderlyId ? (elderly || []).find(e => e.id === p.elderlyId) : null;
+                return (
+                  <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                );
+              })}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadAllFilteredEvolutions}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-100 dark:shadow-none"
+              title="Baixar todas as evoluções filtradas"
+            >
+              <Download size={18} />
+              Baixar Tudo
+            </button>
+            <button
+              onClick={() => openModal('evolution')}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100 dark:shadow-none"
+            >
+              <Activity className="w-5 h-5" />
+              Fluxo Geral
+            </button>
+            <button
+              onClick={() => openModal('evolution')}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-colors font-bold shadow-lg shadow-gray-100 dark:shadow-none"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Evolução (Idoso)
+            </button>
+          </div>
+        </div>
+
+        {/* Barra de Seleção em Lote */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox"
+              checked={displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id))}
+              ref={el => {
+                if (el) {
+                  const some = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
+                  const all = displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
+                  el.indeterminate = some && !all;
+                }
+              }}
+              onChange={() => handleSelectAllEvolutions(displayedEvolutions)}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {selectedEvolutionIds.length === 0 
+                ? 'Nenhuma evolução selecionada' 
+                : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+            </span>
+          </div>
+          {selectedEvolutionIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedEvolutionIds([])}
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Limpar Seleção
+              </button>
+              <button
+                onClick={handleDownloadSelectedEvolutions}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+              >
+                <Printer size={14} />
+                Imprimir Selecionadas
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {displayedEvolutions.map((evolution) => {
+              const patient = (patients || []).find(p => p.id === evolution.patientId);
+              const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
+              const displayName = !evolution.patientId 
+                ? 'Fluxo de Atendimento Geral'
+                : (evolution.patientIds && evolution.patientIds.length > 1
+                    ? evolution.patientIds.map(pid => {
+                        const pat = (patients || []).find(p => p.id === pid);
+                        const lk = pat?.elderlyId ? (elderly || []).find(ed => ed.id === pat.elderlyId) : null;
+                        return lk?.name || pat?.name;
+                      }).filter(Boolean).join(', ')
+                    : (linked?.name || patient?.name || 'Idoso não encontrado'));
+              
               return (
-                <option key={p.id} value={p.id}>{linked?.name || p.name}</option>
+                <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors flex gap-4 items-start">
+                  <div className="pt-2 shrink-0">
+                    <input 
+                      type="checkbox"
+                      checked={selectedEvolutionIds.includes(evolution.id)}
+                      onChange={() => toggleSelectEvolution(evolution.id)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center",
+                          !evolution.patientId ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-gray-800"
+                        )}>
+                          {!evolution.patientId ? (
+                            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          ) : (
+                            <ClipboardList className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 dark:text-white">{displayName}</h4>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap md:flex-nowrap justify-end">
+                        <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase mr-1">
+                          {evolution.serviceType}
+                        </span>
+                        <button
+                          onClick={() => setViewingEvo(evolution)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-colors shrink-0"
+                          title="Visualizar 👁️"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDownloadEvolution(evolution)}
+                          className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors shrink-0"
+                          title="Baixar PDF 📥"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => openModal('evolution', evolution)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors shrink-0"
+                          title="Editar ✏️"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({ id: evolution.id, collection: 'socialEvolutions', label: 'Evolução do Serviço Social' })}
+                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors shrink-0"
+                          title="Excluir 🗑️"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-13">
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Observação</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{evolution.observation}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Conduta</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{evolution.conduct}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               );
             })}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleDownloadAllFilteredEvolutions}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-100 dark:shadow-none"
-            title="Baixar todas as evoluções filtradas"
-          >
-            <Download size={18} />
-            Baixar Tudo
-          </button>
-          <button
-            onClick={() => openModal('evolution')}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-lg shadow-blue-100 dark:shadow-none"
-          >
-            <Activity className="w-5 h-5" />
-            Fluxo Geral
-          </button>
-          <button
-            onClick={() => openModal('evolution')}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-colors font-bold shadow-lg shadow-gray-100 dark:shadow-none"
-          >
-            <Plus className="w-5 h-5" />
-            Nova Evolução (Idoso)
-          </button>
+          </div>
         </div>
       </div>
-
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {(evolutions || []).filter(e => {
-            if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
-            return !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
-          }).map((evolution) => {
-            const patient = (patients || []).find(p => p.id === evolution.patientId);
-            const linked = patient?.elderlyId ? (elderly || []).find(e => e.id === patient.elderlyId) : null;
-            const displayName = !evolution.patientId 
-              ? 'Fluxo de Atendimento Geral'
-              : (evolution.patientIds && evolution.patientIds.length > 1
-                  ? evolution.patientIds.map(pid => {
-                      const pat = (patients || []).find(p => p.id === pid);
-                      const lk = pat?.elderlyId ? (elderly || []).find(ed => ed.id === pat.elderlyId) : null;
-                      return lk?.name || pat?.name;
-                    }).filter(Boolean).join(', ')
-                  : (linked?.name || patient?.name || 'Idoso não encontrado'));
-            
-            return (
-              <div key={evolution.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center",
-                      !evolution.patientId ? "bg-blue-100 dark:bg-blue-900/30" : "bg-gray-100 dark:bg-gray-800"
-                    )}>
-                      {!evolution.patientId ? (
-                        <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      ) : (
-                        <ClipboardList className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                      )}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 dark:text-white">{displayName}</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{safeFormat(evolution.date, "dd 'de' MMMM 'às' HH:mm")}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-wrap md:flex-nowrap justify-end">
-                    <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-bold uppercase mr-1">
-                      {evolution.serviceType}
-                    </span>
-                    <button
-                      onClick={() => setViewingEvo(evolution)}
-                      className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-colors shrink-0"
-                      title="Visualizar 👁️"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDownloadEvolution(evolution)}
-                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-xl transition-colors shrink-0"
-                      title="Baixar PDF 📥"
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => openModal('evolution', evolution)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors shrink-0"
-                      title="Editar ✏️"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteConfirm({ id: evolution.id, collection: 'socialEvolutions', label: 'Evolução do Serviço Social' })}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors shrink-0"
-                      title="Excluir 🗑️"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-13">
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Observação</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{evolution.observation}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Conduta</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{evolution.conduct}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderReferrals = () => (
     <div className="space-y-6">
@@ -4323,6 +4444,317 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
   );
 
   const renderReports = () => {
+    const isDateInSelectedRange = (dateStr: string | undefined | null) => {
+      if (!dateStr) return false;
+      const dateOnly = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+      
+      if (reportFilterType === 'month') {
+        return dateOnly.startsWith(reportSelectedMonth); // 'YYYY-MM'
+      }
+      if (reportFilterType === 'year') {
+        return dateOnly.startsWith(reportSelectedYear); // 'YYYY'
+      }
+      if (reportFilterType === 'semester') {
+        if (!dateOnly.startsWith(reportSelectedYear)) return false;
+        const monthParts = dateOnly.split('-');
+        if (monthParts.length < 2) return false;
+        const month = parseInt(monthParts[1], 10);
+        if (isNaN(month)) return false;
+        if (reportSelectedSemester === '1') {
+          return month >= 1 && month <= 6;
+        } else {
+          return month >= 7 && month <= 12;
+        }
+      }
+      if (reportFilterType === 'days') {
+        if (reportStartDate && dateOnly < reportStartDate) return false;
+        if (reportEndDate && dateOnly > reportEndDate) return false;
+        return true;
+      }
+      return true;
+    };
+
+    // Filtered Evolutions
+    const filteredEvolutions = (evolutions || []).filter(e => {
+      const matchPatient = !reportsPatientFilter || e.patientId === reportsPatientFilter || e.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(e.date);
+    });
+
+    // Filtered Family Visits
+    const filteredFamilyVisits = (familyVisits || []).filter(v => {
+      const matchPatient = !reportsPatientFilter || v.patientId === reportsPatientFilter || v.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(v.date);
+    });
+
+    // Filtered Risk Situations
+    const filteredRiskSituations = (riskSituations || []).filter(r => {
+      const matchPatient = !reportsPatientFilter || r.patientId === reportsPatientFilter || r.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(r.date);
+    });
+
+    // Filtered Referrals
+    const filteredReferrals = (referrals || []).filter(ref => {
+      const matchPatient = !reportsPatientFilter || ref.patientId === reportsPatientFilter || ref.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && isDateInSelectedRange(ref.date);
+    });
+
+    // Filtered PIAs
+    const filteredPias = (pias || []).filter(pia => {
+      const matchPatient = !reportsPatientFilter || pia.elderlyId === reportsPatientFilter;
+      return matchPatient && (!pia.date || isDateInSelectedRange(pia.date));
+    });
+
+    // Filtered Social Studies
+    const filteredSocialStudies = (socialStudies || []).filter(s => {
+      const matchPatient = !reportsPatientFilter || s.patientId === reportsPatientFilter || s.patientIds?.includes(reportsPatientFilter);
+      return matchPatient && (!s.date || isDateInSelectedRange(s.date));
+    });
+
+    // Filtered Documentations
+    const filteredDocumentations = (documentations || []).filter(d => {
+      const matchPatient = !reportsPatientFilter || d.patientId === reportsPatientFilter || d.patientIds?.includes(reportsPatientFilter);
+      return matchPatient;
+    });
+
+    const toggleSection = (section: string) => {
+      if (reportSelectedSections.includes(section)) {
+        setReportSelectedSections(reportSelectedSections.filter(s => s !== section));
+      } else {
+        setReportSelectedSections([...reportSelectedSections, section]);
+      }
+    };
+
+    const getSubtitleText = () => {
+      let period = '';
+      if (reportFilterType === 'month') {
+        const [year, month] = reportSelectedMonth.split('-');
+        const monthNames = [
+          'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+        ];
+        period = `${monthNames[parseInt(month, 10) - 1]} de ${year}`;
+      } else if (reportFilterType === 'year') {
+        period = `Ano de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'semester') {
+        period = `${reportSelectedSemester}º Semestre de ${reportSelectedYear}`;
+      } else if (reportFilterType === 'days') {
+        const fmt = (d: string) => d ? safeFormat(d, 'dd/MM/yyyy') : '...';
+        period = `Período: ${fmt(reportStartDate)} até ${fmt(reportEndDate)}`;
+      }
+      
+      const patientName = reportsPatientFilter 
+        ? `Idoso: ${(patients || []).find(p => p.id === reportsPatientFilter)?.name}` 
+        : 'Todos os Idosos (Geral)';
+        
+      return `Área: Serviço Social | ${patientName} | Cronograma: ${period}`;
+    };
+
+    const handleGenerateIntegratedReport = async (formatType: 'pdf' | 'word') => {
+      const sections = [];
+      const subtitleText = getSubtitleText();
+
+      // 1. Evolutions
+      if (reportSelectedSections.includes('evolutions') && filteredEvolutions.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data/Hora', 'Tipo de Serviço', 'Evolução / Observação', 'Conduta / Encaminhamento', 'Responsável']
+          : ['Data/Hora', 'Idoso', 'Tipo de Serviço', 'Evolução / Observação', 'Conduta / Encaminhamento', 'Responsável'];
+          
+        const data = filteredEvolutions.map(e => {
+          const p = (patients || []).find(pt => pt.id === e.patientId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(e.date, 'dd/MM/yyyy HH:mm');
+          return reportsPatientFilter
+            ? [dtFmt, e.serviceType || 'Geral', e.observation || '-', e.conduct || '-', e.registeredBy || 'N/A']
+            : [dtFmt, name, e.serviceType || 'Geral', e.observation || '-', e.conduct || '-', e.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Evoluções de Serviço Social', columns, data });
+      }
+
+      // 2. Family Visits
+      if (reportSelectedSections.includes('familyVisits') && filteredFamilyVisits.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Visitante', 'Grau de Parentesco', 'Relato / Observações', 'Registrado Por']
+          : ['Data', 'Idoso', 'Visitante', 'Grau de Parentesco', 'Relato / Observações', 'Registrado Por'];
+          
+        const data = filteredFamilyVisits.map(v => {
+          const p = (patients || []).find(pt => pt.id === v.patientId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(v.date, 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, v.visitorName, v.kinship, v.observations || '-', v.registeredBy || 'N/A']
+            : [dtFmt, name, v.visitorName, v.kinship, v.observations || '-', v.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Visitas Familiares e Contatos', columns, data });
+      }
+
+      // 3. Risk Situations
+      if (reportSelectedSections.includes('riskSituations') && filteredRiskSituations.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Tipo de Risco', 'Descrição', 'Gravidade', 'Status', 'Registrado Por']
+          : ['Data', 'Idoso', 'Tipo de Risco', 'Descrição', 'Gravidade', 'Status', 'Registrado Por'];
+          
+        const data = filteredRiskSituations.map(r => {
+          const p = (patients || []).find(pt => pt.id === r.patientId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(r.date, 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, r.type || 'OUTRO', r.description || '-', r.severity || 'MEDIA', r.status || 'IDENTIFICADO', r.registeredBy || 'N/A']
+            : [dtFmt, name, r.type || 'OUTRO', r.description || '-', r.severity || 'MEDIA', r.status || 'IDENTIFICADO', r.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Situações de Risco Social', columns, data });
+      }
+
+      // 4. Referrals
+      if (reportSelectedSections.includes('referrals') && filteredReferrals.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Destino', 'Descrição', 'Status', 'Observações', 'Registrado Por']
+          : ['Data', 'Idoso', 'Destino', 'Descrição', 'Status', 'Observações', 'Registrado Por'];
+          
+        const data = filteredReferrals.map(ref => {
+          const p = (patients || []).find(pt => pt.id === ref.patientId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(ref.date, 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, ref.destination || 'OUTRO', ref.description || '-', ref.status || 'CONCLUIDO', ref.observations || '-', ref.registeredBy || 'N/A']
+            : [dtFmt, name, ref.destination || 'OUTRO', ref.description || '-', ref.status || 'CONCLUIDO', ref.observations || '-', ref.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Encaminhamentos de Serviço Social', columns, data });
+      }
+
+      // 5. PIAs
+      if (reportSelectedSections.includes('pias') && filteredPias.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Status', 'Objetivos', 'Ações de Intervenção', 'Responsável']
+          : ['Data', 'Idoso', 'Status', 'Objetivos', 'Ações de Intervenção', 'Responsável'];
+          
+        const data = filteredPias.map(pia => {
+          const p = (patients || []).find(pt => pt.id === pia.elderlyId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(pia.date, 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, pia.status || 'EM_ANDAMENTO', pia.objectives || '-', pia.actions || '-', pia.responsible || 'N/A']
+            : [dtFmt, name, pia.status || 'EM_ANDAMENTO', pia.objectives || '-', pia.actions || '-', pia.responsible || 'N/A'];
+        });
+        
+        sections.push({ title: 'Plano Individual de Atendimento - PIA', columns, data });
+      }
+
+      // 6. Social Studies
+      if (reportSelectedSections.includes('socialStudies') && filteredSocialStudies.length > 0) {
+        const columns = reportsPatientFilter 
+          ? ['Data', 'Histórico de Vida', 'Condições Sociais', 'Parecer Técnico', 'Registrado Por']
+          : ['Data', 'Idoso', 'Histórico de Vida', 'Condições Sociais', 'Parecer Técnico', 'Registrado Por'];
+          
+        const data = filteredSocialStudies.map(s => {
+          const p = (patients || []).find(pt => pt.id === s.patientId);
+          const name = p?.name || 'Geral';
+          const dtFmt = safeFormat(s.date, 'dd/MM/yyyy');
+          return reportsPatientFilter
+            ? [dtFmt, s.lifeHistory || '-', s.socialConditions || '-', s.technicalOpinion || '-', s.registeredBy || 'N/A']
+            : [dtFmt, name, s.lifeHistory || '-', s.socialConditions || '-', s.technicalOpinion || '-', s.registeredBy || 'N/A'];
+        });
+        
+        sections.push({ title: 'Estudos Sociais Técnicos', columns, data });
+      }
+
+      // 7. Documentations
+      if (reportSelectedSections.includes('documentations') && filteredDocumentations.length > 0) {
+        const columns = ['Idoso', 'RG', 'CPF', 'Cartão SUS', 'Cert. Nascimento', 'Compr. Residência', 'Observações'];
+        const data = filteredDocumentations.map(d => {
+          const p = (patients || []).find(pt => pt.id === d.patientId);
+          const name = p?.name || 'Geral';
+          return [
+            name,
+            d.rg || 'INEXISTENTE',
+            d.cpf || 'INEXISTENTE',
+            d.sus || 'INEXISTENTE',
+            d.birthCertificate || 'INEXISTENTE',
+            d.addressProof || 'INEXISTENTE',
+            d.observations || '-'
+          ];
+        });
+        
+        sections.push({ title: 'Documentações Cadastrais', columns, data });
+      }
+
+      if (sections.length === 0) {
+        showToast('Nenhum dado selecionado ou encontrado para o período e idoso especificados', 'error');
+        return;
+      }
+
+      const docTitle = reportsPatientFilter 
+        ? `Prontuário Social Integrado - ${patients.find(p => p.id === reportsPatientFilter)?.name}`
+        : 'Relatório Consolidado de Atendimento Social';
+
+      if (formatType === 'pdf') {
+        try {
+          await generateMultiSectionPDF({
+            title: docTitle,
+            subtitle: subtitleText,
+            sections,
+            fileName: `relatorio_social_${format(new Date(), 'yyyy-MM-dd')}`
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+        } catch (e) {
+          console.error(e);
+          showToast('Erro ao exportar o PDF', 'error');
+        }
+      } else {
+        try {
+          const mergedColumns = ['Seção', 'Data / Chave', 'Idoso / Residente', 'Descrição / Detalhes', 'Responsável'];
+          const mergedData: any[][] = [];
+
+          sections.forEach(sec => {
+            sec.data.forEach(row => {
+              if (reportsPatientFilter) {
+                const targetName = patients.find(p => p.id === reportsPatientFilter)?.name || 'N/A';
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  targetName,
+                  row.slice(1, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              } else {
+                mergedData.push([
+                  sec.title,
+                  row[0],
+                  row[1] || 'Geral',
+                  row.slice(2, -1).join(' | '),
+                  row[row.length - 1] || 'N/A'
+                ]);
+              }
+            });
+          });
+
+          await generateModernWord({
+            title: docTitle,
+            subtitle: subtitleText,
+            columns: mergedColumns,
+            data: mergedData,
+            fileName: `relatorio_social_word`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao exportar o Word', 'error');
+        }
+      }
+    };
+
+    const hasNoRecords = 
+      filteredEvolutions.length === 0 && 
+      filteredFamilyVisits.length === 0 && 
+      filteredRiskSituations.length === 0 && 
+      filteredReferrals.length === 0 && 
+      filteredPias.length === 0 && 
+      filteredSocialStudies.length === 0 && 
+      filteredDocumentations.length === 0;
+
     const prepareReportData = () => {
       if ((patients || []).length === 0) return null;
       
@@ -4346,7 +4778,6 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
     };
 
     const handleGeneratePDF = async (title: string) => {
-      // Find the specific patient if a filter is active
       const patient = reportsPatientFilter ? patients.find(p => p.id === reportsPatientFilter) : null;
       
       if (title === 'Prontuário Social Individual') {
@@ -4404,6 +4835,35 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
         return;
       }
 
+      if (title === 'Fluxo Geral de Atendimento') {
+        const generalEvolutions = (evolutions || [])
+          .filter(e => !e.patientId)
+          .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+        if (generalEvolutions.length === 0) {
+          showToast('Nenhum registro no Fluxo Geral de Atendimento encontrado', 'error');
+          return;
+        }
+
+        const formattedData = generalEvolutions.map(evo => [
+          safeFormat(evo.date, 'dd/MM/yyyy HH:mm'),
+          evo.serviceType || 'Geral',
+          evo.observation || '',
+          evo.conduct || '',
+          evo.registeredBy || ''
+        ]);
+
+        await generateModernPDF({
+          title: 'Fluxo Geral de Atendimento',
+          subtitle: `Consolidado Geral - Total: ${generalEvolutions.length} atendimentos`,
+          columns: ['Data/Hora', 'Tipo de Serviço', 'Observação / Detalhes', 'Conduta / Encaminhamento', 'Registrado Por'],
+          data: formattedData,
+          fileName: 'fluxo_geral_de_atendimento',
+          orientation: 'landscape'
+        });
+        return;
+      }
+
       const data = prepareReportData();
       if (!data) return;
 
@@ -4419,6 +4879,54 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
     };
 
     const handleGenerateWord = async (title: string) => {
+      const patient = reportsPatientFilter ? patients.find(p => p.id === reportsPatientFilter) : null;
+      
+      if (title === 'Prontuário Social Individual') {
+        if (patient) {
+          await handleDownloadPatientProfile(patient);
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o prontuário individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Relatório Social Individual') {
+        if (patient) {
+          await handleDownloadSocialReport(patient);
+        } else {
+          showToast('Selecione um idoso no filtro acima para gerar o relatório individual', 'error');
+        }
+        return;
+      }
+
+      if (title === 'Fluxo Geral de Atendimento') {
+        const generalEvolutions = (evolutions || [])
+          .filter(e => !e.patientId)
+          .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+        if (generalEvolutions.length === 0) {
+          showToast('Nenhum registro no Fluxo Geral de Atendimento encontrado', 'error');
+          return;
+        }
+
+        const formattedData = generalEvolutions.map(evo => [
+          safeFormat(evo.date, 'dd/MM/yyyy HH:mm'),
+          evo.serviceType || 'Geral',
+          evo.observation || '',
+          evo.conduct || '',
+          evo.registeredBy || ''
+        ]);
+
+        await generateModernWord({
+          title: 'Fluxo Geral de Atendimento',
+          subtitle: `Consolidado Geral - Total: ${generalEvolutions.length} atendimentos`,
+          columns: ['Data/Hora', 'Tipo de Serviço', 'Observação / Detalhes', 'Conduta / Encaminhamento', 'Registrado Por'],
+          data: formattedData,
+          fileName: 'fluxo_geral_de_atendimento_doc'
+        });
+        return;
+      }
+
       const data = prepareReportData();
       if (!data) return;
 
@@ -4434,21 +4942,31 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
     };
 
     return (
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-[40px] text-white shadow-xl shadow-blue-100 dark:shadow-none mb-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <h3 className="text-2xl font-black uppercase tracking-tight mb-2">Central de Relatórios</h3>
-              <p className="text-blue-100 font-medium">Gere documentos técnicos e relatórios gerenciais do Serviço Social</p>
-            </div>
-            <div className="flex flex-col gap-2 bg-white/10 p-4 rounded-3xl backdrop-blur-md border border-white/20">
-              <label className="text-[10px] font-black uppercase tracking-widest text-blue-100 ml-1">Filtrar por Idoso</label>
-              <div className="flex items-center gap-3 bg-white dark:bg-gray-900 px-4 py-2 rounded-2xl">
-                <Filter size={16} className="text-gray-400" />
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div>
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+            Gerador Inteligente de Relatórios
+          </h2>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+            Gere relatórios técnicos integrados de serviço social para impressão oficial. Selecione múltiplos formatos de data, idosos e escolha quais módulos do sistema incluir no documento.
+          </p>
+        </div>
+
+        {/* Filters Card Grid */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Patient selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Idoso / Paciente
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Filter size={16} className="text-gray-400 shrink-0" />
                 <select 
                   value={reportsPatientFilter}
                   onChange={(e) => setReportsPatientFilter(e.target.value)}
-                  className="text-xs font-bold bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white min-w-[200px] outline-none"
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
                 >
                   <option value="">TODOS OS IDOSOS (GERAL)</option>
                   {patients.map(p => (
@@ -4457,50 +4975,228 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
                 </select>
               </div>
             </div>
+
+            {/* 2. Format filter category */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Formato do Período
+              </label>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                <Calendar size={16} className="text-gray-400 shrink-0" />
+                <select 
+                  value={reportFilterType}
+                  onChange={(e) => setReportFilterType(e.target.value as any)}
+                  className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none uppercase"
+                >
+                  <option value="month">Mensal (Mês Selecionado)</option>
+                  <option value="year">Anual (Ano Inteiro)</option>
+                  <option value="semester">Semestral (Metade do Ano)</option>
+                  <option value="days">Por Dias (Intervalo Exato)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 3. The Date pickers */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block ml-0.5">
+                Escolha do Período / Data
+              </label>
+              
+              {reportFilterType === 'month' && (
+                <input 
+                  type="month"
+                  value={reportSelectedMonth}
+                  onChange={(e) => setReportSelectedMonth(e.target.value)}
+                  className="w-full text-xs font-bold bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                />
+              )}
+
+              {reportFilterType === 'year' && (
+                <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700">
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-transparent border-none focus:ring-0 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'semester' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={reportSelectedSemester}
+                    onChange={(e) => setReportSelectedSemester(e.target.value as any)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    <option value="1">1º SEMESTRE (JAN - JUN)</option>
+                    <option value="2">2º SEMESTRE (JUL - DEZ)</option>
+                  </select>
+
+                  <select
+                    value={reportSelectedYear}
+                    onChange={(e) => setReportSelectedYear(e.target.value)}
+                    className="w-full text-xs font-black bg-gray-50 dark:bg-gray-800 px-3 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white outline-none"
+                  >
+                    {['2024', '2025', '2026', '2027'].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {reportFilterType === 'days' && (
+                <div className="grid grid-cols-2 gap-2 items-center">
+                  <input 
+                    type="date"
+                    value={reportStartDate}
+                    onChange={(e) => setReportStartDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                  <input 
+                    type="date"
+                    value={reportEndDate}
+                    onChange={(e) => setReportEndDate(e.target.value)}
+                    className="w-full text-[10px] font-bold bg-gray-50 dark:bg-gray-800 px-2 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-white focus:outline-none"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 p-8 rounded-[40px] border border-gray-100 dark:border-gray-800 shadow-sm mb-8">
-          <div className="flex flex-col md:flex-row md:items-end gap-6">
-            <div className="flex-1 space-y-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl">
-                  <History size={24} />
-                </div>
-                <div>
-                  <h4 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">Extração de Evoluções em Lote</h4>
-                  <p className="text-sm text-gray-500">Baixe todas as evoluções detalhadas de um período específico.</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data Inicial</label>
+        {/* Section categories toggles with badges of found records */}
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-850 shadow-sm space-y-4">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-700 dark:text-gray-300">
+            Seções do Sistema a Incluir no Relatório
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { id: 'evolutions', title: 'Evoluções', desc: 'Registros de evolução diária e atendimentos.', icon: ClipboardList, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-950/20', count: filteredEvolutions.length },
+              { id: 'familyVisits', title: 'Visitas Familiares', desc: 'Visitas, contatos e fortalecimento de vínculos.', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-950/20', count: filteredFamilyVisits.length },
+              { id: 'riskSituations', title: 'Situações de Risco', desc: 'Registros de vulnerabilidade e violação.', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-950/20', count: filteredRiskSituations.length },
+              { id: 'referrals', title: 'Encaminhamentos', desc: 'Atendimentos pela rede (CRAS, CREAS, etc.).', icon: Share2, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-950/20', count: filteredReferrals.length },
+              { id: 'pias', title: 'PIA (Plano Individual)', desc: 'Planejamento individual de atendimento.', icon: FileCheck, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-950/20', count: filteredPias.length },
+              { id: 'socialStudies', title: 'Estudos Sociais', desc: 'Análise social e parecer técnico detalhado.', icon: BookOpen, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-950/20', count: filteredSocialStudies.length },
+              { id: 'documentations', title: 'Documentação Cadastral', desc: 'RG, CPF, SUS e situação documental.', icon: FileText, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-950/20', count: filteredDocumentations.length },
+            ].map((sec) => {
+              const isChecked = reportSelectedSections.includes(sec.id);
+              const IconComp = sec.icon;
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => toggleSection(sec.id)}
+                  className={cn(
+                    "p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3",
+                    isChecked 
+                      ? "border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-sm"
+                      : "border-gray-100 dark:border-gray-800/80 hover:bg-gray-50/50 dark:hover:bg-gray-800/30"
+                  )}
+                >
                   <input 
-                    type="date" 
-                    value={reportStartDate}
-                    onChange={(e) => setReportStartDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => {}} // handled by div click
+                    className="w-4 h-4 text-emerald-600 focus:ring-emerald-500 rounded mt-1 border-gray-300"
                   />
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white text-xs tracking-tight">
+                        <IconComp size={14} className={sec.color} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-full shrink-0",
+                        sec.count > 0 
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                          : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+                      )}>
+                        {sec.count === 1 ? '1 reg' : `${sec.count} regs`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] leading-snug font-medium text-gray-500 dark:text-gray-400">
+                      {sec.desc}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data Final</label>
-                  <input 
-                    type="date" 
-                    value={reportEndDate}
-                    onChange={(e) => setReportEndDate(e.target.value)}
-                    className="w-full bg-gray-50 dark:bg-gray-800 border-none rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  />
-                </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Action triggers */}
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-6 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-2xl shrink-0 mt-0.5">
+              <Info size={20} />
             </div>
-            <button 
-              onClick={handleDownloadBulkEvolutions}
-              className="flex items-center justify-center gap-3 px-8 py-4 bg-green-600 text-white rounded-[32px] font-black uppercase tracking-widest text-xs hover:bg-green-700 active:scale-95 transition-all shadow-xl shadow-green-100 dark:shadow-none h-[52px]"
+            <div>
+              <p className="text-xs font-black text-gray-800 dark:text-white uppercase tracking-tight">
+                Configuração Pronta para Impressão
+              </p>
+              <p className="text-[11px] leading-relaxed font-semibold text-gray-500 dark:text-gray-400 mt-0.5">
+                {hasNoRecords 
+                  ? "Atenção: Não há registros cadastrados para os filtros selecionados. Cadastre evoluções ou mude as datas para habilitar relatórios."
+                  : `Seu relatório integrará ${reportSelectedSections.filter(s => {
+                      if (s === 'evolutions') return filteredEvolutions.length > 0;
+                      if (s === 'familyVisits') return filteredFamilyVisits.length > 0;
+                      if (s === 'riskSituations') return filteredRiskSituations.length > 0;
+                      if (s === 'referrals') return filteredReferrals.length > 0;
+                      if (s === 'pias') return filteredPias.length > 0;
+                      if (s === 'socialStudies') return filteredSocialStudies.length > 0;
+                      if (s === 'documentations') return filteredDocumentations.length > 0;
+                      return false;
+                    }).length} seções do prontuário oficial com formatação de alta qualidade.`
+                }
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+            <button
+              onClick={() => handleGenerateIntegratedReport('pdf')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200 dark:shadow-none"
+              )}
             >
-              <Download size={18} />
-              Baixar Evoluções Detalhadas
+              <Printer size={16} />
+              Imprimir PDF
+            </button>
+
+            <button
+              onClick={() => handleGenerateIntegratedReport('word')}
+              disabled={hasNoRecords}
+              className={cn(
+                "flex-1 md:flex-none flex items-center justify-center gap-2 font-black py-4 px-6 rounded-2xl shadow-lg transition-all text-xs tracking-wider uppercase shrink-0 select-none cursor-pointer",
+                hasNoRecords
+                  ? "bg-gray-250 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed shadow-none"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 dark:shadow-none"
+              )}
+            >
+              <FileText size={16} />
+              Baixar Word
             </button>
           </div>
+        </div>
+
+        {/* Separator / Title for Standard Files */}
+        <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+          <h3 className="text-sm font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Relatórios Temáticos / Fichas Padronizadas
+          </h3>
+          <p className="text-xs text-gray-400 mt-1">
+            Selecione um idoso específico no filtro acima para habilitar a geração destas fichas técnicas individuais.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
@@ -4511,6 +5207,7 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
             { title: 'Estudo Social Técnico', desc: 'Análise aprofundada para fins judiciais ou de rede.', icon: BookOpen, color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
             { title: 'Relatório Conselhos/MP', desc: 'Documento padronizado para órgãos de fiscalização.', icon: Scale, color: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
             { title: 'Relatório de Vínculo Familiar', desc: 'Histórico de visitas e contatos com a família.', icon: Heart, color: 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' },
+            { title: 'Fluxo Geral de Atendimento', desc: 'Consolidado de atendimentos gerais não vinculados a um idoso específico.', icon: Activity, color: 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
           ].map((report, i) => (
             <motion.div 
               key={i} 

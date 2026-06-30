@@ -204,6 +204,56 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
   const [formData, setFormData] = useState<any>({});
   const [editingData, setEditingData] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: string } | null>(null);
+  const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+
+  const toggleSelectEvolution = (id: string) => {
+    setSelectedEvolutionIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllEvolutions = (displayed: any[]) => {
+    const allIds = displayed.map(e => e.id);
+    const areAllSelected = allIds.every(id => selectedEvolutionIds.includes(id));
+    if (areAllSelected) {
+      setSelectedEvolutionIds(prev => prev.filter(id => !allIds.includes(id)));
+    } else {
+      setSelectedEvolutionIds(prev => Array.from(new Set([...prev, ...allIds])));
+    }
+  };
+
+  const handleDownloadSelectedEvolutions = async () => {
+    if (selectedEvolutionIds.length === 0) {
+      showToast('Selecione ao menos uma evolução para baixar/imprimir', 'error');
+      return;
+    }
+    const filtered = (evolutions || []).filter(e => selectedEvolutionIds.includes(e.id));
+    filtered.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    const data = filtered.map(evo => {
+      const patient = (patients || []).find(p => p.id === evo.patientId);
+      const displayName = evo.patientIds && evo.patientIds.length > 1 
+        ? evo.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+        : (patient?.name || 'N/A');
+
+      return [
+        safeDateFormat(evo.date, 'dd/MM/yyyy') + (evo.time ? ` às ${evo.time}` : ''),
+        displayName,
+        evo.activityTitle || 'N/A',
+        evo.participation || 'N/A',
+        evo.notes || 'N/A'
+      ];
+    });
+
+    await generateModernPDF({
+      title: 'Evoluções Pedagógicas Selecionadas',
+      subtitle: `Documento gerado em ${format(new Date(), 'dd/MM/yyyy HH:mm')} - Total: ${filtered.length} registros`,
+      columns: ['Data/Hora', 'Idoso(s)', 'Oficina/Atividade', 'Participação', 'Notas/Evolução'],
+      data,
+      fileName: `evolucoes_pedagogicas_selecionadas_${new Date().getTime()}`,
+      orientation: 'portrait'
+    });
+  };
   const [viewingEvo, setViewingEvo] = useState<any | null>(null);
   const [viewingAct, setViewingAct] = useState<any | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -2185,66 +2235,125 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
               ))}
             </select>
           </div>
-        <div className="space-y-3">
-          {(evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).slice().sort((a, b) => {
-            const dateDiff = b.date.localeCompare(a.date);
-            if (dateDiff !== 0) return dateDiff;
-            return (b.time || '').localeCompare(a.time || '');
-          }).slice(0, 8).map((evolution) => {
-            const patient = (patients || []).find(p => p.id === evolution.patientId);
+
+          {/* Barra de Seleção em Lote */}
+          {(() => {
+            const displayedEvos = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).slice().sort((a, b) => {
+              const dateDiff = b.date.localeCompare(a.date);
+              if (dateDiff !== 0) return dateDiff;
+              return (b.time || '').localeCompare(a.time || '');
+            });
+            const allSelected = displayedEvos.length > 0 && displayedEvos.every(e => selectedEvolutionIds.includes(e.id));
+            const someSelected = displayedEvos.some(e => selectedEvolutionIds.includes(e.id));
+
             return (
-              <div key={evolution.id} className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex items-center justify-between hover:shadow-sm transition-shadow">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
-                    {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={el => {
+                        if (el) {
+                          el.indeterminate = someSelected && !allSelected;
+                        }
+                      }}
+                      onChange={() => handleSelectAllEvolutions(displayedEvos)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      {selectedEvolutionIds.length === 0 
+                        ? 'Nenhuma evolução selecionada' 
+                        : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+                    </span>
                   </div>
-                    <div>
-                      <p className="text-sm font-black text-gray-900 dark:text-white">
-                        {evolution.patientIds && evolution.patientIds.length > 1 
-                          ? evolution.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-                          : (patient?.name || 'N/A')}
-                      </p>
-                      <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black">
-                        {evolution.activityTitle} • {safeDateFormat(evolution.date, 'dd/MM')}{evolution.time ? ` às ${evolution.time}` : ''}
-                      </p>
+                  {selectedEvolutionIds.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedEvolutionIds([])}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      >
+                        Limpar Seleção
+                      </button>
+                      <button
+                        onClick={handleDownloadSelectedEvolutions}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+                      >
+                        <Printer size={14} />
+                        Imprimir Selecionadas
+                      </button>
                     </div>
+                  )}
                 </div>
-                <div className="text-right">
-                  <span className={cn(
-                    "text-[10px] font-black px-2 py-0.5 rounded-full uppercase border",
-                    evolution.participation === 'ATIVO' ? "bg-green-50 text-green-700 border-green-100" : "bg-yellow-50 text-yellow-700 border-yellow-100"
-                  )}>
-                    {evolution.participation}
-                  </span>
-                  <p className="text-[10px] text-gray-900 dark:text-gray-400 mt-1 font-black">{safeDateFormat(evolution.date, 'dd/MM HH:mm')}</p>
+
+                <div className="space-y-3">
+                  {displayedEvos.slice(0, 8).map((evolution) => {
+                    const patient = (patients || []).find(p => p.id === evolution.patientId);
+                    const isSelected = selectedEvolutionIds.includes(evolution.id);
+                    return (
+                      <div key={evolution.id} className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex gap-4 items-center justify-between hover:shadow-sm transition-shadow">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <input 
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectEvolution(evolution.id)}
+                            className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                          />
+                          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
+                            {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-gray-900 dark:text-white truncate">
+                              {evolution.patientIds && evolution.patientIds.length > 1 
+                                ? evolution.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                                : (patient?.name || 'N/A')}
+                            </p>
+                            <p className="text-[11px] text-gray-900 dark:text-gray-400 font-black truncate">
+                              {evolution.activityTitle} • {safeDateFormat(evolution.date, 'dd/MM')}{evolution.time ? ` às ${evolution.time}` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <div className="text-right">
+                            <span className={cn(
+                              "text-[10px] font-black px-2 py-0.5 rounded-full uppercase border",
+                              evolution.participation === 'ATIVO' ? "bg-green-50 text-green-700 border-green-100" : "bg-yellow-50 text-yellow-700 border-yellow-100"
+                            )}>
+                              {evolution.participation}
+                            </span>
+                            <p className="text-[10px] text-gray-900 dark:text-gray-400 mt-1 font-black">{safeDateFormat(evolution.date, 'dd/MM HH:mm')}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={() => setViewingEvo(evolution)}
+                              className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Visualizar 👁️"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => openModal('evolution', evolution)}
+                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Editar ✏️"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirm({ id: evolution.id, type: 'evolution' })}
+                              className="p-1.5 text-gray-400 hover:text-red-655 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Excluir 🗑️"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="flex gap-1 ml-4">
-                  <button 
-                    onClick={() => setViewingEvo(evolution)}
-                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Visualizar 👁️"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    onClick={() => openModal('evolution', evolution)}
-                    className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                    title="Editar ✏️"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button 
-                    onClick={() => setDeleteConfirm({ id: evolution.id, type: 'evolution' })}
-                    className="p-1.5 text-gray-400 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Excluir 🗑️"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              </>
             );
-          })}
-        </div>
+          })()}
         </div>
       </div>
     </div>

@@ -19,6 +19,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   PSICOLOGA: 'Psicóloga',
   PEDAGOGA: 'Pedagoga',
   ENFERMEIRA: 'Enfermeira',
+  TECNICO_ENFERMAGEM: 'Técnico de Enfermagem',
   FISIOTERAPEUTA: 'Fisioterapeuta',
   NUTRICIONISTA: 'Nutricionista',
   FABRICANTE_FRALDAS: 'Fabricante de Fraldas',

@@ -2580,9 +2580,38 @@ const DashboardSection = ({
   );
 };
 
-const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Elderly[], evolutions: EvolutionRecord[], pias: PIA[], showToast: (msg: string, type?: 'success' | 'error') => void }) => {
+const ElderlySection = ({ 
+  elderly, 
+  evolutions, 
+  pias, 
+  showToast,
+  nursingPatients,
+  physioPatients,
+  psychPatients,
+  pedagogyPatients,
+  socialPatients,
+  nutritionPatients
+}: { 
+  elderly: Elderly[], 
+  evolutions: EvolutionRecord[], 
+  pias: PIA[], 
+  showToast: (msg: string, type?: 'success' | 'error') => void,
+  nursingPatients: NursingPatient[],
+  physioPatients: PhysioPatient[],
+  psychPatients: PsychPatient[],
+  pedagogyPatients: PedagogyPatient[],
+  socialPatients: SocialPatient[],
+  nutritionPatients: NutritionPatient[]
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedElderly, setSelectedElderly] = useState<Elderly | null>(null);
+
+  const nursingData = selectedElderly ? nursingPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
+  const physioData = selectedElderly ? physioPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
+  const psychData = selectedElderly ? psychPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
+  const pedagogyData = selectedElderly ? pedagogyPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
+  const socialData = selectedElderly ? socialPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
+  const nutritionData = selectedElderly ? nutritionPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingElderly, setEditingElderly] = useState<Elderly | null>(null);
@@ -3350,34 +3379,189 @@ const ElderlySection = ({ elderly, evolutions, pias, showToast }: { elderly: Eld
                   </div>
 
                   <div className="space-y-8">
-                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-2xl border border-green-100 dark:border-green-900/30">
-                      <h4 className="font-bold text-green-800 dark:text-green-400 mb-4">Informações de Saúde</h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-green-600 dark:text-green-500">Tipo Sanguíneo</span>
-                          <span className="font-bold text-green-800 dark:text-green-300">O+</span>
+                    <div className="bg-green-50/75 dark:bg-green-950/20 p-6 rounded-3xl border border-green-100 dark:border-green-900/30 space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-green-100/50 dark:border-green-900/30">
+                        <Activity className="text-green-600 dark:text-green-400" size={18} />
+                        <h4 className="font-extrabold text-green-800 dark:text-green-300 text-sm uppercase tracking-wider">Informações de Saúde</h4>
+                      </div>
+                      
+                      {/* Enfermagem */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          Enfermagem
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-2 border border-green-100/30 dark:border-green-900/20">
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Diagnóstico: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{nursingData?.diagnosis || 'Não informado'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Comorbidades: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{nursingData?.comorbidities || 'Não informado'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Alergias: </span>
+                            <span className="font-bold text-red-600 dark:text-red-400">{nursingData?.allergies || 'Nenhuma'}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 pt-1">
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Risco: </span>
+                              <span className={cn(
+                                "font-bold px-1.5 py-0.5 rounded text-[10px]",
+                                nursingData?.riskLevel === 'ALTO' ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+                                nursingData?.riskLevel === 'MEDIO' ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
+                                "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              )}>{nursingData?.riskLevel || 'BAIXO'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Risco de Queda: </span>
+                              <span className="font-bold text-gray-800 dark:text-gray-200">{nursingData?.fallRisk || 'BAIXO'}</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Grau Cuidado: </span>
+                              <span className="font-bold text-gray-800 dark:text-gray-200">{nursingData?.careDegree || 'Não informado'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Acamado: </span>
+                              <span className="font-bold text-gray-800 dark:text-gray-200">{nursingData?.isBedridden ? 'Sim' : 'Não'}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-green-600 dark:text-green-500">Alergias</span>
-                          <span className="font-bold text-red-600 dark:text-red-400">Dipirona</span>
+                      </div>
+
+                      {/* Fisioterapia */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                          Fisioterapia
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-2 border border-green-100/30 dark:border-green-900/20">
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Diagnóstico: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{physioData?.diagnosis || 'Não informado'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Limitações Físicas: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{physioData?.observations || 'Não informado'}</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-green-600 dark:text-green-500">Medicação</span>
-                          <span className="font-bold text-green-800 dark:text-green-300">Contínua (3)</span>
+                      </div>
+
+                      {/* Psicologia */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                          Psicologia
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-1 border border-green-100/30 dark:border-green-900/20">
+                          <p className="font-bold text-gray-500 dark:text-gray-400">Histórico de Vida:</p>
+                          <p className="text-gray-700 dark:text-gray-300 text-[11px] leading-relaxed line-clamp-3">
+                            {psychData?.lifeHistory || 'Nenhum histórico registrado.'}
+                          </p>
+                          <div className="pt-1 flex justify-between items-center">
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Recebe Visitas:</span>
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{psychData?.hasVisits ? 'Sim' : 'Não'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-                      <h4 className="font-bold text-blue-800 dark:text-blue-400 mb-4">Contatos de Emergência</h4>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-xs text-blue-600 dark:text-blue-500">Filho: Carlos Silva</p>
-                          <p className="text-sm font-bold text-blue-800 dark:text-blue-300">(98) 98877-6655</p>
+                    <div className="bg-blue-50/70 dark:bg-blue-950/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900/30 space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-blue-100/50 dark:border-blue-900/30">
+                        <Users className="text-blue-600 dark:text-blue-400" size={18} />
+                        <h4 className="font-extrabold text-blue-800 dark:text-blue-300 text-sm uppercase tracking-wider">Social, Pedagógico e Nutrição</h4>
+                      </div>
+
+                      {/* Assistente Social */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                          Assistência Social
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-2 border border-blue-100/30 dark:border-blue-900/20">
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Responsável Legal: </span>
+                            <span className="font-bold text-gray-800 dark:text-gray-200">{socialData?.responsibleName || selectedElderly.responsibleName || 'Não informado'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Contato Resp.: </span>
+                            <span className="font-bold text-blue-600 dark:text-blue-400">{socialData?.responsiblePhone || selectedElderly.responsiblePhone || 'Não informado'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Endereço: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{socialData?.address || selectedElderly.address || 'Não informado'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Benefício: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{socialData?.benefits?.join(', ') || 'Nenhum'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Status: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{socialData?.benefitStatus || 'Não informado'}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs text-blue-600 dark:text-blue-500">Filha: Ana Silva</p>
-                          <p className="text-sm font-bold text-blue-800 dark:text-blue-300">(98) 99911-2233</p>
+                      </div>
+
+                      {/* Pedagoga */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                          Pedagogia
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-2 border border-blue-100/30 dark:border-blue-900/20">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Escolaridade: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{pedagogyData?.schooling || 'Não informada'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Nível: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{pedagogyData?.literacyLevel || 'Não informado'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Profissão Anterior: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{pedagogyData?.previousProfession || 'Não informada'}</span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Limitações Cognitivas: </span>
+                            <span className="text-gray-800 dark:text-gray-200">{pedagogyData?.cognitiveLimitations || 'Nenhuma registrada'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Nutricionista */}
+                      <div className="space-y-2">
+                        <h5 className="text-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Nutrição
+                        </h5>
+                        <div className="bg-white/60 dark:bg-gray-800/40 p-3 rounded-2xl text-xs space-y-2 border border-blue-100/30 dark:border-blue-900/20">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Tipo Dieta: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{nutritionData?.dietType || 'LIVRE'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400 font-sans">Consistência: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{nutritionData?.consistency || 'NORMAL'}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <span className="font-bold text-gray-500 dark:text-gray-400">Alergias Alimentares: </span>
+                            <span className="font-bold text-red-600 dark:text-red-400">{nutritionData?.allergies?.join(', ') || 'Nenhuma'}</span>
+                          </div>
+                          {nutritionData?.intolerances && nutritionData.intolerances.length > 0 && (
+                            <div>
+                              <span className="font-bold text-gray-500 dark:text-gray-400">Intolerâncias: </span>
+                              <span className="text-gray-800 dark:text-gray-200">{nutritionData.intolerances.join(', ')}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -12475,6 +12659,204 @@ export default function App() {
     };
     seedFranciscoRequest();
 
+    // --- Data Seeding for Martinha Cardoso (User Request) ---
+    const seedMartinhaRequest = async () => {
+      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
+      
+      try {
+        const qCpf = query(collection(db, 'elderly'), where('cpf', '==', '70879540320'));
+        const snapCpf = await getDocs(qCpf);
+        
+        const qName = query(collection(db, 'elderly'), where('name', '==', 'Martinha Cardoso'));
+        const snapName = await getDocs(qName);
+
+        let elderlyId = '';
+        const martinhaData = {
+          name: 'Martinha Cardoso',
+          fullName: 'Martinha Cardoso',
+          cpf: '70879540320',
+          rg: '03002171920024',
+          birthDate: '1944-01-03',
+          entryDate: '2024-09-18',
+          gender: 'F',
+          status: 'ATIVO',
+          lastProfession: 'Aposentada',
+          schooling: 'Não Alfabetizada',
+          literacyLevel: 'ANALFABETO',
+          responsibleName: 'Maria Enilde Lima Brito',
+          responsiblePhone: '98981054117',
+          medications: 'Ficha da saúde',
+          diagnoses: 'Baixa Visão, Catarata',
+          observations: 'Naturalidade: Itapecuru Mirim MA. Solteira. Cor: Branca. Situação Socioeconômica: Aposentada. Imóvel? Não. Empréstimo? Não. Relação com a família: Conflituosa. Filhos? Sim. Atividade em grupo: Ausente. Objetivo: Acompanhamento Social. Curadora: Maria Enilde Lima Brito (CPF: 27700802882, Endereço: Casa OAMI, Estrada de Viana, s/n Alto São Francisco).'
+        };
+
+        if (!snapCpf.empty) {
+          elderlyId = snapCpf.docs[0].id;
+          await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
+          console.log("Dados de Martinha Cardoso atualizados no cadastro central.");
+        } else if (!snapName.empty) {
+          elderlyId = snapName.docs[0].id;
+          await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
+          console.log("Dados de Martinha Cardoso atualizados no cadastro central.");
+        } else {
+          const docRef = await addDoc(collection(db, 'elderly'), cleanData(martinhaData));
+          elderlyId = docRef.id;
+          console.log("Cadastro de Martinha Cardoso criado no sistema central.");
+        }
+
+        if (elderlyId) {
+          // --- PIA (Plano Individual de Atendimento) ---
+          const qPias = query(collection(db, 'pias'), where('elderlyId', '==', elderlyId));
+          const snapPias = await getDocs(qPias);
+          const piaData = {
+            elderlyId,
+            date: '2024-09-18',
+            responsible: 'Maria Enilde Lima Brito (Curadora)',
+            status: 'CONCLUIDO',
+            hasBPC: false,
+            hasPension: true,
+            hasLoans: false,
+            hasProperty: false,
+            loanDetails: '',
+            monthlyIncome: 1412,
+            familyInvolvement: 'BAIXO',
+            familyObservations: 'Relação com a família descrita como conflituosa. Possui filhos.',
+            healthStatus: 'Baixa Visão, Catarata. Possui deficiência visual. Restrição alimentar: Não. Uso de substâncias psicoativas: Não.',
+            medications: 'Ficha da saúde',
+            mobilityStatus: 'Baixa visão / Catarata. Possui deficiência.',
+            objectives: 'Acompanhamento Social',
+            actions: 'Atividade em grupo: Ausente. Objetivo: Acompanhamento Social.',
+            observations: 'Naturalidade: Itapecuru Mirim MA. Cor: Branca. Estado Civil: Solteira. Grau de Formação: Não Alfabetizada.'
+          };
+
+          if (!snapPias.empty) {
+            await updateDoc(doc(db, 'pias', snapPias.docs[0].id), cleanData(piaData));
+          } else {
+            await addDoc(collection(db, 'pias'), cleanData(piaData));
+          }
+
+          // --- Assistente Social (Social Patients) ---
+          const qSocial = query(collection(db, 'socialPatients'), where('elderlyId', '==', elderlyId));
+          const snapSocial = await getDocs(qSocial);
+          const socialData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            birthDate: '1944-01-03',
+            schooling: 'Não Alfabetizada',
+            previousProfession: 'Aposentada',
+            address: 'Casa OAMI, Estrada de Viana, s/n Alto São Francisco',
+            phone: '98981054117',
+            responsibleName: 'Maria Enilde Lima Brito (Curadora)',
+            responsiblePhone: '98981054117',
+            benefits: ['APOSENTADORIA'],
+            benefitStatus: 'RECEBE'
+          };
+
+          if (!snapSocial.empty) {
+            await updateDoc(doc(db, 'socialPatients', snapSocial.docs[0].id), cleanData(socialData));
+          } else {
+            await addDoc(collection(db, 'socialPatients'), cleanData({ ...socialData, createdAt: new Date().toISOString() }));
+          }
+
+          // --- Fisioterapeuta (Physio Patients) ---
+          const qPhysio = query(collection(db, 'physioPatients'), where('elderlyId', '==', elderlyId));
+          const snapPhysio = await getDocs(qPhysio);
+          const physioData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            diagnosis: 'Baixa Visão, Catarata',
+            phone: '98981054117',
+            observations: 'Deficiência visual devido a baixa visão e catarata.',
+            category: 'IDOSOS'
+          };
+
+          if (!snapPhysio.empty) {
+            await updateDoc(doc(db, 'physioPatients', snapPhysio.docs[0].id), cleanData(physioData));
+          } else {
+            await addDoc(collection(db, 'physioPatients'), cleanData({ ...physioData, createdAt: new Date().toISOString() }));
+          }
+
+          // --- Enfermagem (Nursing Patients) ---
+          const qNursing = query(collection(db, 'nursingPatients'), where('elderlyId', '==', elderlyId));
+          const snapNursing = await getDocs(qNursing);
+          const nursingData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            diagnosis: 'Baixa Visão, Catarata',
+            comorbidities: 'Catarata, Baixa Visão',
+            allergies: 'Nenhuma',
+            familyContact: 'Maria Enilde Lima Brito (98981054117)',
+            riskLevel: 'MEDIO',
+            isBedridden: false,
+            fallRisk: 'ALTO',
+            careDegree: 'Grau II'
+          };
+
+          if (!snapNursing.empty) {
+            await updateDoc(doc(db, 'nursingPatients', snapNursing.docs[0].id), cleanData(nursingData));
+          } else {
+            await addDoc(collection(db, 'nursingPatients'), cleanData({ ...nursingData, createdAt: new Date().toISOString() }));
+          }
+
+          // --- Psicologia (Psych Patients) ---
+          const qPsych = query(collection(db, 'psychPatients'), where('elderlyId', '==', elderlyId));
+          const snapPsych = await getDocs(qPsych);
+          const psychData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            familyContact: 'Maria Enilde Lima Brito (98981054117)',
+            lifeHistory: 'Naturalidade de Itapecuru Mirim MA. Solteira, com filhos, histórico de relação familiar conflituosa.',
+            hasVisits: false
+          };
+
+          if (!snapPsych.empty) {
+            await updateDoc(doc(db, 'psychPatients', snapPsych.docs[0].id), cleanData(psychData));
+          } else {
+            await addDoc(collection(db, 'psychPatients'), cleanData({ ...psychData, createdAt: new Date().toISOString() }));
+          }
+
+          // --- Pedagogia (Pedagogy Patients) ---
+          const qPedagogy = query(collection(db, 'pedagogyPatients'), where('elderlyId', '==', elderlyId));
+          const snapPedagogy = await getDocs(qPedagogy);
+          const pedagogyData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            schooling: 'Não Alfabetizada',
+            literacyLevel: 'ANALFABETO',
+            previousProfession: 'Aposentada',
+            cognitiveLimitations: 'Baixa visão e catarata, dificultando atividades visuais.'
+          };
+
+          if (!snapPedagogy.empty) {
+            await updateDoc(doc(db, 'pedagogyPatients', snapPedagogy.docs[0].id), cleanData(pedagogyData));
+          } else {
+            await addDoc(collection(db, 'pedagogyPatients'), cleanData({ ...pedagogyData, createdAt: new Date().toISOString() }));
+          }
+
+          // --- Nutrição (Nutrition Patients) ---
+          const qNutrition = query(collection(db, 'nutritionPatients'), where('elderlyId', '==', elderlyId));
+          const snapNutrition = await getDocs(qNutrition);
+          const nutritionData = {
+            elderlyId,
+            name: 'Martinha Cardoso',
+            comorbidities: 'Baixa visão, Catarata',
+            allergies: []
+          };
+
+          if (!snapNutrition.empty) {
+            await updateDoc(doc(db, 'nutritionPatients', snapNutrition.docs[0].id), cleanData(nutritionData));
+          } else {
+            await addDoc(collection(db, 'nutritionPatients'), cleanData({ ...nutritionData, createdAt: new Date().toISOString() }));
+          }
+
+          console.log("Dados de Martinha Cardoso semeados/atualizados com sucesso em todas as especialidades!");
+        }
+      } catch (error) {
+        console.error("Erro ao semear dados de Martinha Cardoso:", error);
+      }
+    };
+    seedMartinhaRequest();
+
     // Ensure Fernanda Kellen is linked strictly to the Administrative Assistant role
     const ensureFernandaKellenRole = async () => {
       // Only execute this check and sync if the logged-in user is franciaraeabreucoelho@gmail.com to avoid permission errors for other roles/users
@@ -15141,7 +15523,20 @@ export default function App() {
           showToast={showToast}
         />
       );
-      case 'elderly': return <ElderlySection elderly={elderly} evolutions={evolutions} pias={pias} showToast={showToast} />;
+      case 'elderly': return (
+        <ElderlySection 
+          elderly={elderly} 
+          evolutions={evolutions} 
+          pias={pias} 
+          showToast={showToast} 
+          nursingPatients={nursingPatientsList}
+          physioPatients={physioPatientsList}
+          psychPatients={psychPatientsList}
+          pedagogyPatients={pedagogyPatientsList}
+          socialPatients={socialPatientsList}
+          nutritionPatients={nutritionPatientsList}
+        />
+      );
       case 'physio': return (
         <PhysioSection 
           user={user}

@@ -28,6 +28,40 @@ async function startServer() {
     });
   }
 
+  // Helper to execute generateContent with automatic retry and model fallback
+  async function generateContentWithRetry(ai: any, params: any, retries = 2, delay = 1000) {
+    let lastError: any = null;
+    const modelsToTry = [params.model, 'gemini-flash-latest'];
+    
+    for (const modelCandidate of modelsToTry) {
+      if (!modelCandidate) continue;
+      
+      const currentParams = { ...params, model: modelCandidate };
+      
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await ai.models.generateContent(currentParams);
+        } catch (error: any) {
+          lastError = error;
+          console.warn(`[Gemini API] Attempt ${attempt} failed for model ${modelCandidate}:`, error.message || error);
+          
+          const errorMessage = (error.message || '').toLowerCase();
+          // If it's a client 400 error (e.g. invalid parameter/unsupported response schema format),
+          // don't bother retrying with same model, break to fallback or raise
+          if (errorMessage.includes("400") || errorMessage.includes("invalid argument")) {
+            break;
+          }
+          
+          if (attempt < retries) {
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
+          }
+        }
+      }
+    }
+    throw lastError;
+  }
+
   // --- API ROUTES FIRST ---
 
   // Health check
@@ -88,7 +122,7 @@ REGRAS:
 Seja proativo na detecção de comandos.
 `;
 
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [{ parts: [{ text: `Profissional: ${userProfile || "Desconhecido"}\n\nMensagem: ${text}` }] }],
         config: {
@@ -142,7 +176,7 @@ ${formSchema}
 TEXTO OCR:
 ${text}`;
 
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [{ parts: [{ text: prompt }] }],
         config: {
@@ -174,7 +208,7 @@ Retorne APENAS o texto corrigido, sem comentários adicionais.
 TEXTO ORIGINAL:
 ${text}`;
 
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [{ parts: [{ text: prompt }] }],
       });
@@ -216,7 +250,7 @@ Preencha os seguintes campos com a maior precisão possível:
 
 Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
 
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [imagePart, { text: prompt }],
         config: {
@@ -256,7 +290,7 @@ Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
       }
 
       const ai = getAIClient();
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [
           {
@@ -285,7 +319,7 @@ Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
       }
 
       const ai = getAIClient();
-      const response = await ai.models.generateContent({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.5-flash",
         contents: [
           {
