@@ -3396,6 +3396,91 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-transparent focus:border-blue-500 rounded-2xl outline-none transition-all resize-none font-medium" 
                   />
                 </div>
+
+                {/* Seleção de Co-workers / Outros Profissionais da Instituição */}
+                <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Co-workers / Profissionais Colaboradores</label>
+                      <span className="text-[10px] text-gray-400">Selecione quem participou desta ação em conjunto</span>
+                    </div>
+                    {formData.coWorkers && formData.coWorkers.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setFormData({ ...formData, coWorkers: [] })}
+                        className="text-[10px] text-red-500 font-bold uppercase tracking-wider"
+                      >
+                        Limpar Seleção ({formData.coWorkers.length})
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-transparent focus-within:border-blue-500 transition-all">
+                      <Search size={16} className="text-gray-400" />
+                      <input 
+                        type="text"
+                        placeholder="Buscar profissional por nome ou cargo..."
+                        value={profSearch}
+                        onChange={(e) => setProfSearch(e.target.value)}
+                        className="bg-transparent text-sm w-full outline-none text-gray-800 dark:text-white"
+                      />
+                      {profSearch && (
+                        <button type="button" onClick={() => setProfSearch('')} className="text-gray-400 hover:text-gray-650">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1">
+                    {professionals
+                      .filter((p: any) => {
+                        if (!profSearch) return true;
+                        
+                        const term = profSearch.toLowerCase();
+                        const pName = (p.name || '').toLowerCase();
+                        const pRole = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                        return pName.includes(term) || pRole.includes(term);
+                      })
+                      .map((p: any) => {
+                        const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              const list = formData.coWorkers || [];
+                              const identifier = p.id || p.email;
+                              if (isSelected) {
+                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                              } else {
+                                setFormData({ ...formData, coWorkers: [...list, identifier] });
+                              }
+                            }}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-2xl border text-left transition-all",
+                              isSelected 
+                                ? "bg-blend-color-burn bg-blue-500/10 dark:bg-blue-950/20 border-blue-400 dark:border-blue-800 text-blue-900 dark:text-blue-300"
+                                : "bg-white dark:bg-gray-850 hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750 text-gray-700 dark:text-gray-300"
+                            )}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold truncate">{p.name}</p>
+                              <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-0.5">{ROLE_LABELS[p.role] || p.role}</p>
+                            </div>
+                            <div className={cn(
+                              "w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                              isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-gray-200 dark:border-gray-700 bg-transparent"
+                            )}>
+                              {isSelected && <CheckCircle2 size={12} />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    }
+                  </div>
+                </div>
               </div>
             )}
 

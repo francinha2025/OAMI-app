@@ -1005,5 +1005,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if hasAnyRole(['PRESIDENTE', 'COORDENADORA', 'PROJETISTA']) || isAdmin();
     }
+
+    match /adminReminders/{reminderId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
   }
 }

@@ -171,39 +171,120 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalType, setModalType] = useState<string>('');
 
+  // Calculations for All Time Totals
+  const allTimeStats = useMemo(() => {
+    const totalRaw = (rawProductions || []).reduce((acc, p) => acc + (p.quantity || 0), 0);
+    const totalWipIn = (wipProcessings || []).reduce((acc, p) => acc + (p.quantityIn || 0), 0);
+    const totalWipOut = (wipProcessings || []).reduce((acc, p) => acc + (p.quantityOut || 0), 0);
+    const totalFinal = (finalPackings || []).reduce((acc, p) => acc + (p.quantityPackaged || 0), 0);
+    const totalDonated = (donations || []).reduce((acc, p) => acc + (p.quantity || 0), 0);
+    const wipLoss = Math.max(0, totalWipIn - totalWipOut);
+    const stockBalance = Math.max(0, totalFinal - totalDonated);
+
+    return {
+      totalRaw,
+      totalWipOut,
+      totalFinal,
+      totalDonated,
+      wipLoss,
+      stockBalance
+    };
+  }, [rawProductions, wipProcessings, finalPackings, donations]);
+
   // Calculations for Dashboard
   const dashboardData = useMemo(() => {
-    const monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
-    const monthEnd = endOfMonth(monthStart);
+    const isAllMonths = selectedMonth === 'ALL';
 
-    const filteredRaw = rawProductions.filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
-    const filteredWip = wipProcessings.filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
-    const filteredFinal = finalPackings.filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
-    const currentGoal = goals.find(g => g.month === selectedMonth);
+    let filteredRaw = rawProductions || [];
+    let filteredWip = wipProcessings || [];
+    let filteredFinal = finalPackings || [];
+    let filteredDonations = donations || [];
 
-    const totalRaw = filteredRaw.reduce((acc, p) => acc + p.quantity, 0);
-    const totalWipIn = filteredWip.reduce((acc, p) => acc + p.quantityIn, 0);
-    const totalWipOut = filteredWip.reduce((acc, p) => acc + p.quantityOut, 0);
-    const totalFinal = filteredFinal.reduce((acc, p) => acc + p.quantityPackaged, 0);
+    if (!isAllMonths) {
+      try {
+        const monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
+        const monthEnd = endOfMonth(monthStart);
 
-    const wipLoss = totalWipIn - totalWipOut;
+        filteredRaw = (rawProductions || []).filter(p => p.date && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
+        filteredWip = (wipProcessings || []).filter(p => p.date && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
+        filteredFinal = (finalPackings || []).filter(p => p.date && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
+        filteredDonations = (donations || []).filter(p => p.date && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    const totalRaw = filteredRaw.reduce((acc, p) => acc + (p.quantity || 0), 0);
+    const totalWipIn = filteredWip.reduce((acc, p) => acc + (p.quantityIn || 0), 0);
+    const totalWipOut = filteredWip.reduce((acc, p) => acc + (p.quantityOut || 0), 0);
+    const totalFinal = filteredFinal.reduce((acc, p) => acc + (p.quantityPackaged || 0), 0);
+    const totalDonated = filteredDonations.reduce((acc, p) => acc + (p.quantity || 0), 0);
+
+    const wipLoss = Math.max(0, totalWipIn - totalWipOut);
     const lossRate = totalWipIn > 0 ? (wipLoss / totalWipIn) * 100 : 0;
     const efficiency = totalRaw > 0 ? (totalFinal / totalRaw) * 100 : 0;
     
-    // Daily breakdown for line chart
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const dailyData = days.map(day => {
-      const dStr = format(day, 'yyyy-MM-dd');
-      const raw = filteredRaw.filter(p => p.date === dStr).reduce((acc, p) => acc + p.quantity, 0);
-      const wip = filteredWip.filter(p => p.date === dStr).reduce((acc, p) => acc + p.quantityOut, 0);
-      const final = filteredFinal.filter(p => p.date === dStr).reduce((acc, p) => acc + p.quantityPackaged, 0);
-      return {
-        name: format(day, 'dd/MM'),
-        producaoBruta: raw,
-        processamento: wip,
-        embalagem: final
-      };
-    }).filter(d => d.producaoBruta > 0 || d.processamento > 0 || d.embalagem > 0);
+    const currentGoal = isAllMonths 
+      ? goals.reduce((acc, g) => acc + (g.targetQuantity || 0), 0)
+      : goals.find(g => g.month === selectedMonth)?.targetQuantity || 0;
+
+    let chartData: Array<{ name: string; producaoBruta: number; processamento: number; embalagem: number }> = [];
+
+    if (isAllMonths) {
+      const monthMap: Record<string, { producaoBruta: number; processamento: number; embalagem: number }> = {};
+      
+      filteredRaw.forEach(p => {
+        if (!p.date) return;
+        const mKey = p.date.substring(0, 7);
+        if (!monthMap[mKey]) monthMap[mKey] = { producaoBruta: 0, processamento: 0, embalagem: 0 };
+        monthMap[mKey].producaoBruta += (p.quantity || 0);
+      });
+
+      filteredWip.forEach(p => {
+        if (!p.date) return;
+        const mKey = p.date.substring(0, 7);
+        if (!monthMap[mKey]) monthMap[mKey] = { producaoBruta: 0, processamento: 0, embalagem: 0 };
+        monthMap[mKey].processamento += (p.quantityOut || 0);
+      });
+
+      filteredFinal.forEach(p => {
+        if (!p.date) return;
+        const mKey = p.date.substring(0, 7);
+        if (!monthMap[mKey]) monthMap[mKey] = { producaoBruta: 0, processamento: 0, embalagem: 0 };
+        monthMap[mKey].embalagem += (p.quantityPackaged || 0);
+      });
+
+      chartData = Object.keys(monthMap).sort().map(mKey => {
+        let label = mKey;
+        try {
+          label = format(parseISO(`${mKey}-01`), 'MMM/yy', { locale: ptBR });
+        } catch (e) {}
+        return {
+          name: label,
+          producaoBruta: monthMap[mKey].producaoBruta,
+          processamento: monthMap[mKey].processamento,
+          embalagem: monthMap[mKey].embalagem
+        };
+      });
+    } else {
+      try {
+        const monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
+        const monthEnd = endOfMonth(monthStart);
+        const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+        chartData = days.map(day => {
+          const dStr = format(day, 'yyyy-MM-dd');
+          const raw = filteredRaw.filter(p => p.date === dStr).reduce((acc, p) => acc + (p.quantity || 0), 0);
+          const wip = filteredWip.filter(p => p.date === dStr).reduce((acc, p) => acc + (p.quantityOut || 0), 0);
+          const final = filteredFinal.filter(p => p.date === dStr).reduce((acc, p) => acc + (p.quantityPackaged || 0), 0);
+          return {
+            name: format(day, 'dd/MM'),
+            producaoBruta: raw,
+            processamento: wip,
+            embalagem: final
+          };
+        }).filter(d => d.producaoBruta > 0 || d.processamento > 0 || d.embalagem > 0);
+      } catch (e) {}
+    }
 
     // Productivity by Package Type
     const packageTypes: Record<string, number> = {};
@@ -216,15 +297,16 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
       totalRaw,
       totalWipOut,
       totalFinal,
+      totalDonated,
       wipLoss,
       lossRate,
       efficiency,
-      goal: currentGoal?.targetQuantity || 0,
-      goalId: currentGoal?.id || null,
-      dailyData,
+      goal: currentGoal,
+      goalId: !isAllMonths ? goals.find(g => g.month === selectedMonth)?.id || null : null,
+      dailyData: chartData,
       pieData
     };
-  }, [rawProductions, wipProcessings, finalPackings, goals, selectedMonth]);
+  }, [rawProductions, wipProcessings, finalPackings, donations, goals, selectedMonth]);
 
   const handleEditRaw = (record: DiaperRawProduction) => {
     setRawForm({
@@ -458,26 +540,35 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   const handleExport = async (type: 'pdf' | 'word' | 'excel') => {
     setExporting(true);
     try {
-      const monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
-      const monthEnd = endOfMonth(monthStart);
-      const monthLabel = format(monthStart, 'MMMM yyyy', { locale: ptBR });
+      const isAllMonths = selectedMonth === 'ALL';
+      let monthLabel = 'Todos os Meses (Soma Total Acumulada)';
+      let monthStart: Date | null = null;
+      let monthEnd: Date | null = null;
 
-      const { totalRaw, totalFinal, wipLoss, lossRate, efficiency, goal } = dashboardData;
+      if (!isAllMonths) {
+        monthStart = startOfMonth(parseISO(`${selectedMonth}-01`));
+        monthEnd = endOfMonth(monthStart);
+        monthLabel = format(monthStart, 'MMMM yyyy', { locale: ptBR });
+      }
+
+      const { totalRaw, totalFinal, totalDonated, wipLoss, lossRate, efficiency, goal } = dashboardData;
 
       // 1. Prepare Summary Rows
       const summaryData = [
-        ['---', 'RESUMO EXECUTIVO DO PERÍODO', '---', '---', '---'],
+        ['---', isAllMonths ? 'RESUMO EXECUTIVO - SOMA TOTAL DE TODOS OS MESES' : 'RESUMO EXECUTIVO DO PERÍODO', '---', '---', '---'],
         ['Indicador', 'Valor Nominal', 'Percentual', 'Meta', 'Status'],
         ['Produção Bruta Total', `${totalRaw} un`, '-', '-', 'OK'],
-        ['Produção Finalizada', `${totalFinal} un`, `${efficiency.toFixed(1)}%`, `${goal} un`, totalFinal >= goal ? 'META ATINGIDA' : 'EM ANDAMENTO'],
+        ['Produção Finalizada', `${totalFinal} un`, `${efficiency.toFixed(1)}%`, isAllMonths ? `${goal} un (Acumulado)` : `${goal} un`, totalFinal >= goal ? 'META ATINGIDA' : 'EM ANDAMENTO'],
         ['Perda em Processamento', `${wipLoss} un`, `${lossRate.toFixed(1)}%`, '< 5%', lossRate > 5 ? 'ATENÇÃO' : 'NORMAL'],
+        ['Total Doado', `${totalDonated} un`, '-', '-', 'OK'],
+        ['Saldo Estimado Estoque', `${Math.max(0, totalFinal - totalDonated)} un`, '-', '-', 'DISPONÍVEL'],
         ['---', '---', '---', '---', '---'],
         ['', '', '', '', ''],
       ];
 
       // 2. Prepare Detailed Activity Log
-      const filteredRaw = rawProductions
-        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+      const filteredRaw = (rawProductions || [])
+        .filter(p => isAllMonths || (monthStart && monthEnd && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })))
         .map(p => ({
           date: p.date,
           activity: 'PRODUÇÃO BRUTA',
@@ -486,8 +577,8 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           resp: p.operator
         }));
 
-      const filteredWip = wipProcessings
-        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+      const filteredWip = (wipProcessings || [])
+        .filter(p => isAllMonths || (monthStart && monthEnd && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })))
         .flatMap(p => [
           {
             date: p.date,
@@ -505,8 +596,8 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           }] : [])
         ]);
 
-      const filteredFinal = finalPackings
-        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+      const filteredFinal = (finalPackings || [])
+        .filter(p => isAllMonths || (monthStart && monthEnd && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })))
         .map(p => ({
           date: p.date,
           activity: 'EMBALAGEM FINAL',
@@ -516,7 +607,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
         }));
 
       const filteredDonations = (donations || [])
-        .filter(p => isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd }))
+        .filter(p => isAllMonths || (monthStart && monthEnd && isWithinInterval(parseISO(p.date), { start: monthStart, end: monthEnd })))
         .map(p => ({
           date: p.date,
           activity: 'DOAÇÃO',
@@ -527,9 +618,9 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
       // Combine and Sort by Date
       const combinedActivities = [...filteredRaw, ...filteredWip, ...filteredFinal, ...filteredDonations]
-        .sort((a, b) => a.date.localeCompare(b.date))
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
         .map(a => [
-          format(parseISO(a.date), 'dd/MM/yyyy'),
+          a.date ? format(parseISO(a.date), 'dd/MM/yyyy') : '--/--/----',
           a.activity,
           a.details,
           a.qty.toString(),
@@ -579,10 +670,15 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
   const renderRawTab = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
         <div>
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white">Registro de Produção Bruta</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Atividade diária de costura e montagem primária.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white">Registro de Produção Bruta</h3>
+            <span className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-black uppercase tracking-wider">
+              Soma Total: {allTimeStats.totalRaw} un.
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Atividade diária de costura e montagem primária (Soma acumulada de todos os meses).</p>
         </div>
         <button 
           onClick={() => {
@@ -596,7 +692,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             });
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-200 dark:shadow-none"
+          className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-200 dark:shadow-none shrink-0"
         >
           <Plus size={20} />
           Nova Entrada
@@ -658,10 +754,15 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
   const renderWipTab = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
         <div>
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white">Evolução de Processamento (WIP)</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Corte, ajuste de bordas e preparação de núcleo.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white">Evolução de Processamento (WIP)</h3>
+            <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-black uppercase tracking-wider">
+              Soma Total Processada: {allTimeStats.totalWipOut} un.
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Corte, ajuste de bordas e preparação de núcleo (Perdas acumuladas: {allTimeStats.wipLoss} un.).</p>
         </div>
         <button 
           onClick={() => {
@@ -676,7 +777,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             });
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none"
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 dark:shadow-none shrink-0"
         >
           <Plus size={20} />
           Registrar Evolução
@@ -743,10 +844,15 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
   const renderFinalTab = () => (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
         <div>
-          <h3 className="text-xl font-bold text-gray-800 dark:text-white">Finalização e Embalagem</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Saída pronta para estoque e rastreabilidade por lote.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white">Finalização e Embalagem</h3>
+            <span className="px-3 py-1 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full text-xs font-black uppercase tracking-wider">
+              Soma Total Embalada: {allTimeStats.totalFinal} un.
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Saída pronta para estoque e rastreabilidade por lote (Soma acumulada de todos os meses).</p>
         </div>
         <button 
           onClick={() => {
@@ -761,7 +867,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             });
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-amber-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-200 dark:shadow-none"
+          className="flex items-center gap-2 bg-amber-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-200 dark:shadow-none shrink-0"
         >
           <Plus size={20} />
           Registrar Saída
@@ -826,22 +932,125 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     const { totalRaw, totalFinal, wipLoss, lossRate, efficiency, goal, dailyData, pieData } = dashboardData;
     const isGoalMet = totalFinal >= goal;
     const goalProgress = goal > 0 ? (totalFinal / goal) * 100 : 0;
+    const isAllMonths = selectedMonth === 'ALL';
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-        {/* Filtro de Mês */}
-        <div className="flex items-center justify-between bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <div>
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white">Relatório Mensal</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Análise de desempenho e perdas da fábrica.</p>
+        {/* Banner de Soma Total Geral (Todos os Meses) */}
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-green-700 text-white p-6 md:p-8 rounded-3xl shadow-lg relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none flex items-center pr-6">
+            <Package size={220} />
           </div>
-          <div className="flex gap-4">
-            <input 
-              type="month" 
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-2 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-green-500"
-            />
+          <div className="relative z-10 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-black uppercase tracking-wider text-white border border-white/30">
+                  Soma Total Acumulada • Histórico Completo
+                </span>
+                <h2 className="text-2xl md:text-3xl font-black mt-2 tracking-tight">
+                  Total Geral de Produção de Fraldas
+                </h2>
+                <p className="text-sm text-emerald-100 font-medium max-w-2xl mt-1">
+                  Somatório de todas as etapas produtivas, doações realizadas e saldo estimado em estoque abrangendo todos os meses registrados.
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedMonth(isAllMonths ? format(new Date(), 'yyyy-MM') : 'ALL')}
+                className={cn(
+                  "px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer",
+                  isAllMonths
+                    ? "bg-white text-emerald-800 ring-4 ring-white/30"
+                    : "bg-emerald-900/50 hover:bg-emerald-900/80 text-white border border-white/20"
+                )}
+              >
+                <BarChart3 size={16} />
+                {isAllMonths ? 'Voltar para Filtro Mensal' : 'Exibir Soma Total (Todos os Meses)'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+              <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20">
+                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Produção Bruta (Total)</p>
+                <p className="text-2xl md:text-3xl font-black text-white mt-1">{allTimeStats.totalRaw} <span className="text-xs font-normal text-emerald-200">un.</span></p>
+                <p className="text-[10px] text-emerald-200 mt-1">Costura & Montagem</p>
+              </div>
+
+              <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20">
+                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Fraldas Embaladas (Total)</p>
+                <p className="text-2xl md:text-3xl font-black text-white mt-1">{allTimeStats.totalFinal} <span className="text-xs font-normal text-emerald-200">un.</span></p>
+                <p className="text-[10px] text-emerald-200 mt-1">Prontas e Loteadas</p>
+              </div>
+
+              <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20">
+                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Doações Entregues (Total)</p>
+                <p className="text-2xl md:text-3xl font-black text-white mt-1">{allTimeStats.totalDonated} <span className="text-xs font-normal text-emerald-200">un.</span></p>
+                <p className="text-[10px] text-emerald-200 mt-1">Saídas para Beneficiários</p>
+              </div>
+
+              <div className="bg-white/15 backdrop-blur-md p-4 rounded-2xl border border-white/20">
+                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Saldo Atual em Estoque</p>
+                <p className="text-2xl md:text-3xl font-black text-white mt-1">{allTimeStats.stockBalance} <span className="text-xs font-normal text-emerald-200">un.</span></p>
+                <p className="text-[10px] text-emerald-200 mt-1">Embaladas - Doadas</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtro de Mês e Soma Total */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
+          <div>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+              <BarChart3 size={20} className="text-green-600" />
+              {isAllMonths ? 'Soma Total de Todos os Meses' : 'Relatório Mensal de Produção'}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {isAllMonths 
+                ? 'Consolidado acumulado somando todos os meses registrados.' 
+                : 'Análise de desempenho e perdas do mês selecionado.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Selector Buttons */}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  if (isAllMonths) {
+                    setSelectedMonth(format(new Date(), 'yyyy-MM'));
+                  }
+                }}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  !isAllMonths
+                    ? "bg-white dark:bg-gray-900 text-green-700 dark:text-green-400 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                )}
+              >
+                <Calendar size={14} />
+                Por Mês
+              </button>
+              <button
+                onClick={() => setSelectedMonth('ALL')}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  isAllMonths
+                    ? "bg-green-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                )}
+              >
+                <TrendingUp size={14} />
+                Soma Total (Todos os Meses)
+              </button>
+            </div>
+
+            {!isAllMonths && (
+              <input 
+                type="month" 
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-2 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 outline-none focus:ring-2 focus:ring-green-500"
+              />
+            )}
+
             <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-800 p-1 rounded-xl border border-gray-100 dark:border-gray-700">
                <button 
                 onClick={() => handleExport('pdf')}
@@ -868,16 +1077,19 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                  <TableIcon size={18} />
                </button>
             </div>
-            <button 
-              onClick={() => {
-                setGoalForm({ ...goalForm, month: selectedMonth });
-                setIsModalOpen(true);
-              }}
-              className="px-6 py-2 bg-green-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all flex items-center gap-2"
-            >
-              <Target size={18} />
-              Ajustar Meta
-            </button>
+
+            {!isAllMonths && (
+              <button 
+                onClick={() => {
+                  setGoalForm({ ...goalForm, month: selectedMonth });
+                  setIsModalOpen(true);
+                }}
+                className="px-6 py-2 bg-green-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-green-200 dark:shadow-none hover:bg-green-700 transition-all flex items-center gap-2"
+              >
+                <Target size={18} />
+                Ajustar Meta
+              </button>
+            )}
           </div>
         </div>
 
@@ -888,10 +1100,12 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-2xl">
                 <Scissors size={24} />
               </div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Produção Bruta</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {isAllMonths ? 'Soma Total Bruta' : 'Produção Bruta'}
+              </span>
             </div>
             <p className="text-3xl font-black text-gray-900 dark:text-white">{totalRaw}<span className="text-xs text-gray-400 ml-1">unidades</span></p>
-            <p className="text-xs text-gray-500 mt-2">Volume total costurado/montado</p>
+            <p className="text-xs text-gray-500 mt-2">{isAllMonths ? 'Total costurado/montado em todos os meses' : 'Volume total costurado/montado no mês'}</p>
           </div>
 
           <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
@@ -899,10 +1113,12 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-2xl">
                 <Truck size={24} />
               </div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Embalado</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {isAllMonths ? 'Soma Total Embalada' : 'Embalado'}
+              </span>
             </div>
             <p className="text-3xl font-black text-gray-900 dark:text-white">{totalFinal}<span className="text-xs text-gray-400 ml-1">unidades</span></p>
-            <p className="text-xs text-gray-500 mt-2">Pronto para entrega/consumo</p>
+            <p className="text-xs text-gray-500 mt-2">{isAllMonths ? 'Total finalizado e embalado em todos os meses' : 'Pronto para entrega/consumo no mês'}</p>
           </div>
 
           <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
@@ -910,7 +1126,9 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl">
                 <AlertTriangle size={24} />
               </div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Perdas de WIP</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {isAllMonths ? 'Perdas Totais WIP' : 'Perdas de WIP'}
+              </span>
             </div>
             <p className="text-3xl font-black text-gray-900 dark:text-white">{wipLoss}<span className="text-xs text-red-500 ml-1">({lossRate.toFixed(1)}%)</span></p>
             <p className="text-xs text-gray-500 mt-2">Volume descartado por defeito</p>
@@ -948,7 +1166,9 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
                   </>
                 )}
               </div>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Meta Mensal</span>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {isAllMonths ? 'Meta Acumulada' : 'Meta Mensal'}
+              </span>
             </div>
             <p className="text-3xl font-black text-gray-900 dark:text-white">{dashboardData.goal}<span className="text-xs text-gray-400 ml-1">un</span></p>
             <p className={cn("text-xs font-bold mt-2 flex items-center gap-1", isGoalMet ? "text-green-600" : "text-amber-600")}>
@@ -960,12 +1180,12 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Daily Evolution */}
+          {/* Daily or Monthly Evolution */}
           <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 h-[450px]">
              <div className="flex items-center justify-between mb-8">
                 <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
                   <TrendingUp size={20} className="text-green-600" />
-                  Evolução de Fluxo Diário
+                  {isAllMonths ? 'Evolução da Produção por Mês' : 'Evolução de Fluxo Diário'}
                 </h4>
              </div>
              <div style={{ width: '100%', height: 300 }}>
@@ -1039,10 +1259,15 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
 
   const renderDonationsTab = () => (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-900 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
         <div>
-          <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Doações Realizadas</h2>
-          <p className="text-sm text-gray-500 font-bold">Registro de saída de fraldas para beneficiários externos</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tighter">Doações Realizadas</h2>
+            <span className="px-3 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-black uppercase tracking-wider">
+              Soma Total Doada: {allTimeStats.totalDonated} un.
+            </span>
+          </div>
+          <p className="text-sm text-gray-500 font-bold mt-1">Registro de saída de fraldas para beneficiários externos (Soma total de todos os meses).</p>
         </div>
         <button
           onClick={() => { 
@@ -1057,7 +1282,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             setModalType('donations' as any); 
             setIsModalOpen(true); 
           }}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all"
+          className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all shrink-0"
         >
           <Plus size={20} />
           Nova Doação

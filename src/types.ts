@@ -258,6 +258,16 @@ export interface Workshop {
   registeredBy?: string;
   professionalId?: string;
   coWorkers?: string[];
+  photos?: string[];
+  documents?: Array<{ name: string; type: string; base64: string; size?: string }>;
+}
+
+export interface AdminReminder {
+  id?: string;
+  category: string;
+  text: string;
+  completed: boolean;
+  createdAt: string;
 }
 
 export interface CommunityElderly {

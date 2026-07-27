@@ -19,6 +19,7 @@ import {
   Info,
   ChevronRight,
   Plus,
+  ArrowLeft,
   Search,
   Bell,
   BellOff,
@@ -8920,7 +8921,9 @@ const WorkshopsSection = ({
     who: '',
     how: '',
     howMuch: '',
-    coWorkers: [] as string[]
+    coWorkers: [] as string[],
+    photos: [] as string[],
+    documents: [] as Array<{ name: string; type: string; base64: string; size?: string }>
   });
 
   const handleAddCommunityElderly = async (e: React.FormEvent) => {
@@ -9037,7 +9040,9 @@ const WorkshopsSection = ({
         who: '',
         how: '',
         howMuch: '',
-        coWorkers: []
+        coWorkers: [],
+        photos: [],
+        documents: []
       });
     } catch (err) {
       handleFirestoreError(err, editingWorkshop ? OperationType.UPDATE : OperationType.CREATE, 'workshops');
@@ -9092,7 +9097,9 @@ const WorkshopsSection = ({
       who: w.who || '',
       how: w.how || '',
       howMuch: w.howMuch || '',
-      coWorkers: w.coWorkers || []
+      coWorkers: w.coWorkers || [],
+      photos: w.photos || [],
+      documents: w.documents || []
     });
     setIsWorkshopModalOpen(true);
   };
@@ -9724,6 +9731,162 @@ const WorkshopsSection = ({
                       onChange={e => setWorkshopFormData({...workshopFormData, how: e.target.value})}
                     />
                   </div>
+
+                  {/* Mídia e Documentos do 5W2H */}
+                  <div className="border-t border-green-150/50 dark:border-green-900/20 pt-6 space-y-4">
+                    <h5 className="text-xs font-black text-green-700 dark:text-green-400 uppercase tracking-widest flex items-center gap-2">
+                      <Paperclip size={14} /> Anexos e Mídia (5W2H)
+                    </h5>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Carregar Mídia (Imagens) */}
+                      <div className="space-y-3 bg-white dark:bg-gray-800/40 p-4 rounded-2xl border border-green-100/30">
+                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">Mídias (Fotos)</span>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {(workshopFormData.photos || []).map((p, idx) => (
+                            <div key={idx} className="relative w-16 h-16 rounded-xl overflow-hidden border border-gray-150 dark:border-gray-750 group shrink-0">
+                              <img src={p} alt="" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (workshopFormData.photos || []).filter((_, i) => i !== idx);
+                                  setWorkshopFormData({ ...workshopFormData, photos: updated });
+                                }}
+                                className="absolute top-1 right-1 p-0.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          ))}
+                          
+                          {(workshopFormData.photos || []).length < 6 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.multiple = true;
+                                input.onchange = async (e: any) => {
+                                  const files: File[] = Array.from(e.target.files || []);
+                                  if (files.length === 0) return;
+                                  
+                                  const loaded: string[] = [];
+                                  for (const file of files) {
+                                    const base64 = await new Promise<string>((resolve) => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => resolve(reader.result as string);
+                                      reader.readAsDataURL(file);
+                                    });
+                                    try {
+                                      const compressed = await compressImage(base64, 800, 800, 0.5);
+                                      loaded.push(compressed);
+                                    } catch (err) {
+                                      loaded.push(base64); // fallback if compression fails
+                                    }
+                                  }
+                                  setWorkshopFormData({
+                                    ...workshopFormData,
+                                    photos: [...(workshopFormData.photos || []), ...loaded].slice(0, 6)
+                                  });
+                                };
+                                input.click();
+                              }}
+                              className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center text-gray-400 hover:text-green-600 hover:border-green-300 transition-colors"
+                            >
+                              <ImageIcon size={20} />
+                              <span className="text-[9px] font-black uppercase mt-1">Add</span>
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-medium leading-relaxed">Arraste ou carregue até 6 fotos da oficina/capacitação.</p>
+                      </div>
+
+                      {/* Carregar Documentos (PDF, DOCX, etc.) */}
+                      <div className="space-y-3 bg-white dark:bg-gray-800/40 p-4 rounded-2xl border border-green-100/30">
+                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">Documentos (PDF, DOC, etc.)</span>
+                        
+                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                          {(workshopFormData.documents || []).map((doc, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-750 group">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={16} className="text-blue-500 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate max-w-[140px] md:max-w-[180px]" title={doc.name}>
+                                    {doc.name}
+                                  </p>
+                                  <p className="text-[9px] text-gray-400 font-medium">{doc.size || 'N/A'}</p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = (workshopFormData.documents || []).filter((_, i) => i !== idx);
+                                  setWorkshopFormData({ ...workshopFormData, documents: updated });
+                                }}
+                                className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+
+                          {(!workshopFormData.documents || workshopFormData.documents.length === 0) && (
+                            <p className="text-[10px] text-gray-400 italic py-2 text-center">Nenhum documento anexado.</p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt';
+                            input.multiple = true;
+                            input.onchange = async (e: any) => {
+                              const files: File[] = Array.from(e.target.files || []);
+                              if (files.length === 0) return;
+
+                              const loadedDocs: Array<{ name: string; type: string; base64: string; size?: string }> = [];
+                              for (const file of files) {
+                                if (file.size > 800 * 1024) {
+                                  showToast(`O arquivo ${file.name} excede o limite de 800KB.`, 'error');
+                                  continue;
+                                }
+                                const base64 = await new Promise<string>((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => resolve(reader.result as string);
+                                  reader.readAsDataURL(file);
+                                });
+                                
+                                const formattedSize = file.size > 1024 * 1024 
+                                  ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+                                  : `${(file.size / 1024).toFixed(0)} KB`;
+
+                                loadedDocs.push({
+                                  name: file.name,
+                                  type: file.type || file.name.split('.').pop() || '',
+                                  base64,
+                                  size: formattedSize
+                                });
+                              }
+
+                              setWorkshopFormData({
+                                ...workshopFormData,
+                                documents: [...(workshopFormData.documents || []), ...loadedDocs]
+                              });
+                            };
+                            input.click();
+                          }}
+                          className="w-full py-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-xs font-black text-gray-500 hover:text-blue-600 flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Upload size={14} />
+                          Anexar Documento (PDF, Word, etc.)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-4 pt-4">
@@ -9841,6 +10004,60 @@ const WorkshopsSection = ({
                   <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Detalhamento (HOW)</p>
                   <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{selectedWorkshop.how || 'Sem detalhamento disponível'}</p>
                 </div>
+
+                {/* Seção de Fotos Anexadas */}
+                {selectedWorkshop.photos && selectedWorkshop.photos.length > 0 && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Mídias Anexadas ({selectedWorkshop.photos.length})</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {selectedWorkshop.photos.map((photo, idx) => (
+                        <div key={idx} className="relative aspect-video rounded-xl overflow-hidden border border-gray-150 dark:border-gray-700 bg-black group">
+                          <img src={photo} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          <a 
+                            href={photo} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity text-xs font-bold gap-1"
+                          >
+                            <Eye size={14} /> Visualizar
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Seção de Documentos Anexados */}
+                {selectedWorkshop.documents && selectedWorkshop.documents.length > 0 && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Documentos Anexados ({selectedWorkshop.documents.length})</p>
+                    <div className="space-y-2">
+                      {selectedWorkshop.documents.map((doc, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3.5 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
+                              <FileText size={18} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate" title={doc.name}>
+                                {doc.name}
+                              </p>
+                              <p className="text-[10px] text-gray-400 font-medium">{doc.size || 'N/A'}</p>
+                            </div>
+                          </div>
+                          
+                          <a
+                            href={doc.base64}
+                            download={doc.name}
+                            className="p-2 bg-gray-50 hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-950/20 text-gray-500 hover:text-green-600 rounded-xl transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold"
+                          >
+                            <FileDown size={14} /> Baixar
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -11709,9 +11926,34 @@ export default function App() {
     return saved || 'dashboard';
   });
 
+  const [tabHistory, setTabHistory] = useState<string[]>(() => {
+    const saved = localStorage.getItem('oami-active-tab');
+    return [saved || 'dashboard'];
+  });
+  const [isGoingBack, setIsGoingBack] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('oami-active-tab', activeTab);
+    
+    if (isGoingBack) {
+      setIsGoingBack(false);
+      return;
+    }
+    setTabHistory(prev => {
+      if (prev.length > 0 && prev[prev.length - 1] === activeTab) return prev;
+      return [...prev, activeTab];
+    });
   }, [activeTab]);
+
+  const handleGoBack = () => {
+    if (tabHistory.length <= 1) return;
+    const newHistory = [...tabHistory];
+    newHistory.pop(); // remove current tab
+    const previousTab = newHistory[newHistory.length - 1];
+    setIsGoingBack(true);
+    setTabHistory(newHistory);
+    setActiveTab(previousTab);
+  };
 
   // --- Initial System Cleanup and Connection Test ---
   useEffect(() => {
@@ -16012,6 +16254,18 @@ export default function App() {
             >
               <Menu size={24} />
             </button>
+            
+            {tabHistory.length > 1 && (
+              <button 
+                onClick={handleGoBack}
+                className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-green-300 dark:hover:border-green-800 transition-all cursor-pointer shrink-0 group"
+                title="Voltar para a aba anterior"
+              >
+                <ArrowLeft size={14} className="text-green-600 dark:text-green-400 transition-transform group-hover:-translate-x-0.5 animate-pulse" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
+            )}
+
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-gray-800 dark:text-white tracking-tight">
                 {activeTab === 'dashboard' ? 'Visão Geral' : 

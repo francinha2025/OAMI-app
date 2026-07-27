@@ -276,6 +276,18 @@
       },
       "required": ["title", "date", "type"]
     },
+    "AdminReminder": {
+      "title": "AdminReminder",
+      "description": "Reminders for RH/Admin",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string" },
+        "text": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["category", "text", "completed", "createdAt"]
+    },
     "Caregiver": {
       "title": "Caregiver",
       "description": "Caregiver participating in training sessions",
@@ -841,6 +853,7 @@
     "nutritionAnthropometries": { "schema": "NutritionAnthropometry", "description": "Nutrition anthropometry data" },
     "nutritionMealPlans": { "schema": "NutritionMealPlan", "description": "Nutrition meal plans" },
     "notifications": { "schema": "AppNotification", "description": "Professional notifications" },
-    "users": { "schema": "StaffMember", "description": "Support staff records" }
+    "users": { "schema": "StaffMember", "description": "Support staff records" },
+    "adminReminders": { "schema": "AdminReminder", "description": "RH/Admin reminders" }
   }
 }
