@@ -16,6 +16,7 @@ import {
   Utensils,
   Image as ImageIcon,
   DollarSign,
+  Landmark,
   Info,
   ChevronRight,
   Plus,
@@ -124,6 +125,7 @@ import { PedagogySection } from './components/PedagogySection';
 import { SocialWorkSection } from './components/SocialWorkSection';
 import { NutritionSection } from './components/NutritionSection';
 import { DiaperProductionSection } from './components/DiaperProductionSection';
+import { TreasurySection } from './components/TreasurySection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { PresidencySupportSection } from './components/PresidencySupportSection';
 import { InstitutionalSupportSection } from './components/InstitutionalSupportSection';
@@ -1509,6 +1511,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       title: 'Administrativo',
       items: [
         { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
+        { id: 'treasury', label: 'Tesouraria', icon: Landmark, roles: ['ADMIN', 'TESOUREIRA', 'COORDENADORA', 'PRESIDENTE'] },
         { id: 'professionals', label: 'Usuários', icon: Users, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'presidency_support', label: 'Suporte à Presidência', icon: ClipboardList, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO'] },
@@ -16074,6 +16077,7 @@ export default function App() {
         />
       );
       case 'financial': return <FinancialSection financialRecords={financialRecords} user={user!} showToast={showToast} />;
+      case 'treasury': return <TreasurySection user={user!} showToast={showToast} showConfirm={showConfirm} />;
       case 'presidency_support': return <PresidencySupportSection documents={presidencyDocs} user={user!} showToast={showToast} />;
       case 'institutional_support': return <InstitutionalSupportSection records={institutionalRecords} user={user!} showToast={showToast} />;
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
@@ -16277,6 +16281,7 @@ export default function App() {
                  activeTab === 'socialWork' ? 'Serviço Social' :
                  activeTab === 'professional' ? 'Avaliação & Monitoramento' : 
                  activeTab === 'financial' ? 'Financeiro' : 
+                 activeTab === 'treasury' ? 'Tesouraria' : 
                  activeTab === 'donors' ? 'Doadores e Sócios' :
                  activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :

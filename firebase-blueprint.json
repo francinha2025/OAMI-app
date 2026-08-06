@@ -854,6 +854,9 @@
     "nutritionMealPlans": { "schema": "NutritionMealPlan", "description": "Nutrition meal plans" },
     "notifications": { "schema": "AppNotification", "description": "Professional notifications" },
     "users": { "schema": "StaffMember", "description": "Support staff records" },
-    "adminReminders": { "schema": "AdminReminder", "description": "RH/Admin reminders" }
+    "adminReminders": { "schema": "AdminReminder", "description": "RH/Admin reminders" },
+    "treasury_transactions": { "description": "Treasury income and expense transactions" },
+    "treasury_receipts": { "description": "Treasury receipts issued" },
+    "system_logs": { "description": "System event audit logs" }
   }
 }

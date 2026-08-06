@@ -10,7 +10,9 @@ export type Role =
   | 'NUTRICIONISTA'
   | 'FABRICANTE_FRALDAS'
   | 'PROJETISTA'
-  | 'AUXILIAR_ADMINISTRATIVO';
+  | 'AUXILIAR_ADMINISTRATIVO'
+  | 'ADMIN'
+  | 'TESOUREIRA';
 
 export interface GalleryItem {
   id: string;
@@ -1064,6 +1066,75 @@ export interface InstitutionalSupportRecord {
   description: string;
   status: 'PENDENTE' | 'RESPONDIDO' | 'CONCLUIDO' | 'ATIVO';
   createdAt: string;
+}
+
+export interface TreasuryReceipt {
+  id: string;
+  receiptNumber: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  category: string;
+  description: string;
+  payerName: string;
+  cpf?: string;
+  registeredBy: string;
+  observations?: string;
+  createdAt: string;
+  status: 'ATIVO' | 'CANCELADO';
+  cancelReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+}
+
+export interface TreasuryExpense {
+  id: string;
+  date: string;
+  amount: number;
+  category: string;
+  favored: string;
+  paymentMethod: string;
+  description: string;
+  receiptUrl?: string;
+  registeredBy: string;
+  createdAt: string;
+  status: 'ATIVO' | 'CANCELADO';
+  cancelReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+}
+
+export interface TreasuryTransaction {
+  id: string;
+  type: 'RECEITA' | 'DESPESA';
+  receiptId?: string;
+  receiptNumber?: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  category: string;
+  description: string;
+  payerOrFavored: string;
+  cpf?: string;
+  receiptUrl?: string;
+  registeredBy: string;
+  createdAt: string;
+  status: 'ATIVO' | 'CANCELADO';
+  cancelReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  observations?: string;
+}
+
+export interface SystemLog {
+  id: string;
+  timestamp: string;
+  action: string;
+  module: string;
+  description: string;
+  userId?: string;
+  userName?: string;
+  details?: any;
 }
 
 

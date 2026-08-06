@@ -439,13 +439,496 @@ export const generateMultiSectionPDF = async ({
   doc.setTextColor(60, 60, 60);
   doc.text('Assinatura do Profissional', pageWidth / 2, signatureY + 17, { align: 'center' });
 
-  // Add Headers and Footers to all pages
+  doc.save(`${fileName}.pdf`);
+};
+
+export interface TreasuryReceiptPDFOptions {
+  receiptNumber: string;
+  date: string;
+  amount: number;
+  paymentMethod: string;
+  category: string;
+  description: string;
+  payerName: string;
+  cpf?: string;
+  registeredBy: string;
+  observations?: string;
+  institutionName?: string;
+  institutionLogo?: string;
+}
+
+export const generateTreasuryReceiptPDF = async ({
+  receiptNumber,
+  date,
+  amount,
+  paymentMethod,
+  category,
+  description,
+  payerName,
+  cpf,
+  registeredBy,
+  observations,
+  institutionName = INSTITUTION_NAME,
+  institutionLogo = INSTITUTION_LOGO,
+}: TreasuryReceiptPDFOptions) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+
+  // Colors
+  const primaryGreen: [number, number, number] = [16, 185, 129]; // #10b981
+  const darkGreen: [number, number, number] = [6, 95, 70]; // #065f46
+
+  // Pre-load logo
+  let logoData: string | ArrayBuffer | null = null;
+  if (institutionLogo) {
+    try {
+      const response = await fetch(institutionLogo, {
+        referrerPolicy: "no-referrer",
+        cache: "force-cache"
+      });
+      if (response.ok) {
+        logoData = await response.arrayBuffer();
+      }
+    } catch (e) {
+      console.error("Error pre-loading logo for receipt PDF", e);
+    }
+  }
+
+  // Top Bar
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(0, 0, pageWidth, 12, 'F');
+
+  // Header Logo
+  const hasLogo = !!logoData;
+  if (logoData) {
+    try {
+      doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 16, 28, 28);
+    } catch (e) {
+      console.error("Error drawing logo in receipt PDF", e);
+    }
+  }
+
+  // Header Text
+  const startX = hasLogo ? 48 : 14;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(30, 41, 59);
+  doc.text(institutionName, startX, 22);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('CNPJ: 10.706.425/0001-74', startX, 27);
+  doc.text('Endereço: MA-014, Alto São Francisco, Vitória do Mearim - Maranhão', startX, 31);
+  doc.text('MÓDULO DE TESOURARIA E GESTÃO FINANCEIRA INSTITUCIONAL', startX, 35);
+
+  // Line separator
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.5);
+  doc.line(14, 48, pageWidth - 14, 48);
+
+  // Receipt Title & Number Box
+  doc.setFillColor(241, 245, 249);
+  doc.roundedRect(14, 52, pageWidth - 28, 22, 3, 3, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+  doc.text(`RECIBO OFICIAL DE RECEITA Nº ${receiptNumber}`, 20, 66);
+
+  const formattedAmount = amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  doc.setFontSize(16);
+  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  const amountTextWidth = doc.getTextWidth(formattedAmount);
+  doc.text(formattedAmount, pageWidth - 20 - amountTextWidth, 66);
+
+  // Declarative Body Box
+  doc.setDrawColor(203, 213, 225);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(14, 80, pageWidth - 28, 45, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(51, 65, 85);
+
+  let formattedDate = date;
+  try {
+    const parts = date.split('-');
+    if (parts.length === 3) {
+      formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  } catch (e) {
+    // keep as is
+  }
+
+  const receiptBodyText = `Recebemos de ${payerName.toUpperCase()}${cpf ? `, portador(a) do CPF nº ${cpf}` : ''}, a quantia de ${formattedAmount}, referente a "${description || category}", recebido via ${paymentMethod} no dia ${formattedDate}.`;
+
+  const splitText = doc.splitTextToSize(receiptBodyText, pageWidth - 40);
+  doc.text(splitText, 20, 92);
+
+  // Structured Information Table
+  autoTable(doc, {
+    startY: 132,
+    head: [['Item', 'Detalhamento da Operação']],
+    body: [
+      ['Nº do Recibo', receiptNumber],
+      ['Data de Emissão', formattedDate],
+      ['Pagador / Doador', `${payerName}${cpf ? ` (CPF: ${cpf})` : ''}`],
+      ['Valor Recebido', formattedAmount],
+      ['Forma de Pagamento', paymentMethod],
+      ['Categoria', category],
+      ['Descrição', description || 'Não informada'],
+      ['Responsável pelo Lançamento', registeredBy],
+      ['Observações', observations || 'Nenhuma observação informada.'],
+    ],
+    theme: 'grid',
+    headStyles: {
+      fillColor: primaryGreen,
+      textColor: [255, 255, 255],
+      fontSize: 10,
+      fontStyle: 'bold',
+      halign: 'left'
+    },
+    bodyStyles: {
+      fontSize: 9,
+      textColor: [51, 65, 85]
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 50, fillColor: [248, 250, 252] },
+      1: { cellWidth: 'auto' }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY || 200;
+
+  // Signature Block
+  const signatureY = Math.max(finalY + 25, 220);
+
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.5);
+  const lineStart = (pageWidth / 2) - 45;
+  const lineEnd = (pageWidth / 2) + 45;
+  doc.line(lineStart, signatureY, lineEnd, signatureY);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(30, 41, 59);
+  doc.text(registeredBy, pageWidth / 2, signatureY + 6, { align: 'center' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Tesouraria / Responsável OAMI', pageWidth / 2, signatureY + 11, { align: 'center' });
+
+  // Footer
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(148, 163, 184);
+  const footerStr = `Recibo gerado automaticamente pelo Módulo de Tesouraria OAMI em ${new Date().toLocaleString('pt-BR')} • Autenticidade Registrada`;
+  doc.text(footerStr, 14, pageHeight - 10);
+
+  doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.rect(14, pageHeight - 5, pageWidth - 28, 0.5, 'F');
+
+  doc.save(`Recibo_${receiptNumber.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`);
+};
+
+export interface FinancialReportPDFOptions {
+  periodTypeLabel: string;
+  periodTitle: string;
+  periodSubtitle: string;
+  totalRevenue: number;
+  totalExpenses: number;
+  netBalance: number;
+  transactions: {
+    date: string;
+    type: 'RECEITA' | 'DESPESA';
+    category: string;
+    payerOrFavored: string;
+    paymentMethod: string;
+    amount: number;
+    receiptNumber?: string;
+  }[];
+  categoryBreakdown: {
+    category: string;
+    type: 'RECEITA' | 'DESPESA';
+    total: number;
+    count: number;
+    percentage: number;
+  }[];
+  monthlyBreakdown?: {
+    monthLabel: string;
+    revenue: number;
+    expense: number;
+    balance: number;
+  }[];
+  generatedBy: string;
+}
+
+export const generateTreasuryFinancialReportPDF = async ({
+  periodTypeLabel,
+  periodTitle,
+  periodSubtitle,
+  totalRevenue,
+  totalExpenses,
+  netBalance,
+  transactions,
+  categoryBreakdown,
+  monthlyBreakdown,
+  generatedBy,
+}: FinancialReportPDFOptions) => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  const pageWidth = doc.internal.pageSize.width;
+  const pageHeight = doc.internal.pageSize.height;
+
+  // Colors
+  const primaryGreen: [number, number, number] = [16, 185, 129]; // #10b981
+  const darkSlate: [number, number, number] = [30, 41, 59];
+  const roseRed: [number, number, number] = [225, 29, 72];
+  const emeraldGreen: [number, number, number] = [5, 150, 105];
+
+  // Pre-load logo
+  let logoData: string | ArrayBuffer | null = null;
+  if (INSTITUTION_LOGO) {
+    try {
+      const response = await fetch(INSTITUTION_LOGO, { referrerPolicy: "no-referrer", cache: "force-cache" });
+      if (response.ok) logoData = await response.arrayBuffer();
+    } catch (e) {
+      console.error("Error pre-loading logo", e);
+    }
+  }
+
+  // Header Bar
+  doc.setFillColor(...primaryGreen);
+  doc.rect(0, 0, pageWidth, 12, 'F');
+
+  if (logoData) {
+    try {
+      doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 16, 26, 26);
+    } catch (e) {
+      console.error("Error adding logo", e);
+    }
+  }
+
+  const hasLogo = !!logoData;
+  const startX = hasLogo ? 45 : 14;
+
+  // Institution Metadata
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkSlate);
+  doc.text(INSTITUTION_NAME, startX, 22);
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim - MA', startX, 27);
+  doc.text('Departamento de Tesouraria e Gestão Financeira', startX, 31);
+
+  // Report Main Title
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...primaryGreen);
+  doc.text(`${periodTypeLabel} - ${periodTitle}`, startX, 38);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text(periodSubtitle, startX, 43);
+
+  // Line
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.line(14, 47, pageWidth - 14, 47);
+
+  // Executive Summary Cards (Draw 3 Boxes)
+  const boxWidth = (pageWidth - 28 - 8) / 3;
+  const boxY = 51;
+  const boxHeight = 22;
+
+  // Card 1: Receitas
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(14, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...emeraldGreen);
+  doc.text('TOTAL RECEITAS (+)', 18, boxY + 6);
+
+  doc.setFontSize(11);
+  doc.text(`R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 18, boxY + 15);
+
+  // Card 2: Despesas
+  doc.setFillColor(254, 242, 242);
+  doc.setDrawColor(254, 202, 202);
+  doc.roundedRect(14 + boxWidth + 4, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...roseRed);
+  doc.text('TOTAL DESPESAS (-)', 18 + boxWidth + 4, boxY + 6);
+
+  doc.setFontSize(11);
+  doc.text(`R$ ${totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 18 + boxWidth + 4, boxY + 15);
+
+  // Card 3: Saldo Líquido
+  const isPositive = netBalance >= 0;
+  doc.setFillColor(isPositive ? 236 : 254, isPositive ? 253 : 242, isPositive ? 245 : 242);
+  doc.setDrawColor(isPositive ? 167 : 254, isPositive ? 243 : 202, isPositive ? 208 : 202);
+  doc.roundedRect(14 + (boxWidth + 4) * 2, boxY, boxWidth, boxHeight, 2, 2, 'FD');
+
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(isPositive ? emeraldGreen[0] : roseRed[0], isPositive ? emeraldGreen[1] : roseRed[1], isPositive ? emeraldGreen[2] : roseRed[2]);
+  doc.text('RESULTADO LÍQUIDO', 18 + (boxWidth + 4) * 2, boxY + 6);
+
+  doc.setFontSize(11);
+  doc.text(`R$ ${netBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 18 + (boxWidth + 4) * 2, boxY + 15);
+
+  let currentY = boxY + boxHeight + 8;
+
+  // Monthly breakdown if available (for semester / annual)
+  if (monthlyBreakdown && monthlyBreakdown.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkSlate);
+    doc.text('Evolução Mensal do Período', 14, currentY);
+
+    autoTable(doc, {
+      startY: currentY + 3,
+      head: [['Mês / Período', 'Receitas (R$)', 'Despesas (R$)', 'Saldo do Mês (R$)']],
+      body: monthlyBreakdown.map(m => [
+        m.monthLabel,
+        m.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+        m.expense.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+        m.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      ]),
+      theme: 'grid',
+      headStyles: { fillColor: primaryGreen, textColor: [255, 255, 255], fontSize: 8.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+      columnStyles: {
+        1: { halign: 'right' },
+        2: { halign: 'right' },
+        3: { halign: 'right', fontStyle: 'bold' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = (doc as any).lastAutoTable?.finalY + 8;
+  }
+
+  // Category Breakdown Table
+  if (categoryBreakdown && categoryBreakdown.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...darkSlate);
+    doc.text('Resumo Por Categoria', 14, currentY);
+
+    autoTable(doc, {
+      startY: currentY + 3,
+      head: [['Tipo', 'Categoria', 'Qtd. Lançamentos', 'Total (R$)', '% do Subtotal']],
+      body: categoryBreakdown.map(c => [
+        c.type,
+        c.category,
+        c.count.toString(),
+        c.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+        `${c.percentage.toFixed(1)}%`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontSize: 8.5, fontStyle: 'bold' },
+      bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 25 },
+        2: { halign: 'center' },
+        3: { halign: 'right', fontStyle: 'bold' },
+        4: { halign: 'right' }
+      },
+      margin: { left: 14, right: 14 }
+    });
+
+    currentY = (doc as any).lastAutoTable?.finalY + 8;
+  }
+
+  // Transactions List Table
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...darkSlate);
+  doc.text(`Lista de Lançamentos (${transactions.length} registros)`, 14, currentY);
+
+  autoTable(doc, {
+    startY: currentY + 3,
+    head: [['Data', 'Tipo', 'Categoria', 'Pagador / Favorecido', 'Pagamento', 'Valor (R$)']],
+    body: transactions.map(t => {
+      let formattedDate = t.date;
+      try {
+        const parts = t.date.split('-');
+        if (parts.length === 3) formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      } catch (e) {}
+
+      return [
+        formattedDate,
+        t.type,
+        t.category,
+        t.payerOrFavored,
+        t.paymentMethod,
+        (t.type === 'RECEITA' ? '+ ' : '- ') + Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      ];
+    }),
+    theme: 'grid',
+    headStyles: { fillColor: primaryGreen, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+    bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 20, fontStyle: 'bold' },
+      2: { cellWidth: 35 },
+      3: { cellWidth: 'auto' },
+      4: { cellWidth: 22 },
+      5: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === 'body' && hookData.column.index === 5) {
+        const rawVal = hookData.cell.raw as string;
+        if (rawVal.startsWith('+')) {
+          hookData.cell.styles.textColor = [5, 150, 105];
+        } else if (rawVal.startsWith('-')) {
+          hookData.cell.styles.textColor = [225, 29, 72];
+        }
+      }
+    },
+    margin: { left: 14, right: 14, bottom: 25 }
+  });
+
+  // Footer & Page Numbers
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    addHeader(doc, i);
-    addFooter(doc, i, totalPages);
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(148, 163, 184);
+    
+    const footerText = `Relatório Financeiro OAMI • Gerado por ${generatedBy} em ${new Date().toLocaleString('pt-BR')}`;
+    doc.text(footerText, 14, pageHeight - 10);
+
+    const pageText = `Página ${i} de ${totalPages}`;
+    doc.text(pageText, pageWidth - 14 - doc.getTextWidth(pageText), pageHeight - 10);
+
+    doc.setFillColor(...primaryGreen);
+    doc.rect(14, pageHeight - 5, pageWidth - 28, 0.5, 'F');
   }
 
-  doc.save(`${fileName}.pdf`);
+  const cleanFileName = `Relatorio_Financeiro_${periodTypeLabel.replace(/\s+/g, '_')}_${periodTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+  doc.save(cleanFileName);
 };

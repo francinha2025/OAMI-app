@@ -992,10 +992,6 @@ service cloud.firestore {
       allow write: if isCoordinator() || isAdmin();
     }
 
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
     match /familyEngagements/{engagementId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && hasAnyRole(['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'COORDENADORA', 'PRESIDENTE', 'PROJETISTA']);
@@ -1009,6 +1005,23 @@ service cloud.firestore {
     match /adminReminders/{reminderId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
+    }
+
+    match /treasury_transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    match /treasury_receipts/{receiptId} {
+      allow read, write: if true;
+    }
+
+    match /system_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
