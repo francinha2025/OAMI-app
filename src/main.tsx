@@ -37,6 +37,25 @@ try {
   };
 } catch (e) {}
 
+// Global handlers to prevent Firestore internal assertion or quota limits from crashing the UI
+window.addEventListener('error', (event) => {
+  const msg = event.message || '';
+  if (msg.includes('FIRESTORE') || msg.includes('ASSERTION FAILED') || msg.includes('Quota exceeded') || msg.includes('quota')) {
+    event.preventDefault();
+    console.warn('Caught Firestore stream exception:', msg);
+    window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+  }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason?.message || String(event.reason || '');
+  if (reason.includes('FIRESTORE') || reason.includes('ASSERTION FAILED') || reason.includes('Quota exceeded') || reason.includes('quota')) {
+    event.preventDefault();
+    console.warn('Caught unhandled Firestore promise rejection:', reason);
+    window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+  }
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

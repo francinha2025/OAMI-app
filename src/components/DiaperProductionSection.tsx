@@ -24,7 +24,8 @@ import {
   Phone,
   MapPin,
   Users,
-  IdCard
+  IdCard,
+  Heart
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -53,7 +54,8 @@ import {
   DiaperFinalPacking, 
   DiaperProductionGoal,
   DiaperDonation,
-  DiaperBeneficiary
+  DiaperBeneficiary,
+  Elderly
 } from '../types';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
@@ -61,9 +63,11 @@ import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { generateModernExcel } from '../lib/excelUtils';
 import { FileText, FileDown, Table as TableIcon } from 'lucide-react';
+import { DiaperConsumptionTab } from './DiaperConsumptionTab';
 
 interface DiaperProductionSectionProps {
   user: UserType;
+  elderly?: Elderly[];
   rawProductions: DiaperRawProduction[];
   wipProcessings: DiaperWIPProcessing[];
   finalPackings: DiaperFinalPacking[];
@@ -80,10 +84,11 @@ interface DiaperProductionSectionProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
-type TabType = 'raw' | 'wip' | 'final' | 'dashboard' | 'donations' | 'beneficiaries';
+type TabType = 'raw' | 'wip' | 'final' | 'dashboard' | 'donations' | 'beneficiaries' | 'consumption';
 
 export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = ({
   user,
+  elderly = [],
   rawProductions,
   wipProcessings,
   finalPackings,
@@ -1898,6 +1903,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
         <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
           {[
             { id: 'dashboard', label: 'Balanço', icon: BarChart3 },
+            { id: 'consumption', label: 'Consumo Idosos', icon: Heart },
             { id: 'raw', label: 'Bruta', icon: Scissors },
             { id: 'wip', label: 'Processo', icon: Activity },
             { id: 'final', label: 'Embalagem', icon: Truck },
@@ -1947,6 +1953,14 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
           {activeTab === 'donations' && renderDonationsTab()}
           {activeTab === 'beneficiaries' && renderBeneficiariesTab()}
           {activeTab === 'dashboard' && renderDashboardTab()}
+          {activeTab === 'consumption' && (
+            <DiaperConsumptionTab 
+              user={user} 
+              elderly={elderly} 
+              finalPackings={finalPackings} 
+              showToast={showToast} 
+            />
+          )}
         </motion.div>
       </AnimatePresence>
 

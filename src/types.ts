@@ -1137,4 +1137,78 @@ export interface SystemLog {
   details?: any;
 }
 
+export interface StockProduct {
+  id: string;
+  name: string;
+  category: string;
+  code: string;
+  unit: string;
+  quantity: number;
+  minQuantity: number;
+  location: string;
+  supplier: string;
+  unitPrice?: number;
+  expirationDate?: string;
+  batchNumber?: string;
+  notes?: string;
+  status: 'ATIVO' | 'INATIVO';
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  productName: string;
+  productCode: string;
+  type: 'ENTRADA' | 'SAIDA';
+  quantity: number;
+  stockBefore: number;
+  stockAfter: number;
+  supplier?: string;
+  destination?: string;
+  reason?: string;
+  responsible: string;
+  notes?: string;
+  date: string;
+  timestamp: string;
+}
+
+export interface ElderlyDiaperUsage {
+  id?: string;
+  elderlyId: string;
+  elderlyName: string;
+  usesDiapers: boolean;
+  diapersPerDay: number;
+  size?: string;
+  notes?: string;
+  lastLoggedDate?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface DiaperConsumptionLog {
+  id: string;
+  elderlyId: string;
+  elderlyName: string;
+  date: string; // YYYY-MM-DD
+  quantity: number;
+  usesDiapers: boolean;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface DiaperStockEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  quantity: number; // units
+  origin: string; // e.g. 'DOACAO', 'PRODUCAO_EXTRA', 'INVENTARIO'
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+
 

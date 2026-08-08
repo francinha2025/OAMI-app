@@ -61,7 +61,8 @@ import {
   History,
   User as UserIcon,
   Star,
-  Award
+  Award,
+  Boxes
 } from 'lucide-react';
 import { 
   format, 
@@ -110,7 +111,7 @@ import {
 import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { ActivityDetailsModal } from './components/ActivityDetailsModal';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -126,6 +127,7 @@ import { SocialWorkSection } from './components/SocialWorkSection';
 import { NutritionSection } from './components/NutritionSection';
 import { DiaperProductionSection } from './components/DiaperProductionSection';
 import { TreasurySection } from './components/TreasurySection';
+import { StockSection } from './components/StockSection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { PresidencySupportSection } from './components/PresidencySupportSection';
 import { InstitutionalSupportSection } from './components/InstitutionalSupportSection';
@@ -175,50 +177,7 @@ const safeFormat = (dateStr: string | undefined | null, formatStr: string, fallb
   }
 };
 
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const errInfo: FirestoreErrorInfo = {
-    error: errorMessage,
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  
-  if (errorMessage.includes('Quota exceeded') || errorMessage.includes('quota')) {
-    window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
-    console.warn("ALERTA: Limite de cota do banco de dados atingido.");
-  }
-
-  // Despachar evento para que o App possa mostrar um toast (showToast não está disponível aqui fora)
-  window.dispatchEvent(new CustomEvent('firestore-error-toast', { detail: { message: `Erro ao acessar ${path}: ${errorMessage}` } }));
-}
+import { handleFirestoreError, OperationType } from './lib/firestoreErrors';
 
 // --- AI Assistant Component ---
 
@@ -1525,6 +1484,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
     {
       title: 'Operacional',
       items: [
+        { id: 'stock', label: 'Controle de Estoque', icon: Boxes, roles: ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
         { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
         { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
@@ -11963,8 +11923,8 @@ export default function App() {
     // Connection Test
     const testConnection = async () => {
       try {
-        const { doc, getDocFromServer } = await import('firebase/firestore');
-        await getDocFromServer(doc(db, 'settings', 'institutional'));
+        const { doc, getDoc } = await import('firebase/firestore');
+        await getDoc(doc(db, 'settings', 'institutional'));
       } catch (error) {
         if (error instanceof Error && error.message.includes('offline')) {
           console.error("Conexão instável ou offline.");
@@ -11986,6 +11946,9 @@ export default function App() {
         });
     }
   }, []);
+
+  const loadedUidRef = useRef<string | null>(null);
+  const hasSeededRef = useRef<boolean>(false);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -12635,6 +12598,12 @@ export default function App() {
 
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        // Se já carregou este UID e já temos 'user' em memória, evita refazer getDoc do perfil!
+        if (loadedUidRef.current === firebaseUser.uid && user) {
+          setIsAuthReady(true);
+          return;
+        }
+
         const userDocRef = doc(db, 'profiles', firebaseUser.uid);
         getDoc(userDocRef).then((docSnap) => {
           if (docSnap.exists()) {
@@ -12670,8 +12639,8 @@ export default function App() {
               photoUrl: firebaseUser.photoURL || data?.photoUrl || ''
             } as User);
             setNeedsProfile(false);
-            console.log("👤 Perfil do usuário carregado:", finalRole);
-            testConnection();
+            loadedUidRef.current = firebaseUser.uid;
+            console.log("👤 Perfil do usuário carregado em memória:", finalRole);
           } else {
             // Bypass para a criadora/admin se o documento não existir ou falhar por cota
             if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
@@ -12691,6 +12660,7 @@ export default function App() {
                 email: 'franciaraeabreucoelho@gmail.com'
               });
               setNeedsProfile(false);
+              loadedUidRef.current = firebaseUser.uid;
             } else if (firebaseUser.email === 'fernandakellenfk378@gmail.com') {
               setDoc(userDocRef, {
                 name: firebaseUser.displayName || 'Fernanda Kellen',
@@ -12708,6 +12678,7 @@ export default function App() {
                 email: 'fernandakellenfk378@gmail.com'
               });
               setNeedsProfile(false);
+              loadedUidRef.current = firebaseUser.uid;
             } else {
               setNeedsProfile(true);
             }
@@ -12726,27 +12697,28 @@ export default function App() {
             }
           }
           
-          // Se falhar por cota ou offline, mas for a admin, deixa entrar
-          if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
-            setUser({
-              id: firebaseUser.uid,
-              name: 'Franciara de Abreú Coelho',
-              role: 'COORDENADORA',
-              photoUrl: firebaseUser.photoURL || '',
-              email: 'franciaraeabreucoelho@gmail.com'
-            });
-            setNeedsProfile(false);
-            console.log("⭐ Admin logada (Bypass de Perfil)");
-            testConnection();
-          } else {
-            if (err.message?.includes('Quota exceeded') || err.message?.includes('quota')) {
-              showToast('Limite diário de acesso atingido (Quota). Tente novamente amanhã.', 'error');
-            }
-            setNeedsProfile(true);
+          // Se falhar por cota ou erro de rede, permite a entrada usando os dados da conta
+          const isFranciara = firebaseUser.email === 'franciaraeabreucoelho@gmail.com';
+          const isFernanda = firebaseUser.email === 'fernandakellenfk378@gmail.com';
+          
+          if (err.message?.includes('Quota exceeded') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+            window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
           }
+
+          setUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || (isFranciara ? 'Franciara de Abreú Coelho' : (isFernanda ? 'Fernanda Kellen' : (firebaseUser.email?.split('@')[0] || 'Usuário'))),
+            role: isFranciara ? 'COORDENADORA' : (isFernanda ? 'AUXILIAR_ADMINISTRATIVO' : 'CUIDADOR'),
+            photoUrl: firebaseUser.photoURL || '',
+            email: firebaseUser.email || ''
+          });
+          setNeedsProfile(false);
+          loadedUidRef.current = firebaseUser.uid;
+          console.log("⭐ Usuário autenticado via perfil fallback devido a erro no Firestore");
           setIsAuthReady(true);
         });
       } else {
+        loadedUidRef.current = null;
         setUser(null);
         setNeedsProfile(false);
         setIsAuthReady(true);
@@ -12766,34 +12738,241 @@ export default function App() {
     };
   }, []);
 
+  // --- Efeito ÚNICO para Semeação Inicial de Dados (Executa apenas 1 vez por sessão) ---
   useEffect(() => {
-    // Listeners for cleanup
-    let unsubElderly = () => {};
-    let unsubStaff = () => {};
-    let unsubDonors = () => {};
-    let unsubPresidencyDocs = () => {};
-    let unsubInstitutionalRecords = () => {};
-    let unsubDiaperDonations = () => {};
-    let unsubDiaperBeneficiaries = () => {};
-    let unsubProductionLogs = () => {};
-    let unsubVolunteers = () => {};
+    if (!isAuthReady || !user) return;
+    if (hasSeededRef.current) return;
+    hasSeededRef.current = true;
+
+    if (auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+      const seedFranciscoRequest = async () => {
+        try {
+          const qCpf = query(collection(db, 'elderly'), where('cpf', '==', '056811913-46'));
+          const snapCpf = await getDocs(qCpf);
+          const qName = query(collection(db, 'elderly'), where('name', '==', 'Francisco Gomes da Silva'));
+          const snapName = await getDocs(qName);
+
+          const docsToUpdate = [...snapCpf.docs, ...snapName.docs];
+          if (docsToUpdate.length > 0) {
+            for (const d of docsToUpdate) {
+              if (d.data().status !== 'ATIVO') {
+                await updateDoc(doc(db, 'elderly', d.id), { status: 'ATIVO' });
+              }
+            }
+          } else {
+            const elderlyRef = await addDoc(collection(db, 'elderly'), cleanData({
+              name: 'Francisco Gomes da Silva',
+              fullName: 'Francisco Gomes da Silva',
+              cpf: '056811913-46',
+              birthDate: '1950-10-04',
+              entryDate: '2020-12-17',
+              status: 'ATIVO',
+              gender: 'M',
+              lastProfession: 'Não informado',
+              schooling: 'Não Alfabetizado',
+              responsibleName: 'Antonilson Lima Moreira',
+              responsiblePhone: '',
+              medications: 'Ficha da saúde',
+              diagnoses: 'Deficiência física e visual',
+              observations: 'Religião: Católica. Naturalidade: São Luís - MA.'
+            }));
+            
+            await addDoc(collection(db, 'pias'), cleanData({
+              elderlyId: elderlyRef.id,
+              date: '2020-12-17',
+              responsible: 'Antonilson Lima Moreira',
+              status: 'CONCLUIDO',
+              hasBPC: true,
+              hasPension: true,
+              hasLoans: false,
+              hasProperty: false,
+              familyInvolvement: 'BAIXO',
+              familyObservations: 'Relação distanciada. Não possui filhos.',
+              healthStatus: 'Pessoa com deficiência física e visual. Sem resistência alimentar.',
+              mobilityStatus: 'Deficiência física e visual',
+              objectives: 'Acompanhamento Social',
+              actions: 'Recebimento institucional e início de acompanhamento social.',
+              observations: 'Religião: Católica. Naturalidade: São Luís - MA. Não alfabetizado. Cor: Pardo. Estado Civil: Viúvo.'
+            }));
+          }
+        } catch (error) {
+          console.error("Erro ao semear dados Francisco:", error);
+        }
+      };
+
+      const seedIarlesRequest = async () => {
+        try {
+          const qName = query(collection(db, 'elderly'), where('name', '==', 'Iarles Vieira Garcia'));
+          const snapName = await getDocs(qName);
+
+          if (!snapName.empty) {
+            for (const d of snapName.docs) {
+              if (d.data().status !== 'ATIVO') {
+                await updateDoc(doc(db, 'elderly', d.id), { status: 'ATIVO' });
+              }
+            }
+          } else {
+            await addDoc(collection(db, 'elderly'), cleanData({
+              name: 'Iarles Vieira Garcia',
+              fullName: 'Iarles Vieira Garcia',
+              birthDate: '1955-05-15',
+              entryDate: '2021-03-10',
+              status: 'ATIVO',
+              gender: 'M',
+              lastProfession: 'Aposentado',
+              schooling: 'Ensino Fundamental',
+              responsibleName: 'Responsável Familiar',
+              medications: 'Ficha da saúde',
+              diagnoses: 'Acompanhamento institucional',
+              observations: 'Idoso institucionalizado ativo.'
+            }));
+          }
+        } catch (error) {
+          console.error("Erro ao semear dados Iarles:", error);
+        }
+      };
+
+      const seedMartinhaRequest = async () => {
+        try {
+          const qCpf = query(collection(db, 'elderly'), where('cpf', '==', '70879540320'));
+          const snapCpf = await getDocs(qCpf);
+          const qName = query(collection(db, 'elderly'), where('name', '==', 'Martinha Cardoso'));
+          const snapName = await getDocs(qName);
+
+          let elderlyId = '';
+          const martinhaData = {
+            name: 'Martinha Cardoso',
+            fullName: 'Martinha Cardoso',
+            cpf: '70879540320',
+            rg: '03002171920024',
+            birthDate: '1944-01-03',
+            entryDate: '2024-09-18',
+            gender: 'F',
+            status: 'ATIVO',
+            lastProfession: 'Aposentada',
+            schooling: 'Não Alfabetizada',
+            literacyLevel: 'ANALFABETO',
+            responsibleName: 'Maria Enilde Lima Brito',
+            responsiblePhone: '98981054117',
+            medications: 'Ficha da saúde',
+            diagnoses: 'Baixa Visão, Catarata'
+          };
+
+          if (!snapCpf.empty) {
+            elderlyId = snapCpf.docs[0].id;
+            await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
+          } else if (!snapName.empty) {
+            elderlyId = snapName.docs[0].id;
+            await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
+          } else {
+            const docRef = await addDoc(collection(db, 'elderly'), cleanData(martinhaData));
+            elderlyId = docRef.id;
+          }
+        } catch (error) {
+          console.error("Erro ao semear dados Martinha:", error);
+        }
+      };
+
+      const ensureFernandaKellenRole = async () => {
+        try {
+          const targetEmail = 'fernandakellenfk378@gmail.com';
+          const qProfiles = query(collection(db, 'profiles'), where('email', '==', targetEmail));
+          const snapProfiles = await getDocs(qProfiles);
+          
+          for (const d of snapProfiles.docs) {
+            const data = d.data();
+            if (data.role !== 'AUXILIAR_ADMINISTRATIVO') {
+              await updateDoc(doc(db, 'profiles', d.id), { role: 'AUXILIAR_ADMINISTRATIVO' });
+            }
+          }
+        } catch (err) {
+          console.error("Error ensuring Fernanda Kellen role:", err);
+        }
+      };
+
+      seedFranciscoRequest();
+      seedIarlesRequest();
+      seedMartinhaRequest();
+      ensureFernandaKellenRole();
+    }
+  }, [isAuthReady, user?.id]);
+
+  // --- Efeito Global do Firestore (Core Data - NUNCA reiniciado na troca de abas) ---
+  useEffect(() => {
+    if (!isAuthReady || !user) return;
+
+    // 1. Idosos principais
+    const unsubElderly = onSnapshot(query(collection(db, 'elderly'), orderBy('name'), limit(300)), (snapshot) => {
+      const list = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        const nameLower = (data.name || '').toLowerCase();
+        let status = data.status || 'ATIVO';
+
+        // Auto-fix status para Iarles Vieira Garcia e Francisco Gomes se estiverem como INATIVO
+        if ((nameLower.includes('iarles') || nameLower.includes('francisco gomes')) && status === 'INATIVO') {
+          status = 'ATIVO';
+          updateDoc(doc(db, 'elderly', docSnap.id), { status: 'ATIVO' }).catch(err => console.error("Error auto-activating elderly:", err));
+        }
+
+        return { id: docSnap.id, ...data, status } as Elderly;
+      });
+      setElderly(list);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'elderly'));
+
+    // 2. Estoque de Fraldas
+    const unsubStock = onSnapshot(doc(db, 'diaperStock', 'current'), (docSnap) => {
+      if (docSnap.exists()) {
+        setDiaperStock({ id: docSnap.id, ...docSnap.data() } as DiaperStock);
+      }
+    }, (err) => handleFirestoreError(err, OperationType.GET, 'diaperStock/current'));
+
+    // 3. Notificações do Usuário
+    const qNotifications = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50));
+    const unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
+      const allNotifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+      const filtered = allNotifs.filter(n => {
+        if (n.targetUserId) return n.targetUserId === user.id;
+        if (n.targetEmail) {
+          return n.targetEmail.toLowerCase() === user.email?.toLowerCase() || 
+                 n.targetEmail.toLowerCase() === auth.currentUser?.email?.toLowerCase();
+        }
+        if (n.targetRole) return n.targetRole === 'ALL' || n.targetRole === user.role;
+        return true;
+      });
+      setNotifications(filtered);
+    }, (err) => {
+      getDocs(query(collection(db, 'notifications'), limit(50))).then(snap => {
+        setNotifications(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification)));
+      }).catch(e => console.error(e));
+    });
+
+    // 4. Configurações Institucionais (getDoc único)
+    getDoc(doc(db, 'settings', 'institutional')).then((docSnap) => {
+      if (docSnap.exists()) {
+        setInstitutionalInfo(docSnap.data() as InstitutionalInfo);
+      }
+    }).catch(err => handleFirestoreError(err, OperationType.GET, 'settings/institutional'));
+
+    return () => {
+      unsubElderly();
+      unsubStock();
+      unsubNotifications();
+    };
+  }, [isAuthReady, user?.id]);
+
+  // --- Efeito Lazy Loading por Aba Ativa (Carrega APENAS a aba selecionada) ---
+  useEffect(() => {
+    if (!isAuthReady || !user) return;
+
+    let unsubEvolutions = () => {};
+    let unsubEvents = () => {};
+    let unsubWorkshops = () => {};
+    let unsubFinal = () => {};
     let unsubRawProd = () => {};
     let unsubWIP = () => {};
     let unsubGoals = () => {};
-    let unsubCommunityElderly = () => {};
-    let unsubCaregivers = () => {};
-    let unsubEvolutions = () => {};
-    let unsubEvents = () => {};
-    let unsubStock = () => {};
-    let unsubFinal = () => {};
-    let unsubFinancial = () => {};
-    let unsubUsers = () => {};
-    let unsubPias = () => {};
-    let unsubGallery = () => {};
-    let unsubWorkshops = () => {};
-    let unsubFamilyEngagements = () => {};
-    let unsubProfessionals = () => {};
-    let unsubProfessionalEvaluations = () => {};
+    let unsubDiaperDonations = () => {};
+    let unsubDiaperBeneficiaries = () => {};
     let unsubPhysioPatients = () => {};
     let unsubPhysioAssessments = () => {};
     let unsubPhysioEvolutions = () => {};
@@ -12834,14 +13013,25 @@ export default function App() {
     let unsubSocialReferrals = () => {};
     let unsubSocialFamilyVisits = () => {};
     let unsubSocialRiskSituations = () => {};
+    let unsubPias = () => {};
     let unsubNutritionPatients = () => {};
     let unsubNutritionEvolutions = () => {};
     let unsubNutritionAnthropometries = () => {};
     let unsubNutritionMealPlans = () => {};
+    let unsubDonors = () => {};
+    let unsubFinancial = () => {};
+    let unsubPresidencyDocs = () => {};
+    let unsubInstitutionalRecords = () => {};
+    let unsubUsers = () => {};
+    let unsubStaff = () => {};
+    let unsubGallery = () => {};
+    let unsubCommunityElderly = () => {};
+    let unsubVolunteers = () => {};
+    let unsubCaregivers = () => {};
+    let unsubFamilyEngagements = () => {};
+    let unsubProfessionals = () => {};
+    let unsubProfessionalEvaluations = () => {};
 
-    if (!isAuthReady || !user) return;
-
-    // Otimização de Cotas: Buscar apenas registros dos últimos 7 dias por padrão (antes era 30)
     const farPast = new Date();
     farPast.setFullYear(farPast.getFullYear() - 10);
     const farPastStr = farPast.toISOString();
@@ -12850,809 +13040,341 @@ export default function App() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const thirtyDaysAgoStr = thirtyDaysAgo.toISOString();
 
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const ninetyDaysAgoStr = ninetyDaysAgo.toISOString();
-
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
     const oneYearAgoStr = oneYearAgo.toISOString();
 
-    // 1. Core Data (Always needed, real-time listeners)
-    // --- Data Seeding for Francisco Gomes da Silva (User Request) ---
-    const seedFranciscoRequest = async () => {
-      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
-      
-      try {
-        const q = query(collection(db, 'elderly'), where('cpf', '==', '056811913-46'));
-        const snapshot = await getDocs(q);
-        
-        if (snapshot.empty) {
-          const elderlyRef = await addDoc(collection(db, 'elderly'), cleanData({
-            name: 'Francisco Gomes da Silva',
-            fullName: 'Francisco Gomes da Silva',
-            cpf: '056811913-46',
-            birthDate: '1950-10-04',
-            entryDate: '2020-12-17',
-            status: 'ATIVO',
-            lastProfession: 'Não informada'
-          }));
-          
-          await addDoc(collection(db, 'pias'), cleanData({
-            elderlyId: elderlyRef.id,
-            date: '2020-12-17',
-            responsible: 'Antonilson Lima Moreira',
-            status: 'CONCLUIDO',
-            hasBPC: true,
-            hasPension: true,
-            hasLoans: false,
-            hasProperty: false,
-            familyInvolvement: 'BAIXO',
-            familyObservations: 'Relação distanciada. Não possui filhos.',
-            healthStatus: 'Pessoa com deficiência física e visual. Sem resistência alimentar.',
-            mobilityStatus: 'Deficiência física e visual',
-            objectives: 'Acompanhamento Social',
-            actions: 'Recebimento institucional e início de acompanhamento social.',
-            observations: 'Religião: Católica. Naturalidade: São Luís - MA. Não alfabetizado. Cor: Pardo. Estado Civil: Viúvo. Registro: 000059565296-4/MA.'
-          }));
-          
-          console.log("Dados do Sr. Francisco Gomes da Silva semeados com sucesso!");
-        }
-      } catch (error) {
-        console.error("Erro ao semear dados:", error);
-      }
-    };
-    seedFranciscoRequest();
-
-    // --- Data Seeding for Martinha Cardoso (User Request) ---
-    const seedMartinhaRequest = async () => {
-      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
-      
-      try {
-        const qCpf = query(collection(db, 'elderly'), where('cpf', '==', '70879540320'));
-        const snapCpf = await getDocs(qCpf);
-        
-        const qName = query(collection(db, 'elderly'), where('name', '==', 'Martinha Cardoso'));
-        const snapName = await getDocs(qName);
-
-        let elderlyId = '';
-        const martinhaData = {
-          name: 'Martinha Cardoso',
-          fullName: 'Martinha Cardoso',
-          cpf: '70879540320',
-          rg: '03002171920024',
-          birthDate: '1944-01-03',
-          entryDate: '2024-09-18',
-          gender: 'F',
-          status: 'ATIVO',
-          lastProfession: 'Aposentada',
-          schooling: 'Não Alfabetizada',
-          literacyLevel: 'ANALFABETO',
-          responsibleName: 'Maria Enilde Lima Brito',
-          responsiblePhone: '98981054117',
-          medications: 'Ficha da saúde',
-          diagnoses: 'Baixa Visão, Catarata',
-          observations: 'Naturalidade: Itapecuru Mirim MA. Solteira. Cor: Branca. Situação Socioeconômica: Aposentada. Imóvel? Não. Empréstimo? Não. Relação com a família: Conflituosa. Filhos? Sim. Atividade em grupo: Ausente. Objetivo: Acompanhamento Social. Curadora: Maria Enilde Lima Brito (CPF: 27700802882, Endereço: Casa OAMI, Estrada de Viana, s/n Alto São Francisco).'
-        };
-
-        if (!snapCpf.empty) {
-          elderlyId = snapCpf.docs[0].id;
-          await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
-          console.log("Dados de Martinha Cardoso atualizados no cadastro central.");
-        } else if (!snapName.empty) {
-          elderlyId = snapName.docs[0].id;
-          await updateDoc(doc(db, 'elderly', elderlyId), cleanData(martinhaData));
-          console.log("Dados de Martinha Cardoso atualizados no cadastro central.");
-        } else {
-          const docRef = await addDoc(collection(db, 'elderly'), cleanData(martinhaData));
-          elderlyId = docRef.id;
-          console.log("Cadastro de Martinha Cardoso criado no sistema central.");
-        }
-
-        if (elderlyId) {
-          // --- PIA (Plano Individual de Atendimento) ---
-          const qPias = query(collection(db, 'pias'), where('elderlyId', '==', elderlyId));
-          const snapPias = await getDocs(qPias);
-          const piaData = {
-            elderlyId,
-            date: '2024-09-18',
-            responsible: 'Maria Enilde Lima Brito (Curadora)',
-            status: 'CONCLUIDO',
-            hasBPC: false,
-            hasPension: true,
-            hasLoans: false,
-            hasProperty: false,
-            loanDetails: '',
-            monthlyIncome: 1412,
-            familyInvolvement: 'BAIXO',
-            familyObservations: 'Relação com a família descrita como conflituosa. Possui filhos.',
-            healthStatus: 'Baixa Visão, Catarata. Possui deficiência visual. Restrição alimentar: Não. Uso de substâncias psicoativas: Não.',
-            medications: 'Ficha da saúde',
-            mobilityStatus: 'Baixa visão / Catarata. Possui deficiência.',
-            objectives: 'Acompanhamento Social',
-            actions: 'Atividade em grupo: Ausente. Objetivo: Acompanhamento Social.',
-            observations: 'Naturalidade: Itapecuru Mirim MA. Cor: Branca. Estado Civil: Solteira. Grau de Formação: Não Alfabetizada.'
-          };
-
-          if (!snapPias.empty) {
-            await updateDoc(doc(db, 'pias', snapPias.docs[0].id), cleanData(piaData));
-          } else {
-            await addDoc(collection(db, 'pias'), cleanData(piaData));
-          }
-
-          // --- Assistente Social (Social Patients) ---
-          const qSocial = query(collection(db, 'socialPatients'), where('elderlyId', '==', elderlyId));
-          const snapSocial = await getDocs(qSocial);
-          const socialData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            birthDate: '1944-01-03',
-            schooling: 'Não Alfabetizada',
-            previousProfession: 'Aposentada',
-            address: 'Casa OAMI, Estrada de Viana, s/n Alto São Francisco',
-            phone: '98981054117',
-            responsibleName: 'Maria Enilde Lima Brito (Curadora)',
-            responsiblePhone: '98981054117',
-            benefits: ['APOSENTADORIA'],
-            benefitStatus: 'RECEBE'
-          };
-
-          if (!snapSocial.empty) {
-            await updateDoc(doc(db, 'socialPatients', snapSocial.docs[0].id), cleanData(socialData));
-          } else {
-            await addDoc(collection(db, 'socialPatients'), cleanData({ ...socialData, createdAt: new Date().toISOString() }));
-          }
-
-          // --- Fisioterapeuta (Physio Patients) ---
-          const qPhysio = query(collection(db, 'physioPatients'), where('elderlyId', '==', elderlyId));
-          const snapPhysio = await getDocs(qPhysio);
-          const physioData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            diagnosis: 'Baixa Visão, Catarata',
-            phone: '98981054117',
-            observations: 'Deficiência visual devido a baixa visão e catarata.',
-            category: 'IDOSOS'
-          };
-
-          if (!snapPhysio.empty) {
-            await updateDoc(doc(db, 'physioPatients', snapPhysio.docs[0].id), cleanData(physioData));
-          } else {
-            await addDoc(collection(db, 'physioPatients'), cleanData({ ...physioData, createdAt: new Date().toISOString() }));
-          }
-
-          // --- Enfermagem (Nursing Patients) ---
-          const qNursing = query(collection(db, 'nursingPatients'), where('elderlyId', '==', elderlyId));
-          const snapNursing = await getDocs(qNursing);
-          const nursingData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            diagnosis: 'Baixa Visão, Catarata',
-            comorbidities: 'Catarata, Baixa Visão',
-            allergies: 'Nenhuma',
-            familyContact: 'Maria Enilde Lima Brito (98981054117)',
-            riskLevel: 'MEDIO',
-            isBedridden: false,
-            fallRisk: 'ALTO',
-            careDegree: 'Grau II'
-          };
-
-          if (!snapNursing.empty) {
-            await updateDoc(doc(db, 'nursingPatients', snapNursing.docs[0].id), cleanData(nursingData));
-          } else {
-            await addDoc(collection(db, 'nursingPatients'), cleanData({ ...nursingData, createdAt: new Date().toISOString() }));
-          }
-
-          // --- Psicologia (Psych Patients) ---
-          const qPsych = query(collection(db, 'psychPatients'), where('elderlyId', '==', elderlyId));
-          const snapPsych = await getDocs(qPsych);
-          const psychData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            familyContact: 'Maria Enilde Lima Brito (98981054117)',
-            lifeHistory: 'Naturalidade de Itapecuru Mirim MA. Solteira, com filhos, histórico de relação familiar conflituosa.',
-            hasVisits: false
-          };
-
-          if (!snapPsych.empty) {
-            await updateDoc(doc(db, 'psychPatients', snapPsych.docs[0].id), cleanData(psychData));
-          } else {
-            await addDoc(collection(db, 'psychPatients'), cleanData({ ...psychData, createdAt: new Date().toISOString() }));
-          }
-
-          // --- Pedagogia (Pedagogy Patients) ---
-          const qPedagogy = query(collection(db, 'pedagogyPatients'), where('elderlyId', '==', elderlyId));
-          const snapPedagogy = await getDocs(qPedagogy);
-          const pedagogyData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            schooling: 'Não Alfabetizada',
-            literacyLevel: 'ANALFABETO',
-            previousProfession: 'Aposentada',
-            cognitiveLimitations: 'Baixa visão e catarata, dificultando atividades visuais.'
-          };
-
-          if (!snapPedagogy.empty) {
-            await updateDoc(doc(db, 'pedagogyPatients', snapPedagogy.docs[0].id), cleanData(pedagogyData));
-          } else {
-            await addDoc(collection(db, 'pedagogyPatients'), cleanData({ ...pedagogyData, createdAt: new Date().toISOString() }));
-          }
-
-          // --- Nutrição (Nutrition Patients) ---
-          const qNutrition = query(collection(db, 'nutritionPatients'), where('elderlyId', '==', elderlyId));
-          const snapNutrition = await getDocs(qNutrition);
-          const nutritionData = {
-            elderlyId,
-            name: 'Martinha Cardoso',
-            comorbidities: 'Baixa visão, Catarata',
-            allergies: []
-          };
-
-          if (!snapNutrition.empty) {
-            await updateDoc(doc(db, 'nutritionPatients', snapNutrition.docs[0].id), cleanData(nutritionData));
-          } else {
-            await addDoc(collection(db, 'nutritionPatients'), cleanData({ ...nutritionData, createdAt: new Date().toISOString() }));
-          }
-
-          console.log("Dados de Martinha Cardoso semeados/atualizados com sucesso em todas as especialidades!");
-        }
-      } catch (error) {
-        console.error("Erro ao semear dados de Martinha Cardoso:", error);
-      }
-    };
-    seedMartinhaRequest();
-
-    // Ensure Fernanda Kellen is linked strictly to the Administrative Assistant role
-    const ensureFernandaKellenRole = async () => {
-      // Only execute this check and sync if the logged-in user is franciaraeabreucoelho@gmail.com to avoid permission errors for other roles/users
-      if (!auth.currentUser || auth.currentUser.email !== 'franciaraeabreucoelho@gmail.com') return;
-      
-      try {
-        const targetEmail = 'fernandakellenfk378@gmail.com';
-        const qProfiles = query(collection(db, 'profiles'), where('email', '==', targetEmail));
-        const snapProfiles = await getDocs(qProfiles);
-        
-        for (const d of snapProfiles.docs) {
-          const data = d.data();
-          if (data.role !== 'AUXILIAR_ADMINISTRATIVO') {
-            await updateDoc(doc(db, 'profiles', d.id), {
-              role: 'AUXILIAR_ADMINISTRATIVO'
-            });
-            console.log(`Updated profile ${d.id} for ${targetEmail} to AUXILIAR_ADMINISTRATIVO.`);
-          }
-        }
-
-        // Also ensure in 'professionals' collection (Administrative assistant resides here rather than 'users' staff collection)
-        const qProfessionals = query(collection(db, 'professionals'), where('email', '==', targetEmail));
-        const snapProfessionals = await getDocs(qProfessionals);
-        if (snapProfessionals.empty) {
-          await addDoc(collection(db, 'professionals'), cleanData({
-            name: 'Fernanda Kellen',
-            email: targetEmail,
-            role: 'AUXILIAR_ADMINISTRATIVO',
-            registrationNumber: 'Reg-FK',
-            phone: '',
-            admissionDate: new Date().toISOString().split('T')[0],
-            status: 'ATIVO',
-            createdAt: new Date().toISOString()
-          }));
-          console.log(`Created professional record for ${targetEmail} as AUXILIAR_ADMINISTRATIVO`);
-        } else {
-          for (const d of snapProfessionals.docs) {
-            const data = d.data();
-            if (data.role !== 'AUXILIAR_ADMINISTRATIVO') {
-              await updateDoc(doc(db, 'professionals', d.id), {
-                role: 'AUXILIAR_ADMINISTRATIVO'
-              });
-              console.log(`Updated professional doc ${d.id} for ${targetEmail} to AUXILIAR_ADMINISTRATIVO.`);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error ensuring Fernanda Kellen role:", err);
-      }
-    };
-    ensureFernandaKellenRole();
-
-    // Replaced fetchStaticData with real-time listeners
-    unsubElderly = onSnapshot(query(collection(db, 'elderly'), orderBy('name'), limit(300)), (snapshot) => {
-      console.log(`📦 Firestore: ${snapshot.size} idosos encontrados.`);
-      setElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Elderly)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'elderly'));
-
-    unsubStaff = onSnapshot(collection(db, 'users'), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
-
-    unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
-      setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
-
-    // 2. Real-time Critical Listeners (Keep as onSnapshot)
-    // Listen to Evolutions (Histórico de 1 ano para Dashboard)
-    const qEvolutions = query(
-      collection(db, 'evolutions'), 
-      where('date', '>=', farPastStr),
-      orderBy('date', 'desc'),
-      limit(500)
-    );
-    unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
-      setEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EvolutionRecord)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'evolutions'));
-
-    // Calendar Events
-    unsubEvents = onSnapshot(query(collection(db, 'calendarEvents'), orderBy('date'), limit(100)), (snapshot) => {
-      setCalendarEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'calendarEvents'));
-
-    // Stock for Diapers
-    unsubStock = onSnapshot(doc(db, 'diaperStock', 'current'), (docSnap) => {
-      if (docSnap.exists()) {
-        setDiaperStock({ id: docSnap.id, ...docSnap.data() } as DiaperStock);
-      }
-    }, (err) => handleFirestoreError(err, OperationType.GET, 'diaperStock/current'));
-
-    // Final Packings (Histórico de 1 ano para Dashboard)
-    unsubFinal = onSnapshot(query(
-      collection(db, 'diaperFinalPackings'), 
-      where('date', '>=', farPastStr),
-      orderBy('date', 'desc'),
-      limit(300)
-    ), (snapshot) => {
-      setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
-
-    unsubRawProd = onSnapshot(query(collection(db, 'diaperRawProductions'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
-      setDiaperRawProductions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperRawProduction)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperRawProductions'));
-
-    unsubWIP = onSnapshot(query(collection(db, 'diaperWIPProcessings'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
-      setDiaperWIPProcessings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperWIPProcessing)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperWIPProcessings'));
-
-    unsubGoals = onSnapshot(collection(db, 'diaperProductionGoals'), (snapshot) => {
-      setDiaperProductionGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperProductionGoal)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperProductionGoals'));
-
-    unsubDiaperDonations = onSnapshot(query(collection(db, 'diaperDonations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
-      setDiaperDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperDonation)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperDonations'));
-
-    unsubDiaperBeneficiaries = onSnapshot(query(collection(db, 'diaperBeneficiaries'), orderBy('name'), limit(100)), (snapshot) => {
-      setDiaperBeneficiaries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperBeneficiary)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperBeneficiaries'));
-
-    // Listen to Donors
-    if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-      unsubDonors = onSnapshot(query(collection(db, 'donors'), orderBy('name'), limit(200)), (snapshot) => {
-        setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'donors'));
-    }
-
-    // Listen to Financial Records
-    if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-      const qFinancial = query(
-        collection(db, 'financial'), 
+    // 1. Dashboard / Cronograma / General
+    if (['dashboard', 'overview', 'productivity', 'schedule', 'workshops', 'monitoring', 'reports'].includes(activeTab)) {
+      const qEvolutions = query(
+        collection(db, 'evolutions'), 
+        where('date', '>=', farPastStr),
         orderBy('date', 'desc'),
-        limit(500)
+        limit(200)
       );
-      unsubFinancial = onSnapshot(qFinancial, (snapshot) => {
-        setFinancialRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord)));
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'financial'));
+      unsubEvolutions = onSnapshot(qEvolutions, (snapshot) => {
+        setEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EvolutionRecord)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'evolutions'));
+
+      unsubEvents = onSnapshot(query(collection(db, 'calendarEvents'), orderBy('date'), limit(100)), (snapshot) => {
+        setCalendarEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CalendarEvent)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'calendarEvents'));
+
+      unsubWorkshops = onSnapshot(query(collection(db, 'workshops'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        setWorkshops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Workshop)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'workshops'));
     }
 
-    // Listen to Presidency and Institutional Support
-    if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+    // 2. Produção de Fraldas (SGPF)
+    if (activeTab === 'diaperProduction') {
+      unsubFinal = onSnapshot(query(collection(db, 'diaperFinalPackings'), where('date', '>=', farPastStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
+        setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
+
+      unsubRawProd = onSnapshot(query(collection(db, 'diaperRawProductions'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        setDiaperRawProductions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperRawProduction)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperRawProductions'));
+
+      unsubWIP = onSnapshot(query(collection(db, 'diaperWIPProcessings'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        setDiaperWIPProcessings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperWIPProcessing)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperWIPProcessings'));
+
+      unsubGoals = onSnapshot(collection(db, 'diaperProductionGoals'), (snapshot) => {
+        setDiaperProductionGoals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperProductionGoal)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperProductionGoals'));
+
+      unsubDiaperDonations = onSnapshot(query(collection(db, 'diaperDonations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
+        setDiaperDonations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperDonation)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperDonations'));
+
+      unsubDiaperBeneficiaries = onSnapshot(query(collection(db, 'diaperBeneficiaries'), orderBy('name'), limit(100)), (snapshot) => {
+        setDiaperBeneficiaries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperBeneficiary)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperBeneficiaries'));
+    }
+
+    // 3. Fisioterapia
+    if (activeTab === 'physio') {
+      unsubPhysioPatients = onSnapshot(query(collection(db, 'physioPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
+
+      unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
+
+      unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
+
+      unsubPhysioExercises = onSnapshot(query(collection(db, 'physioExercises'), orderBy('title'), limit(200)), (snapshot) => {
+        setPhysioExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioExercise)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioExercises'));
+
+      unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPhysioAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAppointment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
+    }
+
+    // 4. Enfermagem
+    if (activeTab === 'nursing') {
+      unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setNursingPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingPatients'));
+
+      unsubMedications = onSnapshot(query(collection(db, 'medications'), limit(200)), (snapshot) => {
+        setMedications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Medication)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'medications'));
+
+      unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
+
+      unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
+
+      unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
+
+      unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
+
+      unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setIncidentRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncidentRecord)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'incidentRecords'));
+
+      unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setShiftSchedules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShiftSchedule)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'shiftSchedules'));
+
+      unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setAvdRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AVDRecord)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'avdRecords'));
+
+      unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setDiaperChangeRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperChangeRecord)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperChangeRecords'));
+    }
+
+    // 5. Psicologia
+    if (activeTab === 'psychology') {
+      unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
+
+      unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
+
+      unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
+
+      unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPsychAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychAppointment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychAppointments'));
+
+      unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPsychEmotionalMonitorings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEmotionalMonitoring)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEmotionalMonitoring'));
+
+      unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), limit(300)), (snapshot) => {
+        setPsychFamilyBonds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychFamilyBond)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychFamilyBonds'));
+
+      unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPsychActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychActivity)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychActivities'));
+
+      unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPsychCognitionAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychCognitionAssessment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychCognitionAssessments'));
+
+      unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), limit(300)), (snapshot) => {
+        setPsychInterventionPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInterventionPlan)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInterventionPlans'));
+    }
+
+    // 6. Pedagogia
+    if (activeTab === 'pedagogy') {
+      unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
+
+      unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
+
+      unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
+
+      unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPedagogyActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyActivity)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyActivities'));
+
+      unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPedagogyStimulationTrackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyStimulationTracking)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyStimulationTrackings'));
+
+      unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setPedagogySocialParticipations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogySocialParticipation)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogySocialParticipations'));
+
+      unsubPedagogyIndividualPlans = onSnapshot(query(collection(db, 'pedagogyIndividualPlans'), limit(300)), (snapshot) => {
+        setPedagogyIndividualPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyIndividualPlan)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyIndividualPlans'));
+    }
+
+    // 7. Serviço Social
+    if (activeTab === 'socialWork') {
+      unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
+
+      unsubSocialFamilyTies = onSnapshot(query(collection(db, 'socialFamilyTies'), limit(300)), (snapshot) => {
+        setSocialFamilyTies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyTie)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyTies'));
+
+      unsubSocialDocumentations = onSnapshot(query(collection(db, 'socialDocumentations'), limit(300)), (snapshot) => {
+        setSocialDocumentations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialDocumentation)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialDocumentations'));
+
+      unsubSocialLegalSituations = onSnapshot(query(collection(db, 'socialLegalSituations'), limit(300)), (snapshot) => {
+        setSocialLegalSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialLegalSituation)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialLegalSituations'));
+
+      unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
+
+      unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
+
+      unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setSocialReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialReferral)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialReferrals'));
+
+      unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setSocialFamilyVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyVisit)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyVisits'));
+
+      unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), limit(300)), (snapshot) => {
+        setSocialRiskSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialRiskSituation)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialRiskSituations'));
+
+      unsubPias = onSnapshot(query(collection(db, 'pias'), limit(300)), (snapshot) => {
+        setPias(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'pias'));
+    }
+
+    // 8. Nutrição
+    if (activeTab === 'nutrition') {
+      unsubNutritionPatients = onSnapshot(query(collection(db, 'nutritionPatients'), orderBy('name'), limit(100)), (snapshot) => {
+        setNutritionPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionPatient)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionPatients'));
+
+      unsubNutritionEvolutions = onSnapshot(query(collection(db, 'nutritionEvolutions'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
+        setNutritionEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionEvolution)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionEvolutions'));
+
+      unsubNutritionAnthropometries = onSnapshot(query(collection(db, 'nutritionAnthropometries'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+        setNutritionAnthropometries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionAnthropometry)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionAnthropometries'));
+
+      unsubNutritionMealPlans = onSnapshot(query(collection(db, 'nutritionMealPlans'), limit(100)), (snapshot) => {
+        setNutritionMealPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionMealPlan)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionMealPlans'));
+    }
+
+    // 9. Financeiro e Doadores
+    if (['financial', 'treasury', 'donors'].includes(activeTab)) {
+      if (['PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO', 'COORDENADORA', 'TESOUREIRA'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
+        unsubFinancial = onSnapshot(query(collection(db, 'financial'), orderBy('date', 'desc'), limit(300)), (snapshot) => {
+          setFinancialRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'financial'));
+
+        unsubDonors = onSnapshot(query(collection(db, 'donors'), orderBy('name'), limit(200)), (snapshot) => {
+          setDonors(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Donor)));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'donors'));
+      }
+    }
+
+    // 10. Suporte à Presidência e Apoio Institucional
+    if (activeTab === 'presidency_support') {
       unsubPresidencyDocs = onSnapshot(query(collection(db, 'presidency_support'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
         setPresidencyDocs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PresidencySupportDocument)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'presidency_support'));
+    }
 
+    if (activeTab === 'institutional_support') {
       unsubInstitutionalRecords = onSnapshot(query(collection(db, 'institutional_support'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
         setInstitutionalRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InstitutionalSupportRecord)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'institutional_support'));
     }
 
-    // Listen to All Users (Limitado para evitar leitura massiva)
-    unsubUsers = onSnapshot(query(collection(db, 'profiles'), limit(50)), (snapshot) => {
-      setAdminUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'profiles');
-      showToast('Erro ao carregar usuários', 'error');
-    });
-
-    // Listen to PIAs
-    unsubPias = onSnapshot(query(collection(db, 'pias'), limit(500)), (snapshot) => {
-      setPias(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PIA)));
-    }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'pias');
-      showToast('Erro ao carregar PIAs', 'error');
-    });
-
-    // Listen to Gallery
-    const qGallery = query(collection(db, 'gallery'), orderBy('date', 'desc'), limit(50));
-    unsubGallery = onSnapshot(qGallery, (snapshot) => {
-      const galleryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
-      if (!galleryData || galleryData.length === 0) {
-        setAllPhotos(MOCK_GALLERY);
-      } else {
-        setAllPhotos(galleryData);
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.LIST, 'gallery');
-      showToast('Erro ao carregar galeria', 'error');
-    });
-
-    // Listen for Community Elderly (real-time)
-    const qCommunityElderly = query(collection(db, 'communityElderly'), orderBy('name'), limit(100));
-    unsubCommunityElderly = onSnapshot(qCommunityElderly, (snapshot) => {
-      setCommunityElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'communityElderly'));
-
-    // Listen to Workshops (1 ano para dashboard)
-    const qWorkshops = query(collection(db, 'workshops'), where('date', '>=', oneYearAgoStr), orderBy('date', 'desc'), limit(150));
-    unsubWorkshops = onSnapshot(qWorkshops, (snapshot) => {
-      setWorkshops(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Workshop)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'workshops'));
-
-    // Listen for Caregivers (real-time)
-    const qCaregivers = query(collection(db, 'caregivers'), orderBy('name'), limit(100));
-    unsubCaregivers = onSnapshot(qCaregivers, (snapshot) => {
-      setCaregivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregivers'));
-
-    // Listen to Family Engagements
-    const qFamilyEngagements = query(collection(db, 'familyEngagements'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50));
-    unsubFamilyEngagements = onSnapshot(qFamilyEngagements, (snapshot) => {
-      setFamilyEngagements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyEngagement)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'familyEngagements'));
-
-    // Listen to Institutional Info (Reduzido para getDoc pois muda raramente)
-    getDoc(doc(db, 'settings', 'institutional')).then((docSnap) => {
-      if (docSnap.exists()) {
-        setInstitutionalInfo(docSnap.data() as InstitutionalInfo);
-      }
-    }).catch(err => handleFirestoreError(err, OperationType.GET, 'settings/institutional'));
-
-    // 3. Tab-Specific Lazy Listeners
-    if (activeTab === 'physio' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'FISIOTERAPEUTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        const qPhysioPatients = query(collection(db, 'physioPatients'), orderBy('name'), limit(100));
-        unsubPhysioPatients = onSnapshot(qPhysioPatients, (snapshot) => {
-          setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
-
-        unsubPhysioAssessments = onSnapshot(query(collection(db, 'physioAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPhysioAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAssessment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAssessments'));
-
-        unsubPhysioEvolutions = onSnapshot(query(collection(db, 'physioEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setPhysioEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioEvolutions'));
-
-        unsubPhysioExercises = onSnapshot(query(collection(db, 'physioExercises'), orderBy('title'), limit(200)), (snapshot) => {
-          setPhysioExercises(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioExercise)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioExercises'));
-
-        unsubPhysioAppointments = onSnapshot(query(collection(db, 'physioAppointments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPhysioAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioAppointment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
-      }
+    // 11. Galeria
+    if (activeTab === 'gallery') {
+      unsubGallery = onSnapshot(query(collection(db, 'gallery'), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        const galleryData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
+        setAllPhotos(galleryData && galleryData.length > 0 ? galleryData : MOCK_GALLERY);
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'gallery'));
     }
 
-    // Nursing Listeners (Cargo ou Board)
-    if (activeTab === 'nursing' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'ENFERMEIRA', 'TECNICO_ENFERMAGEM', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
-          setNursingPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingPatients'));
+    // 12. Usuários e Profissionais
+    if (['professionals', 'adminAssistant'].includes(activeTab)) {
+      unsubUsers = onSnapshot(query(collection(db, 'profiles'), limit(50)), (snapshot) => {
+        setAdminUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'profiles'));
 
-        unsubMedications = onSnapshot(query(collection(db, 'medications'), limit(200)), (snapshot) => {
-          setMedications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Medication)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'medications'));
-
-        unsubMedicationAdministrations = onSnapshot(query(collection(db, 'medicationAdministrations'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setMedicationAdministrations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MedicationAdministration)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'medicationAdministrations'));
-
-        unsubVitalSigns = onSnapshot(query(collection(db, 'vitalSigns'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setVitalSigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VitalSigns)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'vitalSigns'));
-
-        unsubDressingRecords = onSnapshot(query(collection(db, 'dressingRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setDressingRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DressingRecord)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'dressingRecords'));
-
-        unsubNursingEvolutions = onSnapshot(query(collection(db, 'nursingEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setNursingEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingEvolutions'));
-
-        unsubIncidentRecords = onSnapshot(query(collection(db, 'incidentRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setIncidentRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncidentRecord)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'incidentRecords'));
-
-        unsubShiftSchedules = onSnapshot(query(collection(db, 'shiftSchedules'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setShiftSchedules(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ShiftSchedule)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'shiftSchedules'));
-
-        unsubAvdRecords = onSnapshot(query(collection(db, 'avdRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setAvdRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AVDRecord)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'avdRecords'));
-
-        unsubDiaperChangeRecords = onSnapshot(query(collection(db, 'diaperChangeRecords'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setDiaperChangeRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperChangeRecord)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperChangeRecords'));
-      }
+      unsubStaff = onSnapshot(collection(db, 'users'), (snapshot) => {
+        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
     }
 
-    // Psych Listeners (Cargo ou Board)
-    if (activeTab === 'psychology' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'PSICOLOGA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name'), limit(100)), (snapshot) => {
-          setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
-
-        unsubPsychInitialAssessments = onSnapshot(query(collection(db, 'psychInitialAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInitialAssessment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInitialAssessments'));
-
-        unsubPsychEvolutions = onSnapshot(query(collection(db, 'psychEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setPsychEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEvolutions'));
-
-        unsubPsychAppointments = onSnapshot(query(collection(db, 'psychAppointments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychAppointment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychAppointments'));
-
-        unsubPsychEmotionalMonitorings = onSnapshot(query(collection(db, 'psychEmotionalMonitorings'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setPsychEmotionalMonitorings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychEmotionalMonitoring)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychEmotionalMonitorings'));
-
-        unsubPsychFamilyBonds = onSnapshot(query(collection(db, 'psychFamilyBonds'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychFamilyBonds(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychFamilyBond)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychFamilyBonds'));
-
-        unsubPsychActivities = onSnapshot(query(collection(db, 'psychActivities'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychActivity)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychActivities'));
-
-        unsubPsychCognitionAssessments = onSnapshot(query(collection(db, 'psychCognitionAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychCognitionAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychCognitionAssessment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychCognitionAssessments'));
-
-        unsubPsychInterventionPlans = onSnapshot(query(collection(db, 'psychInterventionPlans'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPsychInterventionPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychInterventionPlan)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychInterventionPlans'));
-      }
-    }
-
-    // Pedagogy listeners (Cargo ou Board)
-    if (activeTab === 'pedagogy' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'PEDAGOGA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name'), limit(100)), (snapshot) => {
-          setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
-
-        unsubPedagogyInitialAssessments = onSnapshot(query(collection(db, 'pedagogyInitialAssessments'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPedagogyInitialAssessments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyInitialAssessment)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyInitialAssessments'));
-
-        unsubPedagogyEvolutions = onSnapshot(query(collection(db, 'pedagogyEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setPedagogyEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyEvolutions'));
-
-        unsubPedagogyActivities = onSnapshot(query(collection(db, 'pedagogyActivities'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPedagogyActivities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyActivity)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyActivities'));
-
-        unsubPedagogyStimulationTrackings = onSnapshot(query(collection(db, 'pedagogyStimulationTrackings'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPedagogyStimulationTrackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyStimulationTracking)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyStimulationTrackings'));
-
-        unsubPedagogySocialParticipations = onSnapshot(query(collection(db, 'pedagogySocialParticipations'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPedagogySocialParticipations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogySocialParticipation)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogySocialParticipations'));
-
-        unsubPedagogyIndividualPlans = onSnapshot(query(collection(db, 'pedagogyIndividualPlans'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setPedagogyIndividualPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyIndividualPlan)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyIndividualPlans'));
-
-        // Life Histories - raras alterações, usa getDocs
-        getDocs(query(collection(db, 'pedagogyLifeHistories'), limit(100))).then((snapshot) => {
-          setPedagogyLifeHistories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyLifeHistory)));
-        }).catch(err => handleFirestoreError(err, OperationType.LIST, 'pedagogyLifeHistories'));
-      }
-    }
-
-    // Social Work Listeners (Cargo ou Board)
-    if (activeTab === 'socialWork' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'ASSISTENTE_SOCIAL', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name'), limit(100)), (snapshot) => {
-          setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
-
-        unsubSocialFamilyTies = onSnapshot(query(collection(db, 'socialFamilyTies'), limit(500)), (snapshot) => {
-          setSocialFamilyTies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyTie)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyTies'));
-
-        unsubSocialDocumentations = onSnapshot(query(collection(db, 'socialDocumentations'), limit(500)), (snapshot) => {
-          setSocialDocumentations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialDocumentation)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialDocumentations'));
-
-        unsubSocialLegalSituations = onSnapshot(query(collection(db, 'socialLegalSituations'), limit(500)), (snapshot) => {
-          setSocialLegalSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialLegalSituation)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialLegalSituations'));
-
-        unsubSocialStudies = onSnapshot(query(collection(db, 'socialStudies'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setSocialStudies(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialStudy)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialStudies'));
-
-        unsubSocialEvolutions = onSnapshot(query(collection(db, 'socialEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setSocialEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialEvolutions'));
-
-        unsubSocialReferrals = onSnapshot(query(collection(db, 'socialReferrals'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setSocialReferrals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialReferral)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialReferrals'));
-
-        unsubSocialFamilyVisits = onSnapshot(query(collection(db, 'socialFamilyVisits'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setSocialFamilyVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialFamilyVisit)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialFamilyVisits'));
-
-        unsubSocialRiskSituations = onSnapshot(query(collection(db, 'socialRiskSituations'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setSocialRiskSituations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialRiskSituation)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialRiskSituations'));
-      }
-    }
-
-
-    // Nutrition Listeners
-    if (activeTab === 'nutrition' || activeTab === 'professional' || activeTab === 'dashboard') {
-      if (['PRESIDENTE', 'COORDENADORA', 'NUTRICIONISTA', 'AUXILIAR_ADMINISTRATIVO'].includes(user.role) || auth.currentUser?.email === 'franciaraeabreucoelho@gmail.com') {
-        unsubNutritionPatients = onSnapshot(query(collection(db, 'nutritionPatients'), orderBy('name'), limit(100)), (snapshot) => {
-          setNutritionPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionPatient)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionPatients'));
-
-        unsubNutritionEvolutions = onSnapshot(query(collection(db, 'nutritionEvolutions'), orderBy('date', 'desc'), limit(1000)), (snapshot) => {
-          setNutritionEvolutions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionEvolution)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionEvolutions'));
-
-        unsubNutritionAnthropometries = onSnapshot(query(collection(db, 'nutritionAnthropometries'), orderBy('date', 'desc'), limit(500)), (snapshot) => {
-          setNutritionAnthropometries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionAnthropometry)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionAnthropometries'));
-
-        unsubNutritionMealPlans = onSnapshot(query(collection(db, 'nutritionMealPlans'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
-          setNutritionMealPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionMealPlan)));
-        }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionMealPlans'));
-      }
-    }
-
-    // Listen to Professionals
-    if (user) {
-      const qProfessionals = query(collection(db, 'professionals'), orderBy('name'), limit(100));
-      unsubProfessionals = onSnapshot(qProfessionals, (snapshot) => {
+    // 13. Avaliações Técnicas / Profissional
+    if (activeTab === 'professional') {
+      unsubProfessionals = onSnapshot(query(collection(db, 'professionals'), orderBy('name'), limit(100)), (snapshot) => {
         setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
 
-      const qEvaluations = query(collection(db, 'professionalEvaluations'), orderBy('createdAt', 'desc'), limit(100));
-      unsubProfessionalEvaluations = onSnapshot(qEvaluations, (snapshot) => {
+      unsubProfessionalEvaluations = onSnapshot(query(collection(db, 'professionalEvaluations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
         setProfessionalEvaluations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfessionalEvaluation)));
-      }, (err) => {
-        console.warn("Could not sync professionalEvaluations from firestore, using local/mock:", err);
-      });
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionalEvaluations'));
     }
 
-    // Notifications Listener
-    let unsubNotifications: () => void = () => {};
-    if (user) {
-      const qNotifications = query(
-        collection(db, 'notifications'), 
-        orderBy('date', 'desc'), 
-        limit(150)
-      );
-      unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
-        const allNotifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
-        const filtered = allNotifs.filter(n => {
-          if (n.targetUserId) {
-            return n.targetUserId === user.id;
-          }
-          if (n.targetEmail) {
-            return n.targetEmail.toLowerCase() === user.email?.toLowerCase() || 
-                   n.targetEmail.toLowerCase() === auth.currentUser?.email?.toLowerCase();
-          }
-          if (n.targetRole) {
-            return n.targetRole === 'ALL' || n.targetRole === user.role;
-          }
-          return true;
-        });
-        setNotifications(filtered);
-        
-        // Trigger browser notification for new items
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === 'added' && !snapshot.metadata.hasPendingWrites) {
-            const n = change.doc.data() as AppNotification;
-            const matchesUser = !n.targetUserId && !n.targetEmail
-              ? (!n.targetRole || n.targetRole === 'ALL' || n.targetRole === user.role)
-              : (n.targetUserId === user.id || 
-                 n.targetEmail?.toLowerCase() === user.email?.toLowerCase() || 
-                 n.targetEmail?.toLowerCase() === auth.currentUser?.email?.toLowerCase());
+    // 14. Voluntários, Comunidade e Acompanhamento Familiar
+    if (['volunteers', 'family', 'elderly'].includes(activeTab)) {
+      unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
+        setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
 
-            if (matchesUser && window.Notification && Notification.permission === 'granted' && !n.read) {
-              // Priority for Service Worker implementation (better for mobile system trays)
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.ready.then(registration => {
-                  registration.showNotification(n.title, {
-                    body: n.message,
-                    icon: INSTITUTION_LOGO,
-                    badge: INSTITUTION_LOGO,
-                    tag: change.doc.id,
-                    vibrate: [200, 100, 200],
-                    renotify: true,
-                    data: { url: n.link || '/' }
-                  } as any);
-                }).catch(() => {
-                  // Fallback to basic notification if SW ready fails
-                  new Notification(n.title, {
-                    body: n.message,
-                    icon: INSTITUTION_LOGO
-                  });
-                });
-              } else {
-                new Notification(n.title, {
-                  body: n.message,
-                  icon: INSTITUTION_LOGO
-                });
-              }
-            }
-          }
-        });
-      }, (err) => {
-        // If query fails, fallback to simpler query
-        const qSimple = query(collection(db, 'notifications'), limit(150));
-        onSnapshot(qSimple, (snap) => {
-          const allNotifs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
-          const filtered = allNotifs.filter(n => {
-            if (n.targetUserId) return n.targetUserId === user.id;
-            if (n.targetEmail) {
-              return n.targetEmail.toLowerCase() === user.email?.toLowerCase() || 
-                     n.targetEmail.toLowerCase() === auth.currentUser?.email?.toLowerCase();
-            }
-            if (n.targetRole) return n.targetRole === 'ALL' || n.targetRole === user.role;
-            return true;
-          });
-          setNotifications(filtered);
-        });
-      });
-    }
+      unsubCommunityElderly = onSnapshot(query(collection(db, 'communityElderly'), orderBy('name'), limit(100)), (snapshot) => {
+        setCommunityElderly(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityElderly)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'communityElderly'));
 
-    // Request Notification Permission
-    if (window.Notification && Notification.permission === 'default') {
-      Notification.requestPermission();
+      unsubCaregivers = onSnapshot(query(collection(db, 'caregivers'), orderBy('name'), limit(100)), (snapshot) => {
+        setCaregivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregivers'));
+
+      unsubFamilyEngagements = onSnapshot(query(collection(db, 'familyEngagements'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
+        setFamilyEngagements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyEngagement)));
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'familyEngagements'));
     }
 
     return () => {
-      unsubElderly();
-      unsubStaff();
       unsubEvolutions();
-      unsubDonors();
-      unsubDiaperDonations();
-      unsubDiaperBeneficiaries();
-      unsubStock();
-      unsubProductionLogs();
+      unsubEvents();
+      unsubWorkshops();
+      unsubFinal();
       unsubRawProd();
       unsubWIP();
       unsubGoals();
-      unsubEvents();
-      unsubFinancial();
-      unsubUsers();
-      unsubPias();
-      unsubGallery();
-      unsubVolunteers();
-      unsubCommunityElderly();
-      unsubWorkshops();
-      unsubCaregivers();
-      unsubFamilyEngagements();
-      unsubProfessionals();
-      unsubProfessionalEvaluations();
+      unsubDiaperDonations();
+      unsubDiaperBeneficiaries();
       unsubPhysioPatients();
       unsubPhysioAssessments();
       unsubPhysioEvolutions();
@@ -13693,17 +13415,24 @@ export default function App() {
       unsubSocialReferrals();
       unsubSocialFamilyVisits();
       unsubSocialRiskSituations();
-      unsubRawProd();
-      unsubWIP();
-      unsubFinal();
-      unsubGoals();
+      unsubPias();
       unsubNutritionPatients();
       unsubNutritionEvolutions();
       unsubNutritionAnthropometries();
       unsubNutritionMealPlans();
-      unsubNotifications();
+      unsubDonors();
+      unsubFinancial();
       unsubPresidencyDocs();
       unsubInstitutionalRecords();
+      unsubUsers();
+      unsubStaff();
+      unsubGallery();
+      unsubCommunityElderly();
+      unsubVolunteers();
+      unsubCaregivers();
+      unsubFamilyEngagements();
+      unsubProfessionals();
+      unsubProfessionalEvaluations();
     };
   }, [isAuthReady, user?.id, user?.role, activeTab]);
 
@@ -16078,6 +15807,7 @@ export default function App() {
       );
       case 'financial': return <FinancialSection financialRecords={financialRecords} user={user!} showToast={showToast} />;
       case 'treasury': return <TreasurySection user={user!} showToast={showToast} showConfirm={showConfirm} />;
+      case 'stock': return <StockSection user={user!} showToast={showToast} showConfirm={showConfirm} />;
       case 'presidency_support': return <PresidencySupportSection documents={presidencyDocs} user={user!} showToast={showToast} />;
       case 'institutional_support': return <InstitutionalSupportSection records={institutionalRecords} user={user!} showToast={showToast} />;
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
@@ -16173,6 +15903,7 @@ export default function App() {
       case 'diaperProduction': return (
         <DiaperProductionSection 
           user={user}
+          elderly={elderly}
           rawProductions={diaperRawProductions}
           wipProcessings={diaperWIPProcessings}
           finalPackings={diaperFinalPackings}
@@ -16282,6 +16013,7 @@ export default function App() {
                  activeTab === 'professional' ? 'Avaliação & Monitoramento' : 
                  activeTab === 'financial' ? 'Financeiro' : 
                  activeTab === 'treasury' ? 'Tesouraria' : 
+                 activeTab === 'stock' ? 'Controle de Estoque' :
                  activeTab === 'donors' ? 'Doadores e Sócios' :
                  activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :
