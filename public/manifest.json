@@ -1,21 +1,25 @@
 {
-  "name": "OAMI - Gestão Multidisciplinar",
-  "short_name": "OAMI",
-  "description": "Sistema de gestão multidisciplinar para a OAMI - Gestão ILPI",
+  "name": "Casa OAMI – Gestão ILPI",
+  "short_name": "Casa OAMI",
+  "description": "Sistema de Gestão da Casa OAMI - Gestão ILPI",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#16a34a",
   "icons": [
     {
       "src": "https://i.ibb.co/vC49wFB8/a3068c33-2467-4266-a9c3-da7b27dc78b8.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     },
     {
       "src": "https://i.ibb.co/vC49wFB8/a3068c33-2467-4266-a9c3-da7b27dc78b8.jpg",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     }
   ]
 }

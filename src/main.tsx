@@ -4,38 +4,20 @@ import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
 
-// 🔥 BLOQUEIO TOTAL E LIMPEZA DE CACHE PARA ESTABILIDADE
+// 📱 REGISTRO DE SERVICE WORKER PARA PWA INSTALÁVEL
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
-  });
-
-  // 🧹 Limpa caches e força recarregamento se houver nova versão
-  caches.keys().then(names => {
-    names.forEach(name => caches.delete(name));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Erro ao registrar Service Worker PWA:', err);
+    });
   });
 }
 
 // Limpa localStorage de versões antigas se necessário
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.1.0';
 if (localStorage.getItem('app_version') !== APP_VERSION) {
-  localStorage.clear();
   localStorage.setItem('app_version', APP_VERSION);
 }
-
-// 🚫 Bloqueia qualquer novo registro de Service Worker
-try {
-  (navigator.serviceWorker.register as any) = () => {
-    return Promise.resolve({
-      active: null,
-      installing: null,
-      waiting: null,
-      onupdatefound: null,
-      unregister: () => Promise.resolve(true),
-      update: () => Promise.resolve()
-    });
-  };
-} catch (e) {}
 
 // Global handlers to prevent Firestore internal assertion or quota limits from crashing the UI
 window.addEventListener('error', (event) => {
