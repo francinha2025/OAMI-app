@@ -168,12 +168,12 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
   // Real-time Listeners
   useEffect(() => {
-    const qProd = query(collection(db, 'stock_products'), orderBy('createdAt', 'desc'));
-    const unsubscribeProd = onSnapshot(qProd, (snapshot) => {
+    const unsubscribeProd = onSnapshot(collection(db, 'stock_products'), (snapshot) => {
       const list: StockProduct[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as StockProduct));
+      list.sort((a, b) => (b.createdAt || a.name || '').localeCompare(a.createdAt || b.name || ''));
       setProducts(list);
       setLoading(false);
     }, (err) => {
@@ -182,12 +182,12 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
       setLoading(false);
     });
 
-    const qMov = query(collection(db, 'stock_movements'), orderBy('timestamp', 'desc'));
-    const unsubscribeMov = onSnapshot(qMov, (snapshot) => {
+    const unsubscribeMov = onSnapshot(collection(db, 'stock_movements'), (snapshot) => {
       const list: StockMovement[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as StockMovement));
+      list.sort((a, b) => (b.timestamp || b.date || '').localeCompare(a.timestamp || a.date || ''));
       setMovements(list);
     }, (err) => {
       console.error("Erro ao carregar movimentações do estoque:", err);

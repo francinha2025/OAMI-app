@@ -25,7 +25,8 @@ import {
   PieChart as PieChartIcon,
   BarChart3,
   RefreshCw,
-  Printer
+  Printer,
+  Heart
 } from 'lucide-react';
 import { 
   collection, 
@@ -38,7 +39,8 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { TreasuryReceipt, TreasuryExpense, TreasuryTransaction, User } from '../types';
+import { TreasuryReceipt, TreasuryExpense, TreasuryTransaction, User, Donor } from '../types';
+import { DonorsSection } from './DonorsSection';
 import { generateTreasuryReceiptPDF, generateTreasuryFinancialReportPDF } from '../lib/pdfUtils';
 import { 
   ResponsiveContainer, 
@@ -57,6 +59,8 @@ interface TreasurySectionProps {
   user: User;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   showConfirm: (message: string, onConfirm: () => void) => void;
+  donors?: Donor[];
+  initialTab?: 'overview' | 'new-revenue' | 'new-expense' | 'history' | 'reports' | 'donors';
 }
 
 const PAYMENT_METHODS = [
@@ -95,8 +99,33 @@ const EXPENSE_CATEGORIES = [
 const PIE_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6', '#6366F1', '#14B8A6', '#F97316'];
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToast, showConfirm }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'new-revenue' | 'new-expense' | 'history' | 'reports'>('overview');
+export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToast, showConfirm, donors, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'new-revenue' | 'new-expense' | 'history' | 'reports' | 'donors'>(initialTab || 'overview');
+  const [localDonors, setLocalDonors] = useState<Donor[]>(donors || []);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Sync donors from props or Firestore subscription
+  useEffect(() => {
+    if (donors && donors.length > 0) {
+      setLocalDonors(donors);
+      return;
+    }
+    const unsub = onSnapshot(collection(db, 'donors'), (snapshot) => {
+      const list: Donor[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() } as Donor);
+      });
+      setLocalDonors(list);
+    }, (error) => {
+      console.error("Erro ao carregar doadores na tesouraria:", error);
+    });
+    return () => unsub();
+  }, [donors]);
 
   // Reports Filter State
   const [reportMode, setReportMode] = useState<'MENSAL' | 'SEMESTRAL' | 'ANUAL' | 'PERSONALIZADO'>('MENSAL');
@@ -196,9 +225,10 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     
     // Subscribe to treasury_receipts
     const unsubscribeReceipts = onSnapshot(
-      query(collection(db, 'treasury_receipts'), orderBy('createdAt', 'desc')),
+      collection(db, 'treasury_receipts'),
       (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TreasuryReceipt[];
+        docs.sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
         setReceipts(docs);
       },
       (err) => {
@@ -208,9 +238,10 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
 
     // Subscribe to treasury_transactions
     const unsubscribeTransactions = onSnapshot(
-      query(collection(db, 'treasury_transactions'), orderBy('createdAt', 'desc')),
+      collection(db, 'treasury_transactions'),
       (snapshot) => {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TreasuryTransaction[];
+        docs.sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
         setTransactions(docs);
         setLoading(false);
       },
@@ -873,6 +904,18 @@ console.log("✅ Transação salva:", transactionRef.id);
           <FileText size={16} />
           Histórico de Transações ({transactions.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab('donors')}
+          className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'donors'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <Heart size={16} className={activeTab === 'donors' ? 'text-white' : 'text-pink-500'} />
+          Doadores e Sócios ({localDonors.length})
+        </button>
       </div>
 
       {/* OVERVIEW / DASHBOARD TAB */}
@@ -1104,6 +1147,41 @@ console.log("✅ Transação salva:", transactionRef.id);
                 Sequencial Automatizado
               </span>
             </div>
+
+            {/* Vincular Doador / Sócio Cadastrado */}
+            {localDonors.length > 0 && (
+              <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/80 space-y-2">
+                <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                  <Heart size={16} className="text-pink-500" />
+                  Vincular Doador / Sócio Cadastrado (Preenchimento Rápido):
+                </label>
+                <select
+                  className="w-full bg-white dark:bg-gray-900 border border-emerald-300 dark:border-emerald-700 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                  onChange={(e) => {
+                    const donorId = e.target.value;
+                    if (!donorId) return;
+                    const d = localDonors.find(item => item.id === donorId);
+                    if (d) {
+                      setRevenueForm(prev => ({
+                        ...prev,
+                        payerName: d.name,
+                        amount: d.amount ? String(d.amount) : prev.amount,
+                        category: d.type === 'SOCIO_MENSAL' ? 'Mensalidade / Anuidade' : 'Doação Física',
+                        description: `Contribuição de ${d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador'}: ${d.name}`
+                      }));
+                      showToast(`Dados de ${d.name} preenchidos na receita!`, 'info');
+                    }
+                  }}
+                >
+                  <option value="">-- Selecione para preencher os dados do doador/sócio --</option>
+                  {localDonors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador Eventual'}) {d.amount ? `- R$ ${d.amount.toFixed(2)}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Data */}
@@ -2351,6 +2429,10 @@ console.log("✅ Transação salva:", transactionRef.id);
 
           </div>
         </div>
+      )}
+      {/* DOADORES E SÓCIOS TAB */}
+      {activeTab === 'donors' && (
+        <DonorsSection donors={localDonors} showToast={showToast} />
       )}
     </div>
   );

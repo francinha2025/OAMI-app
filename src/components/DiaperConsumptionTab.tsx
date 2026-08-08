@@ -1046,7 +1046,7 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredElderly.map((item) => {
-                const { elderly: e, usesDiapers, diapersPerDay, monthly, monthlyPacks, notes, lastLoggedDate, logsCount } = item;
+                const { elderly: e, usesDiapers, diapersPerDay, monthly, monthlyPacks, notes, lastLoggedDate, logsCount, savedRecord } = item;
                 
                 // Controlled local date & quantity for this card
                 const currentDateInput = selectedDates[e.id] || getTodayString();
@@ -1224,7 +1224,7 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
                           </button>
 
                           {/* Informações Resumidas do Idoso (Exibidas apenas após registrar/completar com dados reais) */}
-                          {(logsCount > 0 || !!lastLoggedDate) && (
+                          {(logsCount > 0 || (savedRecord && typeof savedRecord.diapersPerDay === 'number' && savedRecord.diapersPerDay > 0)) && monthly > 0 && (
                             <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-[11px]">
                               <div>
                                 <span className="text-gray-400 block text-[9px] uppercase font-bold">Consumo Mensal</span>

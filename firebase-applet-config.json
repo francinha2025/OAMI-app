@@ -1,10 +1,11 @@
 {
   "projectId": "oami-oficial",
-  "appId": "1:264092482774:web:fa69e36f256cb55cb91d77",
-  "apiKey": "AIzaSyD5V-sYEIhbUN7w_b8Hz6_kbRvU8GphDYY",
+  "appId": "1:264092482774:web:7add53d936605440b91d77",
+  "apiKey": "AIzaSyBKbpu-EkWzlBGlrXKzdSiQYEGTGQvwQiU",
   "authDomain": "oami-oficial.firebaseapp.com",
-  
+  "firestoreDatabaseId": "ai-studio-d61425e7-16e9-4907-adf3-94e647ca9031",
   "storageBucket": "oami-oficial.firebasestorage.app",
   "messagingSenderId": "264092482774",
-  "measurementId": ""
+  "measurementId": "",
+  "recaptchaSiteKey": ""
 }
