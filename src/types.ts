@@ -233,6 +233,16 @@ export interface FinancialRecord {
   amount: number;
   type: 'RECEITA' | 'DESPESA';
   category: string;
+  // Stock Integration
+  originModule?: 'STOCK' | string;
+  stockMovementId?: string;
+  stockProductId?: string;
+  stockProductName?: string;
+  stockQuantity?: number;
+  supplier?: string;
+  invoiceNumber?: string;
+  createdAt?: string;
+  createdBy?: string;
 }
 
 export interface InstitutionalInfo {
@@ -1173,6 +1183,15 @@ export interface StockMovement {
   notes?: string;
   date: string;
   timestamp: string;
+  // Treasury & Stock Entry Integration
+  origin?: 'COMPRA' | 'DOACAO';
+  unitPrice?: number;
+  totalPrice?: number;
+  invoiceNumber?: string;
+  deductFromTreasury?: boolean;
+  financialTransactionId?: string;
+  donorName?: string;
+  estimatedValue?: number;
 }
 
 export interface ElderlyDiaperUsage {

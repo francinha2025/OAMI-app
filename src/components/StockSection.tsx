@@ -29,18 +29,28 @@ import {
   FileSpreadsheet,
   X,
   Calendar,
-  UserCheck
+  UserCheck,
+  Gift,
+  ShoppingBag,
+  Eye,
+  CreditCard,
+  Ban,
+  Check,
+  ExternalLink,
+  Receipt
 } from 'lucide-react';
 import { 
   collection, 
   addDoc, 
   updateDoc, 
+  setDoc,
   doc, 
   onSnapshot, 
   query, 
   orderBy, 
   serverTimestamp 
 } from 'firebase/firestore';
+import { cleanData } from '../lib/utils';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -127,6 +137,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   // Movement History Filters
   const [movementSearch, setMovementSearch] = useState('');
   const [movementTypeFilter, setMovementTypeFilter] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS');
+  const [movementOriginFilter, setMovementOriginFilter] = useState<'TODOS' | 'COMPRA_TODAS' | 'COMPRA_DEDUZIDA' | 'COMPRA_NAO_DEDUZIDA' | 'DOACAO'>('TODOS');
 
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -135,6 +146,8 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [movementType, setMovementType] = useState<'ENTRADA' | 'SAIDA'>('ENTRADA');
   const [selectedProductForMovement, setSelectedProductForMovement] = useState<StockProduct | null>(null);
+  const [selectedMovementForDetails, setSelectedMovementForDetails] = useState<StockMovement | null>(null);
+  const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
 
   // Form State - Product
   const [productForm, setProductForm] = useState({
@@ -158,8 +171,60 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     destination: '',
     reason: 'Consumo Interno',
     notes: '',
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    // Treasury & Entry Origin Integration
+    entryOrigin: 'COMPRA' as 'COMPRA' | 'DOACAO',
+    unitPrice: '',
+    totalPrice: '',
+    invoiceNumber: '',
+    deductFromTreasury: true,
+    donorName: '',
+    estimatedValue: ''
   });
+
+  // Alert Editing State
+  const [isAlertsManagerOpen, setIsAlertsManagerOpen] = useState(false);
+  const [alertFilterCategory, setAlertFilterCategory] = useState<'ALL_ALERTS' | 'LOW' | 'ZERO' | 'EXPIRED' | 'ALL_PRODUCTS'>('ALL_ALERTS');
+  const [editingMinQuantityId, setEditingMinQuantityId] = useState<string | null>(null);
+  const [tempMinQuantity, setTempMinQuantity] = useState<number>(0);
+  const [savingMinId, setSavingMinId] = useState<string | null>(null);
+
+  // Quick Update Stock Minimum (Alert)
+  const handleUpdateMinQuantity = async (productId: string, newMin: number) => {
+    setSavingMinId(productId);
+    try {
+      const val = Math.max(0, Number(newMin) || 0);
+      await updateDoc(doc(db, 'stock_products', productId), {
+        minQuantity: val,
+        updatedAt: new Date().toISOString()
+      });
+      const prod = products.find(p => p.id === productId);
+      await logAudit('ALTERACAO_ESTOQUE_MINIMO', `Estoque mínimo do produto "${prod?.name || productId}" alterado para ${val}.`);
+      showToast('Estoque Mínimo (Alerta) atualizado com sucesso!', 'success');
+      setEditingMinQuantityId(null);
+    } catch (err) {
+      console.error("Erro ao atualizar estoque mínimo:", err);
+      showToast('Erro ao atualizar estoque mínimo de alerta.', 'error');
+    } finally {
+      setSavingMinId(null);
+    }
+  };
+
+  // Quick Update Expiration Date
+  const handleUpdateExpirationDate = async (productId: string, newDate: string) => {
+    try {
+      await updateDoc(doc(db, 'stock_products', productId), {
+        expirationDate: newDate || null,
+        updatedAt: new Date().toISOString()
+      });
+      const prod = products.find(p => p.id === productId);
+      await logAudit('ALTERACAO_VALIDADE_PRODUTO', `Data de validade do produto "${prod?.name || productId}" alterada para ${newDate || 'Nenhuma'}.`);
+      showToast('Data de validade atualizada com sucesso!', 'success');
+    } catch (err) {
+      console.error("Erro ao atualizar data de validade:", err);
+      showToast('Erro ao atualizar data de validade.', 'error');
+    }
+  };
 
   // Reports Filter State
   const [reportType, setReportType] = useState<'INVENTORY' | 'LOW_STOCK' | 'EXPIRED' | 'MOVEMENTS'>('INVENTORY');
@@ -247,6 +312,17 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     return activeProducts.reduce((sum, p) => sum + (p.quantity * (p.unitPrice || 0)), 0);
   }, [activeProducts]);
 
+  // Displayed Products for the Alert Manager
+  const displayedAlertProducts = useMemo(() => {
+    if (alertFilterCategory === 'LOW') return lowStockList;
+    if (alertFilterCategory === 'ZERO') return outOfStockList;
+    if (alertFilterCategory === 'EXPIRED') return [...expiredList, ...nearExpiryList];
+    if (alertFilterCategory === 'ALL_PRODUCTS') return activeProducts;
+    // Default 'ALL_ALERTS'
+    const combined = [...outOfStockList, ...lowStockList, ...expiredList, ...nearExpiryList];
+    return Array.from(new Map(combined.map(p => [p.id, p])).values());
+  }, [alertFilterCategory, lowStockList, outOfStockList, expiredList, nearExpiryList, activeProducts]);
+
   // Category Distribution for Recharts
   const categoryChartData = useMemo(() => {
     const map: { [key: string]: number } = {};
@@ -312,6 +388,12 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   const filteredMovements = useMemo(() => {
     return movements.filter(m => {
       if (movementTypeFilter !== 'TODOS' && m.type !== movementTypeFilter) return false;
+
+      if (movementOriginFilter === 'COMPRA_TODAS' && m.origin !== 'COMPRA') return false;
+      if (movementOriginFilter === 'COMPRA_DEDUZIDA' && (m.origin !== 'COMPRA' || m.deductFromTreasury !== true)) return false;
+      if (movementOriginFilter === 'COMPRA_NAO_DEDUZIDA' && (m.origin !== 'COMPRA' || m.deductFromTreasury === true)) return false;
+      if (movementOriginFilter === 'DOACAO' && m.origin !== 'DOACAO') return false;
+
       if (movementSearch.trim()) {
         const term = movementSearch.toLowerCase();
         return (
@@ -319,12 +401,14 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
           m.productCode.toLowerCase().includes(term) ||
           m.responsible.toLowerCase().includes(term) ||
           (m.destination && m.destination.toLowerCase().includes(term)) ||
-          (m.supplier && m.supplier.toLowerCase().includes(term))
+          (m.supplier && m.supplier.toLowerCase().includes(term)) ||
+          (m.donorName && m.donorName.toLowerCase().includes(term)) ||
+          (m.invoiceNumber && m.invoiceNumber.toLowerCase().includes(term))
         );
       }
       return true;
     });
-  }, [movements, movementTypeFilter, movementSearch]);
+  }, [movements, movementTypeFilter, movementOriginFilter, movementSearch]);
 
   // Open Create Product Modal
   const handleOpenCreateModal = () => {
@@ -454,6 +538,8 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     const targetProd = prod || (activeProducts.length > 0 ? activeProducts[0] : null);
     setSelectedProductForMovement(targetProd);
 
+    const initialUnitPrice = targetProd && targetProd.unitPrice ? String(targetProd.unitPrice) : '';
+
     setMovementForm({
       productId: targetProd ? targetProd.id : '',
       quantity: 1,
@@ -461,7 +547,14 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
       destination: '',
       reason: 'Consumo Interno',
       notes: '',
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      entryOrigin: 'COMPRA',
+      unitPrice: initialUnitPrice,
+      totalPrice: initialUnitPrice,
+      invoiceNumber: '',
+      deductFromTreasury: true,
+      donorName: '',
+      estimatedValue: ''
     });
 
     setIsMovementModalOpen(true);
@@ -471,14 +564,17 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   const handleMovementProductSelect = (productId: string) => {
     const found = products.find(p => p.id === productId) || null;
     setSelectedProductForMovement(found);
+    const foundPrice = found && found.unitPrice ? String(found.unitPrice) : '';
     setMovementForm(prev => ({
       ...prev,
       productId,
-      supplier: found ? (found.supplier || '') : prev.supplier
+      supplier: found ? (found.supplier || '') : prev.supplier,
+      unitPrice: foundPrice,
+      totalPrice: foundPrice ? String(Number(foundPrice) * prev.quantity) : ''
     }));
   };
 
-  // Save Movement (Entrada / Saída)
+  // Save Movement (Entrada / Saída) with Treasury Synchronization
   const handleSaveMovement = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -501,47 +597,161 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
       return;
     }
 
-    const newStock = movementType === 'ENTRADA' ? currentQty + qty : currentQty - qty;
+    setIsSubmittingMovement(true);
 
     try {
-      // 1. Update product stock quantity
-      await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), {
-        quantity: newStock,
-        updatedAt: new Date().toISOString()
-      });
+      const newStock = movementType === 'ENTRADA' ? currentQty + qty : currentQty - qty;
+      const movementDocRef = doc(collection(db, 'stock_movements'));
+      const movementId = movementDocRef.id;
 
-      // 2. Add movement record
-      const movementRecord = {
-        productId: selectedProductForMovement.id,
-        productName: selectedProductForMovement.name,
-        productCode: selectedProductForMovement.code,
-        type: movementType,
-        quantity: qty,
-        stockBefore: currentQty,
-        stockAfter: newStock,
-        supplier: movementType === 'ENTRADA' ? movementForm.supplier.trim() : null,
-        destination: movementType === 'SAIDA' ? movementForm.destination.trim() : null,
-        reason: movementType === 'SAIDA' ? movementForm.reason.trim() : null,
-        responsible: user.name,
-        notes: movementForm.notes.trim() || null,
-        date: movementForm.date,
-        timestamp: new Date().toISOString()
-      };
+      if (movementType === 'ENTRADA') {
+        if (movementForm.entryOrigin === 'COMPRA') {
+          const uPrice = Number(movementForm.unitPrice) || 0;
+          const tPrice = Number(movementForm.totalPrice) || (uPrice * qty);
+          const deductBool = movementForm.deductFromTreasury;
+          const supplierText = movementForm.supplier.trim();
+          const invoiceNumText = movementForm.invoiceNumber.trim();
 
-      await addDoc(collection(db, 'stock_movements'), movementRecord);
+          let financialId: string | null = null;
 
-      // 3. Log audit
-      const auditMsg = movementType === 'ENTRADA'
-        ? `Entrada de estoque: +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`
-        : `Saída de estoque: -${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}" para "${movementForm.destination}". Novo saldo: ${newStock}.`;
+          if (deductBool) {
+            // Create corresponding expense in Treasury (financial collection)
+            const financialRef = doc(collection(db, 'financial'));
+            financialId = financialRef.id;
 
-      await logAudit(movementType === 'ENTRADA' ? 'ENTRADA_ESTOQUE' : 'SAIDA_ESTOQUE', auditMsg);
+            const financialPayload = cleanData({
+              id: financialId,
+              date: movementForm.date,
+              description: `Compra de Estoque – ${selectedProductForMovement.name}`,
+              amount: tPrice,
+              type: 'DESPESA',
+              category: 'ESTOQUE',
+              originModule: 'STOCK',
+              stockMovementId: movementId,
+              stockProductId: selectedProductForMovement.id,
+              stockProductName: selectedProductForMovement.name,
+              stockQuantity: qty,
+              supplier: supplierText || 'Não informado',
+              invoiceNumber: invoiceNumText || null,
+              createdAt: new Date().toISOString(),
+              createdBy: user.name
+            });
 
-      showToast(`Movimentação de ${movementType === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso!`, 'success');
+            await setDoc(financialRef, financialPayload);
+          }
+
+          const movementRecord = cleanData({
+            id: movementId,
+            productId: selectedProductForMovement.id,
+            productName: selectedProductForMovement.name,
+            productCode: selectedProductForMovement.code,
+            type: 'ENTRADA',
+            quantity: qty,
+            stockBefore: currentQty,
+            stockAfter: newStock,
+            supplier: supplierText || null,
+            responsible: user.name,
+            notes: deductBool
+              ? (movementForm.notes.trim() || null)
+              : `${movementForm.notes.trim() ? movementForm.notes.trim() + ' • ' : ''}[Não descontar do saldo da entidade]`,
+            date: movementForm.date,
+            timestamp: new Date().toISOString(),
+            origin: 'COMPRA',
+            unitPrice: uPrice,
+            totalPrice: tPrice,
+            invoiceNumber: invoiceNumText || null,
+            deductFromTreasury: deductBool,
+            financialTransactionId: financialId
+          });
+
+          await setDoc(movementDocRef, movementRecord);
+
+          // Update stock_products quantity and unit price/supplier
+          await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), {
+            quantity: newStock,
+            unitPrice: uPrice > 0 ? uPrice : (selectedProductForMovement.unitPrice || 0),
+            supplier: supplierText || selectedProductForMovement.supplier,
+            updatedAt: new Date().toISOString()
+          });
+
+          const auditMsg = deductBool
+            ? `Entrada de estoque (COMPRA) com desconto na Tesouraria (R$ ${tPrice.toFixed(2)}): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`
+            : `Entrada de estoque (COMPRA - NÃO DESCONTADA): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`;
+
+          await logAudit('ENTRADA_ESTOQUE_COMPRA', auditMsg);
+          showToast(`Entrada por Compra (${deductBool ? 'Descontada da Tesouraria' : 'Não descontada'}) registrada com sucesso!`, 'success');
+
+        } else {
+          // DOACAO
+          const donor = movementForm.donorName.trim();
+          const estVal = Number(movementForm.estimatedValue) || 0;
+
+          const movementRecord = cleanData({
+            id: movementId,
+            productId: selectedProductForMovement.id,
+            productName: selectedProductForMovement.name,
+            productCode: selectedProductForMovement.code,
+            type: 'ENTRADA',
+            quantity: qty,
+            stockBefore: currentQty,
+            stockAfter: newStock,
+            supplier: donor ? `Doador: ${donor}` : 'Doação',
+            responsible: user.name,
+            notes: movementForm.notes.trim() || null,
+            date: movementForm.date,
+            timestamp: new Date().toISOString(),
+            origin: 'DOACAO',
+            donorName: donor || null,
+            estimatedValue: estVal > 0 ? estVal : null,
+            deductFromTreasury: false
+          });
+
+          await setDoc(movementDocRef, movementRecord);
+
+          await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), {
+            quantity: newStock,
+            updatedAt: new Date().toISOString()
+          });
+
+          await logAudit('ENTRADA_ESTOQUE_DOACAO', `Entrada de estoque (DOAÇÃO): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`);
+          showToast('Entrada por Doação registrada com sucesso!', 'success');
+        }
+      } else {
+        // SAIDA
+        const movementRecord = cleanData({
+          id: movementId,
+          productId: selectedProductForMovement.id,
+          productName: selectedProductForMovement.name,
+          productCode: selectedProductForMovement.code,
+          type: 'SAIDA',
+          quantity: qty,
+          stockBefore: currentQty,
+          stockAfter: newStock,
+          destination: movementForm.destination.trim(),
+          reason: movementForm.reason.trim(),
+          responsible: user.name,
+          notes: movementForm.notes.trim() || null,
+          date: movementForm.date,
+          timestamp: new Date().toISOString()
+        });
+
+        await setDoc(movementDocRef, movementRecord);
+
+        await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), {
+          quantity: newStock,
+          updatedAt: new Date().toISOString()
+        });
+
+        await logAudit('SAIDA_ESTOQUE', `Saída de estoque: -${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}" para "${movementForm.destination}". Novo saldo: ${newStock}.`);
+        showToast('Saída de Estoque registrada com sucesso!', 'success');
+      }
+
       setIsMovementModalOpen(false);
     } catch (err) {
       console.error("Erro ao registrar movimentação:", err);
       showToast('Erro ao registrar movimentação no banco de dados.', 'error');
+    } finally {
+      setIsSubmittingMovement(false);
     }
   };
 
@@ -811,14 +1021,23 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
           {/* CRITICAL ALERTS BANNER */}
           {(lowStockList.length > 0 || outOfStockList.length > 0 || expiredList.length > 0 || nearExpiryList.length > 0) && (
             <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-3xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-extrabold text-sm">
                   <AlertTriangle size={20} className="text-amber-600 animate-pulse" />
                   Alertas Críticos de Estoque que Necessitam Atenção
                 </div>
-                <span className="text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-900/60 px-3 py-1 rounded-full">
-                  {(lowStockList.length + outOfStockList.length + expiredList.length + nearExpiryList.length)} Ocorrências
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsAlertsManagerOpen(!isAlertsManagerOpen)}
+                    className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <Edit size={14} />
+                    {isAlertsManagerOpen ? 'Ocultar Edição' : 'Editar Alertas Mínimos'}
+                  </button>
+                  <span className="text-xs font-bold text-amber-700 bg-amber-100 dark:bg-amber-900/60 px-3 py-1 rounded-full">
+                    {(lowStockList.length + outOfStockList.length + expiredList.length + nearExpiryList.length)} Ocorrências
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
@@ -873,6 +1092,190 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                     <Clock className="text-orange-500" size={22} />
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* QUICK ALERTS EDITOR CONTROL BAR WHEN NO CRITICAL BANNER IS SHOWN */}
+          {(lowStockList.length === 0 && outOfStockList.length === 0 && expiredList.length === 0 && nearExpiryList.length === 0) && (
+            <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                <AlertTriangle size={16} className="text-amber-500" />
+                <span>Nenhum alerta crítico ativo no momento. Você pode editar os parâmetros de estoque mínimo a qualquer momento.</span>
+              </div>
+              <button
+                onClick={() => setIsAlertsManagerOpen(!isAlertsManagerOpen)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Edit size={14} />
+                {isAlertsManagerOpen ? 'Ocultar Edição' : 'Editar Alertas Mínimos'}
+              </button>
+            </div>
+          )}
+
+          {/* EDITABLE ALERTS MANAGEMENT PANEL */}
+          {isAlertsManagerOpen && (
+            <div className="bg-white dark:bg-gray-800 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-6 shadow-md space-y-5 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700/60 pb-4">
+                <div>
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-black text-base">
+                    <Edit size={18} className="text-amber-600" />
+                    Gerenciador de Alertas e Limites de Estoque Mínimo
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Edite diretamente a quantidade de estoque mínimo (alerta) e validades dos produtos para personalizar as notificações do sistema.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsAlertsManagerOpen(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 self-start sm:self-auto"
+                  title="Fechar Painel"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { id: 'ALL_ALERTS', label: 'Todos em Alerta', count: lowStockList.length + outOfStockList.length + expiredList.length + nearExpiryList.length },
+                  { id: 'LOW', label: 'Abaixo do Mínimo', count: lowStockList.length },
+                  { id: 'ZERO', label: 'Estoque Zerado', count: outOfStockList.length },
+                  { id: 'EXPIRED', label: 'Vencidos / Próx. Vencimento', count: expiredList.length + nearExpiryList.length },
+                  { id: 'ALL_PRODUCTS', label: 'Todos os Produtos', count: activeProducts.length },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAlertFilterCategory(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 border ${
+                      alertFilterCategory === tab.id
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      alertFilterCategory === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}>
+                      {tab.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Products Table for Alert Editing */}
+              <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-800/80 text-gray-500 font-extrabold uppercase border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      <th className="py-3 px-4">Produto</th>
+                      <th className="py-3 px-4 text-center">Saldo Atual</th>
+                      <th className="py-3 px-4 text-center">Estoque Mínimo (Alerta)</th>
+                      <th className="py-3 px-4 text-center">Data de Validade</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Ações Rápidas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {displayedAlertProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-gray-400 font-medium">
+                          Nenhum produto encontrado nesta categoria de alerta.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedAlertProducts.map(p => {
+                        const isLow = p.quantity < p.minQuantity && p.quantity > 0;
+                        const isZero = p.quantity === 0;
+                        const isExpired = p.expirationDate && p.expirationDate < todayStr;
+                        const isNearExpiry = p.expirationDate && p.expirationDate >= todayStr && p.expirationDate <= in30DaysStr;
+
+                        return (
+                          <tr key={p.id} className="hover:bg-amber-50/30 dark:hover:bg-amber-950/20 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-gray-900 dark:text-white text-sm">{p.name}</div>
+                              <div className="text-[10px] text-gray-400 font-mono">{p.code} • {p.category}</div>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className={`px-2.5 py-1 rounded-lg font-black text-xs ${
+                                isZero ? 'bg-rose-100 text-rose-700' : isLow ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {p.quantity} {p.unit}s
+                              </span>
+                            </td>
+                            {/* Editable Min Quantity */}
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  defaultValue={p.minQuantity}
+                                  onBlur={(e) => {
+                                    const val = Number(e.target.value);
+                                    if (val !== p.minQuantity) {
+                                      handleUpdateMinQuantity(p.id, val);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleUpdateMinQuantity(p.id, Number((e.target as HTMLInputElement).value));
+                                    }
+                                  }}
+                                  className="w-20 p-1.5 text-center bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl font-black text-xs focus:ring-2 focus:ring-amber-500 text-gray-900 dark:text-white"
+                                  title="Altere o valor e pressione Enter para salvar o alerta de estoque mínimo"
+                                />
+                                <span className="text-[10px] text-gray-400 font-semibold">{p.unit}</span>
+                              </div>
+                            </td>
+                            {/* Editable Expiration Date */}
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="date"
+                                defaultValue={p.expirationDate || ''}
+                                onChange={(e) => handleUpdateExpirationDate(p.id, e.target.value)}
+                                className="p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl font-bold text-xs text-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500"
+                                title="Altere para atualizar a data de validade monitorada"
+                              />
+                            </td>
+                            {/* Alert Status Badge */}
+                            <td className="py-3 px-4 text-center">
+                              {isZero ? (
+                                <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-extrabold text-[10px] rounded-full">Zerado</span>
+                              ) : isLow ? (
+                                <span className="px-2 py-0.5 bg-amber-100 text-amber-800 font-extrabold text-[10px] rounded-full">Abaixo do Mínimo</span>
+                              ) : isExpired ? (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-800 font-extrabold text-[10px] rounded-full">Vencido</span>
+                              ) : isNearExpiry ? (
+                                <span className="px-2 py-0.5 bg-orange-100 text-orange-800 font-extrabold text-[10px] rounded-full">Vence em Breve</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full">Estoque OK</span>
+                              )}
+                            </td>
+                            {/* Quick Actions */}
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenMovementModal(p, 'ENTRADA')}
+                                  className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                                  title="Adicionar Entrada no Estoque"
+                                >
+                                  <Plus size={14} /> Entrada
+                                </button>
+                                <button
+                                  onClick={() => handleOpenEditModal(p)}
+                                  className="p-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition-colors"
+                                  title="Editar Produto"
+                                >
+                                  <Edit size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -1267,7 +1670,45 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
                         {/* Min Quantity */}
                         <td className="py-3.5 px-4 text-center font-bold text-gray-500">
-                          {p.minQuantity}
+                          {editingMinQuantityId === p.id ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                value={tempMinQuantity}
+                                onChange={(e) => setTempMinQuantity(Number(e.target.value))}
+                                className="w-16 p-1 text-center bg-white dark:bg-gray-800 border border-emerald-500 rounded-lg text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleUpdateMinQuantity(p.id, tempMinQuantity)}
+                                disabled={savingMinId === p.id}
+                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                title="Salvar Estoque Mínimo"
+                              >
+                                <CheckCircle2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => setEditingMinQuantityId(null)}
+                                className="p-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                                title="Cancelar"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingMinQuantityId(p.id);
+                                setTempMinQuantity(p.minQuantity);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group"
+                              title="Clique para editar o estoque mínimo de alerta deste produto"
+                            >
+                              <span>{p.minQuantity}</span>
+                              <Edit size={12} className="text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                            </button>
+                          )}
                         </td>
 
                         {/* Supplier */}
@@ -1379,27 +1820,39 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
         <div className="space-y-6 animate-in fade-in duration-200">
           
           {/* SEARCH & FILTER FOR MOVEMENTS */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
               <input
                 type="text"
-                placeholder="Pesquisar por produto, código, responsável ou destino..."
+                placeholder="Pesquisar por produto, código, responsável, doador, NF ou fornecedor..."
                 value={movementSearch}
                 onChange={(e) => setMovementSearch(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <select
                 value={movementTypeFilter}
                 onChange={(e) => setMovementTypeFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="TODOS">Todos os Tipos</option>
                 <option value="ENTRADA">Apenas Entradas (+)</option>
                 <option value="SAIDA">Apenas Saídas (-)</option>
+              </select>
+
+              <select
+                value={movementOriginFilter}
+                onChange={(e) => setMovementOriginFilter(e.target.value as any)}
+                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="TODOS">Todas as Origens</option>
+                <option value="COMPRA_TODAS">🛒 Apenas Compras (Geral)</option>
+                <option value="COMPRA_DEDUZIDA">💳 Compras Descontadas da Tesouraria</option>
+                <option value="COMPRA_NAO_DEDUZIDA">🚫 Compras NÃO Descontadas</option>
+                <option value="DOACAO">🎁 Apenas Doações</option>
               </select>
 
               <button
@@ -1419,13 +1872,14 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                   <tr>
                     <th className="py-3.5 px-4">Data</th>
                     <th className="py-3.5 px-4 text-center">Tipo</th>
+                    <th className="py-3.5 px-4">Origem / Integração</th>
                     <th className="py-3.5 px-4">Código / Produto</th>
                     <th className="py-3.5 px-4 text-center">Qtd Movimentada</th>
                     <th className="py-3.5 px-4 text-center">Saldo Ant.</th>
                     <th className="py-3.5 px-4 text-center">Saldo Pós</th>
-                    <th className="py-3.5 px-4">Destino / Fornecedor / Motivo</th>
+                    <th className="py-3.5 px-4">Destino / Fornecedor / Doador</th>
                     <th className="py-3.5 px-4">Responsável</th>
-                    <th className="py-3.5 px-4">Observação</th>
+                    <th className="py-3.5 px-4 text-center">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -1443,6 +1897,37 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                         }`}>
                           {m.type}
                         </span>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        {m.type === 'ENTRADA' ? (
+                          <div className="flex flex-col gap-1">
+                            {m.origin === 'DOACAO' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
+                                <Gift size={12} /> Doação
+                              </span>
+                            ) : m.origin === 'COMPRA' ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
+                                  <ShoppingBag size={12} /> Compra
+                                </span>
+                                {m.deductFromTreasury ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 w-fit" title="Descontado do saldo da Tesouraria">
+                                    <CreditCard size={10} /> Descontado Tesouraria
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 w-fit" title="Não descontado da Tesouraria">
+                                    <Ban size={10} /> Não descontado
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400 italic text-[10px]">Entrada padrão</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 italic text-[10px]">Saída de Estoque</span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -1467,13 +1952,25 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                       <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
                         {m.type === 'ENTRADA' ? (
                           <div>
-                            <span className="text-[10px] text-gray-400 block uppercase">Fornecedor</span>
-                            {m.supplier || 'Não informado'}
+                            {m.origin === 'DOACAO' ? (
+                              <>
+                                <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-bold uppercase">Doador</span>
+                                {m.donorName || m.supplier || 'Anônimo'}
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-gray-400 block uppercase">Fornecedor</span>
+                                {m.supplier || 'Não informado'}
+                                {m.invoiceNumber && (
+                                  <span className="text-[10px] text-gray-500 block">NF: {m.invoiceNumber}</span>
+                                )}
+                              </>
+                            )}
                           </div>
                         ) : (
                           <div>
                             <span className="text-[10px] text-gray-400 block uppercase">Destino: {m.destination || 'N/I'}</span>
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400">Motivo: {m.reason || 'N/I'}</span>
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 block">Motivo: {m.reason || 'N/I'}</span>
                           </div>
                         )}
                       </td>
@@ -1482,16 +1979,22 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                         {m.responsible}
                       </td>
 
-                      <td className="py-3.5 px-4 text-gray-400 italic text-[11px] max-w-xs truncate">
-                        {m.notes || '—'}
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          onClick={() => setSelectedMovementForDetails(m)}
+                          className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
+                          title="Ver Detalhes e Vínculo Financeiro"
+                        >
+                          <Eye size={14} /> Detalhes
+                        </button>
                       </td>
                     </tr>
                   ))}
 
                   {filteredMovements.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-gray-400 italic">
-                        Nenhuma movimentação localizada no histórico.
+                      <td colSpan={10} className="py-12 text-center text-gray-400 italic">
+                        Nenhuma movimentação localizada no histórico com os filtros selecionados.
                       </td>
                     </tr>
                   )}
@@ -1859,22 +2362,227 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                   max={movementType === 'SAIDA' && selectedProductForMovement ? selectedProductForMovement.quantity : undefined}
                   required
                   value={movementForm.quantity}
-                  onChange={(e) => setMovementForm({ ...movementForm, quantity: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const q = Number(e.target.value) || 1;
+                    const uPrice = Number(movementForm.unitPrice) || 0;
+                    setMovementForm({
+                      ...movementForm,
+                      quantity: q,
+                      totalPrice: uPrice > 0 ? String((uPrice * q).toFixed(2)) : movementForm.totalPrice
+                    });
+                  }}
                   className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
 
               {/* Conditional fields for ENTRADA */}
               {movementType === 'ENTRADA' && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fornecedor / Origem</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Distribuidora X, Doação, etc."
-                    value={movementForm.supplier}
-                    onChange={(e) => setMovementForm({ ...movementForm, supplier: e.target.value })}
-                    className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
+                <div className="space-y-4 pt-2 border-t border-gray-100 dark:border-gray-800">
+                  
+                  {/* Question 1: Qual é a origem deste produto? */}
+                  <div>
+                    <label className="block text-xs font-black text-gray-700 dark:text-gray-300 uppercase mb-2 flex items-center gap-1.5">
+                      <Package size={14} className="text-emerald-600" />
+                      Qual é a origem deste produto? *
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMovementForm(prev => ({ ...prev, entryOrigin: 'COMPRA' }))}
+                        className={`p-3 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                          movementForm.entryOrigin === 'COMPRA'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-300 shadow-sm ring-2 ring-emerald-500/30'
+                            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                        }`}
+                      >
+                        <ShoppingBag size={16} className={movementForm.entryOrigin === 'COMPRA' ? 'text-emerald-600' : 'text-gray-400'} />
+                        Compra
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setMovementForm(prev => ({ ...prev, entryOrigin: 'DOACAO', deductFromTreasury: false }))}
+                        className={`p-3 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                          movementForm.entryOrigin === 'DOACAO'
+                            ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500 text-purple-800 dark:text-purple-300 shadow-sm ring-2 ring-purple-500/30'
+                            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Gift size={16} className={movementForm.entryOrigin === 'DOACAO' ? 'text-purple-600' : 'text-gray-400'} />
+                        Doação
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* IF COMPRA */}
+                  {movementForm.entryOrigin === 'COMPRA' && (
+                    <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Fornecedor / Loja *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Farmácia Central, Mercado X"
+                            value={movementForm.supplier}
+                            onChange={(e) => setMovementForm({ ...movementForm, supplier: e.target.value })}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Nº da Nota / Recibo
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: NF-123456 (opcional)"
+                            value={movementForm.invoiceNumber}
+                            onChange={(e) => setMovementForm({ ...movementForm, invoiceNumber: e.target.value })}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Valor Unitário (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0,00"
+                            value={movementForm.unitPrice}
+                            onChange={(e) => {
+                              const uPrice = e.target.value;
+                              const qty = Number(movementForm.quantity) || 1;
+                              const calculatedTotal = uPrice !== '' ? String((Number(uPrice) * qty).toFixed(2)) : '';
+                              setMovementForm({ ...movementForm, unitPrice: uPrice, totalPrice: calculatedTotal });
+                            }}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Valor Total (R$) *
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            required
+                            placeholder="0,00"
+                            value={movementForm.totalPrice}
+                            onChange={(e) => setMovementForm({ ...movementForm, totalPrice: e.target.value })}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-extrabold text-emerald-700 dark:text-emerald-300 outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Question 2: Descontar da Tesouraria? */}
+                      <div className="pt-2">
+                        <label className="block text-xs font-black text-gray-800 dark:text-white uppercase mb-2">
+                          Esta compra deve ser descontada do saldo da entidade? *
+                        </label>
+                        <div className="space-y-2">
+                          <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                            movementForm.deductFromTreasury
+                              ? 'bg-emerald-100/70 dark:bg-emerald-900/40 border-emerald-500 ring-2 ring-emerald-500/20'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="deductFromTreasury"
+                              checked={movementForm.deductFromTreasury === true}
+                              onChange={() => setMovementForm({ ...movementForm, deductFromTreasury: true })}
+                              className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                            />
+                            <div>
+                              <span className="font-extrabold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <CreditCard size={14} className="text-emerald-600" />
+                                Sim, descontar da Tesouraria
+                              </span>
+                              <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
+                                Cria automaticamente uma despesa na Tesouraria vinculada a este produto, reduzindo o saldo financeiro da entidade.
+                              </p>
+                            </div>
+                          </label>
+
+                          <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                            !movementForm.deductFromTreasury
+                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 ring-2 ring-amber-500/20'
+                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                          }`}>
+                            <input
+                              type="radio"
+                              name="deductFromTreasury"
+                              checked={movementForm.deductFromTreasury === false}
+                              onChange={() => setMovementForm({ ...movementForm, deductFromTreasury: false })}
+                              className="mt-0.5 text-amber-600 focus:ring-amber-500"
+                            />
+                            <div>
+                              <span className="font-extrabold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
+                                <Ban size={14} className="text-amber-600" />
+                                Não, não descontar da Tesouraria
+                              </span>
+                              <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
+                                Registra a entrada no Estoque sem alterar o saldo da Tesouraria (útil para compras por parceiros ou recursos diretos).
+                              </p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* IF DOACAO */}
+                  {movementForm.entryOrigin === 'DOACAO' && (
+                    <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-2xl border border-purple-100 dark:border-purple-900/40 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Nome do Doador / Empresa
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: João Silva, Supermercado Y (opcional)"
+                            value={movementForm.donorName}
+                            onChange={(e) => setMovementForm({ ...movementForm, donorName: e.target.value })}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 uppercase mb-1">
+                            Valor Estimado da Doação (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0,00 (opcional para inventário)"
+                            value={movementForm.estimatedValue}
+                            onChange={(e) => setMovementForm({ ...movementForm, estimatedValue: e.target.value })}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-purple-100/60 dark:bg-purple-900/40 rounded-xl text-[11px] text-purple-900 dark:text-purple-200 flex items-center gap-2">
+                        <Gift size={16} className="shrink-0 text-purple-600" />
+                        <span>
+                          <strong>Registro de Doação:</strong> O saldo do produto no estoque será incrementado e o histórico armazenado. <strong>NENHUMA despesa será criada na Tesouraria.</strong>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
 
@@ -1957,16 +2665,124 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                 </button>
                 <button
                   type="submit"
-                  className={`flex-1 px-5 py-3 font-bold rounded-2xl text-xs shadow-md transition-colors text-white ${
+                  disabled={isSubmittingMovement}
+                  className={`flex-1 px-5 py-3 font-bold rounded-2xl text-xs shadow-md transition-colors text-white flex items-center justify-center gap-2 ${
                     movementType === 'ENTRADA' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
-                  }`}
+                  } ${isSubmittingMovement ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  Confirmar {movementType === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                  {isSubmittingMovement ? 'Registrando...' : `Confirmar ${movementType === 'ENTRADA' ? 'Entrada' : 'Saída'}`}
                 </button>
               </div>
 
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: MOVEMENT DETAILS & FINANCIAL LINKAGE */}
+      {selectedMovementForDetails && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gradient-to-r from-slate-800 to-gray-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-base font-black flex items-center gap-2">
+                  <FileText size={18} className="text-emerald-400" />
+                  Detalhes da Movimentação
+                </h3>
+                <p className="text-xs text-gray-300 mt-0.5">Código: {selectedMovementForDetails.id}</p>
+              </div>
+              <button onClick={() => setSelectedMovementForDetails(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-1">
+                <p className="font-extrabold text-sm text-gray-900 dark:text-white">{selectedMovementForDetails.productName}</p>
+                <p className="text-gray-500">Código do Produto: {selectedMovementForDetails.productCode}</p>
+                <div className="pt-2 flex items-center justify-between">
+                  <span className="font-bold text-gray-500 uppercase">Tipo:</span>
+                  <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                    selectedMovementForDetails.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {selectedMovementForDetails.type} ({selectedMovementForDetails.quantity} un)
+                  </span>
+                </div>
+              </div>
+
+              {selectedMovementForDetails.type === 'ENTRADA' && (
+                <div className="p-4 rounded-2xl border space-y-2.5 bg-gray-50/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700">
+                  <p className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                    <Package size={14} className="text-emerald-600" /> Origem da Entrada:
+                  </p>
+                  
+                  {selectedMovementForDetails.origin === 'COMPRA' ? (
+                    <div className="space-y-1.5 pl-2 border-l-2 border-blue-500">
+                      <p className="font-extrabold text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                        <ShoppingBag size={14} /> Compra de Produto
+                      </p>
+                      <p><strong>Fornecedor:</strong> {selectedMovementForDetails.supplier || 'Não informado'}</p>
+                      {selectedMovementForDetails.invoiceNumber && <p><strong>Nº da Nota:</strong> {selectedMovementForDetails.invoiceNumber}</p>}
+                      {selectedMovementForDetails.totalPrice ? <p><strong>Valor Total:</strong> R$ {Number(selectedMovementForDetails.totalPrice).toFixed(2)}</p> : null}
+                      
+                      <div className="pt-2">
+                        {selectedMovementForDetails.deductFromTreasury ? (
+                          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/60 rounded-xl text-emerald-900 dark:text-emerald-200 space-y-1">
+                            <p className="font-bold flex items-center gap-1">
+                              <CreditCard size={14} /> Descontado da Tesouraria
+                            </p>
+                            <p className="text-[10px]">Lançamento automático de despesa em Finanças / Tesouraria.</p>
+                            {selectedMovementForDetails.financialTransactionId && (
+                              <p className="text-[10px] font-mono text-emerald-800 dark:text-emerald-300">ID Financeiro: {selectedMovementForDetails.financialTransactionId}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 bg-amber-100 dark:bg-amber-950/60 rounded-xl text-amber-900 dark:text-amber-200 space-y-1">
+                            <p className="font-bold flex items-center gap-1">
+                              <Ban size={14} /> Não descontado da Tesouraria
+                            </p>
+                            <p className="text-[10px]">Entrada no estoque efetuada sem alterar o saldo da Tesouraria.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : selectedMovementForDetails.origin === 'DOACAO' ? (
+                    <div className="space-y-1.5 pl-2 border-l-2 border-purple-500">
+                      <p className="font-extrabold text-purple-700 dark:text-purple-400 flex items-center gap-1">
+                        <Gift size={14} /> Doação de Terceiros
+                      </p>
+                      <p><strong>Doador:</strong> {selectedMovementForDetails.donorName || selectedMovementForDetails.supplier || 'Anônimo'}</p>
+                      {selectedMovementForDetails.estimatedValue ? <p><strong>Valor Estimado:</strong> R$ {Number(selectedMovementForDetails.estimatedValue).toFixed(2)}</p> : null}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Entrada de estoque convencional.</p>
+                  )}
+                </div>
+              )}
+
+              {selectedMovementForDetails.type === 'SAIDA' && (
+                <div className="p-4 rounded-2xl border space-y-2 bg-gray-50/50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700">
+                  <p><strong>Destino:</strong> {selectedMovementForDetails.destination || 'Não informado'}</p>
+                  <p><strong>Motivo:</strong> {selectedMovementForDetails.reason || 'Não informado'}</p>
+                </div>
+              )}
+
+              <div className="space-y-1 pt-2 border-t border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400">
+                <p><strong>Data da Movimentação:</strong> {selectedMovementForDetails.date}</p>
+                <p><strong>Registrado Por:</strong> {selectedMovementForDetails.responsible}</p>
+                {selectedMovementForDetails.notes && <p><strong>Observações:</strong> {selectedMovementForDetails.notes}</p>}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  onClick={() => setSelectedMovementForDetails(null)}
+                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white font-bold rounded-2xl transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

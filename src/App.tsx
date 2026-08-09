@@ -4648,6 +4648,7 @@ const ProfessionalArea = ({
 };
 
 const EXPENSE_CATEGORIES = [
+  { value: 'ESTOQUE', label: 'Compra de Estoque', color: 'bg-teal-500', colorTailwind: 'bg-teal-500', text: 'text-teal-700 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-950/40', border: 'border-teal-200 dark:border-teal-900/40', icon: Boxes },
   { value: 'OFICINAS', label: 'Oficinas', color: 'bg-emerald-500', colorTailwind: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-200 dark:border-emerald-900/40', icon: Briefcase },
   { value: 'CAPACITACAO', label: 'Capacitação', color: 'bg-blue-500', colorTailwind: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-200 dark:border-blue-900/40', icon: Award },
   { value: 'ESCRITORIO', label: 'Mat. Escritório', color: 'bg-indigo-500', colorTailwind: 'bg-indigo-500', text: 'text-indigo-700 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-200 dark:border-indigo-900/40', icon: Paperclip },
@@ -5637,20 +5638,35 @@ const FinancialSection = ({ financialRecords, user, showToast }: {
                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <td className="py-4 text-sm text-gray-600 dark:text-gray-400">{formatFinancialDate(item.date)}</td>
                       <td className="py-4 text-sm font-medium text-gray-800 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <span>{item.description}</span>
-                          {item.invoiceImage && (
-                            <button
-                              onClick={() => {
-                                setSelectedInvoiceImage(item.invoiceImage);
-                                setSelectedInvoiceTitle(`${item.description} - R$ ${item.amount.toLocaleString('pt-BR')}`);
-                                setSelectedInvoiceRecord(item);
-                              }}
-                              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-green-600 hover:text-green-700 flex items-center"
-                              title="Ver Nota Fiscal Anexa (Presidente & Auxiliar)"
-                            >
-                              <Paperclip size={13} />
-                            </button>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold">{item.description}</span>
+                            {(item.originModule === 'STOCK' || item.stockMovementId || item.category === 'ESTOQUE') && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-extrabold bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-200 rounded-md border border-teal-200 dark:border-teal-800">
+                                <Boxes size={11} /> Estoque Integrado
+                              </span>
+                            )}
+                            {item.invoiceImage && (
+                              <button
+                                onClick={() => {
+                                  setSelectedInvoiceImage(item.invoiceImage);
+                                  setSelectedInvoiceTitle(`${item.description} - R$ ${item.amount.toLocaleString('pt-BR')}`);
+                                  setSelectedInvoiceRecord(item);
+                                }}
+                                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors text-green-600 hover:text-green-700 flex items-center"
+                                title="Ver Nota Fiscal Anexa"
+                              >
+                                <Paperclip size={13} />
+                              </button>
+                            )}
+                          </div>
+                          {(item.originModule === 'STOCK' || item.stockMovementId) && (
+                            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-normal mt-0.5 flex flex-wrap items-center gap-x-2">
+                              {item.stockProductName && <span>Produto: <strong className="text-gray-700 dark:text-gray-300">{item.stockProductName}</strong></span>}
+                              {item.stockQuantity ? <span>• Qtd: {item.stockQuantity}</span> : null}
+                              {item.supplier ? <span>• Fornecedor: {item.supplier}</span> : null}
+                              {item.invoiceNumber ? <span>• NF: {item.invoiceNumber}</span> : null}
+                            </div>
                           )}
                         </div>
                       </td>
