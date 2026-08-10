@@ -1192,6 +1192,8 @@ export interface StockMovement {
   financialTransactionId?: string;
   donorName?: string;
   estimatedValue?: number;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface ElderlyDiaperUsage {

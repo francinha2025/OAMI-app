@@ -37,13 +37,16 @@ import {
   Ban,
   Check,
   ExternalLink,
-  Receipt
+  Receipt,
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { 
   collection, 
   addDoc, 
   updateDoc, 
   setDoc,
+  deleteDoc,
   doc, 
   onSnapshot, 
   query, 
@@ -148,6 +151,26 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   const [selectedProductForMovement, setSelectedProductForMovement] = useState<StockProduct | null>(null);
   const [selectedMovementForDetails, setSelectedMovementForDetails] = useState<StockMovement | null>(null);
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
+
+  // Edit Movement Modal State
+  const [isEditMovementModalOpen, setIsEditMovementModalOpen] = useState(false);
+  const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
+  const [isSubmittingEditMovement, setIsSubmittingEditMovement] = useState(false);
+  const [editMovementForm, setEditMovementForm] = useState({
+    quantity: 1,
+    date: new Date().toISOString().split('T')[0],
+    notes: '',
+    entryOrigin: 'COMPRA' as 'COMPRA' | 'DOACAO',
+    supplier: '',
+    invoiceNumber: '',
+    unitPrice: '',
+    totalPrice: '',
+    deductFromTreasury: true,
+    donorName: '',
+    estimatedValue: '',
+    destination: '',
+    reason: 'Consumo Interno'
+  });
 
   // Form State - Product
   const [productForm, setProductForm] = useState({
@@ -753,6 +776,294 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     } finally {
       setIsSubmittingMovement(false);
     }
+  };
+
+  // Open Edit Movement Modal
+  const handleOpenEditMovementModal = (movement: StockMovement) => {
+    setEditingMovement(movement);
+    const isEntrada = movement.type === 'ENTRADA';
+    const origin = (movement.origin as 'COMPRA' | 'DOACAO') || (isEntrada ? 'COMPRA' : 'COMPRA');
+    const uPrice = movement.unitPrice !== undefined && movement.unitPrice !== null ? String(movement.unitPrice) : '';
+    const tPrice = movement.totalPrice !== undefined && movement.totalPrice !== null ? String(movement.totalPrice) : '';
+    const estVal = movement.estimatedValue !== undefined && movement.estimatedValue !== null ? String(movement.estimatedValue) : '';
+
+    setEditMovementForm({
+      quantity: movement.quantity || 1,
+      date: movement.date || new Date().toISOString().split('T')[0],
+      notes: movement.notes || '',
+      entryOrigin: origin,
+      supplier: movement.supplier || '',
+      invoiceNumber: movement.invoiceNumber || '',
+      unitPrice: uPrice,
+      totalPrice: tPrice,
+      deductFromTreasury: movement.deductFromTreasury !== undefined ? movement.deductFromTreasury : true,
+      donorName: movement.donorName || (origin === 'DOACAO' && movement.supplier ? movement.supplier.replace('Doador: ', '') : ''),
+      estimatedValue: estVal,
+      destination: movement.destination || '',
+      reason: movement.reason || 'Consumo Interno'
+    });
+    setIsEditMovementModalOpen(true);
+  };
+
+  // Save Edited Movement (Entrada / Saída) with Stock & Treasury Synchronization
+  const handleSaveEditedMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMovement) return;
+
+    const newQty = Number(editMovementForm.quantity);
+    if (!newQty || newQty <= 0) {
+      showToast('A quantidade deve ser maior que zero.', 'error');
+      return;
+    }
+
+    const isEntrada = editingMovement.type === 'ENTRADA';
+    const prod = products.find(p => p.id === editingMovement.productId);
+    const currentProductQty = prod ? prod.quantity : 0;
+    const oldQty = editingMovement.quantity || 0;
+
+    // Calculate new stock
+    let newProductStock = currentProductQty;
+    if (isEntrada) {
+      const delta = newQty - oldQty;
+      newProductStock = currentProductQty + delta;
+    } else {
+      const delta = newQty - oldQty;
+      newProductStock = currentProductQty - delta;
+    }
+
+    if (newProductStock < 0) {
+      showToast(`Não é possível salvar: o saldo do estoque ficaria negativo (${newProductStock}).`, 'error');
+      return;
+    }
+
+    setIsSubmittingEditMovement(true);
+
+    try {
+      let finalFinancialId = editingMovement.financialTransactionId || null;
+
+      if (isEntrada) {
+        if (editMovementForm.entryOrigin === 'COMPRA') {
+          const uPrice = Number(editMovementForm.unitPrice) || 0;
+          const tPrice = Number(editMovementForm.totalPrice) || (uPrice * newQty);
+          const deductBool = editMovementForm.deductFromTreasury;
+          const supplierText = editMovementForm.supplier.trim();
+          const invoiceNumText = editMovementForm.invoiceNumber.trim();
+
+          if (deductBool) {
+            if (finalFinancialId) {
+              // Update existing financial transaction in Treasury
+              await updateDoc(doc(db, 'financial', finalFinancialId), cleanData({
+                amount: tPrice,
+                date: editMovementForm.date,
+                description: `Compra de Estoque – ${editingMovement.productName}`,
+                supplier: supplierText || 'Não informado',
+                invoiceNumber: invoiceNumText || null,
+                stockQuantity: newQty,
+                updatedAt: new Date().toISOString()
+              }));
+            } else {
+              // Create new financial transaction in Treasury
+              const financialRef = doc(collection(db, 'financial'));
+              finalFinancialId = financialRef.id;
+
+              const financialPayload = cleanData({
+                id: finalFinancialId,
+                date: editMovementForm.date,
+                description: `Compra de Estoque – ${editingMovement.productName}`,
+                amount: tPrice,
+                type: 'DESPESA',
+                category: 'ESTOQUE',
+                originModule: 'STOCK',
+                stockMovementId: editingMovement.id,
+                stockProductId: editingMovement.productId,
+                stockProductName: editingMovement.productName,
+                stockQuantity: newQty,
+                supplier: supplierText || 'Não informado',
+                invoiceNumber: invoiceNumText || null,
+                createdAt: new Date().toISOString(),
+                createdBy: user.name
+              });
+
+              await setDoc(financialRef, financialPayload);
+            }
+          } else {
+            // Not deducted from treasury -> if there was a financial record previously, remove it
+            if (finalFinancialId) {
+              try {
+                await deleteDoc(doc(db, 'financial', finalFinancialId));
+              } catch (delFinErr) {
+                console.warn("Transação financeira não encontrada para exclusão:", delFinErr);
+              }
+              finalFinancialId = null;
+            }
+          }
+
+          // Update movement doc
+          const movementUpdatePayload = cleanData({
+            quantity: newQty,
+            stockAfter: newProductStock,
+            date: editMovementForm.date,
+            supplier: supplierText || null,
+            invoiceNumber: invoiceNumText || null,
+            unitPrice: uPrice,
+            totalPrice: tPrice,
+            deductFromTreasury: deductBool,
+            financialTransactionId: finalFinancialId,
+            origin: 'COMPRA',
+            donorName: null,
+            estimatedValue: null,
+            notes: editMovementForm.notes.trim() || null,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.name
+          });
+
+          await updateDoc(doc(db, 'stock_movements', editingMovement.id), movementUpdatePayload);
+
+          // Update stock_products quantity and price/supplier
+          await updateDoc(doc(db, 'stock_products', editingMovement.productId), cleanData({
+            quantity: newProductStock,
+            unitPrice: uPrice > 0 ? uPrice : (prod?.unitPrice || 0),
+            supplier: supplierText || prod?.supplier,
+            updatedAt: new Date().toISOString()
+          }));
+
+          await logAudit('EDICAO_ENTRADA_COMPRA', `Entrada de Estoque editada (${editingMovement.productName}): Qtd ${oldQty} -> ${newQty}, Saldo ${currentProductQty} -> ${newProductStock}, Valor R$ ${tPrice.toFixed(2)}.`);
+          showToast('Entrada por Compra atualizada com sucesso!', 'success');
+
+        } else {
+          // DOACAO
+          const donor = editMovementForm.donorName.trim();
+          const estVal = Number(editMovementForm.estimatedValue) || 0;
+
+          // If there was a financial record previously, delete it
+          if (finalFinancialId) {
+            try {
+              await deleteDoc(doc(db, 'financial', finalFinancialId));
+            } catch (delFinErr) {
+              console.warn("Transação financeira não encontrada:", delFinErr);
+            }
+            finalFinancialId = null;
+          }
+
+          const movementUpdatePayload = cleanData({
+            quantity: newQty,
+            stockAfter: newProductStock,
+            date: editMovementForm.date,
+            origin: 'DOACAO',
+            supplier: donor ? `Doador: ${donor}` : 'Doação',
+            donorName: donor || null,
+            estimatedValue: estVal > 0 ? estVal : null,
+            unitPrice: null,
+            totalPrice: null,
+            invoiceNumber: null,
+            deductFromTreasury: false,
+            financialTransactionId: null,
+            notes: editMovementForm.notes.trim() || null,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.name
+          });
+
+          await updateDoc(doc(db, 'stock_movements', editingMovement.id), movementUpdatePayload);
+
+          await updateDoc(doc(db, 'stock_products', editingMovement.productId), {
+            quantity: newProductStock,
+            updatedAt: new Date().toISOString()
+          });
+
+          await logAudit('EDICAO_ENTRADA_DOACAO', `Entrada por Doação editada (${editingMovement.productName}): Qtd ${oldQty} -> ${newQty}, Saldo ${currentProductQty} -> ${newProductStock}.`);
+          showToast('Entrada por Doação atualizada com sucesso!', 'success');
+        }
+      } else {
+        // SAIDA
+        const dest = editMovementForm.destination.trim();
+        const reas = editMovementForm.reason.trim();
+
+        const movementUpdatePayload = cleanData({
+          quantity: newQty,
+          stockAfter: newProductStock,
+          date: editMovementForm.date,
+          destination: dest || null,
+          reason: reas || null,
+          notes: editMovementForm.notes.trim() || null,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user.name
+        });
+
+        await updateDoc(doc(db, 'stock_movements', editingMovement.id), movementUpdatePayload);
+
+        await updateDoc(doc(db, 'stock_products', editingMovement.productId), {
+          quantity: newProductStock,
+          updatedAt: new Date().toISOString()
+        });
+
+        await logAudit('EDICAO_SAIDA_ESTOQUE', `Movimentação de Saída editada (${editingMovement.productName}): Qtd ${oldQty} -> ${newQty}, Saldo ${currentProductQty} -> ${newProductStock}.`);
+        showToast('Saída de Estoque atualizada com sucesso!', 'success');
+      }
+
+      setIsEditMovementModalOpen(false);
+      setEditingMovement(null);
+    } catch (err) {
+      console.error("Erro ao salvar edição da movimentação:", err);
+      showToast('Erro ao atualizar a movimentação no banco de dados.', 'error');
+    } finally {
+      setIsSubmittingEditMovement(false);
+    }
+  };
+
+  // Delete Movement (Rollback Stock & Financial Linkage)
+  const handleDeleteMovement = (movement: StockMovement) => {
+    const isEntrada = movement.type === 'ENTRADA';
+    const confirmMessage = isEntrada
+      ? `Deseja realmente excluir a entrada de ${movement.quantity} un de "${movement.productName}"?\n\n` +
+        `• O saldo do estoque será estornado (-${movement.quantity} un).\n` +
+        (movement.deductFromTreasury ? `• O lançamento correspondente na Tesouraria será excluído automaticamente.\n` : '') +
+        `Esta ação não pode ser desfeita.`
+      : `Deseja realmente excluir a saída de ${movement.quantity} un de "${movement.productName}"?\n\n` +
+        `• O saldo do estoque será restaurado (+${movement.quantity} un).\n` +
+        `Esta ação não pode ser desfeita.`;
+
+    showConfirm(confirmMessage, async () => {
+      try {
+        const prod = products.find(p => p.id === movement.productId);
+        const currentStock = prod ? prod.quantity : 0;
+        const restoredStock = isEntrada
+          ? Math.max(0, currentStock - movement.quantity)
+          : currentStock + movement.quantity;
+
+        // 1. Delete linked financial record if deducted from treasury
+        if (isEntrada && movement.deductFromTreasury && movement.financialTransactionId) {
+          try {
+            await deleteDoc(doc(db, 'financial', movement.financialTransactionId));
+          } catch (finErr) {
+            console.warn("Transação financeira não encontrada ou já excluída:", finErr);
+          }
+        }
+
+        // 2. Delete movement record
+        await deleteDoc(doc(db, 'stock_movements', movement.id));
+
+        // 3. Update stock_products quantity
+        await updateDoc(doc(db, 'stock_products', movement.productId), {
+          quantity: restoredStock,
+          updatedAt: new Date().toISOString()
+        });
+
+        // 4. Close details modal if opened with this movement
+        if (selectedMovementForDetails?.id === movement.id) {
+          setSelectedMovementForDetails(null);
+        }
+
+        const auditMsg = isEntrada
+          ? `Movimentação de Entrada excluída: estornado -${movement.quantity} un de "${movement.productName}". Novo saldo: ${restoredStock}.`
+          : `Movimentação de Saída excluída: restaurado +${movement.quantity} un de "${movement.productName}". Novo saldo: ${restoredStock}.`;
+
+        await logAudit('EXCLUSAO_MOVIMENTACAO_ESTOQUE', auditMsg);
+        showToast('Movimentação excluída e saldo de estoque estornado com sucesso!', 'success');
+      } catch (err) {
+        console.error("Erro ao excluir movimentação:", err);
+        showToast('Erro ao excluir a movimentação do estoque.', 'error');
+      }
+    });
   };
 
   // Generate Reports in PDF or Word
@@ -1980,13 +2291,29 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => setSelectedMovementForDetails(m)}
-                          className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
-                          title="Ver Detalhes e Vínculo Financeiro"
-                        >
-                          <Eye size={14} /> Detalhes
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => setSelectedMovementForDetails(m)}
+                            className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
+                            title="Ver Detalhes e Vínculo Financeiro"
+                          >
+                            <Eye size={14} /> Detalhes
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditMovementModal(m)}
+                            className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
+                            title={m.type === 'ENTRADA' ? "Editar Entrada de Estoque" : "Editar Movimentação de Saída"}
+                          >
+                            <Pencil size={14} /> Editar
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMovement(m)}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
+                            title={m.type === 'ENTRADA' ? "Excluir Entrada e Estornar Saldo" : "Excluir Saída e Restaurar Saldo"}
+                          >
+                            <Trash2 size={14} /> Excluir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2774,15 +3101,360 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                 {selectedMovementForDetails.notes && <p><strong>Observações:</strong> {selectedMovementForDetails.notes}</p>}
               </div>
 
-              <div className="pt-2">
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const m = selectedMovementForDetails;
+                    setSelectedMovementForDetails(null);
+                    handleOpenEditMovementModal(m);
+                  }}
+                  className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 font-bold rounded-2xl transition-colors flex items-center justify-center gap-1.5 text-xs"
+                >
+                  <Pencil size={14} /> Editar
+                </button>
+                <button
+                  onClick={() => {
+                    const m = selectedMovementForDetails;
+                    handleDeleteMovement(m);
+                  }}
+                  className="flex-1 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 font-bold rounded-2xl transition-colors flex items-center justify-center gap-1.5 text-xs"
+                >
+                  <Trash2 size={14} /> Excluir
+                </button>
                 <button
                   onClick={() => setSelectedMovementForDetails(null)}
-                  className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white font-bold rounded-2xl transition-colors"
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-800 dark:text-white font-bold rounded-2xl transition-colors text-xs"
                 >
                   Fechar
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT MOVEMENT (ENTRADA / SAÍDA) */}
+      {isEditMovementModalOpen && editingMovement && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className={`p-6 text-white flex justify-between items-center ${
+              editingMovement.type === 'ENTRADA' ? 'bg-gradient-to-r from-blue-700 to-indigo-800' : 'bg-gradient-to-r from-rose-700 to-red-800'
+            }`}>
+              <div>
+                <h3 className="text-lg font-black flex items-center gap-2">
+                  <Pencil size={20} />
+                  {editingMovement.type === 'ENTRADA' ? 'Editar Entrada de Estoque' : 'Editar Saída de Estoque'}
+                </h3>
+                <p className="text-xs text-blue-100 mt-0.5">
+                  Item: <span className="font-bold underline">{editingMovement.productName}</span> ({editingMovement.productCode})
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsEditMovementModalOpen(false);
+                  setEditingMovement(null);
+                }} 
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveEditedMovement} className="p-6 space-y-4 text-xs">
+              
+              {/* Product Info Banner */}
+              <div className="p-3 bg-slate-50 dark:bg-gray-800/60 rounded-2xl border border-slate-200 dark:border-gray-700 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Saldo Atual no Estoque</span>
+                  <span className="text-sm font-black text-gray-800 dark:text-gray-100">
+                    {products.find(p => p.id === editingMovement.productId)?.quantity ?? editingMovement.stockAfter} un
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold block">Qtd Original Desta Movimentação</span>
+                  <span className={`text-sm font-black ${editingMovement.type === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {editingMovement.type === 'ENTRADA' ? '+' : '-'}{editingMovement.quantity} un
+                  </span>
+                </div>
+              </div>
+
+              {/* Data & Quantidade */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                    Data da Movimentação *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editMovementForm.date}
+                    onChange={e => setEditMovementForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                    Nova Quantidade *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editMovementForm.quantity}
+                    onChange={e => {
+                      const val = Number(e.target.value);
+                      setEditMovementForm(prev => {
+                        const u = Number(prev.unitPrice) || 0;
+                        return {
+                          ...prev,
+                          quantity: val,
+                          totalPrice: u > 0 ? String(u * val) : prev.totalPrice
+                        };
+                      });
+                    }}
+                    className="w-full p-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-black text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* ENTRADA SPECIFIC FIELDS */}
+              {editingMovement.type === 'ENTRADA' && (
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/40 space-y-3">
+                  
+                  <div>
+                    <label className="block text-blue-900 dark:text-blue-300 font-extrabold mb-1.5">
+                      Origem da Entrada
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditMovementForm(prev => ({ ...prev, entryOrigin: 'COMPRA' }))}
+                        className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                          editMovementForm.entryOrigin === 'COMPRA'
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <ShoppingBag size={14} /> Compra
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditMovementForm(prev => ({ ...prev, entryOrigin: 'DOACAO' }))}
+                        className={`p-2.5 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                          editMovementForm.entryOrigin === 'DOACAO'
+                            ? 'bg-purple-600 border-purple-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Gift size={14} /> Doação
+                      </button>
+                    </div>
+                  </div>
+
+                  {editMovementForm.entryOrigin === 'COMPRA' ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Fornecedor
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Nome da empresa/fornecedor"
+                            value={editMovementForm.supplier}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, supplier: e.target.value }))}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Nº da Nota Fiscal
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: NF-12345"
+                            value={editMovementForm.invoiceNumber}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Valor Unitário (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={editMovementForm.unitPrice}
+                            onChange={e => {
+                              const uVal = e.target.value;
+                              const numU = Number(uVal) || 0;
+                              const qtyVal = Number(editMovementForm.quantity) || 1;
+                              setEditMovementForm(prev => ({
+                                ...prev,
+                                unitPrice: uVal,
+                                totalPrice: numU > 0 ? (numU * qtyVal).toFixed(2) : prev.totalPrice
+                              }));
+                            }}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Valor Total da Compra (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={editMovementForm.totalPrice}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, totalPrice: e.target.value }))}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-emerald-600 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Tesouraria Toggle */}
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div>
+                          <p className="font-extrabold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                            <CreditCard size={14} className="text-emerald-600" />
+                            Debitar da Tesouraria
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {editMovementForm.deductFromTreasury 
+                              ? 'Lançamento de despesa será sincronizado no financeiro.' 
+                              : 'Não afeta o saldo financeiro da entidade.'}
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editMovementForm.deductFromTreasury}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, deductFromTreasury: e.target.checked }))}
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Nome do Doador
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ex: Empresa Parceira, Voluntário..."
+                            value={editMovementForm.donorName}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, donorName: e.target.value }))}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                            Valor Estimado (R$)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={editMovementForm.estimatedValue}
+                            onChange={e => setEditMovementForm(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                            className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              )}
+
+              {/* SAÍDA SPECIFIC FIELDS */}
+              {editingMovement.type === 'SAIDA' && (
+                <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl border border-rose-100 dark:border-rose-900/40 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                        Destino / Setor *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Ala Feminina, Cozinha..."
+                        value={editMovementForm.destination}
+                        onChange={e => setEditMovementForm(prev => ({ ...prev, destination: e.target.value }))}
+                        className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                        Motivo da Saída *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Consumo Diário, Higiene..."
+                        value={editMovementForm.reason}
+                        onChange={e => setEditMovementForm(prev => ({ ...prev, reason: e.target.value }))}
+                        className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-semibold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Observações */}
+              <div>
+                <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1">
+                  Observações
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Informações complementares sobre esta alteração..."
+                  value={editMovementForm.notes}
+                  onChange={e => setEditMovementForm(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full p-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditMovementModalOpen(false);
+                    setEditingMovement(null);
+                  }}
+                  className="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-2xl text-xs hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEditMovement}
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl text-xs shadow-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmittingEditMovement ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+
+            </form>
+
           </div>
         </div>
       )}
