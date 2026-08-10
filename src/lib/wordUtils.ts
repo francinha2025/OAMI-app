@@ -57,43 +57,60 @@ export const generateModernWord = async ({
     }))
   });
 
-  const tableRows = data.map((row, rowIndex) => new TableRow({
-    children: row.map((cell, colIndex) => {
-      const colHeader = String(columns[colIndex] || '').trim().toLowerCase();
-      const cellTextRaw = String(cell || '').trim();
-      
-      const matchAge = appendAgeToName(cellTextRaw);
-      const hasAgeAdded = matchAge !== cellTextRaw;
-      
-      // Check if it is a patient column using advanced detection
-      const isPatientCol = 
-        ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(colHeader) ||
-        colHeader.includes('idoso') ||
-        colHeader.includes('paciente') ||
-        colHeader.includes('acolhido') ||
-        colHeader.includes('residente') ||
-        hasAgeAdded;
-      
-      let cellText = cellTextRaw;
-      if (isPatientCol && cellText && cellText !== 'N/A' && cellText !== 'Não informado' && cellText !== '-') {
-        cellText = appendAgeToName(cellText);
-      }
+  const tableRows = data.map((row, rowIndex) => {
+    const firstCellRaw = String(row[0] || '').trim().toUpperCase();
+    const isTotalRow = firstCellRaw.includes('TOTAL') || firstCellRaw.includes('CONSOLIDADO') || firstCellRaw.includes('SOMA');
 
-      return new TableCell({
-        children: [new Paragraph({
-          children: [new TextRun({ 
-            text: cellText, 
-            bold: isPatientCol ? true : undefined,
-            color: isPatientCol ? '064e3b' : undefined // High-contrast classy deep green
+    return new TableRow({
+      children: row.map((cell, colIndex) => {
+        const colHeader = String(columns[colIndex] || '').trim().toLowerCase();
+        const cellTextRaw = String(cell || '').trim();
+        
+        if (isTotalRow) {
+          return new TableCell({
+            children: [new Paragraph({
+              children: [new TextRun({ 
+                text: cellTextRaw, 
+                bold: true,
+                color: 'FFFFFF'
+              })],
+              alignment: colIndex === 0 ? AlignmentType.LEFT : AlignmentType.CENTER
+            })],
+            shading: { fill: '10b981' }
+          });
+        }
+
+        const matchAge = appendAgeToName(cellTextRaw);
+        const hasAgeAdded = matchAge !== cellTextRaw;
+        
+        // Check if it is a patient column using advanced detection
+        const isPatientCol = 
+          ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(colHeader) ||
+          (colHeader.includes('idoso') && !colHeader.includes('uso') && !colHeader.includes('status')) ||
+          (colHeader.includes('paciente') && !colHeader.includes('uso')) ||
+          hasAgeAdded;
+        
+        let cellText = cellTextRaw;
+        if (isPatientCol && cellText && cellText !== 'N/A' && cellText !== 'Não informado' && cellText !== '-' && !cellText.toUpperCase().includes('TOTAL')) {
+          cellText = appendAgeToName(cellText);
+        }
+
+        return new TableCell({
+          children: [new Paragraph({
+            children: [new TextRun({ 
+              text: cellText, 
+              bold: isPatientCol ? true : undefined,
+              color: isPatientCol ? '064e3b' : undefined // High-contrast classy deep green
+            })],
+            alignment: AlignmentType.LEFT
           })],
-          alignment: AlignmentType.LEFT
-        })],
-        shading: isPatientCol 
-          ? { fill: 'D1FAE5' } // Emerald light highlight block
-          : (rowIndex % 2 === 0 ? { fill: 'F9FAFB' } : undefined)
-      });
-    })
-  }));
+          shading: isPatientCol 
+            ? { fill: 'D1FAE5' } // Emerald light highlight block
+            : (rowIndex % 2 === 0 ? { fill: 'F9FAFB' } : undefined)
+        });
+      })
+    });
+  });
 
   const table = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },

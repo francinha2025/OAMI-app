@@ -33,7 +33,8 @@ import {
   PlusCircle,
   PackagePlus,
   Box,
-  TrendingDown
+  TrendingDown,
+  X
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -62,6 +63,7 @@ import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { generateModernExcel } from '../lib/excelUtils';
 import { cn } from '../lib/utils';
+import { INSTITUTION_NAME } from '../constants';
 import { handleFirestoreError, OperationType } from '../lib/firestoreErrors';
 
 interface DiaperConsumptionTabProps {
@@ -146,6 +148,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
     origin: 'DOACAO' as 'DOACAO' | 'PRODUCAO_EXTRA' | 'COMPRA' | 'AJUSTE_INVENTARIO',
     notes: ''
   });
+
+  // Modal state for institutional report generation by period
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportPeriod, setReportPeriod] = useState<'DIARIO' | 'MENSAL' | 'SEMESTRAL' | 'ANUAL'>('MENSAL');
+  const [reportDate, setReportDate] = useState(getTodayString());
+  const [reportMonth, setReportMonth] = useState(getTodayString().slice(0, 7)); // 'YYYY-MM'
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportSemester, setReportSemester] = useState<'1' | '2'>(new Date().getMonth() < 6 ? '1' : '2');
+  const [reportUserFilter, setReportUserFilter] = useState<'USERS_ONLY' | 'ALL_ACTIVE' | 'ALL'>('USERS_ONLY');
 
   // Real-time Firestore sync
   useEffect(() => {
@@ -501,88 +512,212 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
     }
   };
 
-  // Export functions
-  const handleExportPDF = () => {
-    const columns = ['Idoso', 'Status', 'Usa Fralda', 'Fraldas/Dia', 'Último Registro', 'Consumo Mensal', 'Pacotes/Mês'];
-    const data = elderlyConsumptionData.map(item => [
-      item.elderly.name,
-      item.elderly.status,
-      item.usesDiapers ? 'SIM' : 'NÃO',
-      item.usesDiapers ? `${item.diapersPerDay} un` : '0 un',
-      item.lastLoggedDate ? item.lastLoggedDate.split('-').reverse().join('/') : 'Não informado',
-      item.usesDiapers ? `${item.monthly} un` : '0 un',
-      item.usesDiapers ? `${item.monthlyPacks} pacotes` : '0 pacotes'
-    ]);
+  // Export function supporting Diário, Mensal, Semestral, and Anual views with OAMI Timbrado
+  const handleGenerateReport = (formatType: 'pdf' | 'excel' | 'word') => {
+    // 1. Determine period title, subtitle, multiplier, and date labels
+    let periodTitle = '';
+    let periodLabel = '';
+    let daysMultiplier = 30;
 
-    const summary = [
-      `INSTITUIÇÃO: OAMI - Organização de Amparo à Melhor Idade`,
-      `INTEGRAÇÃO DE ESTOQUE E CONSUMO DE FRALDAS GERIÁTRICAS (${DIAPER_SIZE}):`,
-      `• Entrada Total no Estoque: ${stockSummary.totalEntradas} fraldas (${stockSummary.totalEntradasPacotes} pacotes de 14 un)`,
-      `• Saída pelo Consumo Registrado: ${stockSummary.totalSaidasConsumo} fraldas (${stockSummary.totalSaidasPacotes} pacotes)`,
-      `• Saldo Atual em Estoque: ${stockSummary.saldoAtualUnidades} fraldas (${stockSummary.saldoAtualPacotes} pacotes)`,
-      `• Autonomia Estimada: ~${stockSummary.daysOfAutonomy} Dias (${stockSummary.isLowStock ? 'ALERTA DE ESTOQUE BAIXO' : 'ESTOQUE REGULAR'})`,
-      `• Idosos Atendidos: ${totals.usersCount} de ${totals.totalActive} idosos (${totals.dailyDiapers} fraldas/dia)`
+    if (reportPeriod === 'DIARIO') {
+      const dateFmt = reportDate ? reportDate.split('-').reverse().join('/') : formatDateBR(getTodayString());
+      periodTitle = `Relatório Diário de Consumo e Demanda de Fraldas Geriátricas`;
+      periodLabel = `Data: ${dateFmt} (1 Dia)`;
+      daysMultiplier = 1;
+    } else if (reportPeriod === 'MENSAL') {
+      const parts = reportMonth ? reportMonth.split('-') : getTodayString().split('-');
+      const y = parts[0] || '2026';
+      const m = parts[1] || '08';
+      const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const monthIndex = parseInt(m, 10) - 1;
+      const mName = monthNames[monthIndex] || m;
+      periodTitle = `Relatório Mensal de Consumo e Demanda de Fraldas Geriátricas`;
+      periodLabel = `Mês: ${mName}/${y} (30 Dias)`;
+      daysMultiplier = 30;
+    } else if (reportPeriod === 'SEMESTRAL') {
+      periodTitle = `Relatório Semestral de Consumo e Demanda de Fraldas Geriátricas`;
+      periodLabel = `${reportSemester}º Semestre de ${reportYear} (180 Dias)`;
+      daysMultiplier = 180;
+    } else {
+      periodTitle = `Relatório Anual de Consumo e Demanda de Fraldas Geriátricas`;
+      periodLabel = `Ano de ${reportYear} (365 Dias)`;
+      daysMultiplier = 365;
+    }
+
+    // 2. Filter elderly data
+    let listToExport = elderlyConsumptionData;
+    if (reportUserFilter === 'USERS_ONLY') {
+      listToExport = listToExport.filter(item => item.usesDiapers && item.diapersPerDay > 0);
+    } else if (reportUserFilter === 'ALL_ACTIVE') {
+      listToExport = listToExport.filter(item => item.elderly.status !== 'INATIVO');
+    }
+
+    // Sort alphabetically by elderly name
+    listToExport = [...listToExport].sort((a, b) => a.elderly.name.localeCompare(b.elderly.name, 'pt-BR'));
+
+    // 3. Columns depending on period
+    let columns: string[] = [];
+    if (reportPeriod === 'DIARIO') {
+      columns = ['Idoso', 'Status', 'Usa Fralda', 'Diário (un)', 'Pacotes/Dia', 'Lançado no Dia', 'Último Registro', 'Observações'];
+    } else if (reportPeriod === 'MENSAL') {
+      columns = ['Idoso', 'Status', 'Usa Fralda', 'Diário (un)', 'Demanda Mensal (un)', 'Pacotes/Mês (14un)', 'Histórico no Mês', 'Último Registro', 'Observações'];
+    } else if (reportPeriod === 'SEMESTRAL') {
+      columns = ['Idoso', 'Status', 'Usa Fralda', 'Diário (un)', 'Mensal (un)', 'Demanda Semestral (un)', 'Pacotes/Semestre', 'Último Registro', 'Observações'];
+    } else {
+      columns = ['Idoso', 'Status', 'Usa Fralda', 'Diário (un)', 'Mensal (un)', 'Demanda Anual (un)', 'Pacotes/Ano (14un)', 'Último Registro', 'Observações'];
+    }
+
+    // Calculate sum metrics for filtered list
+    let totalDailyUnits = 0;
+    let totalPeriodUnits = 0;
+    let totalPeriodPacks = 0;
+    let totalPeriodLogged = 0;
+
+    // 4. Data rows
+    const dataRows = listToExport.map(item => {
+      const dailyUn = item.usesDiapers ? item.diapersPerDay : 0;
+      const periodUn = dailyUn * daysMultiplier;
+      const periodPacks = Math.ceil(periodUn / DIAPERS_PER_PACKAGE);
+
+      totalDailyUnits += dailyUn;
+      totalPeriodUnits += periodUn;
+      totalPeriodPacks += periodPacks;
+
+      // Check logged units in dailyLogs for this elderly in range
+      let loggedUnits = 0;
+      if (reportPeriod === 'DIARIO') {
+        const matchingLogs = dailyLogs.filter(l => l.elderlyId === item.elderly.id && l.date === reportDate);
+        loggedUnits = matchingLogs.reduce((acc, l) => acc + (l.quantity || 0), 0);
+      } else if (reportPeriod === 'MENSAL') {
+        const matchingLogs = dailyLogs.filter(l => l.elderlyId === item.elderly.id && l.date && l.date.startsWith(reportMonth));
+        loggedUnits = matchingLogs.reduce((acc, l) => acc + (l.quantity || 0), 0);
+      } else if (reportPeriod === 'SEMESTRAL') {
+        const yearStr = String(reportYear);
+        const matchingLogs = dailyLogs.filter(l => {
+          if (l.elderlyId !== item.elderly.id || !l.date || !l.date.startsWith(yearStr)) return false;
+          const monthNum = parseInt(l.date.split('-')[1], 10);
+          return reportSemester === '1' ? (monthNum >= 1 && monthNum <= 6) : (monthNum >= 7 && monthNum <= 12);
+        });
+        loggedUnits = matchingLogs.reduce((acc, l) => acc + (l.quantity || 0), 0);
+      } else {
+        const yearStr = String(reportYear);
+        const matchingLogs = dailyLogs.filter(l => l.elderlyId === item.elderly.id && l.date && l.date.startsWith(yearStr));
+        loggedUnits = matchingLogs.reduce((acc, l) => acc + (l.quantity || 0), 0);
+      }
+
+      totalPeriodLogged += loggedUnits;
+
+      const lastDate = item.lastLoggedDate ? item.lastLoggedDate.split('-').reverse().join('/') : '-';
+      const obs = item.notes || '-';
+
+      if (reportPeriod === 'DIARIO') {
+        return [
+          item.elderly.name,
+          item.elderly.status || 'ATIVO',
+          item.usesDiapers ? 'SIM' : 'NÃO',
+          `${dailyUn} un`,
+          `${(dailyUn / DIAPERS_PER_PACKAGE).toFixed(2)} pac`,
+          loggedUnits > 0 ? `${loggedUnits} un` : '0 un',
+          lastDate,
+          obs
+        ];
+      } else if (reportPeriod === 'MENSAL') {
+        return [
+          item.elderly.name,
+          item.elderly.status || 'ATIVO',
+          item.usesDiapers ? 'SIM' : 'NÃO',
+          `${dailyUn} un`,
+          `${periodUn} un`,
+          `${periodPacks} pacotes`,
+          `${loggedUnits} un`,
+          lastDate,
+          obs
+        ];
+      } else if (reportPeriod === 'SEMESTRAL') {
+        return [
+          item.elderly.name,
+          item.elderly.status || 'ATIVO',
+          item.usesDiapers ? 'SIM' : 'NÃO',
+          `${dailyUn} un`,
+          `${dailyUn * 30} un`,
+          `${periodUn} un`,
+          `${periodPacks} pacotes`,
+          lastDate,
+          obs
+        ];
+      } else {
+        return [
+          item.elderly.name,
+          item.elderly.status || 'ATIVO',
+          item.usesDiapers ? 'SIM' : 'NÃO',
+          `${dailyUn} un`,
+          `${dailyUn * 30} un`,
+          `${periodUn} un`,
+          `${periodPacks} pacotes`,
+          lastDate,
+          obs
+        ];
+      }
+    });
+
+    // Totals row at bottom
+    const totalRow = [
+      'TOTAL CONSOLIDADO',
+      `${listToExport.length} idosos`,
+      `${listToExport.filter(i => i.usesDiapers).length} usam`,
+      `${totalDailyUnits} un/dia`,
+      `${totalPeriodUnits} un`,
+      `${totalPeriodPacks} pacotes`,
+      `${totalPeriodLogged} un lançadas`,
+      '-',
+      `Demanda calculada (${daysMultiplier}d)`
+    ];
+
+    dataRows.push(totalRow);
+
+    // 5. Official Header & Timbrado Summary
+    const summaryLines = [
+      `RELATÓRIO INSTITUCIONAL DE CONSUMO E ESTOQUE DE FRALDAS GERIÁTRICAS`,
+      `• Período do Relatório: ${periodLabel} | Embalagem Padrão: 14 fraldas/pacote`,
+      `• Saldo Atual em Estoque: ${stockSummary.saldoAtualUnidades} fraldas (${stockSummary.saldoAtualPacotes} pacotes de 14 un) — ${stockSummary.isLowStock ? 'ALERTA DE ESTOQUE CRÍTICO' : 'ESTOQUE EM NÍVEL ADEQUADO'}`,
+      `• Autonomia Estimada do Estoque: ~${stockSummary.daysOfAutonomy} Dias de uso contínuo`,
+      `• Movimentação no Período: Entradas: ${stockSummary.totalEntradas} un | Saídas: ${stockSummary.totalSaidasGeral} un`,
+      `• Cobertura de Acompanhamento: ${totals.usersCount} idosos atendidos de ${totals.totalActive} idosos ativos`,
+      `• Demanda Consolidada no Período (${daysMultiplier} dias): ${totalPeriodUnits.toLocaleString('pt-BR')} fraldas (~${totalPeriodPacks.toLocaleString('pt-BR')} pacotes fechados)`
     ].join('\n');
 
-    generateModernPDF({
-      title: 'Relatório do Consumo e Estoque de Fraldas',
-      subtitle: summary,
-      columns,
-      data,
-      fileName: 'oami_consumo_estoque_fraldas'
-    });
-    showToast('Relatório PDF gerado com sucesso!', 'success');
-  };
+    const fileName = `oami_relatorio_fraldas_${reportPeriod.toLowerCase()}_${new Date().toISOString().split('T')[0]}`;
 
-  const handleExportExcel = () => {
-    const columns = ['Idoso', 'Status', 'Usa Fralda', 'Fraldas/Dia', 'Último Registro', 'Fraldas/Mês', 'Pacotes/Mês', 'Observações'];
-    const data = elderlyConsumptionData.map(item => [
-      item.elderly.name,
-      item.elderly.status,
-      item.usesDiapers ? 'Sim' : 'Não',
-      item.diapersPerDay,
-      item.lastLoggedDate || 'Sem data',
-      item.monthly,
-      item.monthlyPacks,
-      item.notes || ''
-    ]);
+    if (formatType === 'pdf') {
+      generateModernPDF({
+        title: periodTitle,
+        subtitle: summaryLines,
+        columns,
+        data: dataRows,
+        fileName,
+        institutionName: INSTITUTION_NAME
+      });
+      showToast(`Relatório PDF (${reportPeriod}) baixado com sucesso!`, 'success');
+    } else if (formatType === 'word') {
+      generateModernWord({
+        title: periodTitle,
+        subtitle: summaryLines,
+        columns,
+        data: dataRows,
+        fileName
+      });
+      showToast(`Documento Word (${reportPeriod}) baixado com sucesso!`, 'success');
+    } else if (formatType === 'excel') {
+      generateModernExcel({
+        title: `${periodTitle} - ${periodLabel}`,
+        columns,
+        data: dataRows,
+        fileName
+      });
+      showToast(`Planilha Excel (${reportPeriod}) baixada com sucesso!`, 'success');
+    }
 
-    generateModernExcel({
-      title: 'Consumo e Estoque de Fraldas',
-      columns,
-      data,
-      fileName: 'oami_consumo_estoque_fraldas'
-    });
-    showToast('Relatório Excel exportado!', 'success');
-  };
-
-  const handleExportWord = () => {
-    const columns = ['Idoso', 'Status', 'Usa Fralda', 'Diário', 'Última Data', 'Mensal', 'Pacotes/Mês'];
-    const data = elderlyConsumptionData.map(item => [
-      item.elderly.name,
-      item.elderly.status,
-      item.usesDiapers ? 'SIM' : 'NÃO',
-      `${item.diapersPerDay} un`,
-      item.lastLoggedDate ? item.lastLoggedDate.split('-').reverse().join('/') : '-',
-      `${item.monthly} un`,
-      `${item.monthlyPacks} pac`
-    ]);
-
-    const summary = `RELATÓRIO INSTITUCIONAL DE CONSUMO E ESTOQUE DE FRALDAS GERIÁTRICAS
-• Entrada Total de Estoque: ${stockSummary.totalEntradas} fraldas (${stockSummary.totalEntradasPacotes} pacotes)
-• Saída pelo Consumo: ${stockSummary.totalSaidasConsumo} fraldas (${stockSummary.totalSaidasPacotes} pacotes)
-• Saldo Atual em Estoque: ${stockSummary.saldoAtualUnidades} fraldas (${stockSummary.saldoAtualPacotes} pacotes)
-• Autonomia: ~${stockSummary.daysOfAutonomy} Dias
-• Status do Estoque: ${stockSummary.isLowStock ? 'ALERTA DE ESTOQUE BAIXO' : 'ESTOQUE OK'}`;
-
-    generateModernWord({
-      title: 'Consumo e Estoque de Fraldas',
-      subtitle: summary,
-      columns,
-      data,
-      fileName: 'oami_consumo_estoque_fraldas'
-    });
-    showToast('Documento Word gerado!', 'success');
+    setIsReportModalOpen(false);
   };
 
   // Recharts Data
@@ -668,26 +803,13 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
               + Lançar Entrada de Estoque
             </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportPDF}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20"
-              >
-                <FileText size={15} className="text-red-300" /> PDF
-              </button>
-              <button
-                onClick={handleExportExcel}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20"
-              >
-                <TableIcon size={15} className="text-emerald-300" /> Excel
-              </button>
-              <button
-                onClick={handleExportWord}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20"
-              >
-                <FileDown size={15} className="text-blue-300" /> Word
-              </button>
-            </div>
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-white/20 hover:bg-white/30 text-white rounded-2xl font-black text-xs transition-all shadow-md active:scale-95 border border-white/30 backdrop-blur-md"
+            >
+              <FileText size={18} className="text-emerald-300" />
+              <span>Gerar Relatório Oficial (Diário, Mensal, Semestral, Anual)</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1516,15 +1638,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
       {/* MODAL 1: LANÇAR ENTRADA DE ESTOQUE (DOAÇÃO / PRODUÇÃO / COMPRA) */}
       <AnimatePresence>
         {isStockModalOpen && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsStockModalOpen(false)}>
+          <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/60 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center min-h-screen" onClick={() => setIsStockModalOpen(false)}>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-100 dark:border-gray-800"
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md my-auto border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-20 shrink-0">
                 <div>
                   <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Integração de Estoque</span>
                   <h3 className="text-lg font-black text-gray-900 dark:text-white">
@@ -1532,108 +1654,113 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsStockModalOpen(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-800 flex items-center justify-center font-bold text-sm"
+                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-red-100 dark:hover:bg-red-950/50 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 transition-colors flex items-center justify-center shrink-0 border border-transparent hover:border-red-200"
+                  title="Fechar Janela"
+                  aria-label="Fechar"
                 >
-                  ✕
+                  <X size={20} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveStockEntry} className="space-y-4">
-                {/* Data da Entrada */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Data da Entrada:</label>
-                  <input
-                    type="date"
-                    required
-                    value={stockForm.date}
-                    onChange={e => setStockForm(prev => ({ ...prev, date: e.target.value }))}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
-                  />
-                </div>
-
-                {/* Origem da Entrada */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Origem / Motivo da Entrada:</label>
-                  <select
-                    value={stockForm.origin}
-                    onChange={e => setStockForm(prev => ({ ...prev, origin: e.target.value as any }))}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
-                  >
-                    <option value="DOACAO">Doação Recebida (Externa)</option>
-                    <option value="PRODUCAO_EXTRA">Lote de Produção Extra</option>
-                    <option value="COMPRA">Aquisição / Compra Institucional</option>
-                    <option value="AJUSTE_INVENTARIO">Ajuste de Inventário / Saldo Inicial</option>
-                  </select>
-                </div>
-
-                {/* Tipo de Unidade e Quantidade */}
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Quantidade Recebida:</label>
-                    <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg text-[10px] font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setStockForm(prev => ({ ...prev, unitType: 'PACOTES' }))}
-                        className={cn("px-2.5 py-1 rounded-md transition-all", stockForm.unitType === 'PACOTES' ? "bg-emerald-600 text-white" : "text-gray-500")}
-                      >
-                        Pacotes (14 un)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStockForm(prev => ({ ...prev, unitType: 'UNIDADES' }))}
-                        className={cn("px-2.5 py-1 rounded-md transition-all", stockForm.unitType === 'UNIDADES' ? "bg-emerald-600 text-white" : "text-gray-500")}
-                      >
-                        Unidades
-                      </button>
-                    </div>
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+                <form onSubmit={handleSaveStockEntry} className="space-y-4">
+                  {/* Data da Entrada */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Data da Entrada:</label>
+                    <input
+                      type="date"
+                      required
+                      value={stockForm.date}
+                      onChange={e => setStockForm(prev => ({ ...prev, date: e.target.value }))}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
+                    />
                   </div>
 
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={stockForm.quantity}
-                    onChange={e => setStockForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-black text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500"
-                  />
+                  {/* Origem da Entrada */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Origem / Motivo da Entrada:</label>
+                    <select
+                      value={stockForm.origin}
+                      onChange={e => setStockForm(prev => ({ ...prev, origin: e.target.value as any }))}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
+                    >
+                      <option value="DOACAO">Doação Recebida (Externa)</option>
+                      <option value="PRODUCAO_EXTRA">Lote de Produção Extra</option>
+                      <option value="COMPRA">Aquisição / Compra Institucional</option>
+                      <option value="AJUSTE_INVENTARIO">Ajuste de Inventário / Saldo Inicial</option>
+                    </select>
+                  </div>
 
-                  <p className="text-[11px] text-gray-400 italic">
-                    {stockForm.unitType === 'PACOTES' 
-                      ? `Equivale a ${(stockForm.quantity * DIAPERS_PER_PACKAGE)} fraldas individuais adicionadas ao saldo.`
-                      : `Equivale a ~${Math.floor(stockForm.quantity / DIAPERS_PER_PACKAGE)} pacotes completos de 14 un.`
-                    }
-                  </p>
-                </div>
+                  {/* Tipo de Unidade e Quantidade */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Quantidade Recebida:</label>
+                      <div className="flex bg-gray-100 dark:bg-gray-800 p-0.5 rounded-lg text-[10px] font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setStockForm(prev => ({ ...prev, unitType: 'PACOTES' }))}
+                          className={cn("px-2.5 py-1 rounded-md transition-all", stockForm.unitType === 'PACOTES' ? "bg-emerald-600 text-white" : "text-gray-500")}
+                        >
+                          Pacotes (14 un)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setStockForm(prev => ({ ...prev, unitType: 'UNIDADES' }))}
+                          className={cn("px-2.5 py-1 rounded-md transition-all", stockForm.unitType === 'UNIDADES' ? "bg-emerald-600 text-white" : "text-gray-500")}
+                        >
+                          Unidades
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Observações */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Observações / Detalhes:</label>
-                  <textarea
-                    rows={2}
-                    placeholder="Ex: Doação entregue pela comunidade, nota fiscal #102..."
-                    value={stockForm.notes}
-                    onChange={e => setStockForm(prev => ({ ...prev, notes: e.target.value }))}
-                    className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-800 dark:text-white"
-                  />
-                </div>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={stockForm.quantity}
+                      onChange={e => setStockForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-black text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                    />
 
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsStockModalOpen(false)}
-                    className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
-                  >
-                    Salvar Entrada
-                  </button>
-                </div>
-              </form>
+                    <p className="text-[11px] text-gray-400 italic">
+                      {stockForm.unitType === 'PACOTES' 
+                        ? `Equivale a ${(stockForm.quantity * DIAPERS_PER_PACKAGE)} fraldas individuais adicionadas ao saldo.`
+                        : `Equivale a ~${Math.floor(stockForm.quantity / DIAPERS_PER_PACKAGE)} pacotes completos de 14 un.`
+                      }
+                    </p>
+                  </div>
+
+                  {/* Observações */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Observações / Detalhes:</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ex: Doação entregue pela comunidade, nota fiscal #102..."
+                      value={stockForm.notes}
+                      onChange={e => setStockForm(prev => ({ ...prev, notes: e.target.value }))}
+                      className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-800 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsStockModalOpen(false)}
+                      className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
+                    >
+                      Salvar Entrada
+                    </button>
+                  </div>
+                </form>
+              </div>
             </motion.div>
           </div>
         )}
@@ -1642,15 +1769,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
       {/* MODAL 2: EDITAR DETALHES DE CONSUMO DO IDOSO */}
       <AnimatePresence>
         {editingUsage && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setEditingUsage(null)}>
+          <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/60 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center min-h-screen" onClick={() => setEditingUsage(null)}>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-6 border border-gray-100 dark:border-gray-800"
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md my-auto border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]"
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4">
+              <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-white dark:bg-gray-900 sticky top-0 z-20 shrink-0">
                 <div>
                   <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Configuração do Idoso</span>
                   <h3 className="text-lg font-black text-gray-900 dark:text-white">
@@ -1658,14 +1785,17 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
                   </h3>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setEditingUsage(null)}
-                  className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-gray-800 flex items-center justify-center font-bold text-sm"
+                  className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-red-100 dark:hover:bg-red-950/50 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 transition-colors flex items-center justify-center shrink-0 border border-transparent hover:border-red-200"
+                  title="Fechar Janela"
+                  aria-label="Fechar"
                 >
-                  ✕
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
                 {/* Switch Usa Fraldas */}
                 <div className="flex flex-col space-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
                   <span className="text-xs font-bold text-gray-700 dark:text-gray-200">O idoso usa fralda?</span>
@@ -1784,33 +1914,321 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
                     className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs text-gray-800 dark:text-white"
                   />
                 </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUsage(null)}
+                    className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleRegisterDailyConsumption(
+                        editingUsage.elderlyId,
+                        editingUsage.elderlyName,
+                        editingUsage.usesDiapers,
+                        editingUsage.diapersPerDay,
+                        editingUsage.date,
+                        editingUsage.notes
+                      );
+                      setEditingUsage(null);
+                    }}
+                    className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
+                  >
+                    Salvar Lançamento
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 3: GERAR RELATÓRIO INSTITUCIONAL DE CONSUMO POR PERÍODO (DIÁRIO, MENSAL, SEMESTRAL, ANUAL) */}
+      <AnimatePresence>
+        {isReportModalOpen && (
+          <div className="fixed inset-0 z-[70] overflow-y-auto bg-black/60 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center min-h-screen" onClick={() => setIsReportModalOpen(false)}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-xl my-auto border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[90vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header Fixo/Sticky no Topo */}
+              <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start bg-white dark:bg-gray-900 sticky top-0 z-20 shrink-0">
+                <div className="pr-2">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-full text-[10px] font-black uppercase tracking-wider mb-1">
+                    <ShieldCheck size={12} /> Relatório Oficial OAMI
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <FileText className="text-emerald-600 shrink-0" size={22} />
+                    Relatório de Consumo de Fraldas
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Escolha o período e o formato para baixar o relatório institucional.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(false)}
+                  className="p-2.5 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-red-100 dark:hover:bg-red-950/50 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400 transition-colors flex items-center justify-center shrink-0 border border-transparent hover:border-red-200"
+                  title="Fechar Janela"
+                  aria-label="Fechar"
+                >
+                  <X size={20} />
+                </button>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingUsage(null)}
-                  className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl text-xs font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleRegisterDailyConsumption(
-                      editingUsage.elderlyId,
-                      editingUsage.elderlyName,
-                      editingUsage.usesDiapers,
-                      editingUsage.diapersPerDay,
-                      editingUsage.date,
-                      editingUsage.notes
-                    );
-                    setEditingUsage(null);
-                  }}
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
-                >
-                  Salvar Lançamento
-                </button>
+              {/* Corpo de Conteúdo Rolável */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+                {/* Seleção do Período */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                    1. Selecione a Visão Temporal do Relatório:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReportPeriod('DIARIO')}
+                      className={cn(
+                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1",
+                        reportPeriod === 'DIARIO'
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black"
+                          : "bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 font-bold"
+                      )}
+                    >
+                      <Calendar size={18} />
+                      <span className="text-xs">Diário</span>
+                      <span className="text-[9px] opacity-80">(1 Dia)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportPeriod('MENSAL')}
+                      className={cn(
+                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1",
+                        reportPeriod === 'MENSAL'
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black"
+                          : "bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 font-bold"
+                      )}
+                    >
+                      <Box size={18} />
+                      <span className="text-xs">Mensal</span>
+                      <span className="text-[9px] opacity-80">(30 Dias)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportPeriod('SEMESTRAL')}
+                      className={cn(
+                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1",
+                        reportPeriod === 'SEMESTRAL'
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black"
+                          : "bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 font-bold"
+                      )}
+                    >
+                      <BarChart3 size={18} />
+                      <span className="text-xs">Semestral</span>
+                      <span className="text-[9px] opacity-80">(180 Dias)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReportPeriod('ANUAL')}
+                      className={cn(
+                        "p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1",
+                        reportPeriod === 'ANUAL'
+                          ? "bg-emerald-600 text-white border-emerald-600 shadow-md font-black"
+                          : "bg-gray-50 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100 font-bold"
+                      )}
+                    >
+                      <TrendingUp size={18} />
+                      <span className="text-xs">Anual</span>
+                      <span className="text-[9px] opacity-80">(365 Dias)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Parâmetros do Período Selecionado */}
+                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 space-y-3">
+                  <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+                    2. Parâmetros da Data / Referência:
+                  </span>
+
+                  {reportPeriod === 'DIARIO' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Data do Relatório:</label>
+                      <input
+                        type="date"
+                        value={reportDate}
+                        onChange={e => setReportDate(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  )}
+
+                  {reportPeriod === 'MENSAL' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Mês / Ano de Referência:</label>
+                      <input
+                        type="month"
+                        value={reportMonth}
+                        onChange={e => setReportMonth(e.target.value)}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  )}
+
+                  {reportPeriod === 'SEMESTRAL' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Ano:</label>
+                        <select
+                          value={reportYear}
+                          onChange={e => setReportYear(parseInt(e.target.value, 10))}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
+                        >
+                          <option value={2026}>2026</option>
+                          <option value={2025}>2025</option>
+                          <option value={2024}>2024</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Semestre:</label>
+                        <select
+                          value={reportSemester}
+                          onChange={e => setReportSemester(e.target.value as '1' | '2')}
+                          className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
+                        >
+                          <option value="1">1º Semestre (Jan - Jun)</option>
+                          <option value="2">2º Semestre (Jul - Dez)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {reportPeriod === 'ANUAL' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-700 dark:text-gray-300">Ano de Referência:</label>
+                      <select
+                        value={reportYear}
+                        onChange={e => setReportYear(parseInt(e.target.value, 10))}
+                        className="w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        <option value={2026}>2026</option>
+                        <option value={2025}>2025</option>
+                        <option value={2024}>2024</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Filtro de Público */}
+                  <div className="pt-1">
+                    <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                      Filtro de Idosos no Relatório:
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setReportUserFilter('USERS_ONLY')}
+                        className={cn(
+                          "py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all text-center",
+                          reportUserFilter === 'USERS_ONLY'
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                        )}
+                      >
+                        Apenas usam fraldas ({totals.usersCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportUserFilter('ALL_ACTIVE')}
+                        className={cn(
+                          "py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all text-center",
+                          reportUserFilter === 'ALL_ACTIVE'
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                        )}
+                      >
+                        Ativos ({totals.totalActive})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReportUserFilter('ALL')}
+                        className={cn(
+                          "py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all text-center",
+                          reportUserFilter === 'ALL'
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                        )}
+                      >
+                        Todos ({elderlyConsumptionData.length})
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card de Prévia dos Totais */}
+                <div className="p-3.5 bg-slate-900 text-white rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Demanda do Período Escolhido</span>
+                    <span className="text-lg font-black text-emerald-400">
+                      {(totals.dailyDiapers * (reportPeriod === 'DIARIO' ? 1 : reportPeriod === 'MENSAL' ? 30 : reportPeriod === 'SEMESTRAL' ? 180 : 365)).toLocaleString('pt-BR')} fraldas
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Pacotes de 14 un</span>
+                    <span className="text-sm font-black text-teal-300">
+                      {Math.ceil((totals.dailyDiapers * (reportPeriod === 'DIARIO' ? 1 : reportPeriod === 'MENSAL' ? 30 : reportPeriod === 'SEMESTRAL' ? 180 : 365)) / DIAPERS_PER_PACKAGE).toLocaleString('pt-BR')} pacotes
+                    </span>
+                  </div>
+                </div>
+
+                {/* Botões de Download por Formato */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                    3. Baixar em Formato Oficial:
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateReport('pdf')}
+                      className="py-3 px-2 sm:px-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-xs font-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={16} /> PDF Oficial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateReport('word')}
+                      className="py-3 px-2 sm:px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <FileDown size={16} /> Word (.docx)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateReport('excel')}
+                      className="py-3 px-2 sm:px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      <TableIcon size={16} /> Excel (.xlsx)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Botão para Fechar no Rodapé */}
+                <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsReportModalOpen(false)}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-2xl text-xs transition-colors flex items-center justify-center gap-2"
+                  >
+                    <X size={16} /> Fechar
+                  </button>
+                </div>
+
               </div>
             </motion.div>
           </div>

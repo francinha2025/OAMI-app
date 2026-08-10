@@ -67,6 +67,11 @@ export function getElderlyAgeByName(name: string): number | null {
 export function appendAgeToName(name: any): string {
   if (!name || typeof name !== 'string') return String(name || '');
   
+  const upper = name.trim().toUpperCase();
+  if (upper.includes('TOTAL') || upper.includes('CONSOLIDADO') || upper.includes('DEMANDA') || upper.includes('PACIENTE') || upper.includes('IDOSO')) {
+    return name;
+  }
+
   // Clean first in case there is already (X anos) in the string to avoid duplicating it
   if (/\(\d+\s*anos\)/i.test(name)) {
     return name;

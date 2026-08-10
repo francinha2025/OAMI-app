@@ -8310,7 +8310,7 @@ const ReportsSection = ({
               <button 
                 onClick={() => window.print()}
                 className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
-                title="Imprimir (Papel Timbrado)"
+                title="Imprimir Relatório"
               >
                 <Printer size={18} /> Imprimir
               </button>

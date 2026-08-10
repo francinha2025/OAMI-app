@@ -48,73 +48,58 @@ export const generateModernPDF = async ({
         referrerPolicy: "no-referrer",
         cache: "force-cache"
       });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      logoData = await response.arrayBuffer();
+      if (response.ok) {
+        logoData = await response.arrayBuffer();
+      }
     } catch (e) {
       console.error("Error pre-loading logo", e);
     }
   }
 
-  // Header Function
-  const addHeader = (doc: jsPDF, pageNum: number) => {
+  // Header Letterhead Function (Drawn on every page top)
+  const drawLetterhead = (doc: jsPDF) => {
     // Top Green Bar
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.rect(0, 0, pageWidth, 15, 'F');
+    doc.rect(0, 0, pageWidth, 12, 'F');
 
-    // Institution Logo/Letterhead placeholder
+    // Institution Logo
     const hasLogo = !!logoData;
     if (logoData) {
       try {
-        // Larger logo for "Official" look
-        doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 18, 30, 30);
+        doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 15, 22, 22);
       } catch (e) {
         console.error("Error adding logo to PDF", e);
       }
     }
 
+    const startX = hasLogo ? 40 : 14;
+
     // Institution Name
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text(institutionName, hasLogo ? 50 : 14, 24);
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text(institutionName, startX, 20);
     
     // CNPJ & Endereço
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(110, 110, 110);
-    doc.text(`CNPJ: 10.706.425/0001-74`, hasLogo ? 50 : 14, 29);
-    doc.text(`Endereço: MA-014, Alto São Francisco, Vitória do Mearim - Maranhão`, hasLogo ? 50 : 14, 33);
-    
-    // Unidade text
-    doc.setFontSize(8);
-    doc.text('Relatório Oficial de Atendimento', hasLogo ? 50 : 14, 38);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão`, startX, 25);
+    doc.text(`SGPF OAMI • Relatório Oficial de Gestão e Atendimento`, startX, 29);
 
-    // Report Title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(title, hasLogo ? 50 : 14, 45);
-
-    if (subtitle) {
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(120, 120, 120);
-      doc.text(subtitle, hasLogo ? 50 : 14, 50);
-    }
-
-    // Horizontal Line
-    doc.setDrawColor(200, 200, 200);
+    // Horizontal Line Separator
+    doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
-    doc.line(14, 54, pageWidth - 14, 54);
+    doc.line(14, 35, pageWidth - 14, 35);
   };
 
   // Footer Function
-  const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
-    doc.setFontSize(8);
+  const drawFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(150, 150, 150);
+    doc.setTextColor(148, 163, 184);
     
-    const footerText = `Documento gerado pelo Sistema OAMI em ${new Date().toLocaleString('pt-BR')}`;
+    const footerText = `Documento gerado pelo Sistema OAMI em ${new Date().toLocaleString('pt-BR')} • Autenticidade Institucional`;
     doc.text(footerText, 14, pageHeight - 10);
     
     const pageText = `Página ${pageNum} de ${totalPages}`;
@@ -126,51 +111,111 @@ export const generateModernPDF = async ({
     doc.rect(14, pageHeight - 5, pageWidth - 28, 0.5, 'F');
   };
 
+  // Render Title and Subtitle ON PAGE 1 ONLY before table
+  let startY = 42;
+
+  // Draw Document Title
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.text(title, 14, startY);
+  startY += 5;
+
+  // Draw Subtitle Box if provided
+  if (subtitle) {
+    const rawSubtitleLines = subtitle.split('\n').filter(l => l.trim().length > 0);
+    let wrappedLines: string[] = [];
+    
+    rawSubtitleLines.forEach(line => {
+      const split = doc.splitTextToSize(line.trim(), pageWidth - 36);
+      wrappedLines = wrappedLines.concat(split);
+    });
+
+    const lineHeight = 4.2;
+    const boxPadding = 4;
+    const boxHeight = (wrappedLines.length * lineHeight) + (boxPadding * 2);
+
+    // Draw Rounded Summary Box
+    doc.setFillColor(240, 253, 244); // Light Emerald Background
+    doc.setDrawColor(187, 247, 208); // Emerald Border
+    doc.roundedRect(14, startY, pageWidth - 28, boxHeight, 3, 3, 'FD');
+
+    // Print text lines inside box
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+
+    let textY = startY + boxPadding + 3.5;
+    wrappedLines.forEach(wLine => {
+      if (wLine.includes('•') || wLine.startsWith('INSTITUIÇÃO') || wLine.startsWith('ENDEREÇO') || wLine.startsWith('RELATÓRIO')) {
+        doc.setFont('helvetica', 'bold');
+      } else {
+        doc.setFont('helvetica', 'normal');
+      }
+      doc.text(wLine, 18, textY);
+      textY += lineHeight;
+    });
+
+    startY += boxHeight + 6;
+  } else {
+    startY += 3;
+  }
+
   // Generate Table
   autoTable(doc, {
-    startY: 60,
+    startY,
     head: [columns],
     body: data,
     theme: 'striped',
     headStyles: {
       fillColor: primaryGreen,
       textColor: [255, 255, 255],
-      fontSize: 10,
+      fontSize: 9.5,
       fontStyle: 'bold',
       halign: 'center'
     },
     bodyStyles: {
-      fontSize: 9,
-      textColor: [60, 60, 60]
+      fontSize: 8.5,
+      textColor: [51, 65, 85]
     },
     alternateRowStyles: {
       fillColor: lightGray
     },
-    margin: { top: 55, bottom: 25 },
+    margin: { top: 38, bottom: 22, left: 14, right: 14 },
     didParseCell: (hookData: any) => {
       if (hookData.section === 'body') {
+        const firstCellStr = String(hookData.row.cells[0]?.raw || '').trim().toUpperCase();
+        const isTotalRow = firstCellStr.includes('TOTAL') || firstCellStr.includes('CONSOLIDADO') || firstCellStr.includes('SOMA');
+
+        // Highlight Consolidated Total Row prominently
+        if (isTotalRow) {
+          hookData.cell.styles.fontStyle = 'bold';
+          hookData.cell.styles.fillColor = [16, 185, 129]; // Prominent Emerald Green
+          hookData.cell.styles.textColor = [255, 255, 255]; // Pure White text
+          hookData.cell.styles.fontSize = 9.5;
+          if (hookData.column.index === 0) {
+            hookData.cell.styles.halign = 'left';
+          } else {
+            hookData.cell.styles.halign = 'center';
+          }
+          return;
+        }
+
         const headerText = String(hookData.column.raw || hookData.column.title || '').trim().toLowerCase();
         const rawVal = String(hookData.cell.raw || '').trim();
         
-        // Let's check both column name and registry to accurately find the patient name
-        const matchAge = appendAgeToName(rawVal);
-        const hasAgeAdded = matchAge !== rawVal; // If age can be resolved, it's definitely a patient
-        
         const isPatientCol = 
           ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(headerText) ||
-          headerText.includes('idoso') ||
-          headerText.includes('paciente') ||
-          headerText.includes('acolhido') ||
-          headerText.includes('residente') ||
-          hasAgeAdded;
+          (headerText.includes('idoso') && !headerText.includes('uso') && !headerText.includes('status')) ||
+          (headerText.includes('paciente') && !headerText.includes('uso'));
         
         if (isPatientCol) {
           hookData.cell.styles.fontStyle = 'bold';
-          hookData.cell.styles.textColor = [6, 78, 59]; // Dark emerald text for extremely clean read
-          hookData.cell.styles.fillColor = [209, 250, 229]; // Light elegant background
-          hookData.cell.styles.fontSize = 9.5; // Slightly larger to highlight
+          hookData.cell.styles.textColor = [6, 78, 59]; // Dark emerald text
+          hookData.cell.styles.fillColor = [209, 250, 229]; // Light emerald background
+          hookData.cell.styles.fontSize = 9;
           
-          if (rawVal && rawVal !== 'N/A' && rawVal !== 'Não informado' && rawVal !== '-') {
+          if (rawVal && rawVal !== 'N/A' && rawVal !== 'Não informado' && rawVal !== '-' && !rawVal.toUpperCase().includes('TOTAL')) {
             hookData.cell.text = [appendAgeToName(rawVal)];
           }
         }
@@ -179,13 +224,13 @@ export const generateModernPDF = async ({
   });
 
   // Space for signature of the professional
-  const finalY = (doc as any).lastAutoTable?.finalY || 60;
-  let signatureY = finalY + 15;
-  const signatureSpaceNeeded = 30;
+  const finalY = (doc as any).lastAutoTable?.finalY || startY;
+  let signatureY = finalY + 12;
+  const signatureSpaceNeeded = 25;
 
-  if (signatureY + signatureSpaceNeeded > pageHeight - 20) {
+  if (signatureY + signatureSpaceNeeded > pageHeight - 18) {
     doc.addPage();
-    signatureY = 60; // start nicely below header limits
+    signatureY = 48;
   }
 
   // Draw Signature Line
@@ -193,19 +238,19 @@ export const generateModernPDF = async ({
   doc.setLineWidth(0.5);
   const startX = (pageWidth / 2) - 45;
   const endX = (pageWidth / 2) + 45;
-  doc.line(startX, signatureY + 12, endX, signatureY + 12);
+  doc.line(startX, signatureY + 10, endX, signatureY + 10);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(60, 60, 60);
-  doc.text('Assinatura do Profissional', pageWidth / 2, signatureY + 17, { align: 'center' });
+  doc.text('Assinatura do Profissional Responsável', pageWidth / 2, signatureY + 15, { align: 'center' });
 
-  // Add Headers and Footers to all pages (including any extra page added for signature)
+  // Add Headers and Footers to all pages
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    addHeader(doc, i);
-    addFooter(doc, i, totalPages);
+    drawLetterhead(doc);
+    drawFooter(doc, i, totalPages);
   }
 
   doc.save(`${fileName}.pdf`);
@@ -265,65 +310,50 @@ export const generateMultiSectionPDF = async ({
     }
   }
 
-  // Header Function
-  const addHeader = (doc: jsPDF, pageNum: number) => {
+  // Header Letterhead Function
+  const drawLetterhead = (doc: jsPDF) => {
     // Top Green Bar
     doc.setFillColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.rect(0, 0, pageWidth, 15, 'F');
+    doc.rect(0, 0, pageWidth, 12, 'F');
 
-    // Institution Logo/Letterhead placeholder
+    // Institution Logo
     const hasLogo = !!logoData;
     if (logoData) {
       try {
-        doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 18, 30, 30);
+        doc.addImage(new Uint8Array(logoData as ArrayBuffer), 'PNG', 14, 15, 22, 22);
       } catch (e) {
         console.error("Error adding logo to PDF", e);
       }
     }
 
+    const startX = hasLogo ? 40 : 14;
+
     // Institution Name
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 40);
-    doc.text(institutionName, hasLogo ? 50 : 14, 24);
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text(institutionName, startX, 20);
     
     // CNPJ & Endereço
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(110, 110, 110);
-    doc.text(`CNPJ: 10.706.425/0001-74`, hasLogo ? 50 : 14, 29);
-    doc.text(`Endereço: MA-014, Alto São Francisco, Vitória do Mearim - Maranhão`, hasLogo ? 50 : 14, 33);
-    
-    // Unidade text
-    doc.setFontSize(8);
-    doc.text('Relatório Oficial de Atendimento Integrado', hasLogo ? 50 : 14, 38);
-
-    // Report Title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(title, hasLogo ? 50 : 14, 45);
-
-    if (subtitle) {
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(120, 120, 120);
-      doc.text(subtitle, hasLogo ? 50 : 14, 50);
-    }
+    doc.setTextColor(100, 116, 139);
+    doc.text(`CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão`, startX, 25);
+    doc.text(`SGPF OAMI • Relatório Oficial Multissetorial`, startX, 29);
 
     // Horizontal Line
-    doc.setDrawColor(200, 200, 200);
+    doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
-    doc.line(14, 54, pageWidth - 14, 54);
+    doc.line(14, 35, pageWidth - 14, 35);
   };
 
   // Footer Function
-  const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
-    doc.setFontSize(8);
+  const drawFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
+    doc.setFontSize(7.5);
     doc.setFont('helvetica', 'italic');
-    doc.setTextColor(150, 150, 150);
+    doc.setTextColor(148, 163, 184);
     
-    const footerText = `Documento gerado pelo Sistema OAMI em ${new Date().toLocaleString('pt-BR')}`;
+    const footerText = `Documento gerado pelo Sistema OAMI em ${new Date().toLocaleString('pt-BR')} • Autenticidade Institucional`;
     doc.text(footerText, 14, pageHeight - 10);
     
     const pageText = `Página ${pageNum} de ${totalPages}`;
@@ -335,32 +365,72 @@ export const generateMultiSectionPDF = async ({
     doc.rect(14, pageHeight - 5, pageWidth - 28, 0.5, 'F');
   };
 
-  let currentY = 58;
+  let currentY = 42;
 
-  // Let's print out sections sequence
+  // Render Title and Subtitle Box on Page 1 Only
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
+  doc.text(title, 14, currentY);
+  currentY += 5;
+
+  if (subtitle) {
+    const rawSubtitleLines = subtitle.split('\n').filter(l => l.trim().length > 0);
+    let wrappedLines: string[] = [];
+    
+    rawSubtitleLines.forEach(line => {
+      const split = doc.splitTextToSize(line.trim(), pageWidth - 36);
+      wrappedLines = wrappedLines.concat(split);
+    });
+
+    const lineHeight = 4.2;
+    const boxPadding = 4;
+    const boxHeight = (wrappedLines.length * lineHeight) + (boxPadding * 2);
+
+    doc.setFillColor(240, 253, 244);
+    doc.setDrawColor(187, 247, 208);
+    doc.roundedRect(14, currentY, pageWidth - 28, boxHeight, 3, 3, 'FD');
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+
+    let textY = currentY + boxPadding + 3.5;
+    wrappedLines.forEach(wLine => {
+      if (wLine.includes('•') || wLine.startsWith('INSTITUIÇÃO') || wLine.startsWith('ENDEREÇO') || wLine.startsWith('RELATÓRIO')) {
+        doc.setFont('helvetica', 'bold');
+      } else {
+        doc.setFont('helvetica', 'normal');
+      }
+      doc.text(wLine, 18, textY);
+      textY += lineHeight;
+    });
+
+    currentY += boxHeight + 8;
+  } else {
+    currentY += 3;
+  }
+
+  // Print out sections sequence
   for (const section of sections) {
-    if (section.data.length === 0) continue; // skip empty tables
+    if (section.data.length === 0) continue;
 
-    // Calculate space needed for section header (approx 15mm)
-    if (currentY + 25 > pageHeight - 25) {
+    if (currentY + 25 > pageHeight - 20) {
       doc.addPage();
-      currentY = 58;
+      currentY = 42;
     }
 
-    // Draw section header title
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(section.title.toUpperCase(), 14, currentY + 5);
+    doc.text(section.title.toUpperCase(), 14, currentY + 4);
 
-    // Draw secondary underline under title
     doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
     doc.setLineWidth(0.3);
-    doc.line(14, currentY + 7, pageWidth - 14, currentY + 7);
+    doc.line(14, currentY + 6, pageWidth - 14, currentY + 6);
 
-    currentY += 10;
+    currentY += 9;
 
-    // Output autoTable for this section
     autoTable(doc, {
       startY: currentY,
       head: [section.columns],
@@ -375,27 +445,32 @@ export const generateMultiSectionPDF = async ({
       },
       bodyStyles: {
         fontSize: 8,
-        textColor: [60, 60, 60]
+        textColor: [51, 65, 85]
       },
       alternateRowStyles: {
         fillColor: lightGray
       },
-      margin: { top: 55, bottom: 25 },
+      margin: { top: 38, bottom: 22, left: 14, right: 14 },
       didParseCell: (hookData: any) => {
         if (hookData.section === 'body') {
+          const firstCellStr = String(hookData.row.cells[0]?.raw || '').trim().toUpperCase();
+          const isTotalRow = firstCellStr.includes('TOTAL') || firstCellStr.includes('CONSOLIDADO') || firstCellStr.includes('SOMA');
+
+          if (isTotalRow) {
+            hookData.cell.styles.fontStyle = 'bold';
+            hookData.cell.styles.fillColor = [16, 185, 129];
+            hookData.cell.styles.textColor = [255, 255, 255];
+            hookData.cell.styles.fontSize = 9;
+            return;
+          }
+
           const headerText = String(hookData.column.raw || hookData.column.title || '').trim().toLowerCase();
           const rawVal = String(hookData.cell.raw || '').trim();
           
-          const matchAge = appendAgeToName(rawVal);
-          const hasAgeAdded = matchAge !== rawVal;
-          
           const isPatientCol = 
             ['paciente', 'idoso', 'idoso/fluxo', 'nome do idoso', 'residente', 'nome', 'acolhido', 'paciente/idoso'].includes(headerText) ||
-            headerText.includes('idoso') ||
-            headerText.includes('paciente') ||
-            headerText.includes('acolhido') ||
-            headerText.includes('residente') ||
-            hasAgeAdded;
+            (headerText.includes('idoso') && !headerText.includes('uso') && !headerText.includes('status')) ||
+            (headerText.includes('paciente') && !headerText.includes('uso'));
           
           if (isPatientCol) {
             hookData.cell.styles.fontStyle = 'bold';
@@ -403,7 +478,7 @@ export const generateMultiSectionPDF = async ({
             hookData.cell.styles.fillColor = [209, 250, 229];
             hookData.cell.styles.fontSize = 8.5;
             
-            if (rawVal && rawVal !== 'N/A' && rawVal !== 'Não informado' && rawVal !== '-') {
+            if (rawVal && rawVal !== 'N/A' && rawVal !== 'Não informado' && rawVal !== '-' && !rawVal.toUpperCase().includes('TOTAL')) {
               hookData.cell.text = [appendAgeToName(rawVal)];
             }
           }
@@ -421,23 +496,31 @@ export const generateMultiSectionPDF = async ({
 
   // Signature section
   let signatureY = currentY + 10;
-  const signatureSpaceNeeded = 30;
+  const signatureSpaceNeeded = 25;
 
-  if (signatureY + signatureSpaceNeeded > pageHeight - 20) {
+  if (signatureY + signatureSpaceNeeded > pageHeight - 18) {
     doc.addPage();
-    signatureY = 60;
+    signatureY = 48;
   }
 
   doc.setDrawColor(180, 180, 180);
   doc.setLineWidth(0.5);
   const startX = (pageWidth / 2) - 45;
   const endX = (pageWidth / 2) + 45;
-  doc.line(startX, signatureY + 12, endX, signatureY + 12);
+  doc.line(startX, signatureY + 10, endX, signatureY + 10);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(60, 60, 60);
-  doc.text('Assinatura do Profissional', pageWidth / 2, signatureY + 17, { align: 'center' });
+  doc.text('Assinatura do Profissional Responsável', pageWidth / 2, signatureY + 15, { align: 'center' });
+
+  // Add Headers and Footers to all pages
+  const totalPages = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    drawLetterhead(doc);
+    drawFooter(doc, i, totalPages);
+  }
 
   doc.save(`${fileName}.pdf`);
 };

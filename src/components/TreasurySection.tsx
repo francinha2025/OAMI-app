@@ -972,7 +972,7 @@ console.log("✅ Transação salva:", transactionRef.id);
                 <h3 className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
                   {stats.totalRecibos}
                 </h3>
-                <p className="text-[10px] text-gray-400 mt-1">Documentos com timbrado oficial</p>
+                <p className="text-[10px] text-gray-400 mt-1">Documentos oficiais OAMI</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center">
                 <Receipt size={24} />
