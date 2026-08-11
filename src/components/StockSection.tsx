@@ -2466,20 +2466,25 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
       {/* MODAL: REGISTER / EDIT PRODUCT */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 dark:border-gray-800 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             
-            <div className="p-6 bg-gradient-to-r from-emerald-700 to-teal-700 text-white flex justify-between items-center">
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-emerald-700 to-teal-700 text-white flex justify-between items-center shrink-0 sticky top-0 z-10 shadow-sm">
               <div>
                 <h3 className="text-lg font-black">{editingProduct ? 'Editar Produto' : 'Cadastrar Novo Produto'}</h3>
                 <p className="text-xs text-emerald-100 mt-0.5">Preencha as informações do item para o catálogo de estoque</p>
               </div>
-              <button onClick={() => setIsProductModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button 
+                type="button" 
+                onClick={() => setIsProductModalOpen(false)} 
+                className="p-2 hover:bg-white/20 bg-white/10 rounded-full transition-colors cursor-pointer shrink-0 ml-2" 
+                title="Fechar"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
+            <form onSubmit={handleSaveProduct} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
@@ -2625,10 +2630,10 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
       {/* MODAL: REGISTER MOVEMENT (ENTRADA / SAÍDA) */}
       {isMovementModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 dark:border-gray-800 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             
-            <div className={`p-6 text-white flex justify-between items-center ${
+            <div className={`p-5 sm:p-6 text-white flex justify-between items-center shrink-0 sticky top-0 z-10 shadow-sm ${
               movementType === 'ENTRADA' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-rose-600 to-red-600'
             }`}>
               <div>
@@ -2640,12 +2645,17 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                   Atualização automática do saldo e histórico do almoxarifado
                 </p>
               </div>
-              <button onClick={() => setIsMovementModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button 
+                type="button" 
+                onClick={() => setIsMovementModalOpen(false)} 
+                className="p-2 hover:bg-white/20 bg-white/10 rounded-full transition-colors cursor-pointer shrink-0 ml-2" 
+                title="Fechar"
+              >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMovement} className="p-6 space-y-4">
+            <form onSubmit={handleSaveMovement} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               
               {/* Select Product */}
               <div>
@@ -2811,59 +2821,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                         </div>
                       </div>
 
-                      {/* Question 2: Descontar da Tesouraria? */}
-                      <div className="pt-2">
-                        <label className="block text-xs font-black text-gray-800 dark:text-white uppercase mb-2">
-                          Esta compra deve ser descontada do saldo da entidade? *
-                        </label>
-                        <div className="space-y-2">
-                          <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                            movementForm.deductFromTreasury
-                              ? 'bg-emerald-100/70 dark:bg-emerald-900/40 border-emerald-500 ring-2 ring-emerald-500/20'
-                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                          }`}>
-                            <input
-                              type="radio"
-                              name="deductFromTreasury"
-                              checked={movementForm.deductFromTreasury === true}
-                              onChange={() => setMovementForm({ ...movementForm, deductFromTreasury: true })}
-                              className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <div>
-                              <span className="font-extrabold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                                <CreditCard size={14} className="text-emerald-600" />
-                                Sim, descontar da Tesouraria
-                              </span>
-                              <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
-                                Cria automaticamente uma despesa na Tesouraria vinculada a este produto, reduzindo o saldo financeiro da entidade.
-                              </p>
-                            </div>
-                          </label>
 
-                          <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                            !movementForm.deductFromTreasury
-                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 ring-2 ring-amber-500/20'
-                              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                          }`}>
-                            <input
-                              type="radio"
-                              name="deductFromTreasury"
-                              checked={movementForm.deductFromTreasury === false}
-                              onChange={() => setMovementForm({ ...movementForm, deductFromTreasury: false })}
-                              className="mt-0.5 text-amber-600 focus:ring-amber-500"
-                            />
-                            <div>
-                              <span className="font-extrabold text-xs text-gray-900 dark:text-white flex items-center gap-1.5">
-                                <Ban size={14} className="text-amber-600" />
-                                Não, não descontar da Tesouraria
-                              </span>
-                              <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-0.5">
-                                Registra a entrada no Estoque sem alterar o saldo da Tesouraria (útil para compras por parceiros ou recursos diretos).
-                              </p>
-                            </div>
-                          </label>
-                        </div>
-                      </div>
 
                     </div>
                   )}
@@ -3009,9 +2967,9 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
       {/* MODAL: MOVEMENT DETAILS & FINANCIAL LINKAGE */}
       {selectedMovementForDetails && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-gradient-to-r from-slate-800 to-gray-900 text-white flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-gray-800 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-slate-800 to-gray-900 text-white flex justify-between items-center shrink-0 sticky top-0 z-10 shadow-sm">
               <div>
                 <h3 className="text-base font-black flex items-center gap-2">
                   <FileText size={18} className="text-emerald-400" />
@@ -3019,12 +2977,17 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                 </h3>
                 <p className="text-xs text-gray-300 mt-0.5">Código: {selectedMovementForDetails.id}</p>
               </div>
-              <button onClick={() => setSelectedMovementForDetails(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <button 
+                type="button" 
+                onClick={() => setSelectedMovementForDetails(null)} 
+                className="p-2 hover:bg-white/20 bg-white/10 rounded-full transition-colors cursor-pointer shrink-0 ml-2" 
+                title="Fechar"
+              >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs">
+            <div className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 custom-scrollbar">
               <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl space-y-1">
                 <p className="font-extrabold text-sm text-gray-900 dark:text-white">{selectedMovementForDetails.productName}</p>
                 <p className="text-gray-500">Código do Produto: {selectedMovementForDetails.productCode}</p>
@@ -3135,11 +3098,11 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
       {/* MODAL: EDIT MOVEMENT (ENTRADA / SAÍDA) */}
       {isEditMovementModalOpen && editingMovement && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 dark:border-gray-800 my-8 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 dark:border-gray-800 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
             
             {/* Header */}
-            <div className={`p-6 text-white flex justify-between items-center ${
+            <div className={`p-5 sm:p-6 text-white flex justify-between items-center shrink-0 sticky top-0 z-10 shadow-sm ${
               editingMovement.type === 'ENTRADA' ? 'bg-gradient-to-r from-blue-700 to-indigo-800' : 'bg-gradient-to-r from-rose-700 to-red-800'
             }`}>
               <div>
@@ -3152,18 +3115,20 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                 </p>
               </div>
               <button 
+                type="button"
                 onClick={() => {
                   setIsEditMovementModalOpen(false);
                   setEditingMovement(null);
                 }} 
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                className="p-2 hover:bg-white/20 bg-white/10 rounded-full transition-colors cursor-pointer shrink-0 ml-2"
+                title="Fechar"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSaveEditedMovement} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveEditedMovement} className="p-5 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 custom-scrollbar">
               
               {/* Product Info Banner */}
               <div className="p-3 bg-slate-50 dark:bg-gray-800/60 rounded-2xl border border-slate-200 dark:border-gray-700 flex items-center justify-between">

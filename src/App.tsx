@@ -1479,7 +1479,6 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'volunteers', label: 'Voluntários/Estagiários', icon: BookOpen, roles: ['ANY'] },
         { id: 'family', label: 'Acompanhamento Familiar', icon: Users, roles: ['ANY'] },
-        { id: 'donors', label: 'Doadores e Sócios', icon: Heart, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'TESOUREIRA', 'ADMIN'] },
       ]
     },
     {
@@ -6285,8 +6284,8 @@ const DiaperDonationSection = ({ donations, stock, user, communityElderly, elder
                     onChange={(e) => setFormData({ ...formData, beneficiaryName: e.target.value })}
                   />
                   <datalist id="beneficiary-options">
-                    {communityElderly.map(e => <option key={e.id} value={e.name} />)}
-                    {elderly.map(e => <option key={e.id} value={e.name} />)}
+                    {communityElderly.map((e, idx) => <option key={`comm-${e.id || idx}`} value={e.name} />)}
+                    {elderly.map((e, idx) => <option key={`eld-${e.id || idx}`} value={e.name} />)}
                   </datalist>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -8996,8 +8995,8 @@ const WorkshopsSection = ({
                         {elderly.every(e => workshopFormData.participants.includes(e.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
                       </button>
                     </div>
-                    {elderly.map(e => (
-                      <label key={e.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                    {elderly.map((e, idx) => (
+                      <label key={`eld-${e.id || idx}`} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
                         <input 
                           type="checkbox"
                           className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
@@ -9023,8 +9022,8 @@ const WorkshopsSection = ({
                         {communityElderly.every(e => workshopFormData.participants.includes(e.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
                       </button>
                     </div>
-                    {communityElderly.map(e => (
-                      <label key={e.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                    {communityElderly.map((e, idx) => (
+                      <label key={`comm-${e.id || idx}`} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
                         <input 
                           type="checkbox"
                           className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
@@ -9050,8 +9049,8 @@ const WorkshopsSection = ({
                         {caregivers.every(c => workshopFormData.participants.includes(c.id)) ? 'Desmarcar Todos' : 'Selecionar Todos'}
                       </button>
                     </div>
-                    {caregivers.map(c => (
-                      <label key={c.id} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
+                    {caregivers.map((c, idx) => (
+                      <label key={`cg-${c.id || idx}`} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group">
                         <input 
                           type="checkbox"
                           className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
@@ -10303,7 +10302,7 @@ const ProfileModal = ({
   setSelectedActivityForView: (activity: any) => void,
   users?: any[]
 }) => {
-  const filterAndMap = (list: any[], defaultTypeLabel: string, sector: string) => {
+  const filterAndMap = (list: any[], defaultTypeLabel: string, sector: string, prefix: string = 'act') => {
     return (list || []).filter(item => {
       const isCreator = item.professionalId === user.id || 
                         item.registeredBy === user.email || 
@@ -10338,6 +10337,7 @@ const ProfileModal = ({
       } catch (err) {}
       return {
         id: item.id,
+        renderKey: `${prefix}-${item.id}`,
         type: `${sector}: ${item.type || defaultTypeLabel}`,
         title: item.title || item.evolution || item.content || item.procedures || 'Evolução/Atendimento',
         date: formattedDate || new Date().toISOString().split('T')[0],
@@ -10350,15 +10350,15 @@ const ProfileModal = ({
     });
   };
 
-  const myWorkshops = filterAndMap(workshops, 'Oficina/Capacitação', 'Oficinas');
-  const myPsychAct = filterAndMap(psychActivities, 'Atividade Prática', 'Psicologia');
-  const myPedagogyAct = filterAndMap(pedagogyActivities, 'Atividade Pedagógica', 'Pedagogia');
-  const myPhysioEvo = filterAndMap(physioEvolutions || [], 'Evolução de Fisioterapia', 'Fisioterapia');
-  const myNursingEvo = filterAndMap(nursingEvolutions || [], 'Evolução de Enfermagem', 'Enfermagem');
-  const myPsychEvo = filterAndMap(psychEvolutions || [], 'Evolução de Psicologia', 'Psicologia');
-  const myPedagogyEvo = filterAndMap(pedagogyEvolutions || [], 'Evolução Pedagógica', 'Pedagogia');
-  const mySocialEvo = filterAndMap(socialEvolutions || [], 'Evolução de Serviço Social', 'Serviço Social');
-  const myNutritionEvo = filterAndMap(nutritionEvolutions || [], 'Evolução Nutricional', 'Nutrição');
+  const myWorkshops = filterAndMap(workshops, 'Oficina/Capacitação', 'Oficinas', 'workshop');
+  const myPsychAct = filterAndMap(psychActivities, 'Atividade Prática', 'Psicologia', 'psychActivity');
+  const myPedagogyAct = filterAndMap(pedagogyActivities, 'Atividade Pedagógica', 'Pedagogia', 'pedagogyActivity');
+  const myPhysioEvo = filterAndMap(physioEvolutions || [], 'Evolução de Fisioterapia', 'Fisioterapia', 'physio');
+  const myNursingEvo = filterAndMap(nursingEvolutions || [], 'Evolução de Enfermagem', 'Enfermagem', 'nursing');
+  const myPsychEvo = filterAndMap(psychEvolutions || [], 'Evolução de Psicologia', 'Psicologia', 'psych');
+  const myPedagogyEvo = filterAndMap(pedagogyEvolutions || [], 'Evolução Pedagógica', 'Pedagogia', 'pedagogy');
+  const mySocialEvo = filterAndMap(socialEvolutions || [], 'Evolução de Serviço Social', 'Serviço Social', 'social');
+  const myNutritionEvo = filterAndMap(nutritionEvolutions || [], 'Evolução Nutricional', 'Nutrição', 'nutrition');
 
   const allMyActivities = [
     ...myWorkshops, 
@@ -10622,7 +10622,7 @@ const ProfileModal = ({
               ) : (
                 allMyActivities.map((act) => (
                   <div 
-                    key={act.id} 
+                    key={act.renderKey || act.id} 
                     onClick={() => setSelectedActivityForView(act)}
                     className="p-3 bg-gray-50 dark:bg-gray-850 hover:bg-green-50/40 dark:hover:bg-green-950/20 active:scale-[0.99] rounded-2xl border border-gray-100 dark:border-gray-750 flex items-start gap-3 cursor-pointer transition-all"
                   >
@@ -10666,10 +10666,10 @@ const ProfileModal = ({
                       {act.coWorkers && act.coWorkers.length > 0 && (
                         <div className="mt-1.5 pt-1.5 border-t border-gray-100/50 dark:border-gray-800/50 flex flex-wrap gap-1 items-center">
                           <span className="text-[8px] font-black text-gray-400 uppercase mr-1">Ação Conjunta:</span>
-                          {act.coWorkers.map((cwId: string) => {
+                          {act.coWorkers.map((cwId: string, idx: number) => {
                             const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
                             return (
-                              <span key={cwId} className="px-1.5 py-0.5 bg-green-50/80 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-[8px] font-bold rounded">
+                              <span key={`cw-${cwId}-${idx}`} className="px-1.5 py-0.5 bg-green-50/80 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-[8px] font-bold rounded">
                                 {prof?.name || cwId}
                               </span>
                             );

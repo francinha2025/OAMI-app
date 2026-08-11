@@ -1,32 +1,31 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Landmark, 
   TrendingUp, 
-  TrendingDown, 
-  Wallet, 
-  Receipt, 
   PlusCircle, 
-  MinusCircle, 
   Search, 
-  Filter, 
   Download, 
-  Eye, 
-  XCircle, 
   Trash2,
-  CheckCircle2, 
-  AlertCircle, 
-  Calendar, 
+  Pencil,
   FileText, 
-  User as UserIcon, 
-  CreditCard, 
-  Tag, 
-  Paperclip, 
-  X,
+  Printer,
+  Heart,
+  UserCheck,
+  Sparkles,
   PieChart as PieChartIcon,
   BarChart3,
-  RefreshCw,
-  Printer,
-  Heart
+  CheckCheck,
+  Package,
+  ShoppingBag,
+  Home,
+  Tv,
+  Box,
+  Tag,
+  Gift,
+  Layers,
+  Filter,
+  Info,
+  X
 } from 'lucide-react';
 import { 
   collection, 
@@ -35,13 +34,14 @@ import {
   doc, 
   updateDoc, 
   deleteDoc,
-  query, 
-  orderBy 
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { TreasuryReceipt, TreasuryExpense, TreasuryTransaction, User, Donor } from '../types';
+import { TreasuryReceipt, TreasuryTransaction, User, Donor, StockProduct } from '../types';
 import { DonorsSection } from './DonorsSection';
 import { generateTreasuryReceiptPDF, generateTreasuryFinancialReportPDF } from '../lib/pdfUtils';
+import { generateModernWord } from '../lib/wordUtils';
+import { cleanData } from '../lib/utils';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -60,47 +60,94 @@ interface TreasurySectionProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   showConfirm: (message: string, onConfirm: () => void) => void;
   donors?: Donor[];
-  initialTab?: 'overview' | 'new-revenue' | 'new-expense' | 'history' | 'reports' | 'donors';
+  initialTab?: 'overview' | 'new-revenue' | 'material-donations' | 'history' | 'reports' | 'donors';
 }
 
 const PAYMENT_METHODS = [
   { value: 'PIX', label: 'PIX' },
   { value: 'DINHEIRO', label: 'Dinheiro em Espécie' },
-  { value: 'TRANSFERENCIA', label: 'Transferência / TED / DOC' },
+  { value: 'TRANSFERENCIA', label: 'Transferência Bancária / TED / DOC' },
   { value: 'CARTAO_CREDITO', label: 'Cartão de Crédito' },
   { value: 'CARTAO_DEBITO', label: 'Cartão de Débito' },
   { value: 'BOLETO', label: 'Boleto Bancário' },
-  { value: 'OUTRO', label: 'Outra Forma' },
+  { value: 'OUTRO', label: 'Outra Forma de Contribuição' },
 ];
 
-const REVENUE_CATEGORIES = [
-  'Doação Física',
-  'Doação On-line / PIX',
-  'Mensalidade / Anuidade',
-  'Evento Beneficente',
+const DONATION_CATEGORIES = [
+  'Doação em Dinheiro (Espécie)',
+  'Doação via PIX / On-line',
+  'Doação Recorrente / Sócio Mensal',
+  'Doação de Empresa (Pessoa Jurídica)',
+  'Doação de Pessoa Física',
+  'Evento Beneficente / Campanha',
   'Convênio / Subvenção Pública',
-  'Venda de Produtos / Brechó',
-  'Rendimento de Aplicação',
-  'Outras Receitas'
+  'Outra Contribuição'
 ];
 
-const EXPENSE_CATEGORIES = [
-  'Pessoal / Salários e Encargos',
-  'Material de Consumo / Limpeza',
-  'Alimentação / Horta / Cozinha',
-  'Medicamentos e Insumos de Saúde',
-  'Manutenção Predial e Equipamentos',
-  'Utilidades (Água, Luz, Telefone, Internet)',
-  'Serviços de Terceiros / Contabilidade',
-  'Impostos, Taxas e Tarifas Bancárias',
-  'Outras Despesas'
+const MATERIAL_CATEGORIES = [
+  'Alimentos e Cestas Básicas',
+  'Produtos de Limpeza',
+  'Higiene Pessoal e Fraldas',
+  'Móveis e Utensílios Domésticos',
+  'Eletrodomésticos e Eletrônicos',
+  'Outros Materiais e Insumos'
 ];
 
-const PIE_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6', '#6366F1', '#14B8A6', '#F97316'];
+const MATERIAL_DESTINATIONS = [
+  'Cozinha e Refeitório OAMI',
+  'Acolhidos e Uso Direto',
+  'Limpeza, Higiene e Sede',
+  'Acompanhamento e Doação para Famílias Atendidas',
+  'Almoxarifado e Estoque Geral',
+  'Outro Destino Especificado'
+];
+
+const STOCK_CATEGORIES = [
+  'Alimentos e Nutrição',
+  'Higiene e Limpeza',
+  'Fraldas e Vestuário',
+  'Medicamentos',
+  'Enfermagem e Médico',
+  'Material de Escritório',
+  'Outros'
+];
+
+const STOCK_UNITS = [
+  'Unidade',
+  'Pacote',
+  'Caixa',
+  'Litro',
+  'Kg',
+  'Frasco',
+  'Fardo',
+  'Rolo',
+  'Outro'
+];
+
+const mapMaterialCategoryToStockCategory = (matCat: string): string => {
+  if (!matCat) return 'Alimentos e Nutrição';
+  if (matCat.includes('Aliment')) return 'Alimentos e Nutrição';
+  if (matCat.includes('Limpeza')) return 'Higiene e Limpeza';
+  if (matCat.includes('Higiene') || matCat.includes('Fralda')) return 'Fraldas e Vestuário';
+  return 'Outros';
+};
+
+const DONATION_FINALITIES = [
+  'Livre Destinação da Entidade',
+  'Alimentação, Cozinha e Horta',
+  'Medicamentos, Fraldas e Saúde',
+  'Atividades Pedagógicas e Recreativas',
+  'Manutenção Predial e Infraestrutura',
+  'Apoio Operacional e Serviços',
+  'Outra Finalidade Especificada'
+];
+
+const PIE_COLORS = ['#10B981', '#3B82F6', '#EC4899', '#F59E0B', '#8B5CF6', '#6366F1', '#14B8A6', '#F97316'];
 const MONTH_NAMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToast, showConfirm, donors, initialTab }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'new-revenue' | 'new-expense' | 'history' | 'reports' | 'donors'>(initialTab || 'overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'new-revenue' | 'material-donations' | 'history' | 'reports' | 'donors'>(initialTab || 'overview');
+  const [materialCategoryFilter, setMaterialCategoryFilter] = useState<string>('ALL');
   const [localDonors, setLocalDonors] = useState<Donor[]>(donors || []);
 
   useEffect(() => {
@@ -113,8 +160,10 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
   useEffect(() => {
     if (donors && donors.length > 0) {
       setLocalDonors(donors);
-      return;
     }
+  }, [donors]);
+
+  useEffect(() => {
     const unsub = onSnapshot(collection(db, 'donors'), (snapshot) => {
       const list: Donor[] = [];
       snapshot.forEach((docSnap) => {
@@ -125,24 +174,27 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
       console.error("Erro ao carregar doadores na tesouraria:", error);
     });
     return () => unsub();
-  }, [donors]);
+  }, []);
 
   // Reports Filter State
-  const [reportMode, setReportMode] = useState<'MENSAL' | 'SEMESTRAL' | 'ANUAL' | 'PERSONALIZADO'>('MENSAL');
+  const [reportMode, setReportMode] = useState<'DIARIO' | 'MENSAL' | 'SEMESTRAL' | 'ANUAL' | 'PERSONALIZADO'>('MENSAL');
+  const [reportDayDate, setReportDayDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
   const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
   const [reportSemester, setReportSemester] = useState<1 | 2>(new Date().getMonth() < 6 ? 1 : 2);
   const [reportStartDate, setReportStartDate] = useState<string>(`${new Date().getFullYear()}-01-01`);
   const [reportEndDate, setReportEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [reportDonorFilter, setReportDonorFilter] = useState<string>('ALL');
+  const [reportTypeFilter, setReportTypeFilter] = useState<string>('ALL');
 
   // Firestore collections state
   const [receipts, setReceipts] = useState<TreasuryReceipt[]>([]);
   const [transactions, setTransactions] = useState<TreasuryTransaction[]>([]);
+  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'RECEITA' | 'DESPESA'>('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ATIVO' | 'CANCELADO'>('ATIVO');
@@ -150,110 +202,111 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Form State - Receita
+  // Form State - Cadastrar Doação / Receita
   const [revenueForm, setRevenueForm] = useState({
+    donationKind: 'FINANCIAL' as 'FINANCIAL' | 'MATERIAL',
+    selectedDonorId: '',
     date: new Date().toISOString().split('T')[0],
     amount: '',
     paymentMethod: 'PIX',
-    category: REVENUE_CATEGORIES[0],
+    category: DONATION_CATEGORIES[1], // Doação via PIX / On-line
     customCategory: '',
+    donationType: 'EVENTUAL' as 'EVENTUAL' | 'RECORRENTE' | 'EMPRESA' | 'PESSOA_FISICA' | 'OUTRA',
+    finality: DONATION_FINALITIES[0], // Livre Destinação
+    materialCategory: MATERIAL_CATEGORIES[0], // Alimentos e Cestas Básicas
+    itemDetails: '',
+    quantityOrVolume: '',
+    itemCondition: 'Novo / Lacrado',
+    estimatedValue: '',
+    destination: MATERIAL_DESTINATIONS[0],
     description: '',
     payerName: '',
     cpf: '',
-    observations: ''
+    email: '',
+    phone: '',
+    observations: '',
+    saveAsDonor: true,
+    // Stock Integration fields
+    addToStock: true,
+    stockProductId: 'NEW',
+    stockProductName: '',
+    stockProductCategory: 'Alimentos e Nutrição',
+    stockProductUnit: 'Unidade',
+    stockQuantity: '1',
+    stockMinQuantity: '5'
   });
 
-  // Form State - Despesa
-  const [expenseForm, setExpenseForm] = useState({
-    date: new Date().toISOString().split('T')[0],
-    amount: '',
-    category: EXPENSE_CATEGORIES[0],
-    customCategory: '',
-    favored: '',
-    paymentMethod: 'PIX',
-    description: '',
-    receiptUrl: '',
-    observations: ''
-  });
-
-  // Selected Item for Detail / Receipt Viewer Modal
   const [selectedTransaction, setSelectedTransaction] = useState<TreasuryTransaction | null>(null);
-  const [viewingReceiptTransaction, setViewingReceiptTransaction] = useState<TreasuryTransaction | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Generate a Blob URL for PDF receipt preview (prevents Edge/browser data: iframe security blocks)
-  const pdfBlobUrl = useMemo(() => {
-    if (!viewingReceiptTransaction?.receiptUrl) return null;
-    const url = viewingReceiptTransaction.receiptUrl;
-    const isPdf = url.startsWith('data:application/pdf') || url.toLowerCase().includes('.pdf');
-    if (!isPdf) return null;
+  // Edit Transaction Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<TreasuryTransaction | null>(null);
+  const [editForm, setEditForm] = useState({
+    payerName: '',
+    cpf: '',
+    date: '',
+    amount: '',
+    donationKind: 'FINANCIAL' as 'FINANCIAL' | 'MATERIAL',
+    materialCategory: MATERIAL_CATEGORIES[0],
+    itemDetails: '',
+    quantityOrVolume: '',
+    itemCondition: 'Em bom estado',
+    destination: MATERIAL_DESTINATIONS[0],
+    category: DONATION_CATEGORIES[0],
+    paymentMethod: 'PIX',
+    observations: ''
+  });
 
-    try {
-      if (url.startsWith('data:')) {
-        const parts = url.split(',');
-        if (parts.length >= 2) {
-          const mimeMatch = parts[0].match(/:(.*?);/);
-          const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
-          const binary = atob(parts[1]);
-          const array = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            array[i] = binary.charCodeAt(i);
-          }
-          const blob = new Blob([array], { type: mime });
-          return URL.createObjectURL(blob);
-        }
-      }
-      return url;
-    } catch (err) {
-      console.error("Erro ao converter PDF em Blob URL:", err);
-      return null;
-    }
-  }, [viewingReceiptTransaction]);
-
-  // Clean up Blob URL when viewing receipt changes or component unmounts
-  useEffect(() => {
-    return () => {
-      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-    };
-  }, [pdfBlobUrl]);
-
-  // Real-time Firestore Subscriptions
+  // Real-time Firestore Subscriptions for Donations & Stock
   useEffect(() => {
     setLoading(true);
     
-    // Subscribe to treasury_receipts
+    // 1. Subscribe to treasury_receipts
     const unsubscribeReceipts = onSnapshot(
       collection(db, 'treasury_receipts'),
       (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TreasuryReceipt[];
+        const docs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as TreasuryReceipt[];
         docs.sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
         setReceipts(docs);
       },
-      (err) => {
-        console.error("Error listening to treasury_receipts:", err);
-      }
+      (err) => console.error("Error listening to treasury_receipts:", err)
     );
 
-    // Subscribe to treasury_transactions
-    const unsubscribeTransactions = onSnapshot(
+    // 2. Subscribe to treasury_transactions (Donations & Contributions)
+    const unsubscribeTreasuryTx = onSnapshot(
       collection(db, 'treasury_transactions'),
       (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TreasuryTransaction[];
-        docs.sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
-        setTransactions(docs);
+        const docs = snapshot.docs.map(docSnap => ({ 
+          id: docSnap.id, 
+          ...docSnap.data() 
+        })) as TreasuryTransaction[];
+        
+        // Filter strictly for RECEITA / Doações
+        const donationsOnly = docs.filter(t => t.type === 'RECEITA' || t.isDonation !== false);
+        donationsOnly.sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || b.date || ''));
+        
+        setTransactions(donationsOnly);
         setLoading(false);
       },
-      (err) => {
-        console.error("Error listening to treasury_transactions:", err);
-        setLoading(false);
-      }
+      (err) => console.error("Error listening to treasury_transactions:", err)
+    );
+
+    // 3. Subscribe to stock_products for Stock Linkage
+    const unsubscribeStock = onSnapshot(
+      collection(db, 'stock_products'),
+      (snapshot) => {
+        const list = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })) as StockProduct[];
+        list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        setStockProducts(list);
+      },
+      (err) => console.error("Error listening to stock_products:", err)
     );
 
     return () => {
       unsubscribeReceipts();
-      unsubscribeTransactions();
+      unsubscribeTreasuryTx();
+      unsubscribeStock();
     };
   }, []);
 
@@ -277,22 +330,138 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     return `REC-${String(maxNum + 1).padStart(4, '0')}`;
   }, [receipts]);
 
-  // Filtered Transactions
-  const filteredTransactions = useMemo(() => {
+  // Lista de transações desduplicada para exibição perfeita
+  const uniqueTransactions = useMemo(() => {
+    const seenReceipts = new Set<string>();
+    const seenContent = new Set<string>();
+
     return transactions.filter(t => {
-      // Type Filter
-      if (typeFilter !== 'ALL' && t.type !== typeFilter) return false;
+      if (t.receiptNumber) {
+        if (seenReceipts.has(t.receiptNumber)) return false;
+        seenReceipts.add(t.receiptNumber);
+      }
 
-      // Status Filter
+      const payerClean = (t.payerOrFavored || '').toLowerCase().trim();
+      const contentKey = `${payerClean}_${t.date}_${t.amount}_${t.category}`;
+      if (seenContent.has(contentKey)) return false;
+      seenContent.add(contentKey);
+
+      return true;
+    });
+  }, [transactions]);
+
+  // Função para remover registros duplicados permanentemente do Firestore
+  const cleaningRef = useRef(false);
+  const handleCleanDuplicates = async (silent: boolean = false) => {
+    if (cleaningRef.current) return;
+    cleaningRef.current = true;
+    try {
+      const txSnap = await getDocs(collection(db, 'treasury_transactions'));
+      const recSnap = await getDocs(collection(db, 'treasury_receipts'));
+
+      const allTxs = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allRecs = recSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const seenReceiptNumbers = new Set<string>();
+      const seenContentKeys = new Set<string>();
+
+      const duplicateTxIdsToDelete: string[] = [];
+      const duplicateRecIdsToDelete: string[] = [];
+
+      allTxs.sort((a: any, b: any) => (a.createdAt || a.date || '').localeCompare(b.createdAt || b.date || ''));
+
+      for (const tx of allTxs as any[]) {
+        let isDuplicate = false;
+
+        if (tx.receiptNumber) {
+          if (seenReceiptNumbers.has(tx.receiptNumber)) {
+            isDuplicate = true;
+          } else {
+            seenReceiptNumbers.add(tx.receiptNumber);
+          }
+        }
+
+        const payerClean = (tx.payerOrFavored || '').toLowerCase().trim();
+        const contentKey = `${payerClean}_${tx.date}_${tx.amount}_${tx.category}`;
+        if (seenContentKeys.has(contentKey)) {
+          isDuplicate = true;
+        } else {
+          seenContentKeys.add(contentKey);
+        }
+
+        if (isDuplicate) {
+          duplicateTxIdsToDelete.push(tx.id);
+          if (tx.receiptId) {
+            duplicateRecIdsToDelete.push(tx.receiptId);
+          }
+        }
+      }
+
+      const recSeenNumbers = new Set<string>();
+      const recSeenContent = new Set<string>();
+      for (const rec of allRecs as any[]) {
+        let isDup = false;
+        if (rec.receiptNumber) {
+          if (recSeenNumbers.has(rec.receiptNumber)) {
+            isDup = true;
+          } else {
+            recSeenNumbers.add(rec.receiptNumber);
+          }
+        }
+        const payerClean = (rec.payerName || '').toLowerCase().trim();
+        const contentKey = `${payerClean}_${rec.date}_${rec.amount}_${rec.category}`;
+        if (recSeenContent.has(contentKey)) {
+          isDup = true;
+        } else {
+          recSeenContent.add(contentKey);
+        }
+
+        if (isDup) {
+          duplicateRecIdsToDelete.push(rec.id);
+        }
+      }
+
+      const uniqueTxIds = Array.from(new Set(duplicateTxIdsToDelete));
+      const uniqueRecIds = Array.from(new Set(duplicateRecIdsToDelete));
+
+      for (const txId of uniqueTxIds) {
+        await deleteDoc(doc(db, 'treasury_transactions', txId));
+      }
+      for (const recId of uniqueRecIds) {
+        await deleteDoc(doc(db, 'treasury_receipts', recId));
+      }
+
+      if (uniqueTxIds.length > 0 || uniqueRecIds.length > 0) {
+        if (!silent) {
+          showToast(`${uniqueTxIds.length} lançamento(s) duplicado(s) foram removidos da Tesouraria!`, 'success');
+        }
+      } else if (!silent) {
+        showToast('Nenhum lançamento duplicado foi encontrado.', 'info');
+      }
+    } catch (err) {
+      console.error('Erro ao limpar duplicados:', err);
+      if (!silent) showToast('Erro ao limpar lançamentos duplicados.', 'error');
+    } finally {
+      cleaningRef.current = false;
+    }
+  };
+
+  // Limpeza automática ao carregar registros duplicados no banco
+  const cleanedOnceRef = useRef(false);
+  useEffect(() => {
+    if (transactions.length > 0 && !cleanedOnceRef.current) {
+      cleanedOnceRef.current = true;
+      handleCleanDuplicates(true);
+    }
+  }, [transactions]);
+
+  // Filtered Transactions for History Tab
+  const filteredTransactions = useMemo(() => {
+    return uniqueTransactions.filter(t => {
       if (statusFilter !== 'ALL' && t.status !== statusFilter) return false;
-
-      // Category Filter
       if (categoryFilter !== 'ALL' && t.category !== categoryFilter) return false;
-
-      // Payment Filter
       if (paymentFilter !== 'ALL' && t.paymentMethod !== paymentFilter) return false;
 
-      // Search Term
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase();
         const matchesPayer = t.payerOrFavored?.toLowerCase().includes(term);
@@ -304,7 +473,6 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         }
       }
 
-      // Period Filter
       if (periodFilter === 'THIS_MONTH') {
         const now = new Date();
         const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -321,46 +489,60 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
 
       return true;
     });
-  }, [transactions, typeFilter, statusFilter, categoryFilter, paymentFilter, searchTerm, periodFilter, startDate, endDate]);
+  }, [uniqueTransactions, statusFilter, categoryFilter, paymentFilter, searchTerm, periodFilter, startDate, endDate]);
 
-  // Financial Summaries (Active Transactions only)
+  // Core Metrics & Statistics for Dashboard
   const stats = useMemo(() => {
-    const activeTx = transactions.filter(t => t.status === 'ATIVO');
+    const activeTx = uniqueTransactions.filter(t => t.status === 'ATIVO');
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
-    const totalReceitas = activeTx
-      .filter(t => t.type === 'RECEITA')
+    // Total Doações (Receitas)
+    const donationsTx = activeTx.filter(t => t.type === 'RECEITA');
+    const totalDonations = donationsTx.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    // Doações do Mês
+    const monthDonations = donationsTx
+      .filter(t => t.date?.startsWith(currentMonthStr))
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-    const totalDespesas = activeTx
-      .filter(t => t.type === 'DESPESA')
+    // Doações Recorrentes (Sócios Mensais)
+    const recurringDonations = donationsTx
+      .filter(t => t.donationType === 'RECORRENTE' || t.category.includes('Sócio') || t.category.includes('Mensalidade'))
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-    const saldo = totalReceitas - totalDespesas;
+    // Doações Eventuais (Avulsas)
+    const eventualDonations = donationsTx
+      .filter(t => t.donationType === 'EVENTUAL' || (!t.category.includes('Sócio') && !t.category.includes('Mensalidade')))
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-    const totalRecibos = receipts.filter(r => r.status === 'ATIVO').length;
+    const activeDonorsCount = localDonors.filter(d => d.status === 'ATIVO').length;
+    const monthlyDonorsCount = localDonors.filter(d => d.status === 'ATIVO' && d.type === 'SOCIO_MENSAL').length;
+
+    const avgDonation = donationsTx.length > 0 ? totalDonations / donationsTx.length : 0;
 
     return {
-      totalReceitas,
-      totalDespesas,
-      saldo,
-      totalRecibos
+      totalDonations,
+      monthDonations,
+      recurringDonations,
+      eventualDonations,
+      avgDonation,
+      activeDonorsCount,
+      monthlyDonorsCount,
+      totalReceipts: receipts.filter(r => r.status === 'ATIVO').length
     };
-  }, [transactions, receipts]);
+  }, [uniqueTransactions, receipts, localDonors]);
 
-  // Chart Data: Monthly Comparison
+  // Chart Data: Monthly Donations Evolution
   const chartMonthlyData = useMemo(() => {
-    const map: Record<string, { month: string; Receitas: number; Despesas: number }> = {};
+    const map: Record<string, { month: string; Doações: number }> = {};
     
-    transactions.filter(t => t.status === 'ATIVO').forEach(t => {
+    uniqueTransactions.filter(t => t.status === 'ATIVO' && t.type === 'RECEITA').forEach(t => {
       const monthKey = t.date.substring(0, 7); // YYYY-MM
       if (!map[monthKey]) {
-        map[monthKey] = { month: monthKey, Receitas: 0, Despesas: 0 };
+        map[monthKey] = { month: monthKey, Doações: 0 };
       }
-      if (t.type === 'RECEITA') {
-        map[monthKey].Receitas += Number(t.amount) || 0;
-      } else {
-        map[monthKey].Despesas += Number(t.amount) || 0;
-      }
+      map[monthKey].Doações += Number(t.amount) || 0;
     });
 
     return Object.values(map)
@@ -370,19 +552,19 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         ...item,
         monthLabel: item.month.split('-').reverse().join('/')
       }));
-  }, [transactions]);
+  }, [uniqueTransactions]);
 
-  // Chart Data: Category Breakdown (Receitas & Despesas)
+  // Chart Data: Donation Category Breakdown
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     
-    transactions.filter(t => t.status === 'ATIVO').forEach(t => {
-      const cat = t.category || 'Outros';
+    uniqueTransactions.filter(t => t.status === 'ATIVO' && t.type === 'RECEITA').forEach(t => {
+      const cat = t.category || 'Outras Doações';
       map[cat] = (map[cat] || 0) + (Number(t.amount) || 0);
     });
 
     return Object.entries(map).map(([name, value]) => ({ name, value }));
-  }, [transactions]);
+  }, [uniqueTransactions]);
 
   // Helper function to log system events
   const logSystemEvent = async (action: string, description: string, details?: any) => {
@@ -401,25 +583,40 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     }
   };
 
-  // Submit Revenue (Lançar Receita)
+  // Submit Revenue / Donation
   const handleSaveRevenue = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!revenueForm.amount || parseFloat(revenueForm.amount) <= 0) {
-      showToast('Por favor, informe um valor válido.', 'error');
-      return;
-    }
-    if (!revenueForm.payerName.trim()) {
-      showToast('O nome do pagador é obrigatório.', 'error');
-      return;
+    const isMaterial = revenueForm.donationKind === 'MATERIAL';
+
+    let amountVal = 0;
+    if (isMaterial) {
+      amountVal = parseFloat(revenueForm.estimatedValue) || 0;
+      if (!revenueForm.payerName.trim()) {
+        showToast('O nome do doador é obrigatório.', 'error');
+        return;
+      }
+      if (!revenueForm.itemDetails.trim() && !revenueForm.materialCategory) {
+        showToast('Informe a descrição dos itens ou a categoria do material.', 'error');
+        return;
+      }
+    } else {
+      amountVal = parseFloat(revenueForm.amount);
+      if (isNaN(amountVal) || amountVal <= 0) {
+        showToast('Por favor, informe um valor de doação válido.', 'error');
+        return;
+      }
+      if (!revenueForm.payerName.trim()) {
+        showToast('O nome do doador/pagador é obrigatório.', 'error');
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
       const receiptNum = nextReceiptNumber;
-      const amountVal = parseFloat(revenueForm.amount);
-      const chosenCategory = revenueForm.category === 'Outras Receitas' && revenueForm.customCategory 
-        ? revenueForm.customCategory 
-        : revenueForm.category;
+      const chosenCategory = isMaterial
+        ? revenueForm.materialCategory
+        : (revenueForm.category === 'Outra Contribuição' && revenueForm.customCategory ? revenueForm.customCategory : revenueForm.category);
 
       const nowIso = new Date().toISOString();
 
@@ -428,184 +625,264 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         receiptNumber: receiptNum,
         date: revenueForm.date,
         amount: amountVal,
-        paymentMethod: revenueForm.paymentMethod,
+        paymentMethod: isMaterial ? 'DOACAO_EM_BENS' : revenueForm.paymentMethod,
         category: chosenCategory,
-        description: revenueForm.description || chosenCategory,
+        description: isMaterial 
+          ? (revenueForm.itemDetails.trim() || `Doação de materiais: ${chosenCategory}`)
+          : (revenueForm.description || `Doação de ${revenueForm.payerName.trim()} - Casa OAMI`),
         payerName: revenueForm.payerName.trim(),
         cpf: revenueForm.cpf?.trim() || null,
         registeredBy: user.name,
         observations: revenueForm.observations?.trim() || null,
         createdAt: nowIso,
-        status: 'ATIVO'
+        status: 'ATIVO',
+        donorId: revenueForm.selectedDonorId || null,
+        donationType: revenueForm.donationType,
+        finality: isMaterial ? revenueForm.destination : revenueForm.finality,
+        donationKind: revenueForm.donationKind,
+        materialCategory: isMaterial ? revenueForm.materialCategory : null,
+        itemDetails: isMaterial ? revenueForm.itemDetails.trim() : null,
+        quantityOrVolume: isMaterial ? revenueForm.quantityOrVolume.trim() : null,
+        itemCondition: isMaterial ? revenueForm.itemCondition : null,
+        estimatedValue: isMaterial ? amountVal : null,
+        destination: isMaterial ? revenueForm.destination : null
       });
-      console.log("✅ Recibo salvo:", receiptDocRef.id);
+
       // 2. Create Transaction Document in treasury_transactions
-      const transactionRef = await addDoc(collection(db, 'treasury_transactions'), {
+      await addDoc(collection(db, 'treasury_transactions'), {
         type: 'RECEITA',
         receiptId: receiptDocRef.id,
         receiptNumber: receiptNum,
         date: revenueForm.date,
         amount: amountVal,
-        paymentMethod: revenueForm.paymentMethod,
+        paymentMethod: isMaterial ? 'DOACAO_EM_BENS' : revenueForm.paymentMethod,
         category: chosenCategory,
-        description: revenueForm.description || chosenCategory,
+        description: isMaterial 
+          ? (revenueForm.itemDetails.trim() || `Doação de materiais: ${chosenCategory}`)
+          : (revenueForm.description || `Doação de ${revenueForm.payerName.trim()} - Casa OAMI`),
         payerOrFavored: revenueForm.payerName.trim(),
         cpf: revenueForm.cpf?.trim() || null,
         registeredBy: user.name,
         observations: revenueForm.observations?.trim() || null,
         createdAt: nowIso,
-        status: 'ATIVO'
+        status: 'ATIVO',
+        donorId: revenueForm.selectedDonorId || null,
+        donationType: revenueForm.donationType,
+        finality: isMaterial ? revenueForm.destination : revenueForm.finality,
+        isDonation: true,
+        donationKind: revenueForm.donationKind,
+        materialCategory: isMaterial ? revenueForm.materialCategory : null,
+        itemDetails: isMaterial ? revenueForm.itemDetails.trim() : null,
+        quantityOrVolume: isMaterial ? revenueForm.quantityOrVolume.trim() : null,
+        itemCondition: isMaterial ? revenueForm.itemCondition : null,
+        estimatedValue: isMaterial ? amountVal : null,
+        destination: isMaterial ? revenueForm.destination : null
       });
-console.log("✅ Transação salva:", transactionRef.id);
-      // 3. Register System Log
+
+      // 3. Update or Add Donor record if requested or linked
+      if (revenueForm.selectedDonorId) {
+        const existingDonor = localDonors.find(d => d.id === revenueForm.selectedDonorId);
+        if (existingDonor) {
+          const newTotal = (existingDonor.totalDonated || 0) + amountVal;
+          const newCount = (existingDonor.donationCount || 0) + 1;
+          await updateDoc(doc(db, 'donors', existingDonor.id), {
+            totalDonated: newTotal,
+            donationCount: newCount,
+            lastDonationDate: revenueForm.date,
+            updatedAt: nowIso
+          });
+        }
+      } else if (revenueForm.saveAsDonor && revenueForm.payerName.trim()) {
+        const newDonorData = cleanData({
+          name: revenueForm.payerName.trim(),
+          email: revenueForm.email.trim() || null,
+          phone: revenueForm.phone.trim() || null,
+          type: revenueForm.donationType === 'RECORRENTE' ? 'SOCIO_MENSAL' : 'DOADOR',
+          amount: revenueForm.donationType === 'RECORRENTE' ? amountVal : 0,
+          status: 'ATIVO',
+          startDate: revenueForm.date,
+          cpfOrCnpj: revenueForm.cpf.trim() || null,
+          totalDonated: amountVal,
+          donationCount: 1,
+          lastDonationDate: revenueForm.date,
+          createdAt: nowIso
+        });
+        await addDoc(collection(db, 'donors'), newDonorData);
+      }
+
+      // 3.5. Automatic Entry into Stock if requested for Material Donations
+      let stockEntrySummary = '';
+      if (isMaterial && revenueForm.addToStock) {
+        const qtyToAdd = parseFloat(revenueForm.stockQuantity) || 1;
+        if (qtyToAdd > 0) {
+          if (revenueForm.stockProductId === 'NEW') {
+            const prodName = revenueForm.stockProductName.trim() || revenueForm.itemDetails.trim() || revenueForm.materialCategory;
+            const newProdCode = `EST-${Math.floor(100000 + Math.random() * 900000)}`;
+            const newStockDoc = await addDoc(collection(db, 'stock_products'), {
+              name: prodName,
+              category: revenueForm.stockProductCategory || mapMaterialCategoryToStockCategory(revenueForm.materialCategory),
+              code: newProdCode,
+              unit: revenueForm.stockProductUnit || 'Unidade',
+              quantity: qtyToAdd,
+              minQuantity: parseFloat(revenueForm.stockMinQuantity) || 5,
+              location: revenueForm.destination || 'Almoxarifado Geral',
+              supplier: `Doador: ${revenueForm.payerName.trim()}`,
+              unitPrice: amountVal > 0 && qtyToAdd > 0 ? amountVal / qtyToAdd : 0,
+              status: 'ATIVO',
+              createdAt: nowIso,
+              updatedAt: nowIso,
+              createdBy: user.name
+            });
+
+            await addDoc(collection(db, 'stock_movements'), {
+              productId: newStockDoc.id,
+              productName: prodName,
+              productCode: newProdCode,
+              type: 'ENTRADA',
+              quantity: qtyToAdd,
+              stockBefore: 0,
+              stockAfter: qtyToAdd,
+              supplier: `Doador: ${revenueForm.payerName.trim()}`,
+              responsible: user.name,
+              notes: `Entrada via Doação de Material (Recibo #${receiptNum}) - ${revenueForm.itemDetails || prodName}`,
+              date: revenueForm.date,
+              timestamp: nowIso,
+              origin: 'DOACAO',
+              estimatedValue: amountVal,
+              donorName: revenueForm.payerName.trim(),
+              financialTransactionId: receiptDocRef.id
+            });
+            stockEntrySummary = ` (Com entrada automática no Estoque: +${qtyToAdd} ${revenueForm.stockProductUnit || 'unidades'} em "${prodName}")`;
+          } else {
+            const targetProd = stockProducts.find(p => p.id === revenueForm.stockProductId);
+            if (targetProd) {
+              const stockBefore = targetProd.quantity || 0;
+              const stockAfter = stockBefore + qtyToAdd;
+
+              await updateDoc(doc(db, 'stock_products', targetProd.id), {
+                quantity: stockAfter,
+                updatedAt: nowIso
+              });
+
+              await addDoc(collection(db, 'stock_movements'), {
+                productId: targetProd.id,
+                productName: targetProd.name,
+                productCode: targetProd.code || 'EST-000',
+                type: 'ENTRADA',
+                quantity: qtyToAdd,
+                stockBefore: stockBefore,
+                stockAfter: stockAfter,
+                supplier: `Doador: ${revenueForm.payerName.trim()}`,
+                responsible: user.name,
+                notes: `Entrada via Doação de Material (Recibo #${receiptNum}) - ${revenueForm.itemDetails || targetProd.name}`,
+                date: revenueForm.date,
+                timestamp: nowIso,
+                origin: 'DOACAO',
+                estimatedValue: amountVal,
+                donorName: revenueForm.payerName.trim(),
+                financialTransactionId: receiptDocRef.id
+              });
+              stockEntrySummary = ` (Com entrada automática no Estoque: +${qtyToAdd} ${targetProd.unit} em "${targetProd.name}")`;
+            }
+          }
+        }
+      }
+
+      // 4. System Log
       await logSystemEvent(
-        'LANÇAMENTO DE RECEITA',
-        `Receita ${receiptNum} no valor de R$ ${amountVal.toFixed(2)} lançada para ${revenueForm.payerName}`,
-        { receiptNumber: receiptNum, amount: amountVal, payer: revenueForm.payerName }
+        isMaterial ? 'LANÇAMENTO DE DOAÇÃO DE MATERIAL' : 'LANÇAMENTO DE DOAÇÃO',
+        isMaterial
+          ? `Doação de material (${chosenCategory}) ${receiptNum} registrada para ${revenueForm.payerName.trim()}${stockEntrySummary}`
+          : `Doação ${receiptNum} de R$ ${amountVal.toFixed(2)} registrada para ${revenueForm.payerName.trim()}`,
+        { receiptNumber: receiptNum, amount: amountVal, donor: revenueForm.payerName.trim(), donationKind: revenueForm.donationKind }
       );
 
-      // Offer PDF download
+      // 5. Generate PDF Receipt
       await generateTreasuryReceiptPDF({
         receiptNumber: receiptNum,
         date: revenueForm.date,
         amount: amountVal,
-        paymentMethod: revenueForm.paymentMethod,
+        paymentMethod: isMaterial ? 'Doação em Bens/Insumos' : revenueForm.paymentMethod,
         category: chosenCategory,
-        description: revenueForm.description || chosenCategory,
+        description: isMaterial ? revenueForm.itemDetails.trim() : (revenueForm.description || `Doação - Casa OAMI (${revenueForm.finality})`),
         payerName: revenueForm.payerName.trim(),
         cpf: revenueForm.cpf.trim() || undefined,
         registeredBy: user.name,
-        observations: revenueForm.observations.trim() || undefined
+        observations: revenueForm.observations.trim() || undefined,
+        donationKind: revenueForm.donationKind,
+        itemDetails: revenueForm.itemDetails.trim(),
+        quantityOrVolume: revenueForm.quantityOrVolume.trim(),
+        itemCondition: revenueForm.itemCondition,
+        destination: revenueForm.destination
       });
 
-      showToast(`Receita ${receiptNum} salva e recibo em PDF gerado com sucesso!`, 'success');
+      showToast(`Doação ${receiptNum} registrada com sucesso e recibo PDF gerado!`, 'success');
 
       // Reset Form
       setRevenueForm({
+        donationKind: 'FINANCIAL',
+        selectedDonorId: '',
         date: new Date().toISOString().split('T')[0],
         amount: '',
         paymentMethod: 'PIX',
-        category: REVENUE_CATEGORIES[0],
+        category: DONATION_CATEGORIES[1],
         customCategory: '',
+        donationType: 'EVENTUAL',
+        finality: DONATION_FINALITIES[0],
+        materialCategory: MATERIAL_CATEGORIES[0],
+        itemDetails: '',
+        quantityOrVolume: '',
+        itemCondition: 'Novo / Lacrado',
+        estimatedValue: '',
+        destination: MATERIAL_DESTINATIONS[0],
         description: '',
         payerName: '',
         cpf: '',
-        observations: ''
+        email: '',
+        phone: '',
+        observations: '',
+        saveAsDonor: true,
+        addToStock: true,
+        stockProductId: 'NEW',
+        stockProductName: '',
+        stockProductCategory: 'Alimentos e Nutrição',
+        stockProductUnit: 'Unidade',
+        stockQuantity: '1',
+        stockMinQuantity: '5'
       });
 
-      setActiveTab('history');
-   } catch (err: any) {
-  console.error("ERRO COMPLETO:", err);
-  console.error("Código:", err.code);
-  console.error("Mensagem:", err.message);
-
-  showToast(err.message, 'error');
-} 
-  };
-
-  // Submit Expense (Lançar Despesa)
-  const handleSaveExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expenseForm.amount || parseFloat(expenseForm.amount) <= 0) {
-      showToast('Por favor, informe um valor válido.', 'error');
-      return;
-    }
-    if (!expenseForm.favored.trim()) {
-      showToast('O nome do favorecido é obrigatório.', 'error');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const amountVal = parseFloat(expenseForm.amount);
-      const chosenCategory = expenseForm.category === 'Outras Despesas' && expenseForm.customCategory 
-        ? expenseForm.customCategory 
-        : expenseForm.category;
-
-      const nowIso = new Date().toISOString();
-
-      // 1. Create Transaction Document in treasury_transactions
-      await addDoc(collection(db, 'treasury_transactions'), {
-        type: 'DESPESA',
-        date: expenseForm.date,
-        amount: amountVal,
-        paymentMethod: expenseForm.paymentMethod,
-        category: chosenCategory,
-        description: expenseForm.description.trim(),
-        payerOrFavored: expenseForm.favored.trim(),
-        receiptUrl: expenseForm.receiptUrl || null,
-        registeredBy: user.name,
-        observations: expenseForm.observations?.trim() || null,
-        createdAt: nowIso,
-        status: 'ATIVO'
-      });
-
-      // 2. Register System Log
-      await logSystemEvent(
-        'LANÇAMENTO DE DESPESA',
-        `Despesa no valor de R$ ${amountVal.toFixed(2)} lançada para ${expenseForm.favored}`,
-        { amount: amountVal, favored: expenseForm.favored }
-      );
-
-      showToast('Despesa registrada com sucesso!', 'success');
-
-      // Reset Form
-      setExpenseForm({
-        date: new Date().toISOString().split('T')[0],
-        amount: '',
-        category: EXPENSE_CATEGORIES[0],
-        customCategory: '',
-        favored: '',
-        paymentMethod: 'PIX',
-        description: '',
-        receiptUrl: '',
-        observations: ''
-      });
-
-      setActiveTab('history');
-    } catch (err) {
-      console.error("Error saving expense:", err);
-      showToast('Erro ao salvar despesa. Tente novamente.', 'error');
+      if (isMaterial) {
+        setActiveTab('material-donations');
+      } else {
+        setActiveTab('history');
+      }
+    } catch (err: any) {
+      console.error("Erro ao salvar doação:", err);
+      showToast(err.message || 'Erro ao registrar doação.', 'error');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // Handle Receipt Upload Image
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast('O arquivo deve ter no máximo 5MB.', 'error');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setExpenseForm(prev => ({ ...prev, receiptUrl: reader.result as string }));
-        showToast('Comprovante anexado com sucesso.', 'info');
-      };
-      reader.readAsDataURL(file);
     }
   };
 
   // Delete Transaction
   const handleDeleteTransaction = (tx: TreasuryTransaction) => {
     showConfirm(
-      `Deseja realmente excluir este lançamento de ${tx.type === 'RECEITA' ? 'receita' : 'despesa'} (${tx.payerOrFavored} - R$ ${Number(tx.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})? Esta ação excluirá permanentemente o lançamento da Tesouraria.`,
+      `Deseja realmente excluir este lançamento de doação (${tx.payerOrFavored} - R$ ${Number(tx.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})? Esta ação removerá o registro da Tesouraria.`,
       async () => {
         try {
-          // Delete from treasury_transactions
           await deleteDoc(doc(db, 'treasury_transactions', tx.id));
-
-          // If Receita, also delete matching document in treasury_receipts
           if (tx.receiptId) {
             await deleteDoc(doc(db, 'treasury_receipts', tx.receiptId));
+          } else if (tx.receiptNumber) {
+            const matchingReceipt = receipts.find(r => r.receiptNumber === tx.receiptNumber);
+            if (matchingReceipt) {
+              await deleteDoc(doc(db, 'treasury_receipts', matchingReceipt.id));
+            }
           }
 
-          // System Log
           await logSystemEvent(
             'EXCLUSÃO DE TRANSAÇÃO',
-            `Transação ${tx.type} (${tx.receiptNumber || tx.id}) excluída por ${user.name}.`,
+            `Transação de Doação (${tx.receiptNumber || tx.id}) excluída por ${user.name}.`,
             { transactionId: tx.id }
           );
 
@@ -621,22 +898,127 @@ console.log("✅ Transação salva:", transactionRef.id);
     );
   };
 
+  // Open Edit Modal
+  const handleOpenEditModal = (t: TreasuryTransaction) => {
+    setEditingTransaction(t);
+    const isMat = t.donationKind === 'MATERIAL' || t.paymentMethod === 'DOACAO_EM_BENS';
+    setEditForm({
+      payerName: t.payerOrFavored || '',
+      cpf: t.cpf || '',
+      date: t.date || new Date().toISOString().split('T')[0],
+      amount: String(t.estimatedValue || t.amount || ''),
+      donationKind: isMat ? 'MATERIAL' : 'FINANCIAL',
+      materialCategory: t.materialCategory || t.category || MATERIAL_CATEGORIES[0],
+      itemDetails: t.itemDetails || t.description || '',
+      quantityOrVolume: t.quantityOrVolume || '',
+      itemCondition: t.itemCondition || 'Em bom estado',
+      destination: t.destination || t.finality || MATERIAL_DESTINATIONS[0],
+      category: t.category || (isMat ? 'Doações em Bens/Materiais' : DONATION_CATEGORIES[0]),
+      paymentMethod: t.paymentMethod || 'PIX',
+      observations: t.observations || ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Save Edited Transaction
+  const handleSaveEditedTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+
+    if (!editForm.payerName.trim()) {
+      showToast('Por favor, informe o nome do doador/contribuinte.', 'error');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const isMat = editForm.donationKind === 'MATERIAL';
+      const amountVal = parseFloat(editForm.amount) || 0;
+
+      const updatedData: Partial<TreasuryTransaction> = {
+        payerOrFavored: editForm.payerName.trim(),
+        cpf: editForm.cpf.trim() || null,
+        date: editForm.date,
+        amount: amountVal,
+        paymentMethod: isMat ? 'DOACAO_EM_BENS' : editForm.paymentMethod,
+        category: isMat ? (editForm.materialCategory || 'Doações em Bens/Materiais') : editForm.category,
+        description: isMat
+          ? (editForm.itemDetails.trim() || `Doação de materiais: ${editForm.materialCategory}`)
+          : `Doação de ${editForm.payerName.trim()}`,
+        donationKind: editForm.donationKind,
+        materialCategory: isMat ? editForm.materialCategory : null,
+        itemDetails: isMat ? editForm.itemDetails.trim() : null,
+        quantityOrVolume: isMat ? editForm.quantityOrVolume.trim() : null,
+        itemCondition: isMat ? editForm.itemCondition : null,
+        estimatedValue: isMat ? amountVal : null,
+        destination: isMat ? editForm.destination : null,
+        finality: isMat ? editForm.destination : undefined,
+        observations: editForm.observations?.trim() || null,
+      };
+
+      // 1. Update treasury_transactions
+      await updateDoc(doc(db, 'treasury_transactions', editingTransaction.id), cleanData(updatedData));
+
+      // 2. Update matching receipt if present
+      if (editingTransaction.receiptId) {
+        await updateDoc(doc(db, 'treasury_receipts', editingTransaction.receiptId), cleanData({
+          payerName: editForm.payerName.trim(),
+          cpf: editForm.cpf.trim() || null,
+          date: editForm.date,
+          amount: amountVal,
+          paymentMethod: isMat ? 'DOACAO_EM_BENS' : editForm.paymentMethod,
+          category: isMat ? (editForm.materialCategory || 'Doações em Bens/Materiais') : editForm.category,
+          description: isMat ? (editForm.itemDetails.trim() || `Doação de materiais: ${editForm.materialCategory}`) : `Doação de ${editForm.payerName.trim()}`,
+          donationKind: editForm.donationKind,
+          materialCategory: isMat ? editForm.materialCategory : null,
+          itemDetails: isMat ? editForm.itemDetails.trim() : null,
+          quantityOrVolume: isMat ? editForm.quantityOrVolume.trim() : null,
+          itemCondition: isMat ? editForm.itemCondition : null,
+          estimatedValue: isMat ? amountVal : null,
+          destination: isMat ? editForm.destination : null,
+          observations: editForm.observations?.trim() || null,
+        }));
+      }
+
+      await logSystemEvent(
+        'EDIÇÃO DE TRANSAÇÃO',
+        `Lançamento de Doação (${editingTransaction.receiptNumber || editingTransaction.id}) editado por ${user.name}.`,
+        { transactionId: editingTransaction.id }
+      );
+
+      showToast('Lançamento de doação atualizado com sucesso!', 'success');
+      setIsEditModalOpen(false);
+      setEditingTransaction(null);
+    } catch (err: any) {
+      console.error('Erro ao editar doação:', err);
+      showToast('Erro ao salvar alterações da doação: ' + (err.message || ''), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Download PDF for existing Receipt
   const handleDownloadPDF = async (tx: TreasuryTransaction) => {
     try {
+      const isMat = tx.donationKind === 'MATERIAL' || !!tx.materialCategory;
       await generateTreasuryReceiptPDF({
         receiptNumber: tx.receiptNumber || 'REC-0000',
         date: tx.date,
-        amount: tx.amount,
-        paymentMethod: tx.paymentMethod,
+        amount: Number(tx.estimatedValue || tx.amount) || 0,
+        paymentMethod: isMat ? 'Doação em Bens/Insumos' : tx.paymentMethod,
         category: tx.category,
         description: tx.description,
         payerName: tx.payerOrFavored,
         cpf: tx.cpf,
         registeredBy: tx.registeredBy,
-        observations: tx.observations
+        observations: tx.observations,
+        donationKind: isMat ? 'MATERIAL' : 'FINANCIAL',
+        itemDetails: tx.itemDetails || tx.description,
+        quantityOrVolume: tx.quantityOrVolume,
+        itemCondition: tx.itemCondition,
+        destination: tx.destination || tx.finality
       });
-      showToast('Recibo PDF gerado com sucesso.', 'success');
+      showToast('Recibo de doação em PDF gerado com sucesso.', 'success');
     } catch (e) {
       console.error("Error downloading receipt PDF:", e);
       showToast('Erro ao gerar PDF do recibo.', 'error');
@@ -645,19 +1027,25 @@ console.log("✅ Transação salva:", transactionRef.id);
 
   // Reports Calculations & Memos
   const reportPeriodTitleString = useMemo(() => {
-    if (reportMode === 'MENSAL') {
-      return `RELATÓRIO FINANCEIRO MENSAL - ${MONTH_NAMES[reportMonth - 1].toUpperCase()} / ${reportYear}`;
+    if (reportMode === 'DIARIO') {
+      const dayFmt = reportDayDate ? reportDayDate.split('-').reverse().join('/') : '';
+      return `RELATÓRIO DIÁRIO DE DOAÇÕES - ${dayFmt}`;
+    } else if (reportMode === 'MENSAL') {
+      return `RELATÓRIO MENSAL DE DOAÇÕES - ${MONTH_NAMES[reportMonth - 1].toUpperCase()} / ${reportYear}`;
     } else if (reportMode === 'SEMESTRAL') {
-      return `RELATÓRIO FINANCEIRO SEMESTRAL - ${reportSemester}º SEMESTRE DE ${reportYear}`;
+      return `RELATÓRIO SEMESTRAL DE DOAÇÕES - ${reportSemester}º SEMESTRE DE ${reportYear}`;
     } else if (reportMode === 'ANUAL') {
-      return `RELATÓRIO FINANCEIRO ANUAL - EXERCÍCIO DE ${reportYear}`;
+      return `RELATÓRIO ANUAL DE DOAÇÕES - EXERCÍCIO DE ${reportYear}`;
     } else {
-      return `RELATÓRIO FINANCEIRO PERSONALIZADO`;
+      return `RELATÓRIO DE DOAÇÕES PERSONALIZADO`;
     }
-  }, [reportMode, reportMonth, reportYear, reportSemester]);
+  }, [reportMode, reportDayDate, reportMonth, reportYear, reportSemester]);
 
   const reportPeriodSubtitleString = useMemo(() => {
-    if (reportMode === 'MENSAL') {
+    if (reportMode === 'DIARIO') {
+      const dayFmt = reportDayDate ? reportDayDate.split('-').reverse().join('/') : '';
+      return `Período: ${dayFmt}`;
+    } else if (reportMode === 'MENSAL') {
       const lastDay = new Date(reportYear, reportMonth, 0).getDate();
       return `Período: 01/${reportMonth.toString().padStart(2, '0')}/${reportYear} a ${lastDay.toString().padStart(2, '0')}/${reportMonth.toString().padStart(2, '0')}/${reportYear}`;
     } else if (reportMode === 'SEMESTRAL') {
@@ -671,10 +1059,10 @@ console.log("✅ Transação salva:", transactionRef.id);
       const endFmt = reportEndDate ? reportEndDate.split('-').reverse().join('/') : '31/12/2026';
       return `Período: ${startFmt} a ${endFmt}`;
     }
-  }, [reportMode, reportMonth, reportYear, reportSemester, reportStartDate, reportEndDate]);
+  }, [reportMode, reportDayDate, reportMonth, reportYear, reportSemester, reportStartDate, reportEndDate]);
 
   const reportTransactions = useMemo(() => {
-    return transactions.filter(t => {
+    return uniqueTransactions.filter(t => {
       if (t.status !== 'ATIVO') return false;
       if (!t.date) return false;
 
@@ -683,21 +1071,41 @@ console.log("✅ Transação salva:", transactionRef.id);
       const year = parseInt(parts[0], 10);
       const month = parseInt(parts[1], 10);
 
-      if (reportMode === 'MENSAL') {
-        return year === reportYear && month === reportMonth;
+      // Filter by period mode
+      let inPeriod = true;
+      if (reportMode === 'DIARIO') {
+        inPeriod = t.date === reportDayDate;
+      } else if (reportMode === 'MENSAL') {
+        inPeriod = year === reportYear && month === reportMonth;
       } else if (reportMode === 'SEMESTRAL') {
-        if (year !== reportYear) return false;
-        return reportSemester === 1 ? (month >= 1 && month <= 6) : (month >= 7 && month <= 12);
+        if (year !== reportYear) inPeriod = false;
+        else inPeriod = reportSemester === 1 ? (month >= 1 && month <= 6) : (month >= 7 && month <= 12);
       } else if (reportMode === 'ANUAL') {
-        return year === reportYear;
+        inPeriod = year === reportYear;
       } else if (reportMode === 'PERSONALIZADO') {
-        if (reportStartDate && t.date < reportStartDate) return false;
-        if (reportEndDate && t.date > reportEndDate) return false;
-        return true;
+        if (reportStartDate && t.date < reportStartDate) inPeriod = false;
+        if (reportEndDate && t.date > reportEndDate) inPeriod = false;
       }
+
+      if (!inPeriod) return false;
+
+      // Filter by donor if specified
+      if (reportDonorFilter !== 'ALL') {
+        const donorObj = localDonors.find(d => d.id === reportDonorFilter);
+        if (donorObj && t.payerOrFavored?.toLowerCase() !== donorObj.name.toLowerCase() && t.donorId !== donorObj.id) {
+          return false;
+        }
+      }
+
+      // Filter by donation type
+      if (reportTypeFilter !== 'ALL') {
+        if (reportTypeFilter === 'RECORRENTE' && t.donationType !== 'RECORRENTE' && !t.category.includes('Sócio')) return false;
+        if (reportTypeFilter === 'EVENTUAL' && t.donationType === 'RECORRENTE') return false;
+      }
+
       return true;
     }).sort((a, b) => a.date.localeCompare(b.date));
-  }, [transactions, reportMode, reportYear, reportMonth, reportSemester, reportStartDate, reportEndDate]);
+  }, [uniqueTransactions, reportMode, reportDayDate, reportYear, reportMonth, reportSemester, reportStartDate, reportEndDate, reportDonorFilter, reportTypeFilter, localDonors]);
 
   const reportTotalRevenue = useMemo(() => {
     return reportTransactions
@@ -705,32 +1113,23 @@ console.log("✅ Transação salva:", transactionRef.id);
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   }, [reportTransactions]);
 
-  const reportTotalExpenses = useMemo(() => {
-    return reportTransactions
-      .filter(t => t.type === 'DESPESA')
-      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  }, [reportTransactions]);
-
-  const reportNetBalance = reportTotalRevenue - reportTotalExpenses;
-
   const reportCategoryBreakdown = useMemo(() => {
-    const map: { [cat: string]: { category: string; type: 'RECEITA' | 'DESPESA'; total: number; count: number } } = {};
+    const map: { [cat: string]: { category: string; type: 'RECEITA'; total: number; count: number } } = {};
 
     reportTransactions.forEach(t => {
-      const key = `${t.type}_${t.category}`;
+      const key = `${t.category}`;
       if (!map[key]) {
-        map[key] = { category: t.category, type: t.type, total: 0, count: 0 };
+        map[key] = { category: t.category, type: 'RECEITA', total: 0, count: 0 };
       }
       map[key].total += Number(t.amount || 0);
       map[key].count += 1;
     });
 
     return Object.values(map).map(item => {
-      const subtotal = item.type === 'RECEITA' ? reportTotalRevenue : reportTotalExpenses;
-      const percentage = subtotal > 0 ? (item.total / subtotal) * 100 : 0;
+      const percentage = reportTotalRevenue > 0 ? (item.total / reportTotalRevenue) * 100 : 0;
       return { ...item, percentage };
     }).sort((a, b) => b.total - a.total);
-  }, [reportTransactions, reportTotalRevenue, reportTotalExpenses]);
+  }, [reportTransactions, reportTotalRevenue]);
 
   const reportMonthlyBreakdown = useMemo(() => {
     if (reportMode !== 'SEMESTRAL' && reportMode !== 'ANUAL') return [];
@@ -746,54 +1145,63 @@ console.log("✅ Transação salva:", transactionRef.id);
       });
 
       const rev = mtxs.filter(t => t.type === 'RECEITA').reduce((s, t) => s + Number(t.amount || 0), 0);
-      const exp = mtxs.filter(t => t.type === 'DESPESA').reduce((s, t) => s + Number(t.amount || 0), 0);
 
       return {
-        monthLabel: `${MONTH_NAMES[m - 1]} / ${reportYear}`,
+        monthNumber: m,
+        monthName: MONTH_NAMES[m - 1],
         revenue: rev,
-        expense: exp,
-        balance: rev - exp
+        expense: 0,
+        balance: rev
       };
     });
-  }, [reportTransactions, reportMode, reportSemester, reportYear]);
+  }, [reportTransactions, reportMode, reportSemester]);
 
-  const handleDownloadFinancialReportPDF = async () => {
+  // Export PDF Report
+  const handleExportReportPDF = async () => {
     try {
-      let periodTitleStr = '';
-      let periodSubtitleStr = '';
-
-      if (reportMode === 'MENSAL') {
-        periodTitleStr = `${MONTH_NAMES[reportMonth - 1].toUpperCase()} DE ${reportYear}`;
-        const lastDay = new Date(reportYear, reportMonth, 0).getDate();
-        periodSubtitleStr = `Período: 01/${reportMonth.toString().padStart(2, '0')}/${reportYear} a ${lastDay.toString().padStart(2, '0')}/${reportMonth.toString().padStart(2, '0')}/${reportYear}`;
-      } else if (reportMode === 'SEMESTRAL') {
-        periodTitleStr = `${reportSemester}º SEMESTRE DE ${reportYear}`;
-        periodSubtitleStr = reportSemester === 1 ? `Período: 01/01/${reportYear} a 30/06/${reportYear}` : `Período: 01/07/${reportYear} a 31/12/${reportYear}`;
-      } else if (reportMode === 'ANUAL') {
-        periodTitleStr = `EXERCÍCIO DE ${reportYear}`;
-        periodSubtitleStr = `Período: 01/01/${reportYear} a 31/12/${reportYear}`;
-      } else {
-        periodTitleStr = `PERÍODO PERSONALIZADO`;
-        periodSubtitleStr = `Período: ${reportStartDate.split('-').reverse().join('/')} a ${reportEndDate.split('-').reverse().join('/')}`;
-      }
-
       await generateTreasuryFinancialReportPDF({
-        periodTypeLabel: `RELATÓRIO FINANCEIRO ${reportMode}`,
-        periodTitle: periodTitleStr,
-        periodSubtitle: periodSubtitleStr,
+        periodTypeLabel: reportMode,
+        periodTitle: reportPeriodTitleString,
+        periodSubtitle: reportPeriodSubtitleString,
         totalRevenue: reportTotalRevenue,
-        totalExpenses: reportTotalExpenses,
-        netBalance: reportNetBalance,
+        totalExpenses: 0,
+        netBalance: reportTotalRevenue,
         transactions: reportTransactions,
         categoryBreakdown: reportCategoryBreakdown,
         monthlyBreakdown: reportMonthlyBreakdown,
         generatedBy: user.name
       });
+      showToast('Relatório oficial de doações em PDF gerado com sucesso!', 'success');
+    } catch (e) {
+      console.error("Erro ao gerar PDF do relatório:", e);
+      showToast('Erro ao exportar PDF do relatório.', 'error');
+    }
+  };
 
-      showToast('Relatório financeiro em PDF baixado com sucesso!', 'success');
-    } catch (err) {
-      console.error('Erro ao gerar relatório em PDF:', err);
-      showToast('Erro ao gerar PDF do relatório financeiro.', 'error');
+  // Export Word/Excel Report
+  const handleExportReportWord = async () => {
+    try {
+      const columns = ['Data', 'Recibo', 'Doador / Contribuinte', 'Categoria', 'Forma de Pgto', 'Valor (R$)'];
+      const data = reportTransactions.map(t => [
+        t.date.split('-').reverse().join('/'),
+        t.receiptNumber || '-',
+        t.payerOrFavored,
+        t.category,
+        t.paymentMethod,
+        `R$ ${Number(t.amount).toFixed(2)}`
+      ]);
+
+      await generateModernWord({
+        title: 'Relatório Consolidado de Doações e Captação - Casa OAMI',
+        subtitle: `${reportPeriodTitleString} - Total doado: R$ ${reportTotalRevenue.toFixed(2)}`,
+        columns,
+        data,
+        fileName: `relatorio_doacoes_oami_${reportYear}`
+      });
+      showToast('Relatório em Word gerado com sucesso!', 'success');
+    } catch (e) {
+      console.error("Erro ao exportar Word:", e);
+      showToast('Erro ao gerar arquivo Word do relatório.', 'error');
     }
   };
 
@@ -806,38 +1214,38 @@ console.log("✅ Transação salva:", transactionRef.id);
         </div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md px-3 py-1 rounded-full text-emerald-200 text-xs font-bold uppercase tracking-wider mb-3 border border-emerald-400/30">
-              <Landmark size={14} /> Módulo Oficial de Tesouraria
+            <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md px-3.5 py-1 rounded-full text-emerald-200 text-xs font-bold uppercase tracking-wider mb-3 border border-emerald-400/30">
+              <Heart size={14} className="text-pink-300" /> Opera Assistenza Malati Impediti (OAMI)
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Gestão Financeira e Controle de Caixa
+              Controle de Doações, Doadores e Sócios
             </h1>
             <p className="text-emerald-100/90 text-sm mt-1 max-w-2xl leading-relaxed">
-              Lançamento de receitas, cadastro de despesas com comprovantes, emissão oficial de recibos em PDF e auditoria transparente do caixa.
+              Gestão centralizada de doações em dinheiro, PIX, transferências e sócios contribuintes da Casa OAMI, com emissão oficial de recibos e prestação de contas transparente.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setActiveTab('reports')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
-            >
-              <FileText size={18} />
-              Relatórios Financeiros
-            </button>
-            <button
               onClick={() => setActiveTab('new-revenue')}
               className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
             >
               <PlusCircle size={18} />
-              Nova Receita
+              Nova Doação
             </button>
             <button
-              onClick={() => setActiveTab('new-expense')}
-              className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
+              onClick={() => setActiveTab('donors')}
+              className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
             >
-              <MinusCircle size={18} />
-              Nova Despesa
+              <Heart size={18} />
+              Doadores & Sócios
+            </button>
+            <button
+              onClick={() => setActiveTab('reports')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
+            >
+              <FileText size={18} />
+              Relatórios de Doações
             </button>
           </div>
         </div>
@@ -854,19 +1262,7 @@ console.log("✅ Transação salva:", transactionRef.id);
           }`}
         >
           <BarChart3 size={16} />
-          Visão Geral & Dashboard
-        </button>
-
-        <button
-          onClick={() => setActiveTab('reports')}
-          className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-            activeTab === 'reports'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-          }`}
-        >
-          <FileText size={16} />
-          Relatórios Financeiros
+          Visão Geral & Doações
         </button>
 
         <button
@@ -878,31 +1274,19 @@ console.log("✅ Transação salva:", transactionRef.id);
           }`}
         >
           <PlusCircle size={16} className="text-emerald-500" />
-          Cadastrar Receita
+          Cadastrar Doação / Receita
         </button>
 
         <button
-          onClick={() => setActiveTab('new-expense')}
+          onClick={() => setActiveTab('material-donations')}
           className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-            activeTab === 'new-expense'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-          }`}
-        >
-          <MinusCircle size={16} className="text-rose-500" />
-          Cadastrar Despesa
-        </button>
-
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
-            activeTab === 'history'
+            activeTab === 'material-donations'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
           }`}
         >
-          <FileText size={16} />
-          Histórico de Transações ({transactions.length})
+          <Package size={16} className={activeTab === 'material-donations' ? 'text-white' : 'text-blue-500'} />
+          Doações de Materiais & Bens
         </button>
 
         <button
@@ -916,77 +1300,154 @@ console.log("✅ Transação salva:", transactionRef.id);
           <Heart size={16} className={activeTab === 'donors' ? 'text-white' : 'text-pink-500'} />
           Doadores e Sócios ({localDonors.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'history'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <FileText size={16} />
+          Histórico de Doações ({uniqueTransactions.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('reports')}
+          className={`px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'reports'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+          }`}
+        >
+          <FileText size={16} />
+          Relatórios de Doações
+        </button>
+
+        <button
+          onClick={() => handleCleanDuplicates(false)}
+          title="Remover lançamentos duplicados do banco de dados"
+          className="px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-2 ml-auto"
+        >
+          <Trash2 size={15} />
+          Limpar Duplicados
+        </button>
       </div>
 
       {/* OVERVIEW / DASHBOARD TAB */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Summary Cards */}
+          {/* Main Donation Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Total Receitas */}
+            {/* Total Doações Recebidas */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total de Receitas</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total em Doações</p>
                 <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                  {stats.totalReceitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {stats.totalDonations.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </h3>
-                <p className="text-[10px] text-gray-400 mt-1">Lançamentos de entrada ativos</p>
+                <p className="text-[10px] text-gray-400 mt-1">Arrecadação acumulada da instituição</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 flex items-center justify-center">
+                <Heart size={24} className="text-pink-500" />
+              </div>
+            </div>
+
+            {/* Doações do Mês */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-blue-100 dark:border-blue-900/30 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Doações do Mês</p>
+                <h3 className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+                  {stats.monthDonations.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </h3>
+                <p className="text-[10px] text-gray-400 mt-1">Entradas no mês corrente</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
                 <TrendingUp size={24} />
               </div>
             </div>
 
-            {/* Total Despesas */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-rose-100 dark:border-rose-900/30 flex items-center justify-between">
+            {/* Doações Recorrentes (Sócios) */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-purple-100 dark:border-purple-900/30 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total de Despesas</p>
-                <h3 className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
-                  {stats.totalDespesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Sócios Mensais</p>
+                <h3 className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
+                  {stats.recurringDonations.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </h3>
-                <p className="text-[10px] text-gray-400 mt-1">Saídas pagas ou registradas</p>
+                <p className="text-[10px] text-gray-400 mt-1">{stats.monthlyDonorsCount} sócios ativos no cadastro</p>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center">
-                <TrendingDown size={24} />
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-900/30 text-purple-600 flex items-center justify-center">
+                <UserCheck size={24} />
               </div>
             </div>
 
-            {/* Saldo Atual */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-blue-100 dark:border-blue-900/30 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo em Caixa</p>
-                <h3 className={`text-2xl font-black mt-1 ${stats.saldo >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600'}`}>
-                  {stats.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </h3>
-                <p className="text-[10px] text-gray-400 mt-1">Receitas líquidas menos despesas</p>
-              </div>
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center">
-                <Wallet size={24} />
-              </div>
-            </div>
-
-            {/* Total Recibos */}
+            {/* Doações Eventuais / Avulsas */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-amber-100 dark:border-amber-900/30 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Recibos Emitidos</p>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Doações Eventuais</p>
                 <h3 className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
-                  {stats.totalRecibos}
+                  {stats.eventualDonations.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </h3>
-                <p className="text-[10px] text-gray-400 mt-1">Documentos oficiais OAMI</p>
+                <p className="text-[10px] text-gray-400 mt-1">Contribuições avulsas / campanhas</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center">
-                <Receipt size={24} />
+                <Sparkles size={24} />
               </div>
+            </div>
+          </div>
+
+          {/* Secondary Institutional Indicators */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-gray-400 uppercase">Total de Doadores Cadastrados</span>
+                <p className="text-lg font-black text-gray-800 dark:text-white mt-0.5">{stats.activeDonorsCount} doadores / sócios ativos</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('donors')}
+                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+              >
+                Gerenciar &rarr;
+              </button>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-gray-400 uppercase">Recibos Oficiais Emitidos</span>
+                <p className="text-lg font-black text-gray-800 dark:text-white mt-0.5">{stats.totalReceipts} recibos em PDF</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('history')}
+                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+              >
+                Ver Lista &rarr;
+              </button>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-bold text-gray-400 uppercase">Média por Doação</span>
+                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {stats.avgDonation.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('new-revenue')}
+                className="text-xs font-bold text-emerald-600 hover:underline flex items-center gap-1"
+              >
+                Nova Doação &rarr;
+              </button>
             </div>
           </div>
 
           {/* Recharts Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Bar Chart - Comparison */}
+            {/* Bar Chart - Evolution of Donations */}
             <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
               <h3 className="font-bold text-gray-800 dark:text-white text-base mb-4 flex items-center gap-2">
                 <BarChart3 className="text-emerald-600" size={18} />
-                Evolução Mensal de Receitas vs Despesas
+                Evolução Mensal de Doações Recebidas
               </h3>
 
               {chartMonthlyData.length > 0 ? (
@@ -996,12 +1457,11 @@ console.log("✅ Transação salva:", transactionRef.id);
                       <XAxis dataKey="monthLabel" stroke="#888888" fontSize={12} />
                       <YAxis stroke="#888888" fontSize={12} tickFormatter={(val) => `R$ ${val}`} />
                       <Tooltip 
-                        formatter={(value: any) => [`R$ ${Number(value).toFixed(2)}`, '']} 
+                        formatter={(value: any) => [`R$ ${Number(value).toFixed(2)}`, 'Doações']} 
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       />
                       <Legend />
-                      <Bar dataKey="Receitas" fill="#10B981" radius={[6, 6, 0, 0]} />
-                      <Bar dataKey="Despesas" fill="#EF4444" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="Doações" fill="#10B981" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1012,16 +1472,16 @@ console.log("✅ Transação salva:", transactionRef.id);
               )}
             </div>
 
-            {/* Pie Chart - Category Breakdown */}
+            {/* Pie Chart - Donation Category Breakdown */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
               <h3 className="font-bold text-gray-800 dark:text-white text-base mb-4 flex items-center gap-2">
                 <PieChartIcon className="text-blue-600" size={18} />
-                Distribuição por Categoria
+                Doações por Categoria
               </h3>
 
               {categoryBreakdown.length > 0 ? (
                 <div className="h-72 w-full flex items-center justify-center">
-                 <ResponsiveContainer width="100%" height={280}> 
+                  <ResponsiveContainer width="100%" height={280}>
                     <PieChart>
                       <Pie
                         data={categoryBreakdown}
@@ -1043,7 +1503,7 @@ console.log("✅ Transação salva:", transactionRef.id);
                 </div>
               ) : (
                 <div className="py-16 text-center text-gray-400 text-sm">
-                  Nenhuma categoria registrada.
+                  Nenhuma categoria de doação registrada.
                 </div>
               )}
             </div>
@@ -1053,7 +1513,7 @@ console.log("✅ Transação salva:", transactionRef.id);
           <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-gray-800 dark:text-white text-base">
-                Últimas Transações Lançadas
+                Últimas Doações e Contribuições Recebidas
               </h3>
               <button
                 onClick={() => setActiveTab('history')}
@@ -1063,33 +1523,24 @@ console.log("✅ Transação salva:", transactionRef.id);
               </button>
             </div>
 
-            {transactions.slice(0, 5).length > 0 ? (
-              <div className="overflow-x-auto">
+            {transactions.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-700">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                      <th className="py-3 px-4">Tipo</th>
+                    <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                       <th className="py-3 px-4">Recibo</th>
                       <th className="py-3 px-4">Data</th>
-                      <th className="py-3 px-4">Pagador / Favorecido</th>
-                      <th className="py-3 px-4">Categoria</th>
+                      <th className="py-3 px-4">Doador / Contribuinte</th>
+                      <th className="py-3 px-4">Categoria / Destinação</th>
+                      <th className="py-3 px-4">Forma Pgto</th>
                       <th className="py-3 px-4 text-right">Valor</th>
+                      <th className="py-3 px-4 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
                     {transactions.slice(0, 5).map(t => (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            t.type === 'RECEITA' 
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                              : 'bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
-                          }`}>
-                            {t.type === 'RECEITA' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                            {t.type}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-gray-600 dark:text-gray-300">
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {t.receiptNumber || '-'}
                         </td>
                         <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
@@ -1101,10 +1552,34 @@ console.log("✅ Transação salva:", transactionRef.id);
                         <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
                           {t.category}
                         </td>
-                        <td className={`py-3 px-4 text-right font-black ${
-                          t.type === 'RECEITA' ? 'text-emerald-600' : 'text-rose-600'
-                        }`}>
-                          {t.type === 'RECEITA' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
+                          {t.paymentMethod}
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-emerald-600 dark:text-emerald-400">
+                          + {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </td>
+                        <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleDownloadPDF(t)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+                            title="Baixar Recibo PDF"
+                          >
+                            <Printer size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(t)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            title="Editar Lançamento"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(t)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                            title="Excluir Lançamento"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1113,14 +1588,14 @@ console.log("✅ Transação salva:", transactionRef.id);
               </div>
             ) : (
               <div className="py-8 text-center text-gray-400 text-sm">
-                Nenhuma transação lançada até o momento.
+                Nenhuma doação cadastrada no momento.
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* CADASTRAR RECEITA TAB */}
+      {/* CADASTRAR DOAÇÃO / RECEITA TAB */}
       {activeTab === 'new-revenue' && (
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-emerald-100 dark:border-emerald-900/30 max-w-4xl mx-auto">
           <div className="flex items-center gap-3 pb-6 mb-6 border-b border-gray-100 dark:border-gray-700">
@@ -1128,55 +1603,83 @@ console.log("✅ Transação salva:", transactionRef.id);
               <PlusCircle size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-black text-gray-800 dark:text-white">Cadastrar Nova Receita</h2>
-              <p className="text-xs text-gray-500">Lançamento oficial de entrada de recursos com emissão sequencial de recibo.</p>
+              <h2 className="text-xl font-black text-gray-800 dark:text-white">Registrar Nova Doação / Contribuição</h2>
+              <p className="text-xs text-gray-500">
+                Lançamento oficial de doação financeira ou materiais/bens com emissão de recibo numerado em PDF.
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleSaveRevenue} className="space-y-6">
-            {/* Automatic Receipt Banner */}
-            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4 rounded-2xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Receipt className="text-emerald-600" size={24} />
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Número do Recibo Automático</span>
-                  <p className="text-lg font-black text-emerald-900 dark:text-emerald-200">{nextReceiptNumber}</p>
-                </div>
-              </div>
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-3 py-1 rounded-full">
-                Sequencial Automatizado
-              </span>
-            </div>
+          {/* Donation Kind Selector Switch */}
+          <div className="mb-6 bg-emerald-50/60 dark:bg-emerald-950/20 p-2 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setRevenueForm(prev => ({ ...prev, donationKind: 'FINANCIAL' }))}
+              className={`py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+                revenueForm.donationKind === 'FINANCIAL'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-emerald-100/50'
+              }`}
+            >
+              <Heart size={18} className={revenueForm.donationKind === 'FINANCIAL' ? 'text-white' : 'text-pink-500'} />
+              Doação Financeira (R$, PIX, Dinheiro)
+            </button>
+            <button
+              type="button"
+              onClick={() => setRevenueForm(prev => ({ ...prev, donationKind: 'MATERIAL' }))}
+              className={`py-3 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 ${
+                revenueForm.donationKind === 'MATERIAL'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-emerald-100/50'
+              }`}
+            >
+              <Package size={18} className={revenueForm.donationKind === 'MATERIAL' ? 'text-white' : 'text-blue-500'} />
+              Doação de Materiais, Bens e Insumos
+            </button>
+          </div>
 
-            {/* Vincular Doador / Sócio Cadastrado */}
+          <form onSubmit={handleSaveRevenue} className="space-y-6">
+            {/* Doador Cadastrado Dropdown */}
             {localDonors.length > 0 && (
-              <div className="bg-emerald-50/80 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/80 space-y-2">
-                <label className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
-                  <Heart size={16} className="text-pink-500" />
-                  Vincular Doador / Sócio Cadastrado (Preenchimento Rápido):
+              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/40">
+                <label className="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase mb-1">
+                  Vincular a Doador / Sócio Cadastrado (Opcional)
                 </label>
                 <select
-                  className="w-full bg-white dark:bg-gray-900 border border-emerald-300 dark:border-emerald-700 rounded-xl px-3.5 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                  value={revenueForm.selectedDonorId}
                   onChange={(e) => {
                     const donorId = e.target.value;
-                    if (!donorId) return;
-                    const d = localDonors.find(item => item.id === donorId);
-                    if (d) {
+                    if (donorId) {
+                      const selected = localDonors.find(d => d.id === donorId);
+                      if (selected) {
+                        setRevenueForm(prev => ({
+                          ...prev,
+                          selectedDonorId: donorId,
+                          payerName: selected.name,
+                          cpf: selected.cpfOrCnpj || '',
+                          email: selected.email || '',
+                          phone: selected.phone || '',
+                          donationType: selected.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL',
+                          amount: selected.amount ? String(selected.amount) : prev.amount
+                        }));
+                      }
+                    } else {
                       setRevenueForm(prev => ({
                         ...prev,
-                        payerName: d.name,
-                        amount: d.amount ? String(d.amount) : prev.amount,
-                        category: d.type === 'SOCIO_MENSAL' ? 'Mensalidade / Anuidade' : 'Doação Física',
-                        description: `Contribuição de ${d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador'}: ${d.name}`
+                        selectedDonorId: '',
+                        payerName: '',
+                        cpf: '',
+                        email: '',
+                        phone: ''
                       }));
-                      showToast(`Dados de ${d.name} preenchidos na receita!`, 'info');
                     }
                   }}
+                  className="w-full bg-white dark:bg-gray-800 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
-                  <option value="">-- Selecione para preencher os dados do doador/sócio --</option>
+                  <option value="">-- Doador Avulso / Novo Doador --</option>
                   {localDonors.map(d => (
                     <option key={d.id} value={d.id}>
-                      {d.name} ({d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador Eventual'}) {d.amount ? `- R$ ${d.amount.toFixed(2)}` : ''}
+                      {d.name} {d.cpfOrCnpj ? `(${d.cpfOrCnpj})` : ''} - {d.type === 'SOCIO_MENSAL' ? 'Sócio Mensal' : 'Doador'}
                     </option>
                   ))}
                 </select>
@@ -1184,56 +1687,25 @@ console.log("✅ Transação salva:", transactionRef.id);
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Data */}
-              <div>
+              {/* Nome do Doador */}
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Data de Recebimento *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={revenueForm.date}
-                  onChange={(e) => setRevenueForm(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
-              {/* Valor */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Valor (R$) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="0,00"
-                  value={revenueForm.amount}
-                  onChange={(e) => setRevenueForm(prev => ({ ...prev, amount: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
-              {/* Pagador */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Nome do Pagador / Doador *
+                  Nome Completo do Doador / Razão Social *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Nome completo da pessoa ou empresa"
+                  placeholder="Nome do doador ou empresa contribuinte"
                   value={revenueForm.payerName}
                   onChange={(e) => setRevenueForm(prev => ({ ...prev, payerName: e.target.value }))}
                   className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
 
-              {/* CPF / CNPJ */}
+              {/* CPF/CNPJ */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  CPF ou CNPJ (Opcional)
+                  CPF / CNPJ do Doador
                 </label>
                 <input
                   type="text"
@@ -1244,68 +1716,431 @@ console.log("✅ Transação salva:", transactionRef.id);
                 />
               </div>
 
-              {/* Forma de Pagamento */}
+              {/* Data da Doação */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Forma de Pagamento *
-                </label>
-                <select
-                  value={revenueForm.paymentMethod}
-                  onChange={(e) => setRevenueForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Categoria */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Categoria da Receita *
-                </label>
-                <select
-                  value={revenueForm.category}
-                  onChange={(e) => setRevenueForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                >
-                  {REVENUE_CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Custom Category input if 'Outras Receitas' */}
-            {revenueForm.category === 'Outras Receitas' && (
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Especifique a Categoria
+                  Data do Recebimento *
                 </label>
                 <input
-                  type="text"
-                  placeholder="Nome personalizado da categoria"
-                  value={revenueForm.customCategory}
-                  onChange={(e) => setRevenueForm(prev => ({ ...prev, customCategory: e.target.value }))}
+                  type="date"
+                  required
+                  value={revenueForm.date}
+                  onChange={(e) => setRevenueForm(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+
+              {revenueForm.donationKind === 'FINANCIAL' ? (
+                <>
+                  {/* Valor (R$) */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Valor da Doação (R$) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      placeholder="0,00"
+                      value={revenueForm.amount}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, amount: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Forma de Pagamento */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Forma de Pagamento / Transmissão *
+                    </label>
+                    <select
+                      value={revenueForm.paymentMethod}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {PAYMENT_METHODS.map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Categoria */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Categoria da Doação *
+                    </label>
+                    <select
+                      value={revenueForm.category}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {DONATION_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Custom Category input if other selected */}
+                  {revenueForm.category === 'Outra Contribuição' && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Especifique a Categoria *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Descrição da modalidade de contribuição"
+                        value={revenueForm.customCategory}
+                        onChange={(e) => setRevenueForm(prev => ({ ...prev, customCategory: e.target.value }))}
+                        className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {/* Modalidade / Tipo */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Modalidade do Doador
+                    </label>
+                    <select
+                      value={revenueForm.donationType}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, donationType: e.target.value as any }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      <option value="EVENTUAL">Doação Eventual / Avulsa</option>
+                      <option value="RECORRENTE">Doação Recorrente / Sócio Mensal</option>
+                      <option value="EMPRESA">Empresa Parceira (PJ)</option>
+                      <option value="PESSOA_FISICA">Pessoa Física (PF)</option>
+                    </select>
+                  </div>
+
+                  {/* Finalidade / Destinação */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Destinação / Finalidade Preferencial
+                    </label>
+                    <select
+                      value={revenueForm.finality}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, finality: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {DONATION_FINALITIES.map(f => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Categoria do Material */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Categoria do Material / Bem *
+                    </label>
+                    <select
+                      value={revenueForm.materialCategory}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, materialCategory: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {MATERIAL_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Estado do Item */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Estado de Conservação
+                    </label>
+                    <select
+                      value={revenueForm.itemCondition}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, itemCondition: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      <option value="Novo / Lacrado">Novo / Lacrado</option>
+                      <option value="Seminovo em ótimo estado">Seminovo em ótimo estado</option>
+                      <option value="Usado em bom estado">Usado em bom estado</option>
+                      <option value="Aguardando triagem/higienização">Aguardando triagem/higienização</option>
+                    </select>
+                  </div>
+
+                  {/* Quantidade ou Volume */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Quantidade / Volume / Peso
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 50 kg / 10 pacotes / 1 unidade"
+                      value={revenueForm.quantityOrVolume}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, quantityOrVolume: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Valor Estimado (R$) */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Valor Estimado do Bem (R$) (Opcional)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0,00"
+                      value={revenueForm.estimatedValue}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, estimatedValue: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-blue-600 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Detalhes dos Itens */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Detalhamento dos Itens / Descrição Completa *
+                    </label>
+                    <textarea
+                      rows={3}
+                      required
+                      placeholder="Ex: 10 pacotes de fraldas geriátricas G, 20 fardos de arroz 5kg, 1 mesa de jantar com 4 cadeiras"
+                      value={revenueForm.itemDetails}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, itemDetails: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Destino / Setor */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Destino Interno / Setor Solicitante
+                    </label>
+                    <select
+                      value={revenueForm.destination}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, destination: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {MATERIAL_DESTINATIONS.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* CONEXÃO E ENTRADA AUTOMÁTICA NO ESTOQUE */}
+                  <div className="sm:col-span-2 mt-3 bg-gradient-to-r from-emerald-50 to-teal-50/60 dark:from-emerald-950/30 dark:to-teal-950/20 p-4 sm:p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm shrink-0">
+                          <Package size={20} />
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                            Dar Entrada Automática no Controle de Estoque?
+                          </h4>
+                          <p className="text-[11px] text-gray-600 dark:text-gray-400">
+                            Recomendado para doações de alimentos, produtos de limpeza, higiene pessoal, fraldas e insumos do almoxarifado.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Radio/Button toggle */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRevenueForm(prev => ({ ...prev, addToStock: true }))}
+                        className={`p-3 rounded-xl border text-left font-bold text-xs transition-all flex items-center gap-2.5 cursor-pointer ${
+                          revenueForm.addToStock
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-emerald-50/50'
+                        }`}
+                      >
+                        <CheckCheck size={16} />
+                        Sim, dar entrada e atualizar saldo no Estoque
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRevenueForm(prev => ({ ...prev, addToStock: false }))}
+                        className={`p-3 rounded-xl border text-left font-bold text-xs transition-all flex items-center gap-2.5 cursor-pointer ${
+                          !revenueForm.addToStock
+                            ? 'bg-gray-700 text-white border-gray-700 shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <X size={16} />
+                        Não, apenas registrar doação sem alterar o Estoque
+                      </button>
+                    </div>
+
+                    {/* Conditional Stock Form Fields */}
+                    {revenueForm.addToStock && (
+                      <div className="pt-3 border-t border-emerald-200/60 dark:border-emerald-800/40 space-y-3.5 animate-in fade-in duration-200">
+                        {/* Target Product Selector */}
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                            Vincular ao Produto do Estoque *
+                          </label>
+                          <select
+                            value={revenueForm.stockProductId}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === 'NEW') {
+                                setRevenueForm(prev => ({
+                                  ...prev,
+                                  stockProductId: 'NEW',
+                                  stockProductName: prev.stockProductName || prev.itemDetails || prev.materialCategory,
+                                  stockProductCategory: mapMaterialCategoryToStockCategory(prev.materialCategory)
+                                }));
+                              } else {
+                                const selected = stockProducts.find(p => p.id === val);
+                                setRevenueForm(prev => ({
+                                  ...prev,
+                                  stockProductId: val,
+                                  stockProductName: selected ? selected.name : prev.stockProductName,
+                                  stockProductUnit: selected ? selected.unit : prev.stockProductUnit,
+                                  stockProductCategory: selected ? selected.category : prev.stockProductCategory
+                                }));
+                              }
+                            }}
+                            className="w-full bg-white dark:bg-gray-900 border border-emerald-300 dark:border-emerald-700 rounded-xl px-3.5 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                          >
+                            <option value="NEW">➕ [ Cadastrar / Criar Novo Item no Estoque ]</option>
+                            {stockProducts.length > 0 && (
+                              <optgroup label="Produtos Existentes no Estoque">
+                                {stockProducts.map(p => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name} ({p.category}) — Saldo Atual: {p.quantity} {p.unit}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </select>
+                        </div>
+
+                        {/* New Item Details */}
+                        {revenueForm.stockProductId === 'NEW' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/80 dark:bg-gray-900/80 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                Nome do Item no Estoque *
+                              </label>
+                              <input
+                                type="text"
+                                required={revenueForm.addToStock}
+                                placeholder="Ex: Fralda Geriátrica G, Arroz 5kg, Sabão em Pó"
+                                value={revenueForm.stockProductName}
+                                onChange={(e) => setRevenueForm(prev => ({ ...prev, stockProductName: e.target.value }))}
+                                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                Categoria no Estoque *
+                              </label>
+                              <select
+                                value={revenueForm.stockProductCategory}
+                                onChange={(e) => setRevenueForm(prev => ({ ...prev, stockProductCategory: e.target.value }))}
+                                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                              >
+                                {STOCK_CATEGORIES.map(cat => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                Unidade de Medida *
+                              </label>
+                              <select
+                                value={revenueForm.stockProductUnit}
+                                onChange={(e) => setRevenueForm(prev => ({ ...prev, stockProductUnit: e.target.value }))}
+                                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                              >
+                                {STOCK_UNITS.map(u => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                                Estoque Mínimo de Alerta
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="5"
+                                value={revenueForm.stockMinQuantity}
+                                onChange={(e) => setRevenueForm(prev => ({ ...prev, stockMinQuantity: e.target.value }))}
+                                className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Quantity to add */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                          <div>
+                            <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                              Quantidade para Entrada no Estoque *
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              required={revenueForm.addToStock}
+                              placeholder="Ex: 10"
+                              value={revenueForm.stockQuantity}
+                              onChange={(e) => setRevenueForm(prev => ({ ...prev, stockQuantity: e.target.value }))}
+                              className="w-full bg-white dark:bg-gray-900 border border-emerald-400 dark:border-emerald-600 rounded-xl px-3.5 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
+                          </div>
+
+                          <div className="p-2.5 bg-emerald-100/70 dark:bg-emerald-900/40 rounded-xl border border-emerald-300 dark:border-emerald-800/60 text-[11px] text-emerald-900 dark:text-emerald-200 font-medium leading-tight">
+                            ℹ️ O saldo deste produto no Almoxarifado será incrementado em <strong>+{revenueForm.stockQuantity || '0'} {revenueForm.stockProductUnit || 'unidade(s)'}</strong>.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Save as donor checkbox if not selected from dropdown */}
+            {!revenueForm.selectedDonorId && (
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                <input
+                  type="checkbox"
+                  id="saveAsDonor"
+                  checked={revenueForm.saveAsDonor}
+                  onChange={(e) => setRevenueForm(prev => ({ ...prev, saveAsDonor: e.target.checked }))}
+                  className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                />
+                <label htmlFor="saveAsDonor" className="text-xs font-bold text-gray-700 dark:text-gray-300 cursor-pointer">
+                  Salvar automaticamente no Cadastro de Doadores e Sócios (OAMI) para manter histórico
+                </label>
+              </div>
+            )}
+
+            {/* Descrição Adicional */}
+            {revenueForm.donationKind === 'FINANCIAL' && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                  Descrição Detalhada / Justificativa
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Especificação da doação ou observação no recibo"
+                  value={revenueForm.description}
+                  onChange={(e) => setRevenueForm(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
             )}
-
-            {/* Descrição */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                Descrição detalhada
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Breve especificação da receita ou finalidade do valor"
-                value={revenueForm.description}
-                onChange={(e) => setRevenueForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-              />
-            </div>
 
             {/* Responsável (Readonly) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1324,11 +2159,11 @@ console.log("✅ Transação salva:", transactionRef.id);
               {/* Observações */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Observações Adicionais
+                  Observações Internas
                 </label>
                 <input
                   type="text"
-                  placeholder="Anotações internas"
+                  placeholder="Anotações para controle interno"
                   value={revenueForm.observations}
                   onChange={(e) => setRevenueForm(prev => ({ ...prev, observations: e.target.value }))}
                   className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -1350,390 +2185,158 @@ console.log("✅ Transação salva:", transactionRef.id);
                 className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <Printer size={16} />
-                {submitting ? 'Salvando...' : 'Salvar Receita e Gerar Recibo PDF'}
+                {submitting ? 'Registrando...' : (revenueForm.donationKind === 'MATERIAL' ? 'Salvar Doação de Material e Emitir Comprovante PDF' : 'Salvar Doação e Emitir Recibo PDF')}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* CADASTRAR DESPESA TAB */}
-      {activeTab === 'new-expense' && (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-rose-100 dark:border-rose-900/30 max-w-4xl mx-auto">
-          <div className="flex items-center gap-3 pb-6 mb-6 border-b border-gray-100 dark:border-gray-700">
-            <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-900/30 text-rose-600 flex items-center justify-center font-bold">
-              <MinusCircle size={22} />
-            </div>
+      {/* DOAÇÕES DE MATERIAIS, BENS E INSUMOS TAB */}
+      {activeTab === 'material-donations' && (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-700/60 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-700">
             <div>
-              <h2 className="text-xl font-black text-gray-800 dark:text-white">Cadastrar Nova Despesa</h2>
-              <p className="text-xs text-gray-500">Lançamento de saídas financeiras, compras e pagamento a fornecedores.</p>
+              <h2 className="text-xl font-black text-gray-800 dark:text-white flex items-center gap-2">
+                <Package className="text-blue-600" size={22} />
+                Controle de Doações Físicas, Materiais e Bens (OAMI)
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Gestão de doações de alimentos, produtos de limpeza, higiene pessoal, móveis, eletrodomésticos e outros insumos.
+              </p>
             </div>
+
+            <button
+              onClick={() => {
+                setRevenueForm(prev => ({ ...prev, donationKind: 'MATERIAL' }));
+                setActiveTab('new-revenue');
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 self-start md:self-auto"
+            >
+              <PlusCircle size={18} />
+              Cadastrar Doação de Material
+            </button>
           </div>
 
-          <form onSubmit={handleSaveExpense} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Data */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Data do Pagamento / Vencimento *
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={expenseForm.date}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-                />
-              </div>
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setMaterialCategoryFilter('ALL')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                materialCategoryFilter === 'ALL'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              Todas as Categorias ({uniqueTransactions.filter(t => t.donationKind === 'MATERIAL' || !!t.materialCategory).length})
+            </button>
 
-              {/* Valor */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Valor (R$) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  required
-                  placeholder="0,00"
-                  value={expenseForm.amount}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-bold text-rose-600 focus:ring-2 focus:ring-rose-500 outline-none"
-                />
-              </div>
-
-              {/* Favorecido */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Favorecido / Fornecedor *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Razão Social ou Nome do beneficiário"
-                  value={expenseForm.favored}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, favored: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-                />
-              </div>
-
-              {/* Forma de Pagamento */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Forma de Pagamento *
-                </label>
-                <select
-                  value={expenseForm.paymentMethod}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
+            {MATERIAL_CATEGORIES.map(cat => {
+              const count = uniqueTransactions.filter(t => (t.donationKind === 'MATERIAL' || !!t.materialCategory) && (t.category === cat || t.materialCategory === cat)).length;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setMaterialCategoryFilter(cat)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    materialCategoryFilter === cat
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'
+                  }`}
                 >
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m.value} value={m.value}>{m.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Categoria */}
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Categoria da Despesa *
-                </label>
-                <select
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-                >
-                  {EXPENSE_CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Custom Category input if 'Outras Despesas' */}
-            {expenseForm.category === 'Outras Despesas' && (
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Especifique a Categoria
-                </label>
-                <input
-                  type="text"
-                  placeholder="Nome personalizado da categoria"
-                  value={expenseForm.customCategory}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, customCategory: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-                />
-              </div>
-            )}
-
-            {/* Descrição */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                Descrição da Despesa / Nota Fiscal *
-              </label>
-              <textarea
-                rows={2}
-                required
-                placeholder="Detalhe os produtos ou serviços adquiridos"
-                value={expenseForm.description}
-                onChange={(e) => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
-                className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-              />
-            </div>
-
-            {/* Upload do Comprovante (Opcional) */}
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                Comprovante / Anexo (Opcional)
-              </label>
-              <div className="flex items-center gap-4">
-                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 transition-colors flex items-center gap-2">
-                  <Paperclip size={16} />
-                  Anexar Foto ou PDF
-                  <input type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
-                </label>
-
-                {expenseForm.receiptUrl && (
-                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
-                    <CheckCircle2 size={16} /> Comprovante Anexado
-                    <button
-                      type="button"
-                      onClick={() => setExpenseForm(prev => ({ ...prev, receiptUrl: '' }))}
-                      className="text-gray-400 hover:text-rose-600 ml-2"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Responsável */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Responsável pelo Lançamento
-                </label>
-                <input
-                  type="text"
-                  disabled
-                  value={user.name}
-                  className="w-full bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-500 rounded-xl px-3.5 py-2.5 text-sm font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
-                  Observações
-                </label>
-                <input
-                  type="text"
-                  placeholder="Anotações internas"
-                  value={expenseForm.observations}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, observations: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:ring-2 focus:ring-rose-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setActiveTab('overview')}
-                className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-bold text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
-              >
-                <CheckCircle2 size={16} />
-                {submitting ? 'Salvando...' : 'Salvar Despesa'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* HISTÓRICO COMPLETO TAB */}
-      {activeTab === 'history' && (
-        <div className="space-y-4">
-          {/* Filters Bar */}
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-3">
-            <div className="flex flex-col md:flex-row gap-3">
-              {/* Search Bar */}
-              <div className="relative flex-1">
-                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar por pagador, recibo, favorecido ou descrição..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-              </div>
-
-              {/* Type Filter */}
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold"
-              >
-                <option value="ALL">Todos os Tipos</option>
-                <option value="RECEITA">Apenas Receitas</option>
-                <option value="DESPESA">Apenas Despesas</option>
-              </select>
-
-              {/* Status Filter */}
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold"
-              >
-                <option value="ATIVO">Lançamentos Ativos</option>
-                <option value="ALL">Todos os Lançamentos</option>
-              </select>
-
-              {/* Period Filter */}
-              <select
-                value={periodFilter}
-                onChange={(e) => setPeriodFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold"
-              >
-                <option value="THIS_MONTH">Este Mês</option>
-                <option value="LAST_MONTH">Mês Anterior</option>
-                <option value="ALL">Todo o Período</option>
-                <option value="CUSTOM">Personalizado</option>
-              </select>
-            </div>
-
-            {/* Custom Date Range if selected */}
-            {periodFilter === 'CUSTOM' && (
-              <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-                <span className="text-xs font-bold text-gray-500">De:</span>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs font-medium"
-                />
-                <span className="text-xs font-bold text-gray-500">Até:</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-1.5 text-xs font-medium"
-                />
-              </div>
-            )}
+                  {cat} ({count})
+                </button>
+              );
+            })}
           </div>
 
-          {/* Transactions Table */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-            {filteredTransactions.length > 0 ? (
-              <div className="overflow-x-auto">
+          {/* Material Donations Table */}
+          {(() => {
+            const materialList = uniqueTransactions.filter(t => {
+              const isMat = t.donationKind === 'MATERIAL' || !!t.materialCategory || t.paymentMethod === 'DOACAO_EM_BENS';
+              if (!isMat) return false;
+              if (materialCategoryFilter !== 'ALL' && t.category !== materialCategoryFilter && t.materialCategory !== materialCategoryFilter) {
+                return false;
+              }
+              if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                const matchName = t.payerOrFavored?.toLowerCase().includes(term);
+                const matchDesc = (t.itemDetails || t.description || '').toLowerCase().includes(term);
+                const matchCat = (t.category || '').toLowerCase().includes(term);
+                if (!matchName && !matchDesc && !matchCat) return false;
+              }
+              return true;
+            });
+
+            return materialList.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-700">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Tipo</th>
-                      <th className="py-3.5 px-4">Recibo</th>
-                      <th className="py-3.5 px-4">Data</th>
-                      <th className="py-3.5 px-4">Pagador / Favorecido</th>
-                      <th className="py-3.5 px-4">Categoria</th>
-                      <th className="py-3.5 px-4">Pagamento</th>
-                      <th className="py-3.5 px-4 text-right">Valor</th>
-                      <th className="py-3.5 px-4 text-center">Ações</th>
+                    <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      <th className="py-3 px-4">Recibo #</th>
+                      <th className="py-3 px-4">Data</th>
+                      <th className="py-3 px-4">Doador</th>
+                      <th className="py-3 px-4">Categoria</th>
+                      <th className="py-3 px-4">Detalhamento dos Itens</th>
+                      <th className="py-3 px-4">Qtd / Volume</th>
+                      <th className="py-3 px-4">Estado</th>
+                      <th className="py-3 px-4 text-right">Valor Est.</th>
+                      <th className="py-3 px-4 text-center">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
-                    {filteredTransactions.map(t => (
-                      <tr 
-                        key={t.id} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                      >
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            t.status === 'ATIVO' 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' 
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
-                          }`}>
-                            {t.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1 font-bold ${
-                            t.type === 'RECEITA' ? 'text-emerald-600' : 'text-rose-600'
-                          }`}>
-                            {t.type === 'RECEITA' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                            {t.type}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-gray-700 dark:text-gray-300">
+                    {materialList.map(t => (
+                      <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td className="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
                           {t.receiptNumber || '-'}
                         </td>
-                        <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300">
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
                           {t.date.split('-').reverse().join('/')}
                         </td>
-                        <td className="py-3.5 px-4 font-bold text-gray-800 dark:text-white">
+                        <td className="py-3 px-4 font-bold text-gray-800 dark:text-white">
                           {t.payerOrFavored}
+                          {t.cpf && <span className="block text-[10px] text-gray-400 font-normal">{t.cpf}</span>}
                         </td>
-                        <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
-                          {t.category}
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            {t.materialCategory || t.category}
+                          </span>
                         </td>
-                        <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
-                          {t.paymentMethod}
+                        <td className="py-3 px-4 text-gray-700 dark:text-gray-300 max-w-xs truncate" title={t.itemDetails || t.description}>
+                          {t.itemDetails || t.description}
                         </td>
-                        <td className={`py-3.5 px-4 text-right font-black ${
-                          t.type === 'RECEITA' ? 'text-emerald-600' : 'text-rose-600'
-                        }`}>
-                          {t.type === 'RECEITA' ? '+' : '-'} {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        <td className="py-3 px-4 font-medium text-gray-600 dark:text-gray-400">
+                          {t.quantityOrVolume || '-'}
                         </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {/* View Detail Modal */}
-                            <button
-                              onClick={() => setSelectedTransaction(t)}
-                              title="Visualizar Detalhes"
-                              className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 transition-colors"
-                            >
-                              <Eye size={16} />
-                            </button>
-
-                            {/* View Receipt Attachment Modal */}
-                            {t.receiptUrl && (
-                              <button
-                                onClick={() => setViewingReceiptTransaction(t)}
-                                title="Visualizar Comprovante"
-                                className="p-1.5 hover:bg-blue-100 text-blue-600 dark:hover:bg-blue-900/40 dark:text-blue-400 rounded-lg transition-colors"
-                              >
-                                <Paperclip size={16} />
-                              </button>
-                            )}
-
-                            {/* PDF Button for Receita */}
-                            {t.type === 'RECEITA' && t.status === 'ATIVO' && (
-                              <button
-                                onClick={() => handleDownloadPDF(t)}
-                                title="Baixar PDF do Recibo"
-                                className="p-1.5 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors"
-                              >
-                                <Printer size={16} />
-                              </button>
-                            )}
-
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => handleDeleteTransaction(t)}
-                              title="Excluir Lançamento"
-                              className="p-1.5 hover:bg-rose-100 text-rose-600 dark:hover:bg-rose-900/40 dark:text-rose-400 rounded-lg transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                        <td className="py-3 px-4 text-gray-500">
+                          {t.itemCondition || 'Em bom estado'}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                          {Number(t.estimatedValue || t.amount) > 0 
+                            ? Number(t.estimatedValue || t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            : 'N/A'}
+                        </td>
+                        <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleDownloadPDF(t)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+                            title="Baixar Comprovante em PDF"
+                          >
+                            <Printer size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(t)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            title="Editar Lançamento"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(t)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                            title="Excluir Lançamento"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -1741,137 +2344,250 @@ console.log("✅ Transação salva:", transactionRef.id);
                 </table>
               </div>
             ) : (
-              <div className="py-16 text-center text-gray-400 text-sm">
-                Nenhum lançamento localizado com os filtros selecionados.
+              <div className="py-12 text-center text-gray-400 text-sm bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                <Package size={36} className="mx-auto mb-2 text-gray-300" />
+                Nenhuma doação de material ou bem cadastrada nesta categoria.
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
       )}
 
-      {/* REPORTS TAB */}
-      {activeTab === 'reports' && (
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Report Selector Header */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* HISTÓRICO DE DOAÇÕES TAB */}
+      {activeTab === 'history' && (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-700/60 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-700">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="p-2.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl">
-                  <FileText size={22} />
-                </span>
-                <div>
-                  <h2 className="text-xl font-black text-gray-800 dark:text-white">
-                    Relatórios Financeiros Oficiais
-                  </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Selecione a periodicidade (Mensal, Semestral ou Anual) para emissão de balanço e prestação de contas.
-                  </p>
-                </div>
-              </div>
+              <h2 className="text-xl font-black text-gray-800 dark:text-white flex items-center gap-2">
+                <FileText className="text-emerald-600" size={20} />
+                Histórico de Doações e Contribuições
+              </h2>
+              <p className="text-xs text-gray-500">Consulta e busca detalhada de todas as entradas de doações registradas.</p>
             </div>
 
-            <div className="flex flex-wrap gap-2 w-full md:w-auto">
-              <button
-                type="button"
-                onClick={handleDownloadFinancialReportPDF}
-                className="flex-1 md:flex-none px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center justify-center gap-2"
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-400">Total: {filteredTransactions.length} doações</span>
+            </div>
+          </div>
+
+          {/* Search and Filters Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+            {/* Search */}
+            <div className="relative">
+              <Search size={16} className="absolute left-3.5 top-3 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar doador, recibo ou categoria..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Payment Filter */}
+            <div>
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
               >
-                <Download size={18} />
-                Baixar Relatório (PDF)
+                <option value="ALL">Todas as Formas de Pgto</option>
+                {PAYMENT_METHODS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Period Filter */}
+            <div>
+              <select
+                value={periodFilter}
+                onChange={(e) => setPeriodFilter(e.target.value as any)}
+                className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="THIS_MONTH">Este Mês</option>
+                <option value="LAST_MONTH">Mês Anterior</option>
+                <option value="ALL">Todo o Histórico</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Table */}
+          {filteredTransactions.length > 0 ? (
+            <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-700">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                    <th className="py-3 px-4">Recibo</th>
+                    <th className="py-3 px-4">Data</th>
+                    <th className="py-3 px-4">Doador / Contribuinte</th>
+                    <th className="py-3 px-4">Categoria / Destinação</th>
+                    <th className="py-3 px-4">Forma Pgto</th>
+                    <th className="py-3 px-4 text-right">Valor</th>
+                    <th className="py-3 px-4 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
+                  {filteredTransactions.map(t => (
+                    <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {t.receiptNumber || '-'}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300">
+                        {t.date.split('-').reverse().join('/')}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-gray-800 dark:text-white">
+                        {t.payerOrFavored}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
+                        {t.category}
+                      </td>
+                      <td className="py-3.5 px-4 text-gray-500 dark:text-gray-400">
+                        {t.paymentMethod}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-black text-emerald-600 dark:text-emerald-400">
+                        + {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                      <td className="py-3.5 px-4 text-center flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleDownloadPDF(t)}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+                          title="Baixar Recibo PDF"
+                        >
+                          <Printer size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditModal(t)}
+                          className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                          title="Editar Lançamento"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTransaction(t)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                          title="Excluir Lançamento"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-gray-400 text-sm">
+              Nenhuma doação encontrada com os filtros selecionados.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RELATÓRIOS DE DOAÇÕES TAB */}
+      {activeTab === 'reports' && (
+        <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-sm border border-gray-100 dark:border-gray-700/60 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-gray-100 dark:border-gray-700">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/40 px-3 py-1 rounded-full text-emerald-800 dark:text-emerald-300 text-xs font-bold uppercase mb-2">
+                <FileText size={14} /> Relatório Oficial de Prestação de Contas
+              </div>
+              <h2 className="text-xl font-black text-gray-800 dark:text-white">Relatório de Doações e Captação de Recursos (Casa OAMI)</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Emissão de demonstrativo consolidado de doações por período, doador e finalidade para prestação de contas institucional.</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportReportPDF}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+              >
+                <Download size={16} /> Exportar PDF
               </button>
               <button
-                type="button"
-                onClick={() => window.print()}
-                className="flex-1 md:flex-none px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold text-xs sm:text-sm rounded-2xl transition-all flex items-center justify-center gap-2"
+                onClick={handleExportReportWord}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
               >
-                <Printer size={18} />
-                Imprimir
+                <FileText size={16} /> Exportar Word
               </button>
             </div>
           </div>
 
-          {/* Filter & Period Selector Panel */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-            <label className="block text-xs font-extrabold uppercase tracking-wider text-gray-500">
-              Tipo de Relatório
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setReportMode('MENSAL')}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  reportMode === 'MENSAL'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Calendar size={15} /> Relatório Mensal
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setReportMode('SEMESTRAL')}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  reportMode === 'SEMESTRAL'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <BarChart3 size={15} /> Relatório Semestral
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setReportMode('ANUAL')}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  reportMode === 'ANUAL'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Landmark size={15} /> Relatório Anual
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setReportMode('PERSONALIZADO')}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 ${
-                  reportMode === 'PERSONALIZADO'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                <Filter size={15} /> Período Personalizado
-              </button>
+          {/* Filter & Periodicity Bar for Reports */}
+          <div className="bg-gray-50 dark:bg-gray-900/60 p-4 sm:p-5 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-xs font-extrabold text-gray-700 dark:text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Landmark size={15} className="text-emerald-600" />
+                1. Periodicidade do Relatório para Download:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'DIARIO', label: 'Diário' },
+                  { id: 'MENSAL', label: 'Mensal' },
+                  { id: 'SEMESTRAL', label: 'Semestral' },
+                  { id: 'ANUAL', label: 'Anual' },
+                  { id: 'PERSONALIZADO', label: 'Personalizado' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setReportMode(p.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      reportMode === p.id
+                        ? 'bg-emerald-600 text-white shadow-md'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Dynamic Controls based on Report Mode */}
-            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-4">
+            {/* Dynamic Controls Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-gray-200 dark:border-gray-800">
+              {reportMode === 'DIARIO' && (
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Data Específica</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={reportDayDate}
+                      onChange={(e) => setReportDayDate(e.target.value)}
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setReportDayDate(new Date().toISOString().split('T')[0])}
+                      className="px-3 py-2 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-bold hover:bg-emerald-200 transition-colors whitespace-nowrap"
+                    >
+                      Hoje
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {reportMode === 'MENSAL' && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Mês de Referência</label>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Mês</label>
                     <select
                       value={reportMonth}
                       onChange={(e) => setReportMonth(Number(e.target.value))}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       {MONTH_NAMES.map((m, idx) => (
-                        <option key={idx} value={idx + 1}>{m}</option>
+                        <option key={idx + 1} value={idx + 1}>{m}</option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ano</label>
-                    <select
+                    <input
+                      type="number"
                       value={reportYear}
                       onChange={(e) => setReportYear(Number(e.target.value))}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      {[2024, 2025, 2026, 2027, 2028].map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
                   </div>
                 </>
               )}
@@ -1883,39 +2599,33 @@ console.log("✅ Transação salva:", transactionRef.id);
                     <select
                       value={reportSemester}
                       onChange={(e) => setReportSemester(Number(e.target.value) as 1 | 2)}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
                     >
-                      <option value={1}>1º Semestre (Jan a Jun)</option>
-                      <option value={2}>2º Semestre (Jul a Dez)</option>
+                      <option value={1}>1º Semestre (Janeiro a Junho)</option>
+                      <option value={2}>2º Semestre (Julho a Dezembro)</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ano</label>
-                    <select
+                    <input
+                      type="number"
                       value={reportYear}
                       onChange={(e) => setReportYear(Number(e.target.value))}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                    >
-                      {[2024, 2025, 2026, 2027, 2028].map(y => (
-                        <option key={y} value={y}>{y}</option>
-                      ))}
-                    </select>
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
                   </div>
                 </>
               )}
 
               {reportMode === 'ANUAL' && (
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ano Exercício</label>
-                  <select
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Ano do Exercício</label>
+                  <input
+                    type="number"
                     value={reportYear}
                     onChange={(e) => setReportYear(Number(e.target.value))}
-                    className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    {[2024, 2025, 2026, 2027, 2028].map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                    className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
                 </div>
               )}
 
@@ -1927,7 +2637,7 @@ console.log("✅ Transação salva:", transactionRef.id);
                       type="date"
                       value={reportStartDate}
                       onChange={(e) => setReportStartDate(e.target.value)}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                   <div>
@@ -1936,503 +2646,394 @@ console.log("✅ Transação salva:", transactionRef.id);
                       type="date"
                       value={reportEndDate}
                       onChange={(e) => setReportEndDate(e.target.value)}
-                      className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
                 </>
               )}
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Filtro por Doador</label>
+                <select
+                  value={reportDonorFilter}
+                  onChange={(e) => setReportDonorFilter(e.target.value)}
+                  className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="ALL">Todos os Doadores e Sócios</option>
+                  {localDonors.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Tipo de Doação</label>
+                <select
+                  value={reportTypeFilter}
+                  onChange={(e) => setReportTypeFilter(e.target.value)}
+                  className="w-full py-2 px-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="ALL">Todas as Doações</option>
+                  <option value="RECORRENTE">Apenas Sócios / Recorrentes</option>
+                  <option value="EVENTUAL">Apenas Doações Eventuais</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* MODERN VISUAL REPORT DISPLAY CARD */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 sm:p-8 shadow-lg border border-gray-200 dark:border-gray-700 space-y-8 print:p-0 print:border-none print:shadow-none">
-            
-            {/* Header Letterhead */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-gray-200 dark:border-gray-700 gap-4">
+          {/* Consolidated Executive Summary Banner */}
+          <div className="bg-gradient-to-br from-emerald-900 to-teal-900 text-white p-6 rounded-2xl shadow-md border border-emerald-700/60 space-y-4">
+            <div className="flex items-center justify-between border-b border-emerald-700/60 pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40 dark:text-emerald-400 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/40">
-                  RELATÓRIO OFICIAL DE TESOURARIA
-                </span>
-                <h1 className="text-2xl font-black text-gray-900 dark:text-white mt-2">
-                  {reportPeriodTitleString}
-                </h1>
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
-                  {reportPeriodSubtitleString}
-                </p>
+                <span className="text-xs font-bold uppercase text-emerald-300 tracking-wider">Total Consolidado de Doações</span>
+                <h3 className="text-xl font-black text-white mt-0.5">{reportPeriodTitleString}</h3>
+                <p className="text-xs text-emerald-200/80">{reportPeriodSubtitleString}</p>
               </div>
-              <div className="text-left sm:text-right">
-                <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                  OBRA DE ASSISTÊNCIA AO IDOSO (OAMI)
-                </p>
-                <p className="text-[11px] text-gray-400">CNPJ: 10.706.425/0001-74</p>
-                <p className="text-[10px] text-gray-400 mt-1">Lançamentos Processados: {reportTransactions.length}</p>
-              </div>
-            </div>
-
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Receitas */}
-              <div className="bg-emerald-50/60 dark:bg-emerald-900/20 p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase">Receitas Totais</span>
-                  <TrendingUp className="text-emerald-600 dark:text-emerald-400" size={18} />
-                </div>
-                <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
+              <div className="text-right">
+                <span className="text-xs font-bold text-emerald-300 uppercase">Valor Total Arrecadado</span>
+                <p className="text-3xl font-black text-emerald-300">
                   {reportTotalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </p>
-                <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-                  Entradas no período
-                </p>
-              </div>
-
-              {/* Despesas */}
-              <div className="bg-rose-50/60 dark:bg-rose-900/20 p-5 rounded-2xl border border-rose-200 dark:border-rose-800/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase">Despesas Totais</span>
-                  <TrendingDown className="text-rose-600 dark:text-rose-400" size={18} />
-                </div>
-                <p className="text-2xl font-black text-rose-700 dark:text-rose-400">
-                  {reportTotalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </p>
-                <p className="text-[10px] text-rose-600/80 dark:text-rose-400/80 mt-1">
-                  Saídas no período
-                </p>
-              </div>
-
-              {/* Saldo Líquido */}
-              <div className={`p-5 rounded-2xl border ${
-                reportNetBalance >= 0 
-                  ? 'bg-blue-50/60 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/50' 
-                  : 'bg-amber-50/60 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/50'
-              }`}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase">Balanço do Período</span>
-                  <Wallet className={reportNetBalance >= 0 ? "text-blue-600" : "text-amber-600"} size={18} />
-                </div>
-                <p className={`text-2xl font-black ${reportNetBalance >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-amber-700 dark:text-amber-400'}`}>
-                  {reportNetBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </p>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  {reportNetBalance >= 0 ? '✓ Resultado Positivo (Superávit)' : '⚠️ Resultado Negativo (Déficit)'}
-                </p>
               </div>
             </div>
 
-            {/* Monthly Breakdown for Semestral & Anual */}
-            {(reportMode === 'SEMESTRAL' || reportMode === 'ANUAL') && reportMonthlyBreakdown.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-extrabold text-sm text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                  <BarChart3 size={16} className="text-emerald-600" />
-                  Evolução Mês a Mês do Período
-                </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/10">
+                <span className="text-[10px] font-bold text-emerald-200 uppercase">Quantidade de Contribuições</span>
+                <p className="text-lg font-black text-white mt-0.5">{reportTransactions.length} doações registradas</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-xl border border-white/10">
+                <span className="text-[10px] font-bold text-emerald-200 uppercase">Média por Doação</span>
+                <p className="text-lg font-black text-white mt-0.5">
+                  {reportTransactions.length > 0
+                    ? (reportTotalRevenue / reportTransactions.length).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    : 'R$ 0,00'}
+                </p>
+              </div>
+            </div>
+          </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-600 dark:text-gray-300 font-bold border-b border-gray-200 dark:border-gray-700">
-                      <tr>
-                        <th className="py-3 px-4">Mês / Ano</th>
-                        <th className="py-3 px-4 text-right text-emerald-600 dark:text-emerald-400">Receitas</th>
-                        <th className="py-3 px-4 text-right text-rose-600 dark:text-rose-400">Despesas</th>
-                        <th className="py-3 px-4 text-right">Resultado do Mês</th>
+          {/* Breakdown Table for Report */}
+          <div className="space-y-3">
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm">
+              Demonstrativo de Doações no Período Selecionado
+            </h3>
+
+            {reportTransactions.length > 0 ? (
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-700">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      <th className="py-3 px-4">Data</th>
+                      <th className="py-3 px-4">Recibo</th>
+                      <th className="py-3 px-4">Doador / Contribuinte</th>
+                      <th className="py-3 px-4">Categoria / Destinação</th>
+                      <th className="py-3 px-4">Forma Pgto</th>
+                      <th className="py-3 px-4 text-right">Valor</th>
+                      <th className="py-3 px-4 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs">
+                    {reportTransactions.map(t => (
+                      <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
+                          {t.date.split('-').reverse().join('/')}
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          {t.receiptNumber || '-'}
+                        </td>
+                        <td className="py-3 px-4 font-bold text-gray-800 dark:text-white">
+                          {t.payerOrFavored}
+                        </td>
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
+                          {t.category} {t.finality ? `(${t.finality})` : ''}
+                        </td>
+                        <td className="py-3 px-4 text-gray-500 dark:text-gray-400">
+                          {t.paymentMethod}
+                        </td>
+                        <td className="py-3 px-4 text-right font-black text-emerald-600 dark:text-emerald-400">
+                          + {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </td>
+                        <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleDownloadPDF(t)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
+                            title="Baixar Recibo PDF"
+                          >
+                            <Printer size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditModal(t)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            title="Editar Lançamento"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(t)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                            title="Excluir Lançamento"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {reportMonthlyBreakdown.map((mb, i) => (
-                        <tr key={i} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20">
-                          <td className="py-2.5 px-4 font-bold text-gray-800 dark:text-gray-200">{mb.monthLabel}</td>
-                          <td className="py-2.5 px-4 text-right font-medium text-emerald-600 dark:text-emerald-400">
-                            {mb.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-medium text-rose-600 dark:text-rose-400">
-                            {mb.expense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </td>
-                          <td className={`py-2.5 px-4 text-right font-bold ${
-                            mb.balance >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400'
-                          }`}>
-                            {mb.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-gray-400 text-sm">
+                Nenhuma doação registrada no período selecionado.
               </div>
             )}
-
-            {/* Category Breakdown Progress Bars */}
-            <div className="space-y-4">
-              <h3 className="font-extrabold text-sm text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <PieChartIcon size={16} className="text-emerald-600" />
-                Distribuição por Categoria
-              </h3>
-
-              {reportCategoryBreakdown.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {reportCategoryBreakdown.map((catItem, idx) => (
-                    <div key={idx} className="bg-gray-50 dark:bg-gray-900/60 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-2">
-                      <div className="flex justify-between items-center text-xs">
-                        <div className="flex items-center gap-1.5 font-bold text-gray-800 dark:text-white">
-                          <span className={`w-2 h-2 rounded-full ${catItem.type === 'RECEITA' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                          {catItem.category}
-                        </div>
-                        <span className="font-extrabold text-gray-900 dark:text-white">
-                          {catItem.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      </div>
-                      
-                      {/* Progress Bar */}
-                      <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${catItem.type === 'RECEITA' ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                          style={{ width: `${Math.min(catItem.percentage, 100)}%` }}
-                        />
-                      </div>
-
-                      <div className="flex justify-between text-[10px] text-gray-400">
-                        <span>{catItem.count} {catItem.count === 1 ? 'operação' : 'operações'}</span>
-                        <span>{catItem.percentage.toFixed(1)}% do total</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400 italic">Nenhum lançamento no período selecionado.</p>
-              )}
-            </div>
-
-            {/* Itemized Transactions Table */}
-            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="font-extrabold text-sm text-gray-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                <FileText size={16} className="text-emerald-600" />
-                Extrato Detalhado do Período ({reportTransactions.length} registros)
-              </h3>
-
-              {reportTransactions.length > 0 ? (
-                <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-600 dark:text-gray-300 font-bold border-b border-gray-200 dark:border-gray-700">
-                      <tr>
-                        <th className="py-3 px-4">Data</th>
-                        <th className="py-3 px-4">Tipo</th>
-                        <th className="py-3 px-4">Categoria</th>
-                        <th className="py-3 px-4">Pagador / Favorecido</th>
-                        <th className="py-3 px-4">Pagamento</th>
-                        <th className="py-3 px-4 text-right">Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {reportTransactions.map((tx) => {
-                        let formattedDate = tx.date;
-                        try {
-                          const parts = tx.date.split('-');
-                          if (parts.length === 3) formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
-                        } catch (e) {}
-
-                        return (
-                          <tr key={tx.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20">
-                            <td className="py-2.5 px-4 font-bold text-gray-700 dark:text-gray-300">{formattedDate}</td>
-                            <td className="py-2.5 px-4">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                tx.type === 'RECEITA' 
-                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' 
-                                  : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                              }`}>
-                                {tx.type}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 text-gray-600 dark:text-gray-300 font-medium">{tx.category}</td>
-                            <td className="py-2.5 px-4 text-gray-800 dark:text-gray-200 font-bold">{tx.payerOrFavored}</td>
-                            <td className="py-2.5 px-4 text-gray-500 dark:text-gray-400">{tx.paymentMethod}</td>
-                            <td className={`py-2.5 px-4 text-right font-black ${
-                              tx.type === 'RECEITA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                            }`}>
-                              {tx.type === 'RECEITA' ? '+' : '-'} {Number(tx.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-12 text-center text-gray-400 text-xs">
-                  Nenhum registro localizado para os parâmetros de período informados.
-                </div>
-              )}
-            </div>
-
-            {/* Footer Audit Seal */}
-            <div className="pt-6 border-t border-gray-100 dark:border-gray-700/60 flex flex-col sm:flex-row justify-between items-center gap-3 text-[11px] text-gray-400">
-              <div>
-                Relatório gerado digitalmente em <strong>{new Date().toLocaleString('pt-BR')}</strong> por <strong>{user.name}</strong>
-              </div>
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
-                <CheckCircle2 size={14} /> Autenticidade Registrada na Tesouraria OAMI
-              </div>
-            </div>
-
           </div>
         </div>
       )}
 
-      {/* DETAIL MODAL */}
-      {selectedTransaction && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
-              <h3 className="font-black text-gray-800 dark:text-white text-lg flex items-center gap-2">
-                <Receipt className="text-emerald-600" size={20} />
-                Detalhes da Transação
-              </h3>
-              <button 
-                onClick={() => setSelectedTransaction(null)}
-                className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400"
-              >
-                <X size={20} />
-              </button>
-            </div>
+      {/* DOADORES E SÓCIOS TAB */}
+      {activeTab === 'donors' && (
+        <DonorsSection donors={localDonors} showToast={showToast} user={user} />
+      )}
 
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl">
-                <span className="font-bold text-gray-400 uppercase">Status</span>
-                <span className={`font-bold ${selectedTransaction.status === 'ATIVO' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {selectedTransaction.status}
-                </span>
-              </div>
-
-              {selectedTransaction.receiptNumber && (
-                <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                  <span className="font-bold text-gray-400 uppercase">Recibo Nº</span>
-                  <span className="font-mono font-bold text-gray-800 dark:text-white">{selectedTransaction.receiptNumber}</span>
-                </div>
-              )}
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Tipo</span>
-                <span className="font-bold">{selectedTransaction.type}</span>
-              </div>
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Valor</span>
-                <span className="font-black text-sm text-emerald-600">
-                  {Number(selectedTransaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </div>
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Data</span>
-                <span>{selectedTransaction.date.split('-').reverse().join('/')}</span>
-              </div>
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Pagador / Favorecido</span>
-                <span className="font-bold">{selectedTransaction.payerOrFavored}</span>
-              </div>
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Forma de Pagamento</span>
-                <span>{selectedTransaction.paymentMethod}</span>
-              </div>
-
-              <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2">
-                <span className="font-bold text-gray-400 uppercase">Categoria</span>
-                <span>{selectedTransaction.category}</span>
-              </div>
-
+      {/* MODAL: EDIT DONATION TRANSACTION */}
+      {isEditModalOpen && editingTransaction && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl max-w-2xl w-full border border-gray-100 dark:border-gray-800 my-auto max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            <div className="p-5 sm:p-6 bg-gradient-to-r from-emerald-700 to-teal-700 text-white flex justify-between items-center shrink-0 sticky top-0 z-10 shadow-sm">
               <div>
-                <span className="font-bold text-gray-400 uppercase block mb-1">Descrição</span>
-                <p className="bg-gray-50 dark:bg-gray-900 p-2.5 rounded-xl text-gray-700 dark:text-gray-300">
-                  {selectedTransaction.description}
+                <h3 className="text-lg font-black flex items-center gap-2">
+                  <Pencil size={20} className="text-amber-300" />
+                  Editar Lançamento de Doação
+                </h3>
+                <p className="text-xs text-emerald-100 mt-0.5">
+                  Recibo: {editingTransaction.receiptNumber || 'N/A'}
                 </p>
               </div>
-
-              {selectedTransaction.receiptUrl && (
-                <div>
-                  <span className="font-bold text-gray-400 uppercase block mb-1">Comprovante Anexado</span>
-                  <button
-                    type="button"
-                    onClick={() => setViewingReceiptTransaction(selectedTransaction)}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                  >
-                    <Paperclip size={14} /> Visualizar Comprovante
-                  </button>
-                </div>
-              )}
-
-              <div className="pt-2 text-[10px] text-gray-400 border-t border-gray-100 dark:border-gray-800">
-                Lançado por <span className="font-bold">{selectedTransaction.registeredBy}</span> em {new Date(selectedTransaction.createdAt).toLocaleString('pt-BR')}
-              </div>
-            </div>
-
-            <div className="pt-3 flex justify-end gap-2 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => {
-                  const tx = selectedTransaction;
-                  setSelectedTransaction(null);
-                  handleDeleteTransaction(tx);
-                }}
-                className="px-4 py-2 bg-rose-100 dark:bg-rose-900/40 hover:bg-rose-200 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
-              >
-                <Trash2 size={14} /> Excluir Lançamento
-              </button>
-              {selectedTransaction.type === 'RECEITA' && selectedTransaction.status === 'ATIVO' && (
-                <button
-                  onClick={() => handleDownloadPDF(selectedTransaction)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
-                >
-                  <Printer size={14} /> Baixar Recibo PDF
-                </button>
-              )}
-              <button
-                onClick={() => setSelectedTransaction(null)}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold text-xs"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RECEIPT VIEWER MODAL */}
-      {viewingReceiptTransaction && viewingReceiptTransaction.receiptUrl && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 flex flex-col max-h-[90vh] space-y-4">
-            
-            {/* Header */}
-            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <Paperclip size={20} />
-                </div>
-                <div>
-                  <h3 className="font-black text-gray-800 dark:text-white text-base sm:text-lg">
-                    Comprovante da Despesa
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {viewingReceiptTransaction.payerOrFavored} • {Number(viewingReceiptTransaction.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setViewingReceiptTransaction(null)}
-                className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              <button 
+                type="button" 
+                onClick={() => { setIsEditModalOpen(false); setEditingTransaction(null); }} 
+                className="p-2 hover:bg-white/20 bg-white/10 rounded-full transition-colors cursor-pointer shrink-0 ml-2" 
                 title="Fechar"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Viewer Body */}
-            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 dark:bg-gray-900/50 p-3 sm:p-4 rounded-2xl border border-gray-100 dark:border-gray-700/60 min-h-[280px] max-h-[60vh]">
-              {viewingReceiptTransaction.receiptUrl.startsWith('data:application/pdf') || viewingReceiptTransaction.receiptUrl.toLowerCase().includes('.pdf') ? (
-                <div className="w-full h-full flex flex-col items-center justify-center">
-                  {pdfBlobUrl ? (
-                    <object
-                      data={pdfBlobUrl}
-                      type="application/pdf"
-                      className="w-full h-[52vh] rounded-xl border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm max-w-md my-auto">
-                        <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
-                          <FileText size={24} />
-                        </div>
-                        <h4 className="font-bold text-gray-800 dark:text-white text-base mb-1">Comprovante em PDF</h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                          O seu navegador impede a exibição interna do PDF. Você pode baixar o arquivo e visualizar diretamente no seu dispositivo.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const url = pdfBlobUrl || viewingReceiptTransaction.receiptUrl!;
-                            const fileName = `comprovante_${viewingReceiptTransaction.receiptNumber || viewingReceiptTransaction.id}_${viewingReceiptTransaction.date}.pdf`;
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = fileName;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
-                        >
-                          <Download size={16} /> Baixar PDF
-                        </button>
-                      </div>
-                    </object>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm max-w-md my-auto">
-                      <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-3">
-                        <FileText size={24} />
-                      </div>
-                      <h4 className="font-bold text-gray-800 dark:text-white text-base mb-1">Comprovante em PDF</h4>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                        O arquivo PDF está pronto para ser baixado.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = viewingReceiptTransaction.receiptUrl!;
-                          const fileName = `comprovante_${viewingReceiptTransaction.receiptNumber || viewingReceiptTransaction.id}_${viewingReceiptTransaction.date}.pdf`;
-                          const link = document.createElement('a');
-                          link.href = url;
-                          link.download = fileName;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        }}
-                        className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
-                      >
-                        <Download size={16} /> Baixar PDF
-                      </button>
-                    </div>
-                  )}
+            <form onSubmit={handleSaveEditedTransaction} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar text-xs">
+              
+              {/* Type toggle indicator */}
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800 flex items-center justify-between">
+                <span className="font-bold text-emerald-800 dark:text-emerald-300">Tipo de Doação:</span>
+                <span className="px-3 py-1 rounded-full font-black bg-emerald-600 text-white text-[11px]">
+                  {editForm.donationKind === 'MATERIAL' ? '📦 Doação Física / Material / Bens' : '💰 Doação Financeira'}
+                </span>
+              </div>
+
+              {/* Doador e CPF */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                    Nome do Doador / Contribuinte *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.payerName}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, payerName: e.target.value }))}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
                 </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                    CPF / CNPJ
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.cpf}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, cpf: e.target.value }))}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Data e Valor/Valor Estimado */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                    Data do Recebimento *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editForm.date}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                    {editForm.donationKind === 'MATERIAL' ? 'Valor Estimado (R$)' : 'Valor Recebido (R$) *'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.amount}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
+                    className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Specific fields for Material Donations */}
+              {editForm.donationKind === 'MATERIAL' ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Categoria do Material *
+                      </label>
+                      <select
+                        value={editForm.materialCategory}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, materialCategory: e.target.value }))}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      >
+                        {MATERIAL_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                        Estado de Conservação
+                      </label>
+                      <select
+                        value={editForm.itemCondition}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, itemCondition: e.target.value }))}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      >
+                        <option value="Novo / Lacrado">Novo / Lacrado</option>
+                        <option value="Em bom estado">Em bom estado</option>
+                        <option value="Usado - Funcionando">Usado - Funcionando</option>
+                        <option value="Necessita pequeno reparo">Necessita pequeno reparo</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Quantidade / Volume / Descrição Resumida
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 5 pacotes de 1kg / 1 geladeira Consul"
+                      value={editForm.quantityOrVolume}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, quantityOrVolume: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Detalhamento dos Itens doados
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Descreva os itens recebidos..."
+                      value={editForm.itemDetails}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, itemDetails: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Destino / Local de Armazenamento
+                    </label>
+                    <select
+                      value={editForm.destination}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, destination: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {MATERIAL_DESTINATIONS.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               ) : (
-                <img
-                  src={viewingReceiptTransaction.receiptUrl}
-                  alt="Comprovante da Despesa"
-                  className="max-h-[55vh] w-auto max-w-full object-contain rounded-xl shadow-sm"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Forma de Pagamento
+                    </label>
+                    <select
+                      value={editForm.paymentMethod}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {PAYMENT_METHODS.map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                      Categoria
+                    </label>
+                    <select
+                      value={editForm.category}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    >
+                      {DONATION_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               )}
-            </div>
 
-            {/* Actions Footer */}
-            <div className="pt-2 flex justify-end items-center gap-3 border-t border-gray-100 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => {
-                  const url = pdfBlobUrl || viewingReceiptTransaction.receiptUrl!;
-                  const isPdf = viewingReceiptTransaction.receiptUrl.startsWith('data:application/pdf') || viewingReceiptTransaction.receiptUrl.toLowerCase().includes('.pdf');
-                  const ext = isPdf ? 'pdf' : 'png';
-                  const fileName = `comprovante_${viewingReceiptTransaction.receiptNumber || viewingReceiptTransaction.id}_${viewingReceiptTransaction.date}.${ext}`;
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase mb-1">
+                  Observações Internas
+                </label>
+                <input
+                  type="text"
+                  placeholder="Observações complementares..."
+                  value={editForm.observations}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, observations: e.target.value }))}
+                  className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
 
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = fileName;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
-              >
-                <Download size={16} /> Baixar
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewingReceiptTransaction(null)}
-                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold text-xs rounded-xl transition-all"
-              >
-                Fechar
-              </button>
-            </div>
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-gray-800">
+                <button
+                  type="button"
+                  onClick={() => { setIsEditModalOpen(false); setEditingTransaction(null); }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCheck size={16} />
+                  {submitting ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
 
+            </form>
           </div>
         </div>
-      )}
-      {/* DOADORES E SÓCIOS TAB */}
-      {activeTab === 'donors' && (
-        <DonorsSection donors={localDonors} showToast={showToast} />
       )}
     </div>
   );

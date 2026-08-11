@@ -538,6 +538,11 @@ export interface TreasuryReceiptPDFOptions {
   observations?: string;
   institutionName?: string;
   institutionLogo?: string;
+  donationKind?: 'FINANCIAL' | 'MATERIAL';
+  itemDetails?: string;
+  quantityOrVolume?: string;
+  itemCondition?: string;
+  destination?: string;
 }
 
 export const generateTreasuryReceiptPDF = async ({
@@ -553,6 +558,11 @@ export const generateTreasuryReceiptPDF = async ({
   observations,
   institutionName = INSTITUTION_NAME,
   institutionLogo = INSTITUTION_LOGO,
+  donationKind = 'FINANCIAL',
+  itemDetails,
+  quantityOrVolume,
+  itemCondition,
+  destination
 }: TreasuryReceiptPDFOptions) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -563,9 +573,11 @@ export const generateTreasuryReceiptPDF = async ({
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 
+  const isMaterial = donationKind === 'MATERIAL';
+
   // Colors
-  const primaryGreen: [number, number, number] = [16, 185, 129]; // #10b981
-  const darkGreen: [number, number, number] = [6, 95, 70]; // #065f46
+  const primaryGreen: [number, number, number] = isMaterial ? [14, 116, 144] : [16, 185, 129]; // #0e7490 for material, #10b981 for financial
+  const darkGreen: [number, number, number] = isMaterial ? [21, 94, 117] : [6, 95, 70];
 
   // Pre-load logo
   let logoData: string | ArrayBuffer | null = null;
@@ -621,12 +633,18 @@ export const generateTreasuryReceiptPDF = async ({
   doc.roundedRect(14, 52, pageWidth - 28, 22, 3, 3, 'F');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-  doc.text(`RECIBO OFICIAL DE RECEITA Nº ${receiptNumber}`, 20, 66);
+  const receiptTitle = isMaterial 
+    ? `RECIBO OFICIAL DE DOAÇÃO EM BENS / MATERIAIS Nº ${receiptNumber}`
+    : `RECIBO OFICIAL DE RECEITA Nº ${receiptNumber}`;
+  doc.text(receiptTitle, 20, 66);
 
-  const formattedAmount = amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  doc.setFontSize(16);
+  const formattedAmount = amount > 0 
+    ? amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) + (isMaterial ? ' (Est.)' : '')
+    : (isMaterial ? 'Doação Física' : 'R$ 0,00');
+
+  doc.setFontSize(14);
   doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
   const amountTextWidth = doc.getTextWidth(formattedAmount);
   doc.text(formattedAmount, pageWidth - 20 - amountTextWidth, 66);
@@ -650,26 +668,42 @@ export const generateTreasuryReceiptPDF = async ({
     // keep as is
   }
 
-  const receiptBodyText = `Recebemos de ${payerName.toUpperCase()}${cpf ? `, portador(a) do CPF nº ${cpf}` : ''}, a quantia de ${formattedAmount}, referente a "${description || category}", recebido via ${paymentMethod} no dia ${formattedDate}.`;
+  const receiptBodyText = isMaterial
+    ? `Recebemos de ${payerName.toUpperCase()}${cpf ? `, portador(a) do CPF/CNPJ nº ${cpf}` : ''}, a doação em bens/materiais na categoria "${category}", contendo: "${itemDetails || description || 'Itens diversos'}", para destinação em "${destination || 'Uso Geral OAMI'}", recebido em ${formattedDate}.`
+    : `Recebemos de ${payerName.toUpperCase()}${cpf ? `, portador(a) do CPF nº ${cpf}` : ''}, a quantia de ${formattedAmount}, referente a "${description || category}", recebido via ${paymentMethod} no dia ${formattedDate}.`;
 
   const splitText = doc.splitTextToSize(receiptBodyText, pageWidth - 40);
   doc.text(splitText, 20, 92);
 
   // Structured Information Table
+  const tableBody = isMaterial ? [
+    ['Nº do Recibo', receiptNumber],
+    ['Data de Recebimento', formattedDate],
+    ['Doador / Contribuinte', `${payerName}${cpf ? ` (CPF: ${cpf})` : ''}`],
+    ['Categoria do Material', category],
+    ['Itens / Detalhamento', itemDetails || description || 'Não informado'],
+    ['Quantidade / Volume', quantityOrVolume || 'Não informada'],
+    ['Estado de Conservação', itemCondition || 'Bom estado'],
+    ['Valor Estimado (R$)', amount > 0 ? amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valoração financeira'],
+    ['Destino / Finalidade', destination || 'Atendimento aos acolhidos OAMI'],
+    ['Responsável pelo Recebimento', registeredBy],
+    ['Observações', observations || 'Nenhuma observação informada.'],
+  ] : [
+    ['Nº do Recibo', receiptNumber],
+    ['Data de Emissão', formattedDate],
+    ['Pagador / Doador', `${payerName}${cpf ? ` (CPF: ${cpf})` : ''}`],
+    ['Valor Recebido', formattedAmount],
+    ['Forma de Pagamento', paymentMethod],
+    ['Categoria', category],
+    ['Descrição', description || 'Não informada'],
+    ['Responsável pelo Lançamento', registeredBy],
+    ['Observações', observations || 'Nenhuma observação informada.'],
+  ];
+
   autoTable(doc, {
     startY: 132,
     head: [['Item', 'Detalhamento da Operação']],
-    body: [
-      ['Nº do Recibo', receiptNumber],
-      ['Data de Emissão', formattedDate],
-      ['Pagador / Doador', `${payerName}${cpf ? ` (CPF: ${cpf})` : ''}`],
-      ['Valor Recebido', formattedAmount],
-      ['Forma de Pagamento', paymentMethod],
-      ['Categoria', category],
-      ['Descrição', description || 'Não informada'],
-      ['Responsável pelo Lançamento', registeredBy],
-      ['Observações', observations || 'Nenhuma observação informada.'],
-    ],
+    body: tableBody,
     theme: 'grid',
     headStyles: {
       fillColor: primaryGreen,

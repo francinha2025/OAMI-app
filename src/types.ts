@@ -1095,6 +1095,17 @@ export interface TreasuryReceipt {
   cancelReason?: string;
   cancelledAt?: string;
   cancelledBy?: string;
+  donorId?: string;
+  donationType?: 'EVENTUAL' | 'RECORRENTE' | 'EMPRESA' | 'PESSOA_FISICA' | 'OUTRA';
+  finality?: string;
+  // Material / Physical Donations
+  donationKind?: 'FINANCIAL' | 'MATERIAL';
+  materialCategory?: 'ALIMENTOS' | 'LIMPEZA' | 'HIGIENE' | 'MOVEIS' | 'ELETROS' | 'OUTROS';
+  itemDetails?: string;
+  quantityOrVolume?: string;
+  itemCondition?: string;
+  estimatedValue?: number;
+  destination?: string;
 }
 
 export interface TreasuryExpense {
@@ -1134,6 +1145,19 @@ export interface TreasuryTransaction {
   cancelledAt?: string;
   cancelledBy?: string;
   observations?: string;
+  donorId?: string;
+  donationType?: 'EVENTUAL' | 'RECORRENTE' | 'EMPRESA' | 'PESSOA_FISICA' | 'OUTRA';
+  finality?: string;
+  isDonation?: boolean;
+  originModule?: string;
+  // Material / Physical Donations
+  donationKind?: 'FINANCIAL' | 'MATERIAL';
+  materialCategory?: 'ALIMENTOS' | 'LIMPEZA' | 'HIGIENE' | 'MOVEIS' | 'ELETROS' | 'OUTROS';
+  itemDetails?: string;
+  quantityOrVolume?: string;
+  itemCondition?: string;
+  estimatedValue?: number;
+  destination?: string;
 }
 
 export interface SystemLog {
