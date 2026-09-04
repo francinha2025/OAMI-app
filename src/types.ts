@@ -1207,17 +1207,18 @@ export interface StockMovement {
   notes?: string;
   date: string;
   timestamp: string;
-  // Treasury & Stock Entry Integration
+  // Stock Entry details
   origin?: 'COMPRA' | 'DOACAO';
   unitPrice?: number;
   totalPrice?: number;
   invoiceNumber?: string;
-  deductFromTreasury?: boolean;
-  financialTransactionId?: string;
   donorName?: string;
   estimatedValue?: number;
   updatedAt?: string;
   updatedBy?: string;
+  // Legacy fields (deprecated)
+  deductFromTreasury?: boolean;
+  financialTransactionId?: string;
 }
 
 export interface ElderlyDiaperUsage {

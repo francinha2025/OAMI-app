@@ -32,6 +32,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 // Adicione aqui a URL ou Base64 do seu timbrado (Logo)
 export const INSTITUTION_LOGO = 'https://i.ibb.co/vC49wFB8/a3068c33-2467-4266-a9c3-da7b27dc78b8.jpg';
 export const INSTITUTION_NAME = 'Opera Assistenza Malati Impediti (OAMI)';
+export const INSTITUTION_CNPJ = '10.706.425/0001-74';
+export const INSTITUTION_ADDRESS = 'MA-014, Alto São Francisco, Vitória do Mearim – Maranhão';
 
 export const MOCK_GALLERY: any[] = [
   {

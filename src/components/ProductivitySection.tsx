@@ -37,6 +37,7 @@ import {
   Elderly
 } from '../types';
 import { db } from '../firebase';
+import { cn, getProfessionalName } from '../lib/utils';
 import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
 
 interface ProductivitySectionProps {
@@ -716,10 +717,11 @@ export const ProductivitySection = ({
                                 {act.coWorkers.map((cwId: string) => {
                                   const matched = professionals.find(p => 
                                     p.id === cwId || 
+                                    p.uid === cwId ||
                                     p.email?.toLowerCase() === cwId.toLowerCase() ||
                                     p.name?.toLowerCase() === cwId.toLowerCase()
                                   );
-                                  return matched ? matched.name : cwId;
+                                  return matched ? matched.name : getProfessionalName(cwId, professionals);
                                 }).join(', ')}
                               </span>
                             </div>

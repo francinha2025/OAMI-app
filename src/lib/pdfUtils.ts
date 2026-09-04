@@ -263,6 +263,9 @@ interface MultiSectionPDFOptions {
     title: string;
     columns: string[];
     data: any[][];
+    color?: [number, number, number];
+    textColor?: [number, number, number];
+    bannerBgColor?: [number, number, number];
   }[];
   fileName: string;
   institutionName?: string;
@@ -415,21 +418,32 @@ export const generateMultiSectionPDF = async ({
   for (const section of sections) {
     if (section.data.length === 0) continue;
 
-    if (currentY + 25 > pageHeight - 20) {
+    if (currentY + 28 > pageHeight - 20) {
       doc.addPage();
       currentY = 42;
     }
 
+    // Section Color Support (for distinct categories)
+    const secColor = section.color || primaryGreen;
+    const secBgColor = section.bannerBgColor || [240, 253, 244];
+    const secTextColor = section.textColor || [6, 78, 59];
+
+    // Category Header Banner Box
+    const bannerHeight = 8.5;
+    doc.setFillColor(secBgColor[0], secBgColor[1], secBgColor[2]);
+    doc.setDrawColor(secColor[0], secColor[1], secColor[2]);
+    doc.roundedRect(14, currentY, pageWidth - 28, bannerHeight, 2, 2, 'FD');
+
+    // Left accent bar
+    doc.setFillColor(secColor[0], secColor[1], secColor[2]);
+    doc.roundedRect(14, currentY, 4, bannerHeight, 1, 1, 'F');
+
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.text(section.title.toUpperCase(), 14, currentY + 4);
+    doc.setFontSize(10);
+    doc.setTextColor(secTextColor[0], secTextColor[1], secTextColor[2]);
+    doc.text(section.title.toUpperCase(), 21, currentY + 5.8);
 
-    doc.setDrawColor(primaryGreen[0], primaryGreen[1], primaryGreen[2]);
-    doc.setLineWidth(0.3);
-    doc.line(14, currentY + 6, pageWidth - 14, currentY + 6);
-
-    currentY += 9;
+    currentY += bannerHeight + 3;
 
     autoTable(doc, {
       startY: currentY,
@@ -437,7 +451,7 @@ export const generateMultiSectionPDF = async ({
       body: section.data,
       theme: 'striped',
       headStyles: {
-        fillColor: primaryGreen,
+        fillColor: secColor,
         textColor: [255, 255, 255],
         fontSize: 9,
         fontStyle: 'bold',
@@ -454,13 +468,22 @@ export const generateMultiSectionPDF = async ({
       didParseCell: (hookData: any) => {
         if (hookData.section === 'body') {
           const firstCellStr = String(hookData.row.cells[0]?.raw || '').trim().toUpperCase();
-          const isTotalRow = firstCellStr.includes('TOTAL') || firstCellStr.includes('CONSOLIDADO') || firstCellStr.includes('SOMA');
+          const isSubtotalRow = firstCellStr.includes('SUBTOTAL') || firstCellStr.includes('TOTAL DA CATEGORIA');
+          const isTotalRow = firstCellStr.includes('TOTAL GERAL') || firstCellStr.includes('CONSOLIDADO') || (firstCellStr.includes('TOTAL') && !isSubtotalRow);
 
           if (isTotalRow) {
             hookData.cell.styles.fontStyle = 'bold';
-            hookData.cell.styles.fillColor = [16, 185, 129];
+            hookData.cell.styles.fillColor = [15, 23, 42]; // Slate 900 for final consolidated summary
             hookData.cell.styles.textColor = [255, 255, 255];
             hookData.cell.styles.fontSize = 9;
+            return;
+          }
+
+          if (isSubtotalRow) {
+            hookData.cell.styles.fontStyle = 'bold';
+            hookData.cell.styles.fillColor = [secBgColor[0], secBgColor[1], secBgColor[2]];
+            hookData.cell.styles.textColor = [secTextColor[0], secTextColor[1], secTextColor[2]];
+            hookData.cell.styles.fontSize = 8.5;
             return;
           }
 
@@ -616,12 +639,11 @@ export const generateTreasuryReceiptPDF = async ({
   doc.setTextColor(30, 41, 59);
   doc.text(institutionName, startX, 22);
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text('CNPJ: 10.706.425/0001-74', startX, 27);
-  doc.text('Endereço: MA-014, Alto São Francisco, Vitória do Mearim - Maranhão', startX, 31);
-  doc.text('MÓDULO DE TESOURARIA E GESTÃO FINANCEIRA INSTITUCIONAL', startX, 35);
+  doc.text('CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão', startX, 27);
+  doc.text('MÓDULO DE TESOURARIA E GESTÃO FINANCEIRA INSTITUCIONAL', startX, 31);
 
   // Line separator
   doc.setDrawColor(226, 232, 240);
@@ -850,7 +872,7 @@ export const generateTreasuryFinancialReportPDF = async ({
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text('CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim - MA', startX, 27);
+  doc.text('CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão', startX, 27);
   doc.text('Departamento de Tesouraria e Gestão Financeira', startX, 31);
 
   // Report Main Title

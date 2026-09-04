@@ -21,7 +21,7 @@ import {
 import { ProductivitySection } from './ProductivitySection';
 import { Award } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { cn, safeReplace } from '../lib/utils';
+import { cn, safeReplace, getProfessionalName } from '../lib/utils';
 import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -1720,10 +1720,10 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                     <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
                     <div className="flex flex-wrap gap-1">
                       {viewingEvo.coWorkers.map(cwId => {
-                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        const prof = (professionals || []).find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                         return (
                           <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
-                            {prof ? prof.name : cwId}
+                            {prof ? prof.name : getProfessionalName(cwId, professionals)}
                           </span>
                         );
                       })}
@@ -3444,16 +3444,16 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
                         return pName.includes(term) || pRole.includes(term);
                       })
                       .map((p: any) => {
-                        const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                        const isSelected = (formData.coWorkers || []).some((cwId: string) => cwId === p.id || cwId === p.uid || (p.email && cwId.toLowerCase() === p.email.toLowerCase()) || (p.name && cwId.toLowerCase() === p.name.toLowerCase()));
                         return (
                           <button
-                            key={p.id}
+                            key={p.id || p.uid || p.email}
                             type="button"
                             onClick={() => {
                               const list = formData.coWorkers || [];
-                              const identifier = p.id || p.email;
+                              const identifier = p.id || p.uid || p.email;
                               if (isSelected) {
-                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.uid && item !== p.email && item !== p.name) });
                               } else {
                                 setFormData({ ...formData, coWorkers: [...list, identifier] });
                               }
@@ -3743,16 +3743,16 @@ const PsychologyModal = ({ isOpen, onClose, type, patients, elderly, onSave, onS
                         return pName.includes(term) || pRole.includes(term);
                       })
                       .map((p: any) => {
-                        const isSelected = (formData.coWorkers || []).includes(p.id) || (formData.coWorkers || []).includes(p.email);
+                        const isSelected = (formData.coWorkers || []).some((cwId: string) => cwId === p.id || cwId === p.uid || (p.email && cwId.toLowerCase() === p.email.toLowerCase()) || (p.name && cwId.toLowerCase() === p.name.toLowerCase()));
                         return (
                           <button
-                            key={p.id}
+                            key={p.id || p.uid || p.email}
                             type="button"
                             onClick={() => {
                               const list = formData.coWorkers || [];
-                              const identifier = p.id || p.email;
+                              const identifier = p.id || p.uid || p.email;
                               if (isSelected) {
-                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.email) });
+                                setFormData({ ...formData, coWorkers: list.filter((item: string) => item !== p.id && item !== p.uid && item !== p.email && item !== p.name) });
                               } else {
                                 setFormData({ ...formData, coWorkers: [...list, identifier] });
                               }

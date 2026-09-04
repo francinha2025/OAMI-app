@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { differenceInYears, parseISO } from 'date-fns';
+import { differenceInYears, parseISO, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 export function getElderlyAgeByName(name: string): number | null {
   if (typeof window === 'undefined') return null;
@@ -191,4 +192,89 @@ export async function compressImage(base64Str: string, maxWidth = 800, maxHeight
       resolve(canvas.toDataURL('image/jpeg', quality));
     };
   });
+}
+
+export function safeFormat(dateStr: string | undefined | null, formatStr: string, fallback = '--/--'): string {
+  if (!dateStr) return fallback;
+  try {
+    const d = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    if (isNaN(d.getTime())) return fallback;
+    return format(d, formatStr, { locale: ptBR });
+  } catch {
+    return fallback;
+  }
+}
+
+export function getProfessionalName(idOrUidOrEmail: string | undefined | null, list?: any[]): string {
+  if (!idOrUidOrEmail) return '';
+  const search = String(idOrUidOrEmail).trim().toLowerCase();
+  if (!search) return '';
+
+  // 1. Try passed list
+  if (list && Array.isArray(list)) {
+    const found = list.find((p: any) => 
+      p && (
+        (p.id && String(p.id).trim().toLowerCase() === search) ||
+        (p.uid && String(p.uid).trim().toLowerCase() === search) ||
+        (p.email && String(p.email).trim().toLowerCase() === search) ||
+        (p.name && String(p.name).trim().toLowerCase() === search)
+      )
+    );
+    if (found && found.name) return found.name;
+  }
+
+  // 2. Try global window.__allProfessionals registry
+  if (typeof window !== 'undefined') {
+    const globalList = (window as any).__allProfessionals;
+    if (globalList && Array.isArray(globalList)) {
+      const found = globalList.find((p: any) => 
+        p && (
+          (p.id && String(p.id).trim().toLowerCase() === search) ||
+          (p.uid && String(p.uid).trim().toLowerCase() === search) ||
+          (p.email && String(p.email).trim().toLowerCase() === search) ||
+          (p.name && String(p.name).trim().toLowerCase() === search)
+        )
+      );
+      if (found && found.name) return found.name;
+    }
+  }
+
+  return String(idOrUidOrEmail);
+}
+
+export function getProfessionalRole(idOrUidOrEmail: string | undefined | null, list?: any[]): string {
+  if (!idOrUidOrEmail) return '';
+  const search = String(idOrUidOrEmail).trim().toLowerCase();
+  if (!search) return '';
+
+  // 1. Try passed list
+  if (list && Array.isArray(list)) {
+    const found = list.find((p: any) => 
+      p && (
+        (p.id && String(p.id).trim().toLowerCase() === search) ||
+        (p.uid && String(p.uid).trim().toLowerCase() === search) ||
+        (p.email && String(p.email).trim().toLowerCase() === search) ||
+        (p.name && String(p.name).trim().toLowerCase() === search)
+      )
+    );
+    if (found) return found.role || found.cargo || '';
+  }
+
+  // 2. Try global registry
+  if (typeof window !== 'undefined') {
+    const globalList = (window as any).__allProfessionals;
+    if (globalList && Array.isArray(globalList)) {
+      const found = globalList.find((p: any) => 
+        p && (
+          (p.id && String(p.id).trim().toLowerCase() === search) ||
+          (p.uid && String(p.uid).trim().toLowerCase() === search) ||
+          (p.email && String(p.email).trim().toLowerCase() === search) ||
+          (p.name && String(p.name).trim().toLowerCase() === search)
+        )
+      );
+      if (found) return found.role || found.cargo || '';
+    }
+  }
+
+  return '';
 }

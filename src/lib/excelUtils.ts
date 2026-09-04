@@ -47,9 +47,9 @@ export const generateModernExcel = ({
   // Prepare the data with headers and professional details
   const worksheetData = [
     [title],
-    ["INSTITUIÇÃO OAMI - Gestão ILPI"],
-    ["CNPJ: 10.706.425/0001-74"],
-    ["Endereço: MA-014, Alto São Francisco, Vitória do Mearim – Maranhão"],
+    ["Opera Assistenza Malati Impediti (OAMI)"],
+    ["CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão"],
+    ["Relatório Oficial do Sistema OAMI"],
     [],      // Spacer
     columns,  // Headers
     ...formattedData,   // Values

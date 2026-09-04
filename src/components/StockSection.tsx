@@ -39,7 +39,8 @@ import {
   ExternalLink,
   Receipt,
   Trash2,
-  Pencil
+  Pencil,
+  Tag
 } from 'lucide-react';
 import { 
   collection, 
@@ -69,8 +70,8 @@ import {
 } from 'recharts';
 import { db } from '../firebase';
 import { StockProduct, StockMovement, User } from '../types';
-import { generateModernPDF } from '../lib/pdfUtils';
-import { generateModernWord } from '../lib/wordUtils';
+import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
+import { generateModernWord, generateMultiSectionWord } from '../lib/wordUtils';
 import { handleFirestoreError, OperationType } from '../lib/firestoreErrors';
 
 interface StockSectionProps {
@@ -79,7 +80,7 @@ interface StockSectionProps {
   showConfirm: (message: string, onConfirm: () => void) => void;
 }
 
-const CATEGORIES = [
+export const CATEGORIES = [
   'Medicamentos',
   'Higiene e Limpeza',
   'Alimentos e Nutrição',
@@ -88,6 +89,124 @@ const CATEGORIES = [
   'Fraldas e Vestuário',
   'Outros'
 ];
+
+export const CATEGORY_THEMES: Record<string, {
+  color: string;
+  badgeBg: string;
+  badgeText: string;
+  bannerBg: string;
+  border: string;
+  subtotalBg: string;
+  subtotalText: string;
+  textAccent: string;
+  iconBg: string;
+  pdfColor: [number, number, number];
+  pdfBgColor: [number, number, number];
+  pdfTextColor: [number, number, number];
+}> = {
+  'Medicamentos': {
+    color: '#2563EB',
+    badgeBg: 'bg-blue-100 dark:bg-blue-950/70',
+    badgeText: 'text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700',
+    bannerBg: 'bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 text-white shadow-md shadow-blue-500/20',
+    border: 'border-blue-500/50 dark:border-blue-500/60 ring-1 ring-blue-500/20',
+    subtotalBg: 'bg-blue-50/90 dark:bg-blue-950/40 border-t-2 border-blue-400 dark:border-blue-600',
+    subtotalText: 'text-blue-900 dark:text-blue-200',
+    textAccent: 'text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [37, 99, 235], // Blue 600
+    pdfBgColor: [239, 246, 255], // Blue 50
+    pdfTextColor: [30, 58, 138] // Blue 900
+  },
+  'Alimentos e Nutrição': {
+    color: '#EA580C',
+    badgeBg: 'bg-orange-100 dark:bg-orange-950/70',
+    badgeText: 'text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700',
+    bannerBg: 'bg-gradient-to-r from-amber-600 via-orange-600 to-red-500 text-white shadow-md shadow-orange-500/20',
+    border: 'border-orange-500/50 dark:border-orange-500/60 ring-1 ring-orange-500/20',
+    subtotalBg: 'bg-orange-50/90 dark:bg-orange-950/40 border-t-2 border-orange-400 dark:border-orange-600',
+    subtotalText: 'text-orange-900 dark:text-orange-200',
+    textAccent: 'text-orange-600 dark:text-orange-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [234, 88, 12], // Orange 600
+    pdfBgColor: [255, 247, 237], // Orange 50
+    pdfTextColor: [124, 45, 18] // Orange 900
+  },
+  'Higiene e Limpeza': {
+    color: '#0891B2',
+    badgeBg: 'bg-cyan-100 dark:bg-cyan-950/70',
+    badgeText: 'text-cyan-800 dark:text-cyan-200 border-cyan-300 dark:border-cyan-700',
+    bannerBg: 'bg-gradient-to-r from-cyan-700 via-teal-600 to-blue-600 text-white shadow-md shadow-cyan-500/20',
+    border: 'border-cyan-500/50 dark:border-cyan-500/60 ring-1 ring-cyan-500/20',
+    subtotalBg: 'bg-cyan-50/90 dark:bg-cyan-950/40 border-t-2 border-cyan-400 dark:border-cyan-600',
+    subtotalText: 'text-cyan-900 dark:text-cyan-200',
+    textAccent: 'text-cyan-600 dark:text-cyan-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [8, 145, 178], // Cyan 600
+    pdfBgColor: [236, 254, 255], // Cyan 50
+    pdfTextColor: [22, 78, 99] // Cyan 900
+  },
+  'Material de Escritório': {
+    color: '#7C3AED',
+    badgeBg: 'bg-violet-100 dark:bg-violet-950/70',
+    badgeText: 'text-violet-800 dark:text-violet-200 border-violet-300 dark:border-violet-700',
+    bannerBg: 'bg-gradient-to-r from-violet-700 via-purple-600 to-indigo-600 text-white shadow-md shadow-violet-500/20',
+    border: 'border-violet-500/50 dark:border-violet-500/60 ring-1 ring-violet-500/20',
+    subtotalBg: 'bg-violet-50/90 dark:bg-violet-950/40 border-t-2 border-violet-400 dark:border-violet-600',
+    subtotalText: 'text-violet-900 dark:text-violet-200',
+    textAccent: 'text-violet-600 dark:text-violet-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [124, 58, 237], // Violet 600
+    pdfBgColor: [245, 243, 255], // Violet 50
+    pdfTextColor: [76, 29, 149] // Violet 900
+  },
+  'Enfermagem e Médico': {
+    color: '#E11D48',
+    badgeBg: 'bg-rose-100 dark:bg-rose-950/70',
+    badgeText: 'text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-700',
+    bannerBg: 'bg-gradient-to-r from-rose-700 via-pink-600 to-red-600 text-white shadow-md shadow-rose-500/20',
+    border: 'border-rose-500/50 dark:border-rose-500/60 ring-1 ring-rose-500/20',
+    subtotalBg: 'bg-rose-50/90 dark:bg-rose-950/40 border-t-2 border-rose-400 dark:border-rose-600',
+    subtotalText: 'text-rose-900 dark:text-rose-200',
+    textAccent: 'text-rose-600 dark:text-rose-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [225, 29, 72], // Rose 600
+    pdfBgColor: [255, 241, 242], // Rose 50
+    pdfTextColor: [136, 19, 55] // Rose 900
+  },
+  'Fraldas e Vestuário': {
+    color: '#D946EF',
+    badgeBg: 'bg-fuchsia-100 dark:bg-fuchsia-950/70',
+    badgeText: 'text-fuchsia-800 dark:text-fuchsia-200 border-fuchsia-300 dark:border-fuchsia-700',
+    bannerBg: 'bg-gradient-to-r from-fuchsia-700 via-pink-600 to-purple-600 text-white shadow-md shadow-fuchsia-500/20',
+    border: 'border-fuchsia-500/50 dark:border-fuchsia-500/60 ring-1 ring-fuchsia-500/20',
+    subtotalBg: 'bg-fuchsia-50/90 dark:bg-fuchsia-950/40 border-t-2 border-fuchsia-400 dark:border-fuchsia-600',
+    subtotalText: 'text-fuchsia-900 dark:text-fuchsia-200',
+    textAccent: 'text-fuchsia-600 dark:text-fuchsia-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [217, 70, 239], // Fuchsia 600
+    pdfBgColor: [253, 244, 255], // Fuchsia 50
+    pdfTextColor: [112, 26, 117] // Fuchsia 900
+  },
+  'Outros': {
+    color: '#475569',
+    badgeBg: 'bg-slate-100 dark:bg-slate-800',
+    badgeText: 'text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700',
+    bannerBg: 'bg-gradient-to-r from-slate-800 via-slate-700 to-zinc-700 text-white shadow-md',
+    border: 'border-slate-400 dark:border-slate-600 ring-1 ring-slate-400/20',
+    subtotalBg: 'bg-slate-100/90 dark:bg-slate-800/60 border-t-2 border-slate-300 dark:border-slate-600',
+    subtotalText: 'text-slate-900 dark:text-slate-200',
+    textAccent: 'text-slate-600 dark:text-slate-400',
+    iconBg: 'bg-white/20 text-white border border-white/30',
+    pdfColor: [71, 85, 105], // Slate 600
+    pdfBgColor: [248, 250, 252], // Slate 50
+    pdfTextColor: [15, 23, 42] // Slate 900
+  }
+};
+
+export const getCategoryTheme = (category: string) => {
+  return CATEGORY_THEMES[category] || CATEGORY_THEMES['Outros'];
+};
 
 const UNITS = [
   'Unidade',
@@ -140,7 +259,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
   // Movement History Filters
   const [movementSearch, setMovementSearch] = useState('');
   const [movementTypeFilter, setMovementTypeFilter] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS');
-  const [movementOriginFilter, setMovementOriginFilter] = useState<'TODOS' | 'COMPRA_TODAS' | 'COMPRA_DEDUZIDA' | 'COMPRA_NAO_DEDUZIDA' | 'DOACAO'>('TODOS');
+  const [movementOriginFilter, setMovementOriginFilter] = useState<'TODOS' | 'COMPRA' | 'DOACAO'>('TODOS');
 
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -165,7 +284,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     invoiceNumber: '',
     unitPrice: '',
     totalPrice: '',
-    deductFromTreasury: true,
     donorName: '',
     estimatedValue: '',
     destination: '',
@@ -195,12 +313,10 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     reason: 'Consumo Interno',
     notes: '',
     date: new Date().toISOString().split('T')[0],
-    // Treasury & Entry Origin Integration
     entryOrigin: 'COMPRA' as 'COMPRA' | 'DOACAO',
     unitPrice: '',
     totalPrice: '',
     invoiceNumber: '',
-    deductFromTreasury: true,
     donorName: '',
     estimatedValue: ''
   });
@@ -249,10 +365,85 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     }
   };
 
-  // Reports Filter State
+  // Reports Filter & Customization State
   const [reportType, setReportType] = useState<'INVENTORY' | 'LOW_STOCK' | 'EXPIRED' | 'MOVEMENTS'>('INVENTORY');
+  const [reportGroupBy, setReportGroupBy] = useState<'CATEGORY' | 'FLAT'>('CATEGORY');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState<string>('TODAS');
+  const [reportPeriodType, setReportPeriodType] = useState<'ALL' | 'MONTHLY' | 'SEMIANNUAL' | 'ANNUAL' | 'CUSTOM'>('ALL');
+  const [reportYear, setReportYear] = useState<number>(new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
+  const [reportSemester, setReportSemester] = useState<1 | 2>(new Date().getMonth() + 1 <= 6 ? 1 : 2);
   const [reportStartDate, setReportStartDate] = useState(`${new Date().getFullYear()}-01-01`);
   const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Compute Active Period Description & Date Range
+  const reportPeriodInfo = useMemo(() => {
+    const today = new Date();
+    const currentYear = reportYear || today.getFullYear();
+
+    if (reportPeriodType === 'MONTHLY') {
+      const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      const m = reportMonth || (today.getMonth() + 1);
+      const mmStr = String(m).padStart(2, '0');
+      const lastDay = new Date(currentYear, m, 0).getDate();
+      const start = `${currentYear}-${mmStr}-01`;
+      const end = `${currentYear}-${mmStr}-${String(lastDay).padStart(2, '0')}`;
+      return {
+        label: `Mensal: ${monthNames[m - 1]} de ${currentYear}`,
+        shortLabel: `${monthNames[m - 1]}/${currentYear}`,
+        startDate: start,
+        endDate: end
+      };
+    }
+
+    if (reportPeriodType === 'SEMIANNUAL') {
+      const s = reportSemester || (today.getMonth() + 1 <= 6 ? 1 : 2);
+      if (s === 1) {
+        return {
+          label: `Semestral: 1º Semestre de ${currentYear} (Jan a Jun)`,
+          shortLabel: `1º Sem/${currentYear}`,
+          startDate: `${currentYear}-01-01`,
+          endDate: `${currentYear}-06-30`
+        };
+      } else {
+        return {
+          label: `Semestral: 2º Semestre de ${currentYear} (Jul a Dez)`,
+          shortLabel: `2º Sem/${currentYear}`,
+          startDate: `${currentYear}-07-01`,
+          endDate: `${currentYear}-12-31`
+        };
+      }
+    }
+
+    if (reportPeriodType === 'ANNUAL') {
+      return {
+        label: `Anual: Exercício de ${currentYear}`,
+        shortLabel: `Ano ${currentYear}`,
+        startDate: `${currentYear}-01-01`,
+        endDate: `${currentYear}-12-31`
+      };
+    }
+
+    if (reportPeriodType === 'CUSTOM') {
+      return {
+        label: `Personalizado (${reportStartDate.split('-').reverse().join('/')} a ${reportEndDate.split('-').reverse().join('/')})`,
+        shortLabel: `${reportStartDate.split('-').reverse().join('/')} a ${reportEndDate.split('-').reverse().join('/')}`,
+        startDate: reportStartDate,
+        endDate: reportEndDate
+      };
+    }
+
+    // ALL (Consolidado Atual)
+    return {
+      label: 'Posição Geral Atual (Consolidada)',
+      shortLabel: 'Geral Atual',
+      startDate: reportStartDate,
+      endDate: reportEndDate
+    };
+  }, [reportPeriodType, reportYear, reportMonth, reportSemester, reportStartDate, reportEndDate]);
 
   // Real-time Listeners
   useEffect(() => {
@@ -335,6 +526,78 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     return activeProducts.reduce((sum, p) => sum + (p.quantity * (p.unitPrice || 0)), 0);
   }, [activeProducts]);
 
+  // Report Specific Memos (Categorized & Filtered)
+  const reportProducts = useMemo(() => {
+    let baseList: StockProduct[] = [];
+    if (reportType === 'INVENTORY') {
+      baseList = activeProducts;
+    } else if (reportType === 'LOW_STOCK') {
+      baseList = [...lowStockList, ...outOfStockList];
+    } else if (reportType === 'EXPIRED') {
+      baseList = [...expiredList, ...nearExpiryList];
+    } else {
+      return [];
+    }
+
+    if (reportCategoryFilter !== 'TODAS') {
+      baseList = baseList.filter(p => (p.category || 'Outros') === reportCategoryFilter);
+    }
+
+    return baseList;
+  }, [reportType, activeProducts, lowStockList, outOfStockList, expiredList, nearExpiryList, reportCategoryFilter]);
+
+  const reportGroupedByCategory = useMemo(() => {
+    if (reportType === 'MOVEMENTS') return [];
+
+    // Distinct list of categories in reportProducts
+    const categoriesPresent = Array.from(new Set(reportProducts.map(p => p.category || 'Outros'))).sort();
+
+    return categoriesPresent.map(cat => {
+      const items = reportProducts.filter(p => (p.category || 'Outros') === cat);
+      const totalQuantity = items.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+      const totalEstimatedValue = items.reduce((acc, curr) => acc + ((Number(curr.quantity) || 0) * (Number(curr.unitPrice) || 0)), 0);
+      return {
+        category: cat,
+        items,
+        itemsCount: items.length,
+        totalQuantity,
+        totalEstimatedValue
+      };
+    });
+  }, [reportProducts, reportType]);
+
+  const reportOverallTotals = useMemo(() => {
+    if (reportType === 'MOVEMENTS') {
+      const activeStart = reportPeriodInfo.startDate;
+      const activeEnd = reportPeriodInfo.endDate;
+      const periodMovements = movements.filter(m => m.date && m.date >= activeStart && m.date <= activeEnd);
+      const totalEntradas = periodMovements.filter(m => m.type === 'ENTRADA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+      const totalSaidas = periodMovements.filter(m => m.type === 'SAIDA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+      return {
+        totalMovements: periodMovements.length,
+        totalEntradas,
+        totalSaidas,
+        totalItems: periodMovements.length,
+        totalQuantity: totalEntradas - totalSaidas,
+        totalValue: 0,
+        totalCategories: 0
+      };
+    }
+
+    const totalItems = reportProducts.length;
+    const totalQuantity = reportProducts.reduce((acc, curr) => acc + (Number(curr.quantity) || 0), 0);
+    const totalValue = reportProducts.reduce((acc, curr) => acc + ((Number(curr.quantity) || 0) * (Number(curr.unitPrice) || 0)), 0);
+    return {
+      totalItems,
+      totalQuantity,
+      totalValue,
+      totalCategories: reportGroupedByCategory.length,
+      totalEntradas: 0,
+      totalSaidas: 0,
+      totalMovements: 0
+    };
+  }, [reportProducts, reportGroupedByCategory, reportType, movements, reportPeriodInfo]);
+
   // Displayed Products for the Alert Manager
   const displayedAlertProducts = useMemo(() => {
     if (alertFilterCategory === 'LOW') return lowStockList;
@@ -412,9 +675,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     return movements.filter(m => {
       if (movementTypeFilter !== 'TODOS' && m.type !== movementTypeFilter) return false;
 
-      if (movementOriginFilter === 'COMPRA_TODAS' && m.origin !== 'COMPRA') return false;
-      if (movementOriginFilter === 'COMPRA_DEDUZIDA' && (m.origin !== 'COMPRA' || m.deductFromTreasury !== true)) return false;
-      if (movementOriginFilter === 'COMPRA_NAO_DEDUZIDA' && (m.origin !== 'COMPRA' || m.deductFromTreasury === true)) return false;
+      if (movementOriginFilter === 'COMPRA' && m.origin !== 'COMPRA') return false;
       if (movementOriginFilter === 'DOACAO' && m.origin !== 'DOACAO') return false;
 
       if (movementSearch.trim()) {
@@ -575,7 +836,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
       unitPrice: initialUnitPrice,
       totalPrice: initialUnitPrice,
       invoiceNumber: '',
-      deductFromTreasury: true,
       donorName: '',
       estimatedValue: ''
     });
@@ -597,7 +857,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     }));
   };
 
-  // Save Movement (Entrada / Saída) with Treasury Synchronization
+  // Save Movement (Entrada / Saída)
   const handleSaveMovement = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -631,37 +891,8 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
         if (movementForm.entryOrigin === 'COMPRA') {
           const uPrice = Number(movementForm.unitPrice) || 0;
           const tPrice = Number(movementForm.totalPrice) || (uPrice * qty);
-          const deductBool = movementForm.deductFromTreasury;
           const supplierText = movementForm.supplier.trim();
           const invoiceNumText = movementForm.invoiceNumber.trim();
-
-          let financialId: string | null = null;
-
-          if (deductBool) {
-            // Create corresponding expense in Treasury (financial collection)
-            const financialRef = doc(collection(db, 'financial'));
-            financialId = financialRef.id;
-
-            const financialPayload = cleanData({
-              id: financialId,
-              date: movementForm.date,
-              description: `Compra de Estoque – ${selectedProductForMovement.name}`,
-              amount: tPrice,
-              type: 'DESPESA',
-              category: 'ESTOQUE',
-              originModule: 'STOCK',
-              stockMovementId: movementId,
-              stockProductId: selectedProductForMovement.id,
-              stockProductName: selectedProductForMovement.name,
-              stockQuantity: qty,
-              supplier: supplierText || 'Não informado',
-              invoiceNumber: invoiceNumText || null,
-              createdAt: new Date().toISOString(),
-              createdBy: user.name
-            });
-
-            await setDoc(financialRef, financialPayload);
-          }
 
           const movementRecord = cleanData({
             id: movementId,
@@ -674,35 +905,27 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
             stockAfter: newStock,
             supplier: supplierText || null,
             responsible: user.name,
-            notes: deductBool
-              ? (movementForm.notes.trim() || null)
-              : `${movementForm.notes.trim() ? movementForm.notes.trim() + ' • ' : ''}[Não descontar do saldo da entidade]`,
+            notes: movementForm.notes.trim() || null,
             date: movementForm.date,
             timestamp: new Date().toISOString(),
             origin: 'COMPRA',
-            unitPrice: uPrice,
-            totalPrice: tPrice,
-            invoiceNumber: invoiceNumText || null,
-            deductFromTreasury: deductBool,
-            financialTransactionId: financialId
+            unitPrice: uPrice > 0 ? uPrice : null,
+            totalPrice: tPrice > 0 ? tPrice : null,
+            invoiceNumber: invoiceNumText || null
           });
 
           await setDoc(movementDocRef, movementRecord);
 
           // Update stock_products quantity and unit price/supplier
-          await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), {
+          await updateDoc(doc(db, 'stock_products', selectedProductForMovement.id), cleanData({
             quantity: newStock,
             unitPrice: uPrice > 0 ? uPrice : (selectedProductForMovement.unitPrice || 0),
             supplier: supplierText || selectedProductForMovement.supplier,
             updatedAt: new Date().toISOString()
-          });
+          }));
 
-          const auditMsg = deductBool
-            ? `Entrada de estoque (COMPRA) com desconto na Tesouraria (R$ ${tPrice.toFixed(2)}): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`
-            : `Entrada de estoque (COMPRA - NÃO DESCONTADA): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`;
-
-          await logAudit('ENTRADA_ESTOQUE_COMPRA', auditMsg);
-          showToast(`Entrada por Compra (${deductBool ? 'Descontada da Tesouraria' : 'Não descontada'}) registrada com sucesso!`, 'success');
+          await logAudit('ENTRADA_ESTOQUE_COMPRA', `Entrada de estoque (COMPRA): +${qty} ${selectedProductForMovement.unit}(s) de "${selectedProductForMovement.name}". Novo saldo: ${newStock}.`);
+          showToast('Entrada por Compra registrada com sucesso!', 'success');
 
         } else {
           // DOACAO
@@ -725,8 +948,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
             timestamp: new Date().toISOString(),
             origin: 'DOACAO',
             donorName: donor || null,
-            estimatedValue: estVal > 0 ? estVal : null,
-            deductFromTreasury: false
+            estimatedValue: estVal > 0 ? estVal : null
           });
 
           await setDoc(movementDocRef, movementRecord);
@@ -796,7 +1018,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
       invoiceNumber: movement.invoiceNumber || '',
       unitPrice: uPrice,
       totalPrice: tPrice,
-      deductFromTreasury: movement.deductFromTreasury !== undefined ? movement.deductFromTreasury : true,
       donorName: movement.donorName || (origin === 'DOACAO' && movement.supplier ? movement.supplier.replace('Doador: ', '') : ''),
       estimatedValue: estVal,
       destination: movement.destination || '',
@@ -805,7 +1026,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     setIsEditMovementModalOpen(true);
   };
 
-  // Save Edited Movement (Entrada / Saída) with Stock & Treasury Synchronization
+  // Save Edited Movement (Entrada / Saída)
   const handleSaveEditedMovement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMovement) return;
@@ -839,64 +1060,12 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     setIsSubmittingEditMovement(true);
 
     try {
-      let finalFinancialId = editingMovement.financialTransactionId || null;
-
       if (isEntrada) {
         if (editMovementForm.entryOrigin === 'COMPRA') {
           const uPrice = Number(editMovementForm.unitPrice) || 0;
           const tPrice = Number(editMovementForm.totalPrice) || (uPrice * newQty);
-          const deductBool = editMovementForm.deductFromTreasury;
           const supplierText = editMovementForm.supplier.trim();
           const invoiceNumText = editMovementForm.invoiceNumber.trim();
-
-          if (deductBool) {
-            if (finalFinancialId) {
-              // Update existing financial transaction in Treasury
-              await updateDoc(doc(db, 'financial', finalFinancialId), cleanData({
-                amount: tPrice,
-                date: editMovementForm.date,
-                description: `Compra de Estoque – ${editingMovement.productName}`,
-                supplier: supplierText || 'Não informado',
-                invoiceNumber: invoiceNumText || null,
-                stockQuantity: newQty,
-                updatedAt: new Date().toISOString()
-              }));
-            } else {
-              // Create new financial transaction in Treasury
-              const financialRef = doc(collection(db, 'financial'));
-              finalFinancialId = financialRef.id;
-
-              const financialPayload = cleanData({
-                id: finalFinancialId,
-                date: editMovementForm.date,
-                description: `Compra de Estoque – ${editingMovement.productName}`,
-                amount: tPrice,
-                type: 'DESPESA',
-                category: 'ESTOQUE',
-                originModule: 'STOCK',
-                stockMovementId: editingMovement.id,
-                stockProductId: editingMovement.productId,
-                stockProductName: editingMovement.productName,
-                stockQuantity: newQty,
-                supplier: supplierText || 'Não informado',
-                invoiceNumber: invoiceNumText || null,
-                createdAt: new Date().toISOString(),
-                createdBy: user.name
-              });
-
-              await setDoc(financialRef, financialPayload);
-            }
-          } else {
-            // Not deducted from treasury -> if there was a financial record previously, remove it
-            if (finalFinancialId) {
-              try {
-                await deleteDoc(doc(db, 'financial', finalFinancialId));
-              } catch (delFinErr) {
-                console.warn("Transação financeira não encontrada para exclusão:", delFinErr);
-              }
-              finalFinancialId = null;
-            }
-          }
 
           // Update movement doc
           const movementUpdatePayload = cleanData({
@@ -905,10 +1074,8 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
             date: editMovementForm.date,
             supplier: supplierText || null,
             invoiceNumber: invoiceNumText || null,
-            unitPrice: uPrice,
-            totalPrice: tPrice,
-            deductFromTreasury: deductBool,
-            financialTransactionId: finalFinancialId,
+            unitPrice: uPrice > 0 ? uPrice : null,
+            totalPrice: tPrice > 0 ? tPrice : null,
             origin: 'COMPRA',
             donorName: null,
             estimatedValue: null,
@@ -935,16 +1102,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
           const donor = editMovementForm.donorName.trim();
           const estVal = Number(editMovementForm.estimatedValue) || 0;
 
-          // If there was a financial record previously, delete it
-          if (finalFinancialId) {
-            try {
-              await deleteDoc(doc(db, 'financial', finalFinancialId));
-            } catch (delFinErr) {
-              console.warn("Transação financeira não encontrada:", delFinErr);
-            }
-            finalFinancialId = null;
-          }
-
           const movementUpdatePayload = cleanData({
             quantity: newQty,
             stockAfter: newProductStock,
@@ -956,8 +1113,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
             unitPrice: null,
             totalPrice: null,
             invoiceNumber: null,
-            deductFromTreasury: false,
-            financialTransactionId: null,
             notes: editMovementForm.notes.trim() || null,
             updatedAt: new Date().toISOString(),
             updatedBy: user.name
@@ -1010,13 +1165,12 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     }
   };
 
-  // Delete Movement (Rollback Stock & Financial Linkage)
+  // Delete Movement (Rollback Stock)
   const handleDeleteMovement = (movement: StockMovement) => {
     const isEntrada = movement.type === 'ENTRADA';
     const confirmMessage = isEntrada
       ? `Deseja realmente excluir a entrada de ${movement.quantity} un de "${movement.productName}"?\n\n` +
         `• O saldo do estoque será estornado (-${movement.quantity} un).\n` +
-        (movement.deductFromTreasury ? `• O lançamento correspondente na Tesouraria será excluído automaticamente.\n` : '') +
         `Esta ação não pode ser desfeita.`
       : `Deseja realmente excluir a saída de ${movement.quantity} un de "${movement.productName}"?\n\n` +
         `• O saldo do estoque será restaurado (+${movement.quantity} un).\n` +
@@ -1030,25 +1184,16 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
           ? Math.max(0, currentStock - movement.quantity)
           : currentStock + movement.quantity;
 
-        // 1. Delete linked financial record if deducted from treasury
-        if (isEntrada && movement.deductFromTreasury && movement.financialTransactionId) {
-          try {
-            await deleteDoc(doc(db, 'financial', movement.financialTransactionId));
-          } catch (finErr) {
-            console.warn("Transação financeira não encontrada ou já excluída:", finErr);
-          }
-        }
-
-        // 2. Delete movement record
+        // 1. Delete movement record
         await deleteDoc(doc(db, 'stock_movements', movement.id));
 
-        // 3. Update stock_products quantity
+        // 2. Update stock_products quantity
         await updateDoc(doc(db, 'stock_products', movement.productId), {
           quantity: restoredStock,
           updatedAt: new Date().toISOString()
         });
 
-        // 4. Close details modal if opened with this movement
+        // 3. Close details modal if opened with this movement
         if (selectedMovementForDetails?.id === movement.id) {
           setSelectedMovementForDetails(null);
         }
@@ -1066,89 +1211,273 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     });
   };
 
-  // Generate Reports in PDF or Word
+  // Generate Reports in PDF or Word (Categorized or Flat)
   const handleExportReportPDF = async () => {
     try {
       let title = '';
       let subtitle = '';
-      let columns: string[] = [];
-      let data: any[][] = [];
+
+      const periodSuffix = ` • Período: ${reportPeriodInfo.label}`;
 
       if (reportType === 'INVENTORY') {
         title = 'Relatório de Inventário Geral de Estoque';
-        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')} por ${user.name}`;
-        columns = ['Código', 'Produto', 'Categoria', 'Unid.', 'Local', 'Saldo', 'Mínimo', 'Val. Unit', 'Total Est.'];
-        data = activeProducts.map(p => [
-          p.code,
-          p.name,
-          p.category,
-          p.unit,
-          p.location,
-          p.quantity,
-          p.minQuantity,
-          (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-          (p.quantity * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-        ]);
+        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')} por ${user.name}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
       } else if (reportType === 'LOW_STOCK') {
         title = 'Relatório de Produtos com Estoque Baixo / Crítico';
-        subtitle = `Produtos que necessitam reposição emergencial. Emissão: ${new Date().toLocaleDateString('pt-BR')}`;
-        columns = ['Código', 'Produto', 'Categoria', 'Saldo Atual', 'Estoque Mínimo', 'Fornecedor', 'Local'];
-        data = [...lowStockList, ...outOfStockList].map(p => [
-          p.code,
-          p.name,
-          p.category,
-          p.quantity === 0 ? 'ZERADO (0)' : p.quantity,
-          p.minQuantity,
-          p.supplier || 'Não inf.',
-          p.location
-        ]);
+        subtitle = `Produtos que necessitam reposição emergencial. Emissão: ${new Date().toLocaleDateString('pt-BR')}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
       } else if (reportType === 'EXPIRED') {
-        title = 'Relatório de Produtos Vencidos ou Próximos do Vencimento';
-        subtitle = `Validades monitoradas. Emissão: ${new Date().toLocaleDateString('pt-BR')}`;
-        columns = ['Código', 'Produto', 'Categoria', 'Lote', 'Validade', 'Saldo', 'Status Validade'];
-        data = [...expiredList, ...nearExpiryList].map(p => {
-          const isExp = p.expirationDate && p.expirationDate < todayStr;
-          return [
+        title = 'Relatório de Validades e Lotes do Estoque';
+        subtitle = `Produtos vencidos ou próximos ao vencimento. Emissão: ${new Date().toLocaleDateString('pt-BR')}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
+      } else if (reportType === 'MOVEMENTS') {
+        title = 'Relatório de Movimentações de Estoque';
+        subtitle = `Período: ${reportPeriodInfo.label} • Emitido por ${user.name}`;
+      }
+
+      // CATEGORIZED EXPORT (For Inventory, Low Stock, Expired)
+      if (reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS') {
+        if (reportGroupedByCategory.length === 0) {
+          showToast('Nenhum produto encontrado para os filtros selecionados.', 'info');
+          return;
+        }
+
+        const sections = reportGroupedByCategory.map(group => {
+          let sectionColumns: string[] = [];
+          let sectionData: any[][] = [];
+
+          if (reportType === 'INVENTORY') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Qtd (Saldo)', 'Unid.', 'Mínimo', 'Status', 'Localização', 'Lote / Validade', 'Fornecedor', 'Val. Unit.', 'Total Est.'];
+            sectionData = group.items.map(p => {
+              const isZero = p.quantity === 0;
+              const isLow = p.quantity > 0 && p.quantity <= p.minQuantity;
+              const statusStr = isZero ? 'ZERADO (0)' : isLow ? 'ESTOQUE BAIXO' : 'NORMAL';
+              const loteValidade = p.expirationDate 
+                ? `${p.batchNumber ? `L: ${p.batchNumber} | ` : ''}${p.expirationDate.split('-').reverse().join('/')}`
+                : (p.batchNumber ? `L: ${p.batchNumber}` : 'N/I');
+
+              return [
+                p.code || 'S/C',
+                p.name,
+                p.quantity,
+                p.unit || 'un',
+                p.minQuantity,
+                statusStr,
+                p.location || 'N/I',
+                loteValidade,
+                p.supplier || 'N/I',
+                (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                ((p.quantity || 0) * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+              ];
+            });
+
+            // Subtotal Row for this Category
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} produtos cadastrados`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+          } else if (reportType === 'LOW_STOCK') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Saldo Atual', 'Unid.', 'Mínimo', 'Déficit', 'Localização', 'Fornecedor', 'Val. Unit.'];
+            sectionData = group.items.map(p => {
+              const deficit = Math.max(0, p.minQuantity - p.quantity);
+              return [
+                p.code || 'S/C',
+                p.name,
+                p.quantity === 0 ? 'ZERADO (0)' : p.quantity,
+                p.unit || 'un',
+                p.minQuantity,
+                deficit > 0 ? `-${deficit} un` : '0',
+                p.location || 'N/I',
+                p.supplier || 'Não inf.',
+                (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+              ];
+            });
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} itens críticos`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+          } else if (reportType === 'EXPIRED') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Saldo', 'Unid.', 'Lote', 'Data Validade', 'Status Validade', 'Localização'];
+            sectionData = group.items.map(p => {
+              const isExp = p.expirationDate && p.expirationDate < todayStr;
+              return [
+                p.code || 'S/C',
+                p.name,
+                p.quantity,
+                p.unit || 'un',
+                p.batchNumber || 'N/A',
+                p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/A',
+                isExp ? '❌ VENCIDO' : '⚠️ PRÓXIMO VENCIMENTO',
+                p.location || 'N/I'
+              ];
+            });
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} itens monitorados`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-'
+            ]);
+          }
+
+          const theme = getCategoryTheme(group.category);
+          return {
+            title: `CATEGORIA: ${group.category.toUpperCase()} (${group.itemsCount} itens • Qtd Total: ${group.totalQuantity} un • Total: ${group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`,
+            columns: sectionColumns,
+            data: sectionData,
+            color: theme.pdfColor,
+            bannerBgColor: theme.pdfBgColor,
+            textColor: theme.pdfTextColor
+          };
+        });
+
+        // Add final Consolidated Total Section
+        sections.push({
+          title: 'RESUMO CONSOLIDADO GERAL DO ESTOQUE',
+          columns: ['Total de Categorias', 'Total de Produtos Cadastrados', 'Quantidade Total Física (Soma)', 'Valor Patrimonial Acumulado'],
+          data: [
+            [
+              `${reportGroupedByCategory.length} categorias`,
+              `${reportOverallTotals.totalItems} produtos distintos`,
+              `${reportOverallTotals.totalQuantity} unidades físicas`,
+              reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ],
+            [
+              'TOTAL GERAL CONSOLIDADO',
+              '-',
+              `${reportOverallTotals.totalQuantity} un`,
+              reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]
+          ],
+          color: [15, 23, 42], // Slate 900
+          bannerBgColor: [241, 245, 249], // Slate 100
+          textColor: [15, 23, 42]
+        });
+
+        await generateMultiSectionPDF({
+          title,
+          subtitle,
+          sections,
+          fileName: `Relatorio_Estoque_${reportType}_Categorizado_${new Date().toISOString().substring(0, 10)}.pdf`,
+          orientation: 'landscape'
+        });
+
+      } else {
+        // FLAT LIST / MOVEMENTS REPORT
+        let columns: string[] = [];
+        let data: any[][] = [];
+
+        if (reportType === 'INVENTORY') {
+          columns = ['Código', 'Produto', 'Categoria', 'Unid.', 'Local', 'Saldo', 'Mínimo', 'Val. Unit', 'Total Est.'];
+          data = reportProducts.map(p => [
             p.code,
             p.name,
             p.category,
-            p.batchNumber || 'N/A',
-            p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/A',
+            p.unit,
+            p.location,
             p.quantity,
-            isExp ? '❌ VENCIDO' : '⚠️ PRÓXIMO DO VENCIMENTO'
-          ];
-        });
-      } else if (reportType === 'MOVEMENTS') {
-        title = 'Relatório de Movimentações de Estoque';
-        subtitle = `Período: ${reportStartDate.split('-').reverse().join('/')} a ${reportEndDate.split('-').reverse().join('/')}`;
-        columns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd', 'Saldo Ant.', 'Saldo Pós', 'Destino/Fornecedor', 'Responsável'];
-        
-        const periodMovements = movements.filter(m => {
-          if (!m.date) return false;
-          return m.date >= reportStartDate && m.date <= reportEndDate;
-        });
+            p.minQuantity,
+            (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            (p.quantity * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+          ]);
+          data.push([
+            'TOTAL GERAL CONSOLIDADO',
+            `${reportProducts.length} produtos`,
+            '-',
+            '-',
+            '-',
+            `${reportOverallTotals.totalQuantity} un`,
+            '-',
+            '-',
+            reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+          ]);
+        } else if (reportType === 'LOW_STOCK') {
+          columns = ['Código', 'Produto', 'Categoria', 'Saldo Atual', 'Estoque Mínimo', 'Fornecedor', 'Local'];
+          data = reportProducts.map(p => [
+            p.code,
+            p.name,
+            p.category,
+            p.quantity === 0 ? 'ZERADO (0)' : p.quantity,
+            p.minQuantity,
+            p.supplier || 'Não inf.',
+            p.location
+          ]);
+        } else if (reportType === 'EXPIRED') {
+          columns = ['Código', 'Produto', 'Categoria', 'Lote', 'Validade', 'Saldo', 'Status Validade'];
+          data = reportProducts.map(p => {
+            const isExp = p.expirationDate && p.expirationDate < todayStr;
+            return [
+              p.code,
+              p.name,
+              p.category,
+              p.batchNumber || 'N/A',
+              p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/A',
+              p.quantity,
+              isExp ? '❌ VENCIDO' : '⚠️ PRÓXIMO DO VENCIMENTO'
+            ];
+          });
+        } else if (reportType === 'MOVEMENTS') {
+          columns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd', 'Saldo Ant.', 'Saldo Pós', 'Destino/Fornecedor', 'Responsável'];
+          const activeStart = reportPeriodInfo.startDate;
+          const activeEnd = reportPeriodInfo.endDate;
+          const periodMovements = movements.filter(m => {
+            if (!m.date) return false;
+            return m.date >= activeStart && m.date <= activeEnd;
+          });
 
-        data = periodMovements.map(m => [
-          m.date.split('-').reverse().join('/'),
-          m.type,
-          m.productCode,
-          m.productName,
-          m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`,
-          m.stockBefore,
-          m.stockAfter,
-          m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I'),
-          m.responsible
-        ]);
+          data = periodMovements.map(m => [
+            m.date.split('-').reverse().join('/'),
+            m.type,
+            m.productCode,
+            m.productName,
+            m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`,
+            m.stockBefore,
+            m.stockAfter,
+            m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I'),
+            m.responsible
+          ]);
+
+          data.push([
+            'TOTAL DO PERÍODO',
+            `${periodMovements.length} movimentações`,
+            '-',
+            '-',
+            `Entradas: +${reportOverallTotals.totalEntradas} | Saídas: -${reportOverallTotals.totalSaidas}`,
+            '-',
+            '-',
+            '-',
+            '-'
+          ]);
+        }
+
+        await generateModernPDF({
+          title,
+          subtitle,
+          columns,
+          data,
+          fileName: `Relatorio_Estoque_${reportType}_${new Date().toISOString().substring(0, 10)}.pdf`,
+          orientation: 'landscape'
+        });
       }
-
-      await generateModernPDF({
-        title,
-        subtitle,
-        columns,
-        data,
-        fileName: `Relatorio_Estoque_${reportType}_${new Date().toISOString().substring(0, 10)}.pdf`,
-        orientation: 'landscape'
-      });
 
       showToast('Relatório em PDF gerado com sucesso!', 'success');
     } catch (err) {
@@ -1161,70 +1490,210 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
     try {
       let title = '';
       let subtitle = '';
-      let columns: string[] = [];
-      let data: any[][] = [];
+
+      const periodSuffix = ` • Período: ${reportPeriodInfo.label}`;
 
       if (reportType === 'INVENTORY') {
         title = 'Relatório de Inventário Geral de Estoque';
-        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')} por ${user.name}`;
-        columns = ['Código', 'Produto', 'Categoria', 'Unid.', 'Local', 'Saldo', 'Mínimo', 'Total Est.'];
-        data = activeProducts.map(p => [
-          p.code,
-          p.name,
-          p.category,
-          p.unit,
-          p.location,
-          p.quantity,
-          p.minQuantity,
-          (p.quantity * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-        ]);
+        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')} por ${user.name}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
       } else if (reportType === 'LOW_STOCK') {
-        title = 'Relatório de Produtos com Estoque Baixo';
-        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')}`;
-        columns = ['Código', 'Produto', 'Categoria', 'Saldo', 'Mínimo', 'Fornecedor'];
-        data = [...lowStockList, ...outOfStockList].map(p => [
-          p.code,
-          p.name,
-          p.category,
-          p.quantity,
-          p.minQuantity,
-          p.supplier || 'N/I'
-        ]);
+        title = 'Relatório de Produtos com Estoque Baixo / Crítico';
+        subtitle = `Produtos que necessitam reposição emergencial. Emissão: ${new Date().toLocaleDateString('pt-BR')}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
       } else if (reportType === 'EXPIRED') {
-        title = 'Relatório de Validades do Estoque';
-        subtitle = `Emissão: ${new Date().toLocaleDateString('pt-BR')}`;
-        columns = ['Código', 'Produto', 'Lote', 'Validade', 'Saldo', 'Status'];
-        data = [...expiredList, ...nearExpiryList].map(p => [
-          p.code,
-          p.name,
-          p.batchNumber || 'N/I',
-          p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/I',
-          p.quantity,
-          p.expirationDate && p.expirationDate < todayStr ? 'VENCIDO' : 'PRÓXIMO VENCIMENTO'
-        ]);
+        title = 'Relatório de Validades e Lotes do Estoque';
+        subtitle = `Produtos com data de validade expirada ou próxima. Emissão: ${new Date().toLocaleDateString('pt-BR')}${reportCategoryFilter !== 'TODAS' ? ` • Categoria: ${reportCategoryFilter}` : ''}${periodSuffix}`;
       } else {
         title = 'Relatório de Movimentações de Estoque';
-        subtitle = `Período: ${reportStartDate.split('-').reverse().join('/')} a ${reportEndDate.split('-').reverse().join('/')}`;
-        columns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd', 'Responsável'];
-        
-        const periodMovements = movements.filter(m => m.date >= reportStartDate && m.date <= reportEndDate);
-        data = periodMovements.map(m => [
-          m.date.split('-').reverse().join('/'),
-          m.type,
-          m.productCode,
-          m.productName,
-          m.quantity,
-          m.responsible
-        ]);
+        subtitle = `Período: ${reportPeriodInfo.label} • Emitido por ${user.name}`;
       }
 
-      await generateModernWord({
-        title,
-        subtitle,
-        columns,
-        data,
-        fileName: `Relatorio_Estoque_${reportType}_${new Date().toISOString().substring(0, 10)}.docx`
-      });
+      if (reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS') {
+        if (reportGroupedByCategory.length === 0) {
+          showToast('Nenhum produto encontrado para os filtros selecionados.', 'info');
+          return;
+        }
+
+        const sections = reportGroupedByCategory.map(group => {
+          let sectionColumns: string[] = [];
+          let sectionData: any[][] = [];
+
+          if (reportType === 'INVENTORY') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Qtd', 'Unid.', 'Mínimo', 'Status', 'Local', 'Lote/Validade', 'Fornecedor', 'Val. Unit.', 'Total Est.'];
+            sectionData = group.items.map(p => {
+              const isZero = p.quantity === 0;
+              const isLow = p.quantity > 0 && p.quantity <= p.minQuantity;
+              const statusStr = isZero ? 'ZERADO' : isLow ? 'BAIXO' : 'NORMAL';
+              const loteValidade = p.expirationDate 
+                ? `${p.batchNumber ? `L: ${p.batchNumber} - ` : ''}${p.expirationDate.split('-').reverse().join('/')}`
+                : (p.batchNumber ? `L: ${p.batchNumber}` : 'N/I');
+
+              return [
+                p.code || 'S/C',
+                p.name,
+                p.quantity,
+                p.unit || 'un',
+                p.minQuantity,
+                statusStr,
+                p.location || 'N/I',
+                loteValidade,
+                p.supplier || 'N/I',
+                (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                ((p.quantity || 0) * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+              ];
+            });
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} produtos`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+          } else if (reportType === 'LOW_STOCK') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Saldo Atual', 'Unid.', 'Mínimo', 'Local', 'Fornecedor', 'Val. Unit.'];
+            sectionData = group.items.map(p => [
+              p.code || 'S/C',
+              p.name,
+              p.quantity === 0 ? 'ZERADO (0)' : p.quantity,
+              p.unit || 'un',
+              p.minQuantity,
+              p.location || 'N/I',
+              p.supplier || 'N/I',
+              (p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} itens críticos`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]);
+          } else if (reportType === 'EXPIRED') {
+            sectionColumns = ['Código', 'Produto / Descrição', 'Saldo', 'Unid.', 'Lote', 'Validade', 'Status', 'Local'];
+            sectionData = group.items.map(p => [
+              p.code || 'S/C',
+              p.name,
+              p.quantity,
+              p.unit || 'un',
+              p.batchNumber || 'N/A',
+              p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/A',
+              p.expirationDate && p.expirationDate < todayStr ? 'VENCIDO' : 'PRÓXIMO VENCIMENTO',
+              p.location || 'N/I'
+            ]);
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.itemsCount} itens monitorados`,
+              `${group.totalQuantity} un`,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-'
+            ]);
+          }
+
+          return {
+            title: `CATEGORIA: ${group.category.toUpperCase()} (${group.itemsCount} itens • Qtd Total: ${group.totalQuantity} un • Total: ${group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})`,
+            columns: sectionColumns,
+            data: sectionData
+          };
+        });
+
+        // Consolidated summary
+        sections.push({
+          title: 'RESUMO CONSOLIDADO GERAL DO ESTOQUE',
+          columns: ['Total de Categorias', 'Total de Produtos', 'Quantidade Total Física', 'Valor Total Patrimonial'],
+          data: [
+            [
+              `${reportGroupedByCategory.length} categorias`,
+              `${reportOverallTotals.totalItems} produtos cadastrados`,
+              `${reportOverallTotals.totalQuantity} unidades no total`,
+              reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ]
+          ]
+        });
+
+        await generateMultiSectionWord({
+          title,
+          subtitle,
+          sections,
+          fileName: `Relatorio_Estoque_${reportType}_Categorizado_${new Date().toISOString().substring(0, 10)}.docx`
+        });
+
+      } else {
+        // Flat Word
+        let columns: string[] = [];
+        let data: any[][] = [];
+
+        if (reportType === 'INVENTORY') {
+          columns = ['Código', 'Produto', 'Categoria', 'Unid.', 'Local', 'Saldo', 'Mínimo', 'Total Est.'];
+          data = reportProducts.map(p => [
+            p.code,
+            p.name,
+            p.category,
+            p.unit,
+            p.location,
+            p.quantity,
+            p.minQuantity,
+            (p.quantity * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+          ]);
+        } else if (reportType === 'LOW_STOCK') {
+          columns = ['Código', 'Produto', 'Categoria', 'Saldo', 'Mínimo', 'Fornecedor'];
+          data = reportProducts.map(p => [
+            p.code,
+            p.name,
+            p.category,
+            p.quantity,
+            p.minQuantity,
+            p.supplier || 'N/I'
+          ]);
+        } else if (reportType === 'EXPIRED') {
+          columns = ['Código', 'Produto', 'Lote', 'Validade', 'Saldo', 'Status'];
+          data = reportProducts.map(p => [
+            p.code,
+            p.name,
+            p.batchNumber || 'N/I',
+            p.expirationDate ? p.expirationDate.split('-').reverse().join('/') : 'N/I',
+            p.quantity,
+            p.expirationDate && p.expirationDate < todayStr ? 'VENCIDO' : 'PRÓXIMO VENCIMENTO'
+          ]);
+        } else {
+          columns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd', 'Responsável'];
+          const activeStart = reportPeriodInfo.startDate;
+          const activeEnd = reportPeriodInfo.endDate;
+          const periodMovements = movements.filter(m => {
+            if (!m.date) return false;
+            return m.date >= activeStart && m.date <= activeEnd;
+          });
+          data = periodMovements.map(m => [
+            m.date.split('-').reverse().join('/'),
+            m.type,
+            m.productCode,
+            m.productName,
+            m.quantity,
+            m.responsible
+          ]);
+        }
+
+        await generateModernWord({
+          title,
+          subtitle,
+          columns,
+          data,
+          fileName: `Relatorio_Estoque_${reportType}_${new Date().toISOString().substring(0, 10)}.docx`
+        });
+      }
 
       showToast('Relatório em Word (.docx) gerado com sucesso!', 'success');
     } catch (err) {
@@ -2160,9 +2629,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                 className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
               >
                 <option value="TODOS">Todas as Origens</option>
-                <option value="COMPRA_TODAS">🛒 Apenas Compras (Geral)</option>
-                <option value="COMPRA_DEDUZIDA">💳 Compras Descontadas da Tesouraria</option>
-                <option value="COMPRA_NAO_DEDUZIDA">🚫 Compras NÃO Descontadas</option>
+                <option value="COMPRA">🛒 Apenas Compras</option>
                 <option value="DOACAO">🎁 Apenas Doações</option>
               </select>
 
@@ -2183,7 +2650,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                   <tr>
                     <th className="py-3.5 px-4">Data</th>
                     <th className="py-3.5 px-4 text-center">Tipo</th>
-                    <th className="py-3.5 px-4">Origem / Integração</th>
+                    <th className="py-3.5 px-4">Origem</th>
                     <th className="py-3.5 px-4">Código / Produto</th>
                     <th className="py-3.5 px-4 text-center">Qtd Movimentada</th>
                     <th className="py-3.5 px-4 text-center">Saldo Ant.</th>
@@ -2214,24 +2681,13 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                         {m.type === 'ENTRADA' ? (
                           <div className="flex flex-col gap-1">
                             {m.origin === 'DOACAO' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
                                 <Gift size={12} /> Doação
                               </span>
                             ) : m.origin === 'COMPRA' ? (
-                              <>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
-                                  <ShoppingBag size={12} /> Compra
-                                </span>
-                                {m.deductFromTreasury ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 w-fit" title="Descontado do saldo da Tesouraria">
-                                    <CreditCard size={10} /> Descontado Tesouraria
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 w-fit" title="Não descontado da Tesouraria">
-                                    <Ban size={10} /> Não descontado
-                                  </span>
-                                )}
-                              </>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
+                                <ShoppingBag size={12} /> Compra
+                              </span>
                             ) : (
                               <span className="text-gray-400 italic text-[10px]">Entrada padrão</span>
                             )}
@@ -2338,125 +2794,753 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
         <div className="space-y-6 animate-in fade-in duration-200">
           
           <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl">
-                <FileText size={24} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl">
+                  <FileText size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 dark:text-white">Gerador de Relatórios & Inventário do Almoxarifado</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Emita relatórios oficiais detalhados agrupados por categoria com faixas de destaque, totais por categoria e consolidados para PDF ou Word (.docx).
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-black text-gray-900 dark:text-white">Gerador de Relatórios e Inventário</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Emita relatórios detalhados do estoque em formatos PDF ou Word (.docx) para fiscalização e auditoria.
-                </p>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleExportReportPDF}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-2xl shadow-sm transition-all flex items-center gap-2"
+                >
+                  <Download size={16} />
+                  Exportar PDF
+                </button>
+                <button
+                  onClick={handleExportReportWord}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-2xl shadow-sm transition-all flex items-center gap-2"
+                >
+                  <FileSpreadsheet size={16} />
+                  Exportar Word
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 font-bold text-xs rounded-2xl transition-all flex items-center gap-1.5"
+                >
+                  <Printer size={16} />
+                  Imprimir
+                </button>
               </div>
             </div>
 
             {/* REPORT TYPE SELECTOR */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              
-              <button
-                onClick={() => setReportType('INVENTORY')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  reportType === 'INVENTORY'
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20'
-                    : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Boxes className="text-emerald-600 mb-2" size={24} />
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">Inventário Completo</h4>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Lista todos os produtos ativos, localização, saldos e valores estimados.</p>
-              </button>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                1. Selecione o Tipo de Relatório:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                
+                <button
+                  onClick={() => setReportType('INVENTORY')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${
+                    reportType === 'INVENTORY'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Boxes className="text-emerald-600 mb-1.5" size={22} />
+                  <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">Inventário Completo</h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Todos os produtos ativos, saldo físico, localização e valores.</p>
+                </button>
 
-              <button
-                onClick={() => setReportType('LOW_STOCK')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  reportType === 'LOW_STOCK'
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20'
-                    : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <AlertTriangle className="text-amber-500 mb-2" size={24} />
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">Estoque Baixo & Zerado</h4>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Foco nos produtos que necessitam de compras e reposição imediata.</p>
-              </button>
+                <button
+                  onClick={() => setReportType('LOW_STOCK')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${
+                    reportType === 'LOW_STOCK'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <AlertTriangle className="text-amber-500 mb-1.5" size={22} />
+                  <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">Estoque Baixo & Zerado</h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Itens em nível crítico ou esgotados para compra urgente.</p>
+                </button>
 
-              <button
-                onClick={() => setReportType('EXPIRED')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  reportType === 'EXPIRED'
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20'
-                    : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Clock className="text-rose-500 mb-2" size={24} />
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">Validade e Lotes</h4>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Produtos com data de validade expirada ou próximos do vencimento.</p>
-              </button>
+                <button
+                  onClick={() => setReportType('EXPIRED')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${
+                    reportType === 'EXPIRED'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Clock className="text-rose-500 mb-1.5" size={22} />
+                  <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">Validade & Lotes</h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Itens vencidos ou com vencimento nos próximos 30 dias.</p>
+                </button>
 
-              <button
-                onClick={() => setReportType('MOVEMENTS')}
-                className={`p-5 rounded-2xl border text-left transition-all ${
-                  reportType === 'MOVEMENTS'
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20'
-                    : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <History className="text-blue-500 mb-2" size={24} />
-                <h4 className="font-extrabold text-sm text-gray-900 dark:text-white">Movimentações por Período</h4>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">Histórico de entradas e saídas em um intervalo de datas.</p>
-              </button>
+                <button
+                  onClick={() => setReportType('MOVEMENTS')}
+                  className={`p-4 rounded-2xl border text-left transition-all ${
+                    reportType === 'MOVEMENTS'
+                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                      : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <History className="text-blue-500 mb-1.5" size={22} />
+                  <h4 className="font-extrabold text-xs sm:text-sm text-gray-900 dark:text-white">Movimentações por Período</h4>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Histórico completo de entradas e saídas por intervalo de datas.</p>
+                </button>
 
+              </div>
             </div>
 
-            {/* DATE RANGE FILTER FOR MOVEMENTS REPORT */}
-            {reportType === 'MOVEMENTS' && (
-              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl flex flex-wrap items-center gap-4 border border-gray-200 dark:border-gray-700">
-                <span className="text-xs font-bold text-gray-600 dark:text-gray-300">Filtrar Período:</span>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase">Data Inicial</label>
-                  <input
-                    type="date"
-                    value={reportStartDate}
-                    onChange={(e) => setReportStartDate(e.target.value)}
-                    className="p-2 bg-white dark:bg-gray-800 border rounded-xl text-xs font-bold"
-                  />
+            {/* ORGANIZATION & CATEGORIZATION CONTROLS */}
+            <div className="bg-gray-50 dark:bg-gray-900/80 p-4 sm:p-5 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+              
+              {/* PERIOD SELECTOR (MENSAL, SEMESTRAL, ANUAL, GERAL, PERSONALIZADO) */}
+              <div className="space-y-2 pb-3 border-b border-gray-200/80 dark:border-gray-800">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={15} className="text-emerald-600" />
+                    <span className="text-[11px] font-black text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                      Periodicidade / Intervalo do Relatório:
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/40 self-start sm:self-auto">
+                    📅 {reportPeriodInfo.label}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase">Data Final</label>
-                  <input
-                    type="date"
-                    value={reportEndDate}
-                    onChange={(e) => setReportEndDate(e.target.value)}
-                    className="p-2 bg-white dark:bg-gray-800 border rounded-xl text-xs font-bold"
-                  />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setReportPeriodType('ALL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      reportPeriodType === 'ALL'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Layers size={13} />
+                    Geral Atual
+                  </button>
+
+                  <button
+                    onClick={() => setReportPeriodType('MONTHLY')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      reportPeriodType === 'MONTHLY'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Calendar size={13} />
+                    Mensal
+                  </button>
+
+                  <button
+                    onClick={() => setReportPeriodType('SEMIANNUAL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      reportPeriodType === 'SEMIANNUAL'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Clock size={13} />
+                    Semestral
+                  </button>
+
+                  <button
+                    onClick={() => setReportPeriodType('ANNUAL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      reportPeriodType === 'ANNUAL'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileSpreadsheet size={13} />
+                    Anual
+                  </button>
+
+                  <button
+                    onClick={() => setReportPeriodType('CUSTOM')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      reportPeriodType === 'CUSTOM'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Filter size={13} />
+                    Personalizado
+                  </button>
                 </div>
+
+                {/* Sub-controls depending on period type */}
+                {reportPeriodType === 'MONTHLY' && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 bg-white dark:bg-gray-800/90 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Mês de Referência:</label>
+                      <select
+                        value={reportMonth}
+                        onChange={(e) => setReportMonth(Number(e.target.value))}
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        <option value={1}>01 - Janeiro</option>
+                        <option value={2}>02 - Fevereiro</option>
+                        <option value={3}>03 - Março</option>
+                        <option value={4}>04 - Abril</option>
+                        <option value={5}>05 - Maio</option>
+                        <option value={6}>06 - Junho</option>
+                        <option value={7}>07 - Julho</option>
+                        <option value={8}>08 - Agosto</option>
+                        <option value={9}>09 - Setembro</option>
+                        <option value={10}>10 - Outubro</option>
+                        <option value={11}>11 - Novembro</option>
+                        <option value={12}>12 - Dezembro</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Ano:</label>
+                      <select
+                        value={reportYear}
+                        onChange={(e) => setReportYear(Number(e.target.value))}
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        {[2024, 2025, 2026, 2027, 2028].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400 italic">
+                      Abrangência: {reportPeriodInfo.startDate.split('-').reverse().join('/')} até {reportPeriodInfo.endDate.split('-').reverse().join('/')}
+                    </span>
+                  </div>
+                )}
+
+                {reportPeriodType === 'SEMIANNUAL' && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 bg-white dark:bg-gray-800/90 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Semestre:</label>
+                      <select
+                        value={reportSemester}
+                        onChange={(e) => setReportSemester(Number(e.target.value) as 1 | 2)}
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        <option value={1}>1º Semestre (01/Jan a 30/Jun)</option>
+                        <option value={2}>2º Semestre (01/Jul a 31/Dez)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Ano:</label>
+                      <select
+                        value={reportYear}
+                        onChange={(e) => setReportYear(Number(e.target.value))}
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        {[2024, 2025, 2026, 2027, 2028].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400 italic">
+                      Abrangência: {reportPeriodInfo.startDate.split('-').reverse().join('/')} até {reportPeriodInfo.endDate.split('-').reverse().join('/')}
+                    </span>
+                  </div>
+                )}
+
+                {reportPeriodType === 'ANNUAL' && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 bg-white dark:bg-gray-800/90 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-bold text-gray-600 dark:text-gray-300">Ano de Exercício Fiscal:</label>
+                      <select
+                        value={reportYear}
+                        onChange={(e) => setReportYear(Number(e.target.value))}
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-800 dark:text-white"
+                      >
+                        {[2024, 2025, 2026, 2027, 2028].map(y => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400 italic">
+                      Abrangência Anual: 01/01/{reportYear} até 31/12/{reportYear}
+                    </span>
+                  </div>
+                )}
+
+                {reportPeriodType === 'CUSTOM' && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2 bg-white dark:bg-gray-800/90 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/40">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Data Inicial</label>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-bold text-gray-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">Data Final</label>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="p-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-xs font-bold text-gray-800 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* EXPORT ACTION BUTTONS */}
-            <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
-              <button
-                onClick={handleExportReportPDF}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2"
-              >
-                <Download size={18} />
-                Exportar em PDF
-              </button>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                
+                {/* Mode: Categorized vs Flat */}
+                {reportType !== 'MOVEMENTS' && (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                      Modo de Agrupamento dos Produtos:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setReportGroupBy('CATEGORY')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          reportGroupBy === 'CATEGORY'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Layers size={15} />
+                        Separar por Categoria (com Faixas e Subtotais)
+                      </button>
+                      
+                      <button
+                        onClick={() => setReportGroupBy('FLAT')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                          reportGroupBy === 'FLAT'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <FileText size={15} />
+                        Listagem Contínua Geral
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              <button
-                onClick={handleExportReportWord}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-md transition-all flex items-center gap-2"
-              >
-                <FileSpreadsheet size={18} />
-                Exportar em Word (.docx)
-              </button>
+                {/* Filter specific category */}
+                {reportType !== 'MOVEMENTS' && (
+                  <div className="space-y-1.5 w-full md:w-auto">
+                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                      Filtrar Categoria Específica:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={reportCategoryFilter}
+                        onChange={(e) => setReportCategoryFilter(e.target.value)}
+                        className="w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                      >
+                        <option value="TODAS">📁 Todas as Categorias (Consolidado)</option>
+                        {CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>🏷️ {cat}</option>
+                        ))}
+                      </select>
+                      {reportCategoryFilter !== 'TODAS' && (
+                        <button
+                          onClick={() => setReportCategoryFilter('TODAS')}
+                          className="text-xs text-gray-400 hover:text-red-500 underline font-bold whitespace-nowrap"
+                        >
+                          Limpar filtro
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-              <button
-                onClick={() => window.print()}
-                className="px-5 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 font-bold text-xs sm:text-sm rounded-2xl transition-all flex items-center gap-2"
-              >
-                <Printer size={18} />
-                Imprimir
-              </button>
+              </div>
+            </div>
+
+            {/* SUMMARY STATS BAR */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-gray-50 dark:bg-gray-900/60 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <span className="text-[10px] font-bold uppercase text-gray-400 block">Categorias Ativas</span>
+                <span className="text-lg font-black text-gray-900 dark:text-white">
+                  {reportType === 'MOVEMENTS' ? '—' : reportGroupedByCategory.length}
+                </span>
+              </div>
+              <div className="p-3.5 bg-gray-50 dark:bg-gray-900/60 rounded-2xl border border-gray-200 dark:border-gray-700">
+                <span className="text-[10px] font-bold uppercase text-gray-400 block">Produtos Listados</span>
+                <span className="text-lg font-black text-gray-900 dark:text-white">
+                  {reportOverallTotals.totalItems}
+                </span>
+              </div>
+              <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/40">
+                <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400 block">
+                  {reportType === 'MOVEMENTS' ? 'Saldo Líquido Período' : 'Qtd Total em Estoque (Soma)'}
+                </span>
+                <span className="text-lg font-black text-emerald-700 dark:text-emerald-300">
+                  {reportOverallTotals.totalQuantity} <span className="text-xs font-bold">unidades</span>
+                </span>
+              </div>
+              <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 rounded-2xl border border-blue-200 dark:border-blue-800/40">
+                <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 block">Valor Patrimonial Total</span>
+                <span className="text-lg font-black text-blue-700 dark:text-blue-300">
+                  {reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            </div>
+
+            {/* LIVE REPORT PREVIEW AREA */}
+            <div className="space-y-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye size={18} className="text-emerald-600" />
+                  <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wider">
+                    Prévia do Relatório na Tela
+                  </h3>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS' 
+                    ? 'Agrupado e separado por categoria' 
+                    : 'Listagem sequencial'}
+                </span>
+              </div>
+
+              {/* REPORT PREVIEW CONTAINER */}
+              <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-8 shadow-sm">
+                
+                {/* Official Report Header in Preview */}
+                <div className="border-b border-gray-200 dark:border-gray-700 pb-5 text-center space-y-1">
+                  <h4 className="text-base font-black text-gray-900 dark:text-white">Opera Assistenza Malati Impediti (OAMI)</h4>
+                  <p className="text-[11px] text-gray-500 font-semibold">CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Almoxarifado Central & Farmácia</p>
+                  
+                  <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                    <div className="inline-block px-4 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-full font-black text-xs uppercase tracking-wide">
+                      {reportType === 'INVENTORY' && 'Relatório de Inventário Geral de Estoque'}
+                      {reportType === 'LOW_STOCK' && 'Relatório de Produtos com Estoque Baixo e Crítico'}
+                      {reportType === 'EXPIRED' && 'Relatório de Monitoramento de Validades e Lotes'}
+                      {reportType === 'MOVEMENTS' && 'Relatório de Movimentações de Estoque'}
+                    </div>
+
+                    <div className="inline-block px-3 py-1 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 rounded-full font-extrabold text-xs uppercase tracking-wide">
+                      📅 {reportPeriodInfo.label}
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Emitido em: {new Date().toLocaleString('pt-BR')} por {user.name} ({user.role})
+                  </p>
+                </div>
+
+                {/* CATEGORIZED VIEW */}
+                {reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS' && (
+                  <div className="space-y-8">
+                    {reportGroupedByCategory.map((group) => {
+                      const theme = getCategoryTheme(group.category);
+
+                      return (
+                        <div key={group.category} className={`space-y-0 rounded-3xl overflow-hidden border ${theme.border} shadow-lg transition-all`}>
+                          
+                          {/* CATEGORY COLOR BANNER (FAIXA DE DESTAQUE COM COR VIBRANTE) */}
+                          <div className={`p-4 sm:p-5 ${theme.bannerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+                            <div className="flex items-center gap-3.5">
+                              <div className={`p-2.5 rounded-2xl shadow-inner ${theme.iconBg} backdrop-blur-md`}>
+                                <Tag size={22} className="stroke-[2.5]" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-white/80 bg-black/20 px-2 py-0.5 rounded-md backdrop-blur-xs">
+                                    Setor / Categoria
+                                  </span>
+                                </div>
+                                <h3 className="text-lg sm:text-xl font-black tracking-wide uppercase text-white mt-0.5 drop-shadow-xs">
+                                  {group.category}
+                                </h3>
+                              </div>
+                            </div>
+
+                            {/* Category Badges Summary */}
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                              <span className="px-3.5 py-1.5 bg-black/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/20 shadow-xs flex items-center gap-1.5">
+                                📦 <span>{group.itemsCount} produtos</span>
+                              </span>
+                              <span className="px-3.5 py-1.5 bg-white/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                                🔢 <span>Qtd Total: {group.totalQuantity} un</span>
+                              </span>
+                              <span className="px-4 py-1.5 bg-white text-gray-950 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5">
+                                💰 <span>Total: {group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* CATEGORY PRODUCTS TABLE */}
+                          <div className="overflow-x-auto p-2 sm:p-4 bg-white dark:bg-gray-800/80">
+                            <table className="w-full text-left text-xs">
+                              <thead>
+                                <tr className="border-b-2 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-extrabold uppercase text-[10px]">
+                                  <th className="py-3 px-3">Código</th>
+                                  <th className="py-3 px-3">Produto / Descrição</th>
+                                  <th className="py-3 px-3 text-center">Saldo Atual (Qtd)</th>
+                                  <th className="py-3 px-3 text-center">Unidade</th>
+                                  <th className="py-3 px-3 text-center">Est. Mínimo</th>
+                                  <th className="py-3 px-3 text-center">Status</th>
+                                  <th className="py-3 px-3">Localização</th>
+                                  <th className="py-3 px-3">Lote / Validade</th>
+                                  <th className="py-3 px-3">Fornecedor</th>
+                                  <th className="py-3 px-3 text-right">Val. Unitário</th>
+                                  <th className="py-3 px-3 text-right">Total Estimado</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {group.items.map((p) => {
+                                  const isZero = p.quantity === 0;
+                                  const isLow = p.quantity > 0 && p.quantity <= p.minQuantity;
+                                  const isExpired = p.expirationDate && p.expirationDate < todayStr;
+                                  const isNearExpiry = p.expirationDate && p.expirationDate >= todayStr && p.expirationDate <= in30DaysStr;
+
+                                  return (
+                                    <tr key={p.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-750 transition-colors">
+                                      <td className="py-3 px-3 font-mono font-bold text-gray-500 dark:text-gray-400 text-[11px]">
+                                        {p.code || 'S/C'}
+                                      </td>
+                                      <td className="py-3 px-3">
+                                        <span className="font-extrabold text-gray-900 dark:text-white block text-xs">
+                                          {p.name}
+                                        </span>
+                                        {p.description && (
+                                          <span className="text-[10px] text-gray-400 block line-clamp-1">{p.description}</span>
+                                        )}
+                                      </td>
+                                      <td className="py-3 px-3 text-center">
+                                        <span className={`px-2.5 py-1 rounded-xl font-black text-xs inline-block shadow-2xs ${
+                                          isZero
+                                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-200 border border-rose-300 dark:border-rose-700'
+                                            : isLow
+                                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300 dark:border-amber-700'
+                                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700'
+                                        }`}>
+                                          {p.quantity} {p.unit}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-3 text-center text-gray-600 dark:text-gray-300 font-medium">
+                                        {p.unit}
+                                      </td>
+                                      <td className="py-3 px-3 text-center text-gray-500 font-medium">
+                                        {p.minQuantity}
+                                      </td>
+                                      <td className="py-3 px-3 text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                          isZero
+                                            ? 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900'
+                                            : isLow
+                                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                                            : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900'
+                                        }`}>
+                                          {isZero ? 'ZERADO' : isLow ? 'BAIXO' : 'NORMAL'}
+                                        </span>
+                                      </td>
+                                      <td className="py-3 px-3 text-gray-600 dark:text-gray-300">
+                                        {p.location || '—'}
+                                      </td>
+                                      <td className="py-3 px-3">
+                                        {p.expirationDate ? (
+                                          <div>
+                                            <span className={`font-bold text-[11px] block ${
+                                              isExpired
+                                                ? 'text-red-600 font-black'
+                                                : isNearExpiry
+                                                ? 'text-amber-600 font-black'
+                                                : 'text-gray-700 dark:text-gray-300'
+                                            }`}>
+                                              {p.expirationDate.split('-').reverse().join('/')}
+                                            </span>
+                                            {p.batchNumber && (
+                                              <span className="text-[10px] text-gray-400">Lote: {p.batchNumber}</span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-400 italic text-[11px]">N/A</span>
+                                        )}
+                                      </td>
+                                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-medium">
+                                        {p.supplier || '—'}
+                                      </td>
+                                      <td className="py-3 px-3 text-right text-gray-700 dark:text-gray-300 font-mono">
+                                        {(p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </td>
+                                      <td className="py-3 px-3 text-right font-black text-gray-900 dark:text-white font-mono">
+                                        {((p.quantity || 0) * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+
+                              {/* SUBTOTAL ROW FOR THIS CATEGORY (THEMED COLOR) */}
+                              <tfoot>
+                                <tr className={`${theme.subtotalBg} text-xs font-black`}>
+                                  <td colSpan={2} className={`py-3.5 px-3.5 ${theme.subtotalText} uppercase font-extrabold tracking-wide`}>
+                                    SUBTOTAL DA CATEGORIA: {group.category} ({group.itemsCount} ITENS)
+                                  </td>
+                                  <td className={`py-3.5 px-3.5 text-center ${theme.subtotalText} font-black`}>
+                                    {group.totalQuantity} un
+                                  </td>
+                                  <td colSpan={7} className="py-3.5 px-3.5 text-right text-gray-500 dark:text-gray-400 uppercase text-[10px] font-bold">
+                                    Subtotal Financeiro Acumulado:
+                                  </td>
+                                  <td className={`py-3.5 px-3.5 text-right font-black ${theme.subtotalText} font-mono text-sm`}>
+                                    {group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+
+                    {reportGroupedByCategory.length === 0 && (
+                      <div className="py-12 text-center text-gray-400 italic">
+                        Nenhum produto encontrado para a categoria selecionada.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* FLAT VIEW OR MOVEMENTS */}
+                {(reportGroupBy === 'FLAT' || reportType === 'MOVEMENTS') && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-bold uppercase text-[10px] bg-gray-50 dark:bg-gray-800">
+                          {reportType === 'MOVEMENTS' ? (
+                            <>
+                              <th className="py-2.5 px-3">Data</th>
+                              <th className="py-2.5 px-3">Tipo</th>
+                              <th className="py-2.5 px-3">Código</th>
+                              <th className="py-2.5 px-3">Produto</th>
+                              <th className="py-2.5 px-3 text-center">Qtd</th>
+                              <th className="py-2.5 px-3 text-center">Saldo Ant.</th>
+                              <th className="py-2.5 px-3 text-center">Saldo Pós</th>
+                              <th className="py-2.5 px-3">Origem / Destino</th>
+                              <th className="py-2.5 px-3">Responsável</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="py-2.5 px-3">Código</th>
+                              <th className="py-2.5 px-3">Produto</th>
+                              <th className="py-2.5 px-3">Categoria</th>
+                              <th className="py-2.5 px-3 text-center">Saldo</th>
+                              <th className="py-2.5 px-3 text-center">Unid.</th>
+                              <th className="py-2.5 px-3 text-center">Mínimo</th>
+                              <th className="py-2.5 px-3">Local</th>
+                              <th className="py-2.5 px-3 text-right">Val. Unit.</th>
+                              <th className="py-2.5 px-3 text-right">Total Est.</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {reportType === 'MOVEMENTS' ? (
+                          movements
+                            .filter(m => {
+                              if (!m.date) return false;
+                              return m.date >= reportPeriodInfo.startDate && m.date <= reportPeriodInfo.endDate;
+                            })
+                            .map(m => (
+                              <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                <td className="py-3 px-3 font-bold text-gray-700 dark:text-gray-300">
+                                  {m.date ? m.date.split('-').reverse().join('/') : '—'}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                                    m.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                  }`}>
+                                    {m.type}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 font-mono text-gray-500">{m.productCode}</td>
+                                <td className="py-3 px-3 font-bold text-gray-900 dark:text-white">{m.productName}</td>
+                                <td className={`py-3 px-3 text-center font-black ${
+                                  m.type === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'
+                                }`}>
+                                  {m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`}
+                                </td>
+                                <td className="py-3 px-3 text-center text-gray-500">{m.stockBefore}</td>
+                                <td className="py-3 px-3 text-center font-bold text-gray-800 dark:text-gray-200">{m.stockAfter}</td>
+                                <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
+                                  {m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I')}
+                                </td>
+                                <td className="py-3 px-3 font-medium text-gray-700 dark:text-gray-300">{m.responsible}</td>
+                              </tr>
+                            ))
+                        ) : (
+                          reportProducts.map(p => (
+                            <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                              <td className="py-3 px-3 font-mono font-bold text-gray-500">{p.code || 'S/C'}</td>
+                              <td className="py-3 px-3 font-bold text-gray-900 dark:text-white">{p.name}</td>
+                              <td className="py-3 px-3">
+                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-[10px] font-bold">
+                                  {p.category}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-center font-black text-gray-900 dark:text-white">{p.quantity}</td>
+                              <td className="py-3 px-3 text-center text-gray-500">{p.unit}</td>
+                              <td className="py-3 px-3 text-center text-gray-500">{p.minQuantity}</td>
+                              <td className="py-3 px-3 text-gray-600 dark:text-gray-400">{p.location || '—'}</td>
+                              <td className="py-3 px-3 text-right font-mono">{(p.unitPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                              <td className="py-3 px-3 text-right font-black font-mono">{((p.quantity || 0) * (p.unitPrice || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* CONSOLIDATED SUMMARY FOOTER CARD (TOTAL GERAL) */}
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 sm:p-7 shadow-xl border border-slate-700/60 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+                  
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+                    <div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full text-[10px] font-black uppercase tracking-widest mb-2">
+                        ✨ Fechamento & Auditoria Geral
+                      </div>
+                      <h4 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                        TOTAL GERAL CONSOLIDADO DO ESTOQUE
+                      </h4>
+                      <p className="text-xs text-slate-300 mt-1 max-w-md">
+                        Balanço físico e avaliação patrimonial global apurada para o período selecionado ({reportPeriodInfo.label}).
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 w-full lg:w-auto shrink-0">
+                      <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/10 shadow-inner">
+                        <span className="text-[10px] font-bold text-slate-300 block uppercase tracking-wider">Produtos Distintos</span>
+                        <span className="text-lg sm:text-xl font-black text-white mt-0.5 block">{reportOverallTotals.totalItems} <span className="text-xs text-slate-300 font-normal">itens</span></span>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/10 shadow-inner">
+                        <span className="text-[10px] font-bold text-slate-300 block uppercase tracking-wider">Qtd Total Física</span>
+                        <span className="text-lg sm:text-xl font-black text-amber-300 mt-0.5 block">{reportOverallTotals.totalQuantity} <span className="text-xs text-slate-300 font-normal">un</span></span>
+                      </div>
+                      <div className="bg-white text-slate-950 p-3.5 sm:p-4 rounded-2xl col-span-2 sm:col-span-1 shadow-lg border border-white/20">
+                        <span className="text-[10px] font-black text-indigo-900 block uppercase tracking-wider">Valor Patrimonial Total</span>
+                        <span className="text-lg sm:text-xl font-black text-indigo-950 mt-0.5 block font-mono">
+                          {reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
             </div>
 
           </div>
@@ -2738,7 +3822,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
                       <button
                         type="button"
-                        onClick={() => setMovementForm(prev => ({ ...prev, entryOrigin: 'DOACAO', deductFromTreasury: false }))}
+                        onClick={() => setMovementForm(prev => ({ ...prev, entryOrigin: 'DOACAO' }))}
                         className={`p-3 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                           movementForm.entryOrigin === 'DOACAO'
                             ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-500 text-purple-800 dark:text-purple-300 shadow-sm ring-2 ring-purple-500/30'
@@ -2862,7 +3946,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                       <div className="p-3 bg-purple-100/60 dark:bg-purple-900/40 rounded-xl text-[11px] text-purple-900 dark:text-purple-200 flex items-center gap-2">
                         <Gift size={16} className="shrink-0 text-purple-600" />
                         <span>
-                          <strong>Registro de Doação:</strong> O saldo do produto no estoque será incrementado e o histórico armazenado. <strong>NENHUMA despesa será criada na Tesouraria.</strong>
+                          <strong>Registro de Doação:</strong> O saldo do produto no estoque será incrementado e o histórico de movimentação ficará registrado.
                         </span>
                       </div>
                     </div>
@@ -3014,28 +4098,8 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                       </p>
                       <p><strong>Fornecedor:</strong> {selectedMovementForDetails.supplier || 'Não informado'}</p>
                       {selectedMovementForDetails.invoiceNumber && <p><strong>Nº da Nota:</strong> {selectedMovementForDetails.invoiceNumber}</p>}
+                      {selectedMovementForDetails.unitPrice ? <p><strong>Valor Unitário:</strong> R$ {Number(selectedMovementForDetails.unitPrice).toFixed(2)}</p> : null}
                       {selectedMovementForDetails.totalPrice ? <p><strong>Valor Total:</strong> R$ {Number(selectedMovementForDetails.totalPrice).toFixed(2)}</p> : null}
-                      
-                      <div className="pt-2">
-                        {selectedMovementForDetails.deductFromTreasury ? (
-                          <div className="p-2.5 bg-emerald-100 dark:bg-emerald-950/60 rounded-xl text-emerald-900 dark:text-emerald-200 space-y-1">
-                            <p className="font-bold flex items-center gap-1">
-                              <CreditCard size={14} /> Descontado da Tesouraria
-                            </p>
-                            <p className="text-[10px]">Lançamento automático de despesa em Finanças / Tesouraria.</p>
-                            {selectedMovementForDetails.financialTransactionId && (
-                              <p className="text-[10px] font-mono text-emerald-800 dark:text-emerald-300">ID Financeiro: {selectedMovementForDetails.financialTransactionId}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="p-2.5 bg-amber-100 dark:bg-amber-950/60 rounded-xl text-amber-900 dark:text-amber-200 space-y-1">
-                            <p className="font-bold flex items-center gap-1">
-                              <Ban size={14} /> Não descontado da Tesouraria
-                            </p>
-                            <p className="text-[10px]">Entrada no estoque efetuada sem alterar o saldo da Tesouraria.</p>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ) : selectedMovementForDetails.origin === 'DOACAO' ? (
                     <div className="space-y-1.5 pl-2 border-l-2 border-purple-500">
@@ -3287,30 +4351,6 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
                             className="w-full p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-emerald-600 dark:text-emerald-400 outline-none focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
-                      </div>
-
-                      {/* Tesouraria Toggle */}
-                      <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                        <div>
-                          <p className="font-extrabold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                            <CreditCard size={14} className="text-emerald-600" />
-                            Debitar da Tesouraria
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {editMovementForm.deductFromTreasury 
-                              ? 'Lançamento de despesa será sincronizado no financeiro.' 
-                              : 'Não afeta o saldo financeiro da entidade.'}
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={editMovementForm.deductFromTreasury}
-                            onChange={e => setEditMovementForm(prev => ({ ...prev, deductFromTreasury: e.target.checked }))}
-                            className="sr-only peer"
-                          />
-                          <div className="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
-                        </label>
                       </div>
                     </div>
                   ) : (

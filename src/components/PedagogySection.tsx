@@ -18,7 +18,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn, safeReplace } from '../lib/utils';
+import { cn, safeReplace, getProfessionalName } from '../lib/utils';
 import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { extractFormData, fixGrammar } from '../services/geminiService';
@@ -2176,10 +2176,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-2">Equipe / Colaboradores:</p>
                     <div className="flex flex-wrap gap-2">
                       {activity.coWorkers.map(cwId => {
-                        const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        const prof = (professionals || []).find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                         return (
                           <span key={cwId} className="px-3 py-1 bg-pink-50/50 dark:bg-pink-950/20 text-pink-700 dark:text-pink-350 rounded-xl text-[10px] font-black border border-pink-100 dark:border-pink-900 shadow-sm">
-                            {prof ? prof.name : cwId}
+                            {prof ? prof.name : getProfessionalName(cwId, professionals)}
                           </span>
                         );
                       })}
@@ -3436,10 +3436,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
                     <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
                     <div className="flex flex-wrap gap-1">
                       {viewingEvo.coWorkers.map(cwId => {
-                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        const prof = (professionals || []).find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                         return (
                           <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
-                            {prof ? prof.name : cwId}
+                            {prof ? prof.name : getProfessionalName(cwId, professionals)}
                           </span>
                         );
                       })}
@@ -3538,10 +3538,10 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
                     <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
                     <div className="flex flex-wrap gap-1">
                       {viewingAct.coWorkers.map(cwId => {
-                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        const prof = (professionals || []).find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                         return (
                           <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
-                            {prof ? prof.name : cwId}
+                            {prof ? prof.name : getProfessionalName(cwId, professionals)}
                           </span>
                         );
                       })}

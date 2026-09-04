@@ -108,7 +108,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { cn, safeReplace, cleanData, compressImage } from './lib/utils';
+import { cn, safeReplace, cleanData, compressImage, getProfessionalName, getProfessionalRole } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { ActivityDetailsModal } from './components/ActivityDetailsModal';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
@@ -132,6 +132,8 @@ import { StockSection } from './components/StockSection';
 import { AdminAssistantSection } from './components/AdminAssistantSection';
 import { PresidencySupportSection } from './components/PresidencySupportSection';
 import { InstitutionalSupportSection } from './components/InstitutionalSupportSection';
+import { MonitoringSection } from './components/MonitoringSection';
+import { ReportsSection } from './components/reports/ReportsSection';
 import { GlobalGallery } from './components/GlobalGallery';
 import { DigitizeButton } from './components/DigitizeButton';
 import { ProductivitySection } from './components/ProductivitySection';
@@ -1084,12 +1086,11 @@ const OfficialHeader = () => {
     <div className="print-only w-full mb-8 border-b-2 border-green-600 pb-4">
       <div className="flex items-center justify-between gap-8">
         <div className="flex-1">
-          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Opera Assistenza Malati Impediti</h1>
-          <p className="text-sm font-bold text-green-700 tracking-widest mt-1">OAMI - UNIDADE POMPÉIA/SP</p>
-          <div className="mt-4 space-y-0.5 text-[10px] text-gray-600 font-medium leading-tight">
-            <p>CNPJ: 00.000.000/0000-00</p>
-            <p>Rua Exemplo, 123 - Pompéia - São Paulo/SP</p>
-            <p>Tel: (11) 0000-0000 | Email: contato@oami.org.br</p>
+          <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tighter">Opera Assistenza Malati Impediti (OAMI)</h1>
+          <p className="text-sm font-bold text-green-700 tracking-widest mt-1">Casa OAMI – Gestão ILPI</p>
+          <div className="mt-3 space-y-0.5 text-[11px] text-gray-600 font-medium leading-tight">
+            <p className="font-semibold text-gray-700">CNPJ: 10.706.425/0001-74 • MA-014, Alto São Francisco, Vitória do Mearim – Maranhão</p>
+            <p>Relatório Oficial de Gestão e Atendimento</p>
           </div>
         </div>
         <div className="w-32 h-32 flex-shrink-0">
@@ -1487,8 +1488,8 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'stock', label: 'Controle de Estoque', icon: Boxes, roles: ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
         { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
-        { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['ADMIN', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
       ]
     },
     {
@@ -8069,285 +8070,7 @@ const GallerySection = ({ user, showToast }: { user: User, showToast: (msg: stri
   );
 };
 
-const ReportsSection = ({ 
-  elderly, 
-  evolutions, 
-  pias, 
-  socialEvolutions,
-  psychEvolutions,
-  pedagogyEvolutions,
-  physioEvolutions,
-  nursingEvolutions,
-  photos, 
-  showToast 
-}: { 
-  elderly: Elderly[], 
-  evolutions: EvolutionRecord[], 
-  pias: PIA[], 
-  socialEvolutions: SocialEvolution[],
-  psychEvolutions: PsychEvolution[],
-  pedagogyEvolutions: PedagogyEvolution[],
-  physioEvolutions: PhysioEvolution[],
-  nursingEvolutions: NursingEvolution[],
-  photos: GalleryPhoto[], 
-  showToast: (msg: string, type?: 'success' | 'error') => void 
-}) => {
-  const [generating, setGenerating] = useState(false);
-  const [reportPeriod, setReportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'semi-annually' | 'annually'>('monthly');
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
-  const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
-
-  const unifiedEvolutions = useMemo(() => {
-    const all: any[] = [
-      ...evolutions.map(e => ({ ...e, id: `gen-${e.id}`, professionalRole: e.professionalRole, source: 'Geral' })),
-      ...socialEvolutions.map(e => ({ ...e, id: `soc-${e.id}`, date: e.date, professionalRole: 'ASSISTENTE_SOCIAL', source: 'Social' })),
-      ...psychEvolutions.map(e => ({ ...e, id: `psy-${e.id}`, date: e.date, professionalRole: 'PSICOLOGA', source: 'Psicologia' })),
-      ...pedagogyEvolutions.map(e => ({ ...e, id: `ped-${e.id}`, date: e.date, professionalRole: 'PEDAGOGA', source: 'Pedagogia' })),
-      ...physioEvolutions.map(e => ({ ...e, id: `phy-${e.id}`, date: e.date, professionalRole: 'FISIOTERAPEUTA', source: 'Fisioterapia' })),
-      ...nursingEvolutions.map(e => ({ ...e, id: `nur-${e.id}`, date: e.date, professionalRole: 'ENFERMEIRA', source: 'Enfermagem' })),
-    ];
-    return all;
-  }, [evolutions, socialEvolutions, psychEvolutions, pedagogyEvolutions, physioEvolutions, nursingEvolutions]);
-
-  const filteredData = useMemo(() => {
-    let start: Date;
-    let end: Date;
-
-    if (reportPeriod === 'daily') {
-      start = parseISO(selectedDate);
-      end = endOfDay(start);
-    } else if (reportPeriod === 'weekly') {
-      const base = parseISO(selectedDate);
-      start = startOfWeek(base, { weekStartsOn: 0 });
-      end = endOfWeek(base, { weekStartsOn: 0 });
-    } else if (reportPeriod === 'monthly') {
-      const base = parseISO(`${selectedMonth}-01`);
-      start = startOfMonth(base);
-      end = endOfMonth(base);
-    } else if (reportPeriod === 'semi-annually') {
-      const isSecondHalf = new Date().getMonth() >= 6;
-      start = isSecondHalf ? parseISO(`${selectedYear}-07-01`) : parseISO(`${selectedYear}-01-01`);
-      end = isSecondHalf ? endOfMonth(parseISO(`${selectedYear}-12-01`)) : endOfMonth(parseISO(`${selectedYear}-06-01`));
-    } else {
-      start = parseISO(`${selectedYear}-01-01`);
-      end = endOfMonth(parseISO(`${selectedYear}-12-01`));
-    }
-
-    const filterFn = (dateStr: string) => {
-      const d = parseISO(dateStr);
-      return d >= start && d <= end;
-    };
-
-    return {
-      evolutions: unifiedEvolutions.filter(ev => filterFn(ev.date)),
-      pias: pias.filter(p => filterFn(p.date)),
-      periodLabel: reportPeriod === 'daily' ? format(start, 'dd/MM/yyyy') : 
-                   reportPeriod === 'weekly' ? `${format(start, 'dd/MM')} a ${format(end, 'dd/MM/yyyy')}` :
-                   reportPeriod === 'monthly' ? format(start, 'MMMM yyyy', { locale: ptBR }) :
-                   reportPeriod === 'semi-annually' ? `${start.getMonth() === 0 ? '1º' : '2º'} Semestre ${selectedYear}` :
-                   selectedYear
-    };
-  }, [reportPeriod, selectedDate, selectedMonth, selectedYear, unifiedEvolutions, pias]);
-
-  const getReportData = () => {
-    const { evolutions: periodEvolutions, pias: periodPIAs } = filteredData;
-    const roles = [...new Set(periodEvolutions.map(e => e.professionalRole))];
-    const columns = ['Categoria', 'Informação'];
-    const data = [
-      ['RESUMO DAS AÇÕES', ''],
-      ['Total de Idosos Atendidos', elderly.filter(e => e.status === 'ATIVO').length.toString()],
-      ['Evoluções Registradas no Período', periodEvolutions.length.toString()],
-      ['Novos PIAs/Revisões', periodPIAs.length.toString()],
-      ['', ''],
-      ['ATENDIMENTOS POR ÁREA', ''],
-      ...roles.map(role => [
-        ROLE_LABELS[role as Role] || role,
-        `${periodEvolutions.filter(e => e.professionalRole === role).length} atendimentos`
-      ])
-    ];
-    return { columns, data };
-  };
-
-  const generatePDF = async () => {
-    setGenerating(true);
-    try {
-      const { periodLabel } = filteredData;
-      const { columns, data } = getReportData();
-
-      await generateModernPDF({
-        title: 'Relatório OAMI',
-        subtitle: `Período: ${periodLabel} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
-        columns,
-        data,
-        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
-      });
-      showToast('Relatório PDF gerado com sucesso!');
-    } catch (error) {
-      console.error("PDF Generation Error:", error);
-      showToast('Erro ao gerar PDF', 'error');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const generateWord = async () => {
-    setGenerating(true);
-    try {
-      const { periodLabel } = filteredData;
-      const { columns, data } = getReportData();
-
-      await generateModernWord({
-        title: 'Relatório OAMI',
-        subtitle: `Período: ${periodLabel} - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
-        columns,
-        data,
-        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
-      });
-      showToast('Relatório Word gerado com sucesso!');
-    } catch (error) {
-      console.error("Word Generation Error:", error);
-      showToast('Erro ao gerar Word', 'error');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const generateExcel = () => {
-    setGenerating(true);
-    try {
-      const { periodLabel } = filteredData;
-      const { columns, data } = getReportData();
-
-      generateModernExcel({
-        title: 'Relatório OAMI',
-        columns,
-        data,
-        fileName: `relatorio_${reportPeriod}_${safeReplace(periodLabel, /\//g, '-')}`
-      });
-      showToast('Relatório Excel gerado com sucesso!');
-    } catch (error) {
-      console.error("Excel Generation Error:", error);
-      showToast('Erro ao gerar Excel', 'error');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div className="space-y-8">
-      <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Relatórios Consolidados</h2>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Gere documentos de atividades e atendimentos por período.</p>
-          </div>
-          <div className="flex flex-wrap gap-3 w-full md:w-auto">
-            <select 
-              className="p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm text-gray-800 dark:text-white font-bold"
-              value={reportPeriod}
-              onChange={(e) => setReportPeriod(e.target.value as any)}
-            >
-              <option value="daily">Diário</option>
-              <option value="weekly">Semanal</option>
-              <option value="monthly">Mensal</option>
-              <option value="semi-annually">Semestral</option>
-              <option value="annually">Anual</option>
-            </select>
-
-            {reportPeriod === 'daily' || reportPeriod === 'weekly' ? (
-              <input 
-                type="date" 
-                className="p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm text-gray-800 dark:text-white"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              />
-            ) : reportPeriod === 'monthly' ? (
-              <input 
-                type="month" 
-                className="p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm text-gray-800 dark:text-white"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
-            ) : (
-              <select 
-                className="p-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm text-gray-800 dark:text-white font-bold"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-              >
-                {[2024, 2025, 2026, 2027].map(y => (
-                  <option key={y} value={y.toString()}>{y}</option>
-                ))}
-              </select>
-            )}
-
-            <div className="flex gap-2">
-              <button 
-                onClick={generateWord}
-                disabled={generating}
-                className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
-                title="Exportar Word"
-              >
-                <FileText size={18} /> Word
-              </button>
-              <button 
-                onClick={generateExcel}
-                disabled={generating}
-                className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-all flex items-center gap-2 disabled:opacity-50"
-                title="Exportar Excel"
-              >
-                <TableIcon size={18} /> Excel
-              </button>
-              <button 
-                onClick={generatePDF}
-                disabled={generating}
-                className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-red-700 transition-all flex items-center gap-2 disabled:opacity-50"
-                title="Exportar PDF"
-              >
-                <FileDown size={18} /> PDF
-              </button>
-              <button 
-                onClick={() => window.print()}
-                className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-purple-700 transition-all flex items-center gap-2"
-                title="Imprimir Relatório"
-              >
-                <Printer size={18} /> Imprimir
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/30">
-            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center text-green-600 dark:text-green-400 mb-4">
-              <Activity size={20} />
-            </div>
-            <h4 className="font-bold text-gray-800 dark:text-white mb-1">Ações Técnicas</h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Resumo de todas as evoluções e atendimentos do período: <span className="font-bold text-green-600">{filteredData.periodLabel}</span>.</p>
-          </div>
-          <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4">
-              <ImageIcon size={20} />
-            </div>
-            <h4 className="font-bold text-gray-800 dark:text-white mb-1">Galeria de Fotos</h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Inclusão automática das fotos registradas no período.</p>
-          </div>
-          <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200 dark:border-gray-700">
-            <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-xl flex items-center justify-center text-gray-600 dark:text-gray-400 mb-4">
-              <Search size={20} />
-            </div>
-            <h4 className="font-bold text-gray-800 dark:text-white mb-1">Dados Consolidados</h4>
-            <div className="text-[10px] space-y-1 text-gray-500 mt-2">
-              <p>• Evoluções: {filteredData.evolutions.length}</p>
-              <p>• Atendimentos: {filteredData.evolutions.length}</p>
-              <p>• PIAs no período: {filteredData.pias.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Note: ReportsSection is imported from ./components/reports/ReportsSection and provides the integrated Relatório Geral dashboard
 
 const WorkshopsSection = ({ 
   workshops, 
@@ -9125,18 +8848,18 @@ const WorkshopsSection = ({
                       }
 
                       return filteredProfs.map(p => {
-                        const isChecked = (workshopFormData.coWorkers || []).includes(p.id) || (workshopFormData.coWorkers || []).includes(p.email);
+                        const isChecked = (workshopFormData.coWorkers || []).some(cwId => cwId === p.id || cwId === p.uid || (p.email && cwId.toLowerCase() === p.email.toLowerCase()) || (p.name && cwId.toLowerCase() === p.name.toLowerCase()));
                         return (
-                          <label key={p.id} className="flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 rounded-xl cursor-pointer transition-colors group border border-gray-50 dark:border-gray-750">
+                          <label key={p.id || p.uid || p.email} className="flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 rounded-xl cursor-pointer transition-colors group border border-gray-50 dark:border-gray-750">
                             <input 
                               type="checkbox"
                               className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                               checked={isChecked}
                               onChange={() => {
-                                const idToUse = p.id || p.email;
+                                const idToUse = p.id || p.uid || p.email;
                                 const originalCoWorkers = workshopFormData.coWorkers || [];
                                 const newCoWorkers = isChecked
-                                  ? originalCoWorkers.filter(id => id !== p.id && id !== p.email)
+                                  ? originalCoWorkers.filter(id => id !== p.id && id !== p.uid && id !== p.email && id !== p.name)
                                   : [...originalCoWorkers, idToUse];
                                 setWorkshopFormData({...workshopFormData, coWorkers: newCoWorkers});
                               }}
@@ -9488,12 +9211,13 @@ const WorkshopsSection = ({
                     <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase mb-2">Colaboradores da Ação ({selectedWorkshop.coWorkers.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedWorkshop.coWorkers.map(id => {
-                        const prof = professionals.find(p => p.id === id || p.email === id);
-                        if (!prof) return null;
+                        const prof = (professionals || []).find(p => p.id === id || p.uid === id || p.email === id || p.name === id);
+                        const displayName = prof ? prof.name : getProfessionalName(id, professionals);
+                        const roleName = prof?.role ? (ROLE_LABELS[prof.role] || prof.role) : getProfessionalRole(id, professionals);
                         return (
                           <div key={id} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-xl shadow-sm text-xs border border-emerald-100/30">
-                            <span className="font-bold text-gray-700 dark:text-gray-200">{prof.name}</span>
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">({ROLE_LABELS[prof.role] || prof.role})</span>
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{displayName}</span>
+                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">({roleName})</span>
                           </div>
                         );
                       })}
@@ -9773,416 +9497,7 @@ const StaffManagementSection = ({ staff, onSave, onDelete, showToast }: { staff:
   );
 };
 
-const MonitoringSection = ({ 
-  elderly, 
-  evolutions, 
-  pias, 
-  socialEvolutions,
-  psychEvolutions,
-  pedagogyEvolutions,
-  physioEvolutions,
-  nursingEvolutions,
-  vitalSigns,
-  psychEmotionalMonitorings,
-  workshops,
-  showToast 
-}: { 
-  elderly: Elderly[], 
-  evolutions: EvolutionRecord[],
-  pias: PIA[],
-  socialEvolutions: SocialEvolution[],
-  psychEvolutions: PsychEvolution[],
-  pedagogyEvolutions: PedagogyEvolution[],
-  physioEvolutions: PhysioEvolution[],
-  nursingEvolutions: NursingEvolution[],
-  vitalSigns: VitalSigns[],
-  psychEmotionalMonitorings: PsychEmotionalMonitoring[],
-  workshops: Workshop[],
-  showToast: (msg: string, type?: 'success' | 'error') => void 
-}) => {
-  const [selectedElderlyId, setSelectedElderlyId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'evolutions' | 'pias' | 'health'>('dashboard');
-  const [exporting, setExporting] = useState(false);
-
-  const unifiedEvolutions = useMemo(() => {
-    const all: any[] = [
-      ...evolutions.map(e => ({ ...e, id: `gen-${e.id}`, professional: e.professionalRole, source: 'Geral' })),
-      ...socialEvolutions.map(e => ({ ...e, id: `soc-${e.id}`, elderlyId: e.patientId, professional: 'ASSISTENTE_SOCIAL', content: e.observation, source: 'Social' })),
-      ...psychEvolutions.map(e => ({ ...e, id: `psy-${e.id}`, elderlyId: e.patientId, professional: 'PSICOLOGA', content: e.observation, source: 'Psicologia' })),
-      ...pedagogyEvolutions.map(e => ({ ...e, id: `ped-${e.id}`, elderlyId: e.patientId, professional: 'PEDAGOGA', content: e.observations, source: 'Pedagogia' })),
-      ...physioEvolutions.map(e => ({ ...e, id: `phy-${e.id}`, elderlyId: e.patientId, professional: 'FISIOTERAPEUTA', content: e.evolution, source: 'Fisioterapia' })),
-      ...nursingEvolutions.map(e => ({ ...e, id: `nur-${e.id}`, elderlyId: e.patientId, professional: 'ENFERMEIRA', content: e.content, source: 'Enfermagem' })),
-    ];
-    return all.sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
-      return (dateB || 0) - (dateA || 0);
-    });
-  }, [evolutions, socialEvolutions, psychEvolutions, pedagogyEvolutions, physioEvolutions, nursingEvolutions]);
-
-  const generateMonitoringPDF = async () => {
-    setExporting(true);
-    try {
-      const columns = ['Indicador', 'Valor'];
-      const data = [
-        ['Total de Idosos Atendidos', (elderly || []).length.toString()],
-        ['PIAs em Andamento', (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
-        ['Evoluções Totais', (unifiedEvolutions || []).length.toString()],
-        ['Atendimentos de Fisioterapia', (physioEvolutions || []).length.toString()],
-        ['Atendimentos de Psicologia', (psychEvolutions || []).length.toString()],
-        ['Atendimentos de Pedagogia', (pedagogyEvolutions || []).length.toString()],
-        ['Atendimentos de Serviço Social', (socialEvolutions || []).length.toString()],
-        ['Atendimentos de Enfermagem', (nursingEvolutions || []).length.toString()]
-      ];
-
-      await generateModernPDF({
-        title: 'Relatório de Monitoramento e Impacto',
-        subtitle: `Indicadores Institucionais - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
-        columns,
-        data,
-        fileName: 'relatorio_monitoramento'
-      });
-      showToast('Relatório de monitoramento exportado com sucesso!');
-    } catch (err) {
-      console.error("Export Error:", err);
-      showToast('Erro ao exportar relatório de monitoramento', 'error');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const generateMonitoringWord = async () => {
-    setExporting(true);
-    try {
-      const columns = ['Indicador', 'Valor'];
-      const data = [
-        ['Total de Idosos Atendidos', (elderly || []).length.toString()],
-        ['PIAs em Andamento', (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length.toString()],
-        ['Evoluções Totais', (unifiedEvolutions || []).length.toString()],
-        ['Atendimentos de Fisioterapia', (physioEvolutions || []).length.toString()],
-        ['Atendimentos de Psicologia', (psychEvolutions || []).length.toString()],
-        ['Atendimentos de Pedagogia', (pedagogyEvolutions || []).length.toString()],
-        ['Atendimentos de Serviço Social', (socialEvolutions || []).length.toString()],
-        ['Atendimentos de Enfermagem', (nursingEvolutions || []).length.toString()]
-      ];
-
-      await generateModernWord({
-        title: 'Relatório de Monitoramento e Impacto',
-        subtitle: `Indicadores Institucionais - Gerado em ${format(new Date(), "dd/MM/yyyy")}`,
-        columns,
-        data,
-        fileName: 'relatorio_monitoramento'
-      });
-      showToast('Relatório Word gerado com sucesso!');
-    } catch (err) {
-      console.error("Export Error:", err);
-      showToast('Erro ao exportar relatório em Word', 'error');
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const selectedElderly = (elderly || []).find(e => e.id === selectedElderlyId);
-  const elderlyPia = (pias || []).find(p => p.elderlyId === selectedElderlyId);
-  const elderlyEvolutions = (unifiedEvolutions || []).filter(ev => ev && ev.elderlyId === selectedElderlyId);
-  const elderlyVitals = (vitalSigns || []).filter(v => v && v.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const elderlyEmotions = (psychEmotionalMonitorings || []).filter(m => m && m.patientId === selectedElderlyId).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  return (
-    <div className="space-y-8">
-      <div className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Monitoramento e Avaliação de Impacto</h2>
-            <p className="text-sm text-gray-500">Acompanhamento integrado de todas as áreas profissionais</p>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={generateMonitoringWord}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all disabled:opacity-50"
-            >
-              <FileText size={18} />
-              Relatório Word
-            </button>
-            <button 
-              onClick={generateMonitoringPDF}
-              disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold hover:bg-red-100 dark:hover:bg-red-900/40 transition-all disabled:opacity-50"
-            >
-              <FileDown size={18} />
-              Relatório PDF
-            </button>
-          </div>
-        </div>
-
-        {/* Tabs de Navegação do Monitoramento */}
-        <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
-          {[
-            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'evolutions', label: 'Evoluções', icon: Activity },
-            { id: 'pias', label: 'PIAs Sociais', icon: ClipboardList },
-            { id: 'health', label: 'Saúde e Vitals', icon: HeartPulse },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap",
-                activeTab === tab.id 
-                  ? "bg-green-600 text-white shadow-lg shadow-green-600/20" 
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700"
-              )}
-            >
-              <tab.icon size={18} />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-        
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[
-                { label: 'Total Idosos', value: elderly.length, icon: Users, color: 'text-blue-600' },
-                { label: 'PIAs Ativos', value: (pias || []).filter(p => p.status === 'EM_ANDAMENTO').length, icon: ClipboardList, color: 'text-green-600' },
-                { label: 'Evoluções (Total)', value: unifiedEvolutions.length, icon: Activity, color: 'text-purple-600' },
-                { label: 'Workshops', value: workshops.length, icon: BookOpen, color: 'text-orange-600' },
-              ].map((m, i) => (
-                <div key={i} className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <m.icon className={m.color} size={20} />
-                  </div>
-                  <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">{m.label}</p>
-                  <span className="text-3xl font-bold text-gray-800 dark:text-white">{m.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                <h3 className="font-bold text-gray-800 dark:text-white mb-6">Distribuição de Atendimentos</h3>
-                 <div style={{ width: '100%', height: 300 }}>
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                       <Pie
-                         data={[
-                           { name: 'Social', value: socialEvolutions.length },
-                           { name: 'Psicologia', value: psychEvolutions.length },
-                           { name: 'Pedagogia', value: pedagogyEvolutions.length },
-                           { name: 'Fisioterapia', value: physioEvolutions.length },
-                           { name: 'Enfermagem', value: nursingEvolutions.length },
-                         ]}
-                         cx="50%"
-                         cy="50%"
-                         innerRadius={60}
-                         outerRadius={80}
-                         paddingAngle={5}
-                         dataKey="value"
-                       >
-                         {['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'].map((color, index) => (
-                           <Cell key={`cell-${index}`} fill={color} />
-                         ))}
-                       </Pie>
-                       <Tooltip />
-                     </PieChart>
-                   </ResponsiveContainer>
-                 </div>
-              </div>
-
-              <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                <h3 className="font-bold text-gray-800 dark:text-white mb-6">Status dos PIAs</h3>
-                <div className="space-y-4">
-                  {['EM_ANDAMENTO', 'CONCLUIDO', 'REVISAR'].map(status => {
-                    const count = (pias || []).filter(p => p.status === status).length;
-                    const percentage = (pias || []).length > 0 ? (count / (pias || []).length) * 100 : 0;
-                    return (
-                      <div key={status} className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="font-bold text-gray-600 dark:text-gray-400">{safeReplace(status, '_', ' ') || 'ATIVO'}</span>
-                          <span className="font-bold text-gray-800 dark:text-white">{count}</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                          <div 
-                            className={cn(
-                              "h-full rounded-full transition-all duration-500",
-                              status === 'EM_ANDAMENTO' ? 'bg-blue-500' : status === 'CONCLUIDO' ? 'bg-green-500' : 'bg-yellow-500'
-                            )}
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'evolutions' && (
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <Activity className="text-blue-600 dark:text-blue-400" size={24} />
-                Timeline de Evoluções Multidisciplinares
-              </h3>
-              <select 
-                className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 w-full md:w-64 text-gray-800 dark:text-white"
-                value={selectedElderlyId}
-                onChange={(e) => setSelectedElderlyId(e.target.value)}
-              >
-                <option value="">Todos os idosos...</option>
-                {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-            </div>
-
-            <div className="space-y-4">
-              {(selectedElderlyId ? elderlyEvolutions : unifiedEvolutions).slice(0, 20).map((ev) => (
-                <div key={ev.id} className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800 flex gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                    ev.source === 'Social' ? 'bg-blue-100 text-blue-600' :
-                    ev.source === 'Psicologia' ? 'bg-green-100 text-green-600' :
-                    ev.source === 'Pedagogia' ? 'bg-yellow-100 text-yellow-600' :
-                    ev.source === 'Fisioterapia' ? 'bg-red-100 text-red-600' :
-                    'bg-purple-100 text-purple-600'
-                  )}>
-                    <UserCircle size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <h4 className="font-bold text-gray-800 dark:text-white">
-                          {(elderly || []).find(e => e.id === ev.elderlyId)?.name || 'Idoso não encontrado'}
-                        </h4>
-                        <span className="text-xs font-bold text-blue-600 uppercase">{ev.source}</span>
-                      </div>
-                      <span className="text-xs text-gray-400 font-bold">{safeFormat(ev.date, 'dd/MM/yyyy HH:mm')}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{ev.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'pias' && (
-          <div className="space-y-6">
-            <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-              <ClipboardList className="text-green-600 dark:text-green-400" size={24} />
-              Planos Individuais de Atendimento (PIA)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {(pias || []).map(pia => {
-                if (!pia || !pia.id) return null;
-                const resident = (elderly || []).find(e => e.id === pia.elderlyId);
-                return (
-                  <div key={pia.id} className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                    <div className="flex justify-between items-start mb-4">
-                      <h4 className="font-bold text-gray-800 dark:text-white">{resident?.name || 'Idoso não encontrado'}</h4>
-                      <span className={cn(
-                        "px-2 py-1 rounded-lg text-[10px] font-bold uppercase",
-                        pia.status === 'EM_ANDAMENTO' ? 'bg-blue-100 text-blue-600' :
-                        pia.status === 'CONCLUIDO' ? 'bg-green-100 text-green-600' :
-                        'bg-yellow-100 text-yellow-600'
-                      )}>
-                        {safeReplace(pia.status, '_', ' ') || 'ATIVO'}
-                      </span>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Objetivos</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.objectives || 'Nenhum objetivo definido'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Ações</p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">{pia.actions || 'Nenhuma ação definida'}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'health' && (
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                <HeartPulse className="text-red-600 dark:text-red-400" size={24} />
-                Monitoramento de Saúde e Bem-estar
-              </h3>
-              <select 
-                className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 w-full md:w-64 text-gray-800 dark:text-white"
-                value={selectedElderlyId}
-                onChange={(e) => setSelectedElderlyId(e.target.value)}
-              >
-                <option value="">Selecione um idoso...</option>
-                {(elderly || []).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-            </div>
-
-            {selectedElderly ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <h4 className="font-bold text-gray-800 dark:text-white mb-6">Sinais Vitais (Últimos Registros)</h4>
-                  <div className="space-y-4">
-                    {elderlyVitals.slice(0, 5).map((v, i) => (
-                      <div key={i} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">PA</p>
-                          <p className="font-bold text-gray-800 dark:text-white">{v.systolicBP}/{v.diastolicBP}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Temp</p>
-                          <p className="font-bold text-gray-800 dark:text-white">{v.temperature}°C</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Sat</p>
-                          <p className="font-bold text-gray-800 dark:text-white">{v.saturation}%</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-6 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-100 dark:border-gray-800">
-                  <h4 className="font-bold text-gray-800 dark:text-white mb-6">Monitoramento Emocional</h4>
-                  <div className="space-y-4">
-                    {elderlyEmotions.slice(0, 5).map((m, i) => (
-                      <div key={i} className="p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-bold text-gray-400">{safeFormat(m.date, 'dd/MM/yyyy')}</span>
-                          <span className={cn(
-                            "px-2 py-1 rounded-lg text-[10px] font-bold uppercase",
-                            m.wellBeing === 'FELIZ' ? 'bg-green-100 text-green-600' :
-                            m.wellBeing === 'NEUTRO' ? 'bg-yellow-100 text-yellow-600' :
-                            'bg-red-100 text-red-600'
-                          )}>
-                            {m.wellBeing}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{m.observations}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-20 bg-gray-50 dark:bg-gray-800/30 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
-                <p className="text-gray-500 dark:text-gray-400 font-medium">Selecione um idoso para visualizar os dados de saúde</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
+// MonitoringSection is loaded as a modular component from ./components/MonitoringSection
 
 const NotificationsModal = ({ events, onClose, onViewSchedule }: { 
   events: CalendarEvent[], 
@@ -10654,8 +9969,8 @@ const ProfileModal = ({
                       </div>
                       {(() => {
                         const creatorUser = users.find(u => u.id === act.registeredBy || u.email === act.registeredBy) 
-                          || professionals.find(p => p.id === act.registeredBy || p.email === act.registeredBy || p.name === act.registeredBy);
-                        const displayName = creatorUser ? creatorUser.name : act.registeredBy;
+                          || professionals.find(p => p.id === act.registeredBy || p.uid === act.registeredBy || p.email === act.registeredBy || p.name === act.registeredBy);
+                        const displayName = creatorUser ? creatorUser.name : getProfessionalName(act.registeredBy, professionals);
                         return (
                           <div className="text-[10px] font-medium text-gray-500 dark:text-gray-400">
                             <span className="font-bold uppercase text-[8px] tracking-wider text-gray-400 dark:text-gray-500">Responsável Principal: </span>
@@ -10667,10 +9982,10 @@ const ProfileModal = ({
                         <div className="mt-1.5 pt-1.5 border-t border-gray-100/50 dark:border-gray-800/50 flex flex-wrap gap-1 items-center">
                           <span className="text-[8px] font-black text-gray-400 uppercase mr-1">Ação Conjunta:</span>
                           {act.coWorkers.map((cwId: string, idx: number) => {
-                            const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                            const prof = professionals.find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                             return (
                               <span key={`cw-${cwId}-${idx}`} className="px-1.5 py-0.5 bg-green-50/80 dark:bg-green-950/20 text-green-700 dark:text-green-400 text-[8px] font-bold rounded">
-                                {prof?.name || cwId}
+                                {prof?.name || getProfessionalName(cwId, professionals)}
                               </span>
                             );
                           })}
@@ -11809,6 +11124,127 @@ export default function App() {
     });
   }, [elderly, socialPatients]);
 
+  const combinedProfessionals = useMemo(() => {
+    const map = new Map<string, Professional>();
+
+    // 1. From professionals collection
+    (professionals || []).forEach(p => {
+      if (!p) return;
+      const key = (p.uid || p.id || p.email || p.name || '').trim();
+      if (!key) return;
+      const profObj: Professional = {
+        ...p,
+        id: p.id || p.uid || key,
+        uid: p.uid || p.id || key,
+        name: p.name || 'Profissional',
+        role: p.role || (p as any).cargo || 'GERAL',
+        email: p.email || '',
+        registrationNumber: p.registrationNumber || '',
+        status: p.status || 'ATIVO',
+        admissionDate: p.admissionDate || new Date().toISOString(),
+        createdAt: p.createdAt || new Date().toISOString()
+      };
+      map.set(key.toLowerCase(), profObj);
+      if (p.email) map.set(p.email.toLowerCase(), profObj);
+      if (p.id) map.set(p.id.toLowerCase(), profObj);
+      if (p.uid) map.set(p.uid.toLowerCase(), profObj);
+    });
+
+    // 2. From adminUsers (profiles)
+    (adminUsers || []).forEach(u => {
+      if (!u) return;
+      const key = (u.id || (u as any).uid || u.email || u.name || '').trim();
+      if (!key) return;
+      const existing = map.get(key.toLowerCase()) || (u.email ? map.get(u.email.toLowerCase()) : undefined);
+      const merged: Professional = {
+        id: u.id || (u as any).uid || key,
+        uid: (u as any).uid || u.id || key,
+        name: u.name || existing?.name || 'Profissional',
+        role: (u.role as any) || existing?.role || 'GERAL',
+        email: u.email || existing?.email || '',
+        registrationNumber: u.registrationNumber || existing?.registrationNumber || '',
+        phone: existing?.phone || '',
+        address: existing?.address || '',
+        admissionDate: existing?.admissionDate || new Date().toISOString(),
+        status: existing?.status || 'ATIVO',
+        createdAt: existing?.createdAt || new Date().toISOString(),
+        photoUrl: u.photoUrl || existing?.photoUrl
+      };
+      map.set(key.toLowerCase(), merged);
+      if (u.id) map.set(u.id.toLowerCase(), merged);
+      if ((u as any).uid) map.set((u as any).uid.toLowerCase(), merged);
+      if (u.email) map.set(u.email.toLowerCase(), merged);
+    });
+
+    // 3. From users (StaffMember)
+    (users || []).forEach(s => {
+      if (!s) return;
+      const key = (s.id || s.email || s.name || '').trim();
+      if (!key) return;
+      const existing = map.get(key.toLowerCase()) || (s.email ? map.get(s.email.toLowerCase()) : undefined);
+      if (!existing) {
+        const staffProf: Professional = {
+          id: s.id || key,
+          uid: s.id || key,
+          name: s.name || 'Profissional',
+          role: s.role || 'GERAL',
+          email: s.email || '',
+          registrationNumber: '',
+          phone: (s as any).phone || '',
+          address: '',
+          admissionDate: new Date().toISOString(),
+          status: 'ATIVO',
+          createdAt: new Date().toISOString()
+        };
+        map.set(key.toLowerCase(), staffProf);
+        if (s.id) map.set(s.id.toLowerCase(), staffProf);
+        if (s.email) map.set(s.email.toLowerCase(), staffProf);
+      }
+    });
+
+    // 4. Current logged in user
+    if (user && user.name) {
+      const userKey = (user.id || user.email || user.name).trim().toLowerCase();
+      if (userKey && !map.has(userKey)) {
+        const currentProf: Professional = {
+          id: user.id || userKey,
+          uid: user.id || userKey,
+          name: user.name,
+          role: user.role || 'GERAL',
+          email: user.email || '',
+          registrationNumber: user.registrationNumber || '',
+          phone: '',
+          address: '',
+          admissionDate: new Date().toISOString(),
+          status: 'ATIVO',
+          createdAt: new Date().toISOString(),
+          photoUrl: user.photoUrl
+        };
+        map.set(userKey, currentProf);
+      }
+    }
+
+    // Return deduplicated list
+    const uniqueList: Professional[] = [];
+    const seenIds = new Set<string>();
+
+    map.forEach((prof) => {
+      const uniqueKey = (prof.id || prof.uid || prof.email || prof.name || '').trim().toLowerCase();
+      if (uniqueKey && !seenIds.has(uniqueKey)) {
+        seenIds.add(uniqueKey);
+        uniqueList.push(prof);
+      }
+    });
+
+    return uniqueList.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [professionals, adminUsers, users, user]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__allProfessionals = combinedProfessionals;
+    }
+  }, [combinedProfessionals]);
+
   const isRoleOrUserTagged = useCallback((coWorkersList: string[] | undefined | null, targetRoles: string[]) => {
     if (!coWorkersList || !Array.isArray(coWorkersList)) return false;
     
@@ -11832,9 +11268,10 @@ export default function App() {
         return true;
       }
 
-      // Look up professional info
-      const prof = professionals.find(p => 
+      // Look up professional info from combinedProfessionals
+      const prof = combinedProfessionals.find(p => 
         (p.id && String(p.id).toLowerCase() === cwStr) ||
+        (p.uid && String(p.uid).toLowerCase() === cwStr) ||
         (p.email && p.email.toLowerCase() === cwStr) ||
         (p.name && p.name.toLowerCase() === cwStr)
       );
@@ -11845,7 +11282,7 @@ export default function App() {
     }
 
     return false;
-  }, [user, professionals]);
+  }, [user, combinedProfessionals]);
 
   const mergedPhysioEvolutions = useMemo(() => {
     const list = [...physioEvolutions];
@@ -12868,23 +12305,21 @@ export default function App() {
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'gallery'));
     }
 
-    // 12. Usuários e Profissionais
-    if (['professionals', 'adminAssistant'].includes(activeTab)) {
-      unsubUsers = onSnapshot(query(collection(db, 'profiles'), limit(50)), (snapshot) => {
-        setAdminUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'profiles'));
+    // 12. Usuários e Profissionais (Carregados globalmente para identificação e colaboração multidiscliplinar)
+    unsubUsers = onSnapshot(query(collection(db, 'profiles'), limit(100)), (snapshot) => {
+      setAdminUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'profiles'));
 
-      unsubStaff = onSnapshot(collection(db, 'users'), (snapshot) => {
-        setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
-    }
+    unsubStaff = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StaffMember)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'users'));
+
+    unsubProfessionals = onSnapshot(query(collection(db, 'professionals'), orderBy('name'), limit(100)), (snapshot) => {
+      setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
 
     // 13. Avaliações Técnicas / Profissional
     if (activeTab === 'professional') {
-      unsubProfessionals = onSnapshot(query(collection(db, 'professionals'), orderBy('name'), limit(100)), (snapshot) => {
-        setProfessionals(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional)));
-      }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
-
       unsubProfessionalEvaluations = onSnapshot(query(collection(db, 'professionalEvaluations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
         setProfessionalEvaluations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfessionalEvaluation)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionalEvaluations'));
@@ -15064,7 +14499,7 @@ export default function App() {
           evolutions={mergedPhysioEvolutions}
           exercises={physioExercises}
           appointments={physioAppointments}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15107,7 +14542,7 @@ export default function App() {
           incidents={incidentRecords}
           shifts={shiftSchedules}
           users={users}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           avds={avdRecords}
           diaperChanges={diaperChangeRecords}
           physioEvolutions={physioEvolutions}
@@ -15156,7 +14591,7 @@ export default function App() {
           activities={psychActivities}
           cognitionAssessments={psychCognitionAssessments}
           interventionPlans={psychInterventionPlans}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15203,7 +14638,7 @@ export default function App() {
           socialParticipations={pedagogySocialParticipations}
           individualPlans={pedagogyIndividualPlans}
           lifeHistories={pedagogyLifeHistories}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15251,7 +14686,7 @@ export default function App() {
           familyVisits={socialFamilyVisits}
           riskSituations={socialRiskSituations}
           pias={pias}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15294,7 +14729,7 @@ export default function App() {
           evolutions={mergedNutritionEvolutions}
           anthropometries={nutritionAnthropometries}
           mealPlans={nutritionMealPlans}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15324,7 +14759,7 @@ export default function App() {
       );
       case 'professionals': return (
         <ProfessionalsSection 
-          professionals={professionals} 
+          professionals={combinedProfessionals} 
           users={users}
           onSaveStaff={handleSaveStaffMember}
           onDeleteStaff={async (id) => {
@@ -15341,7 +14776,7 @@ export default function App() {
       );
       case 'professional': return (
         <ProfessionalArea 
-          professionals={professionals}
+          professionals={combinedProfessionals}
           evaluations={professionalEvaluations}
           onSaveEvaluation={handleSaveProfessionalEvaluation}
           onDeleteEvaluation={handleDeleteProfessionalEvaluation}
@@ -15379,7 +14814,7 @@ export default function App() {
           communityElderly={communityElderly} 
           caregivers={caregivers} 
           elderly={elderly} 
-          professionals={professionals} 
+          professionals={combinedProfessionals} 
           showToast={showToast} 
           user={user!}
           sendNotification={sendNotification}
@@ -15388,18 +14823,60 @@ export default function App() {
       );
       case 'monitoring': return (
         <MonitoringSection 
+          user={user || undefined}
           elderly={elderly} 
           evolutions={evolutions} 
           pias={pias} 
           socialEvolutions={socialEvolutions}
+          socialPatients={socialPatients}
+          socialFamilyVisits={socialFamilyVisits}
+          socialRiskSituations={socialRiskSituations}
+          socialReferrals={socialReferrals}
+          socialStudies={socialStudies}
           psychEvolutions={psychEvolutions}
-          pedagogyEvolutions={pedagogyEvolutions}
-          physioEvolutions={physioEvolutions}
-          nursingEvolutions={nursingEvolutions}
-          vitalSigns={vitalSigns}
+          psychPatients={psychPatients}
+          psychActivities={psychActivities}
+          psychAppointments={psychAppointments}
           psychEmotionalMonitorings={psychEmotionalMonitorings}
+          psychCognitionAssessments={psychCognitionAssessments}
+          pedagogyEvolutions={pedagogyEvolutions}
+          pedagogyPatients={pedagogyPatients}
+          pedagogyActivities={pedagogyActivities}
+          pedagogyStimulationTrackings={pedagogyStimulationTrackings}
+          pedagogySocialParticipations={pedagogySocialParticipations}
+          physioEvolutions={physioEvolutions}
+          physioPatients={physioPatients}
+          physioAssessments={physioAssessments}
+          physioExercises={physioExercises}
+          physioAppointments={physioAppointments}
+          nursingEvolutions={nursingEvolutions}
+          nursingPatients={nursingPatients}
+          vitalSigns={vitalSigns}
+          dressingRecords={dressingRecords}
+          medicationAdministrations={medicationAdministrations}
+          incidentRecords={incidentRecords}
+          diaperChangeRecords={diaperChangeRecords}
+          nutritionEvolutions={nutritionEvolutions}
+          nutritionPatients={nutritionPatients}
+          nutritionAnthropometries={nutritionAnthropometries}
+          nutritionMealPlans={nutritionMealPlans}
           workshops={workshops}
+          professionals={combinedProfessionals}
+          users={users}
+          caregivers={caregivers}
+          volunteers={volunteers}
+          donors={donors}
+          diaperDonations={diaperDonations}
+          diaperBeneficiaries={diaperBeneficiaries}
+          diaperRawProductions={diaperRawProductions}
+          diaperWIPProcessings={diaperWIPProcessings}
+          diaperFinalPackings={diaperFinalPackings}
+          diaperProductionGoals={diaperProductionGoals}
+          financialRecords={financialRecords}
+          allPhotos={allPhotos}
           showToast={showToast} 
+          showConfirm={showConfirm}
+          onNavigateTab={(tab) => setActiveTab(tab)}
         />
       );
       case 'gallery': return (
@@ -15431,16 +14908,63 @@ export default function App() {
       );
       case 'reports': return (
         <ReportsSection 
+          user={user!}
           elderly={elderly} 
           evolutions={evolutions} 
           pias={pias} 
           socialEvolutions={socialEvolutions}
+          socialPatients={socialPatients}
+          socialFamilyVisits={socialFamilyVisits}
+          socialRiskSituations={socialRiskSituations}
+          socialReferrals={socialReferrals}
+          socialStudies={socialStudies}
           psychEvolutions={psychEvolutions}
+          psychPatients={psychPatients}
+          psychActivities={psychActivities}
+          psychAppointments={psychAppointments}
+          psychEmotionalMonitorings={psychEmotionalMonitorings}
+          psychCognitionAssessments={psychCognitionAssessments}
           pedagogyEvolutions={pedagogyEvolutions}
+          pedagogyPatients={pedagogyPatients}
+          pedagogyActivities={pedagogyActivities}
+          pedagogyStimulationTrackings={pedagogyStimulationTrackings}
+          pedagogySocialParticipations={pedagogySocialParticipations}
           physioEvolutions={physioEvolutions}
+          physioPatients={physioPatients}
+          physioAssessments={physioAssessments}
+          physioExercises={physioExercises}
+          physioAppointments={physioAppointments}
           nursingEvolutions={nursingEvolutions}
-          photos={allPhotos} 
+          nursingPatients={nursingPatients}
+          vitalSigns={vitalSigns}
+          dressingRecords={dressingRecords}
+          medicationAdministrations={medicationAdministrations}
+          incidentRecords={incidentRecords}
+          diaperChangeRecords={diaperChangeRecords}
+          nutritionEvolutions={nutritionEvolutions}
+          nutritionPatients={nutritionPatients}
+          nutritionAnthropometries={nutritionAnthropometries}
+          nutritionMealPlans={nutritionMealPlans}
+          workshops={workshops}
+          professionals={combinedProfessionals}
+          users={users}
+          caregivers={caregivers}
+          volunteers={volunteers}
+          donors={donors}
+          diaperDonations={diaperDonations}
+          diaperBeneficiaries={diaperBeneficiaries}
+          diaperRawProductions={diaperRawProductions}
+          diaperWIPProcessings={diaperWIPProcessings}
+          diaperFinalPackings={diaperFinalPackings}
+          diaperProductionGoals={diaperProductionGoals}
+          financialRecords={financialRecords}
+          allPhotos={allPhotos}
+          photos={allPhotos}
+          familyEngagements={familyEngagements}
+          presidencyDocs={presidencyDocs}
+          institutionalRecords={institutionalRecords}
           showToast={showToast} 
+          showConfirm={showConfirm}
         />
       );
       case 'donors': return <TreasurySection user={user!} showToast={showToast} showConfirm={showConfirm} donors={donors} initialTab="donors" />;
@@ -15467,7 +14991,7 @@ export default function App() {
       case 'productivity': return (
         <ProductivitySection 
           user={user}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           nursingEvolutions={nursingEvolutions}
           physioEvolutions={physioEvolutions}
           psychEvolutions={psychEvolutions}
@@ -15562,7 +15086,8 @@ export default function App() {
                  activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :
                  activeTab === 'settings' ? 'Configurações' : 
-                 activeTab === 'gallery' ? 'Galeria Multidisciplinar' : 'Institucional'}
+                 activeTab === 'gallery' ? 'Galeria Multidisciplinar' : 
+                 activeTab === 'reports' ? 'Relatórios & Painel Geral' : 'Institucional'}
               </h1>
               <p className="hidden md:block text-gray-500 dark:text-gray-400 mt-1">Bem-vindo ao sistema OAMI, {user.name.split(' ')[0]}.</p>
             </div>
@@ -15806,7 +15331,7 @@ export default function App() {
           pedagogyEvolutions={pedagogyEvolutions}
           socialEvolutions={socialEvolutions}
           nutritionEvolutions={nutritionEvolutions}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           setSelectedActivityForView={setSelectedActivityForView}
           users={users}
         />
@@ -15826,7 +15351,7 @@ export default function App() {
         <ActivityDetailsModal 
           activity={selectedActivityForView}
           onClose={() => setSelectedActivityForView(null)}
-          professionals={professionals}
+          professionals={combinedProfessionals}
           elderly={elderly}
           users={users}
         />

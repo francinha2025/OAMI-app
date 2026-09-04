@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { format, isToday, parseISO, startOfToday, isSameDay, subMonths, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn, safeReplace } from '../lib/utils';
+import { cn, safeReplace, getProfessionalName } from '../lib/utils';
 import { ROLE_LABELS } from '../constants';
 import { generateModernPDF, generateMultiSectionPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
@@ -5449,10 +5449,10 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
                     <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Equipe / Colaboradores</span>
                     <div className="flex flex-wrap gap-1">
                       {viewingEvo.coWorkers.map(cwId => {
-                        const prof = (professionals || []).find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                        const prof = (professionals || []).find(p => p.id === cwId || p.uid === cwId || p.email === cwId || p.name === cwId);
                         return (
                           <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/35 text-green-700 dark:text-green-400 text-xs font-bold rounded">
-                            {prof ? prof.name : cwId}
+                            {prof ? prof.name : getProfessionalName(cwId, professionals)}
                           </span>
                         );
                       })}

@@ -360,4 +360,6 @@ Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error("[Server] Failed to start server:", error);
+});
