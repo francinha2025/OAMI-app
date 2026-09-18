@@ -16,9 +16,13 @@ import {
   Activity,
   Boxes,
   BookOpen,
-  DollarSign
+  DollarSign,
+  Download,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { UnifiedReportItem } from './reportsTypes';
+import { openAttachedDocument, downloadAttachedDocument } from '../../lib/documentStorage';
 
 interface Props {
   item: UnifiedReportItem | null;
@@ -27,6 +31,7 @@ interface Props {
 
 export const ReportItemDetailsModal: React.FC<Props> = ({ item, onClose }) => {
   const [showRawJson, setShowRawJson] = useState(false);
+  const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 
   if (!item) return null;
 
@@ -208,18 +213,54 @@ export const ReportItemDetailsModal: React.FC<Props> = ({ item, onClose }) => {
               </h4>
               <div className="space-y-2">
                 {item.documents.map((doc, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">{doc.name || `Anexo ${idx + 1}`}</span>
-                    {doc.url && (
-                      <a
-                        href={doc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 dark:text-blue-400 font-bold hover:underline inline-flex items-center gap-1 shrink-0"
+                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-gray-800 dark:text-gray-200 truncate block text-xs">
+                        {doc.name || `Anexo ${idx + 1}`}
+                      </span>
+                      {(doc as any).size && (
+                        <span className="text-[10px] text-gray-400">{(doc as any).size}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await openAttachedDocument(doc as any);
+                          } catch (err: any) {
+                            console.error('Erro ao abrir documento:', err);
+                          }
+                        }}
+                        className="p-1.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg font-bold inline-flex items-center gap-1"
+                        title="Visualizar documento"
                       >
-                        <ExternalLink size={12} /> Abrir
-                      </a>
-                    )}
+                        <Eye size={13} /> Visualizar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={downloadingIndex === idx}
+                        onClick={async () => {
+                          try {
+                            setDownloadingIndex(idx);
+                            await downloadAttachedDocument(doc as any);
+                          } catch (err: any) {
+                            console.error('Erro ao baixar documento:', err);
+                          } finally {
+                            setDownloadingIndex(null);
+                          }
+                        }}
+                        className="p-1.5 text-xs text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg font-bold inline-flex items-center gap-1 disabled:opacity-50"
+                        title="Baixar arquivo"
+                      >
+                        {downloadingIndex === idx ? (
+                          <Loader2 size={13} className="animate-spin text-green-600" />
+                        ) : (
+                          <Download size={13} />
+                        )}
+                        Baixar
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

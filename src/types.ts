@@ -252,6 +252,19 @@ export interface InstitutionalInfo {
   history: string;
 }
 
+export interface AttachedDocument {
+  id?: string;
+  name: string;
+  type: string;
+  base64?: string;
+  size?: string;
+  sizeBytes?: number;
+  isChunked?: boolean;
+  chunkCount?: number;
+  uploadedAt?: string;
+  url?: string;
+}
+
 export interface Workshop {
   id: string;
   title: string;
@@ -271,7 +284,7 @@ export interface Workshop {
   professionalId?: string;
   coWorkers?: string[];
   photos?: string[];
-  documents?: Array<{ name: string; type: string; base64: string; size?: string }>;
+  documents?: AttachedDocument[];
 }
 
 export interface AdminReminder {
@@ -1062,6 +1075,11 @@ export interface PresidencySupportDocument {
   date: string;
   description: string;
   url?: string;
+  attachmentName?: string;
+  attachmentSize?: string;
+  attachmentId?: string;
+  attachmentChunked?: boolean;
+  attachmentChunkCount?: number;
   status: 'EM_ELABORACAO' | 'APROVADO' | 'ARQUIVADO';
   author: string;
   createdAt: string;
@@ -1075,6 +1093,12 @@ export interface InstitutionalSupportRecord {
   date: string;
   description: string;
   status: 'PENDENTE' | 'RESPONDIDO' | 'CONCLUIDO' | 'ATIVO';
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentSize?: string;
+  attachmentId?: string;
+  attachmentChunked?: boolean;
+  attachmentChunkCount?: number;
   createdAt: string;
 }
 

@@ -62,7 +62,9 @@ import {
   User as UserIcon,
   Star,
   Award,
-  Boxes
+  Boxes,
+  Mail,
+  Key
 } from 'lucide-react';
 import { 
   format, 
@@ -111,7 +113,8 @@ import {
 import { cn, safeReplace, cleanData, compressImage, getProfessionalName, getProfessionalRole } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { ActivityDetailsModal } from './components/ActivityDetailsModal';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, AttachedDocument, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
+import { processAndStoreFile, downloadAttachedDocument, openAttachedDocument, deleteDocumentChunks, MAX_DOCUMENT_FILE_SIZE_LABEL } from './lib/documentStorage';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
@@ -1309,14 +1312,26 @@ const LoginLogo = () => {
   );
 };
 
-const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginError, isLoggingIn }: { 
+const Login = ({ 
+  onGoogleLogin, 
+  onEmailLogin,
+  onCompleteProfile, 
+  needsProfile, 
+  error: loginError, 
+  isLoggingIn,
+  treasurerEmail = 'tesouraria@oami.org.br'
+}: { 
   onGoogleLogin: () => void, 
+  onEmailLogin?: (email: string) => void,
   onCompleteProfile: (role: Role) => void,
   needsProfile: boolean,
   error: string | null,
-  isLoggingIn: boolean
+  isLoggingIn: boolean,
+  treasurerEmail?: string
 }) => {
   const [selectedRole, setSelectedRole] = useState<Role | ''>('');
+  const [loginMethod, setLoginMethod] = useState<'email' | 'google'>('email');
+  const [emailInput, setEmailInput] = useState('');
 
   if (needsProfile) {
     return (
@@ -1359,68 +1374,164 @@ const Login = ({ onGoogleLogin, onCompleteProfile, needsProfile, error: loginErr
     );
   }
 
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    if (onEmailLogin) {
+      onEmailLogin(emailInput.trim());
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-green-50 dark:bg-gray-950 flex items-center justify-center p-4 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-b from-green-50 to-slate-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center p-4 transition-colors duration-300">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-xl w-full max-w-md border border-green-100 dark:border-gray-800"
+        className="bg-white dark:bg-gray-900 p-8 rounded-3xl shadow-xl w-full max-w-md border border-green-100 dark:border-gray-800"
       >
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6">
           <LoginLogo />
-          <h1 className="text-2xl font-bold text-green-800 dark:text-green-400">OAMI - Vitória do Mearim</h1>
-          <p className="text-green-600 dark:text-green-500 text-sm">Sistema de Gestão ILPI</p>
+          <h1 className="text-2xl font-black text-green-900 dark:text-green-400 tracking-tight">OAMI - Vitória do Mearim</h1>
+          <p className="text-green-700 dark:text-green-500 text-xs font-bold uppercase tracking-wider mt-0.5">Sistema de Gestão Integrada</p>
         </div>
 
-        <div className="space-y-6">
-          <p className="text-center text-gray-600 dark:text-gray-400 text-sm">Acesse o sistema utilizando sua conta institucional ou pessoal vinculada.</p>
-          
-          <button 
-            onClick={onGoogleLogin}
-            disabled={isLoggingIn}
-            className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isLoggingIn ? (
-              <>
-                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-green-600 dark:text-green-400">
-                  <Activity size={18} />
-                </motion.div>
-                Conectando...
-              </>
-            ) : (
-              <>
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                Entrar com Google
-              </>
+        {/* Tab switch between Email and Google */}
+        <div className="grid grid-cols-2 p-1 bg-gray-100 dark:bg-gray-800 rounded-2xl mb-6">
+          <button
+            type="button"
+            onClick={() => setLoginMethod('email')}
+            className={cn(
+              "py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5",
+              loginMethod === 'email' 
+                ? "bg-white dark:bg-gray-700 text-green-700 dark:text-green-400 shadow-sm" 
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             )}
+          >
+            <Mail size={14} />
+            Entrar com E-mail
           </button>
+          <button
+            type="button"
+            onClick={() => setLoginMethod('google')}
+            className={cn(
+              "py-2.5 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5",
+              loginMethod === 'google' 
+                ? "bg-white dark:bg-gray-700 text-green-700 dark:text-green-400 shadow-sm" 
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            )}
+          >
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-3.5 h-3.5" />
+            Conta Google
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {loginMethod === 'email' ? (
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                  E-mail de Acesso (Tesouraria ou Equipe)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <Mail size={16} />
+                  </div>
+                  <input
+                    type="email"
+                    required
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="ex: tesouraria@oami.org.br ou seu e-mail"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Botão de Preenchimento Rápido da Tesouraria */}
+              <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900/30 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg text-emerald-700 dark:text-emerald-400">
+                    <Landmark size={15} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-tight">Acesso da Tesouraria</p>
+                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono">{treasurerEmail || 'tesouraria@oami.org.br'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEmailInput(treasurerEmail || 'tesouraria@oami.org.br')}
+                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-all shrink-0"
+                >
+                  Usar Este
+                </button>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isLoggingIn || !emailInput.trim()}
+                className="w-full bg-green-700 hover:bg-green-800 text-white font-black py-3.5 px-4 rounded-xl shadow-md shadow-green-100 dark:shadow-none transition-all flex items-center justify-center gap-2 text-xs tracking-wider uppercase disabled:opacity-50"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                      <Activity size={16} />
+                    </motion.div>
+                    Acessando...
+                  </>
+                ) : (
+                  <>
+                    <Key size={15} />
+                    Entrar no Sistema com E-mail
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-center text-gray-500 dark:text-gray-400 text-xs leading-relaxed">
+                Acesse com sua conta Google vinculada. Se seu e-mail estiver cadastrado como Tesoureira ou Administração, você entrará automaticamente com todas as permissões liberadas.
+              </p>
+              
+              <button 
+                type="button"
+                onClick={onGoogleLogin}
+                disabled={isLoggingIn}
+                className="w-full bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold py-3.5 px-4 rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm transition-all flex items-center justify-center gap-3 disabled:opacity-50 text-xs"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-green-600 dark:text-green-400">
+                      <Activity size={18} />
+                    </motion.div>
+                    Conectando...
+                  </>
+                ) : (
+                  <>
+                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+                    Entrar com Google
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           {loginError && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl space-y-3">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl space-y-2">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
                 <p className="text-xs text-red-700 dark:text-red-400 font-medium">
                   {loginError}
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
-                <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider italic">Dica: Tente abrir o sistema em uma nova aba.</p>
-                <a 
-                  href={window.location.href} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 text-[10px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 p-2 rounded-lg hover:bg-blue-100"
-                >
-                  ABRIR EM NOVA ABA
-                  <ChevronRight size={12} />
-                </a>
-              </div>
             </div>
           )}
 
-          <p className="text-[10px] text-center text-gray-400 dark:text-gray-500">
-            Ao entrar, você concorda com os termos de uso e privacidade da instituição.
-          </p>
+          <div className="pt-2 text-center">
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">
+              Ambiente Institucional Seguro • OAMI ILPI
+            </p>
+          </div>
         </div>
       </motion.div>
 
@@ -1449,7 +1560,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
     {
       title: 'Geral',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'dashboard', label: 'Dashboard', icon: TrendingUp, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'TESOUREIRA'] },
         { id: 'productivity', label: 'Painel e Colaboração', icon: Award, roles: ['ANY'] },
         { id: 'elderly', label: 'Idosos', icon: Users, roles: ['ANY'] },
         { id: 'schedule', label: 'Cronograma', icon: Calendar, roles: ['ANY'] },
@@ -1474,7 +1585,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'adminAssistant', label: 'Painel Auxiliar', icon: LayoutDashboard, roles: ['COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
         { id: 'treasury', label: 'Tesouraria', icon: Landmark, roles: ['ADMIN', 'TESOUREIRA', 'COORDENADORA', 'PRESIDENTE', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'professionals', label: 'Usuários', icon: Users, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'financial', label: 'Financeiro', icon: DollarSign, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO', 'TESOUREIRA'] },
         { id: 'presidency_support', label: 'Suporte à Presidência', icon: ClipboardList, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'institutional_support', label: 'Apoio Institucional', icon: Briefcase, roles: ['PRESIDENTE', 'COORDENADORA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'institutional', label: 'Institucional', icon: Info, roles: ['PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
@@ -1489,7 +1600,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
         { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
         { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
         { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['ADMIN', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'TESOUREIRA'] },
       ]
     },
     {
@@ -8111,6 +8222,8 @@ const WorkshopsSection = ({
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState<{ msg: string; onConfirm: () => void } | null>(null);
   const [profSearch, setProfSearch] = useState('');
+  const [uploadingDocStatus, setUploadingDocStatus] = useState<string | null>(null);
+  const [isDocDownloading, setIsDocDownloading] = useState<string | null>(null);
   
   const [elderlyFormData, setElderlyFormData] = useState({
     name: '',
@@ -8149,7 +8262,7 @@ const WorkshopsSection = ({
     howMuch: '',
     coWorkers: [] as string[],
     photos: [] as string[],
-    documents: [] as Array<{ name: string; type: string; base64: string; size?: string }>
+    documents: [] as AttachedDocument[]
   });
 
   const handleAddCommunityElderly = async (e: React.FormEvent) => {
@@ -8298,6 +8411,14 @@ const WorkshopsSection = ({
       msg: 'Tem certeza que deseja excluir esta atividade? Esta ação não pode ser desfeita.',
       onConfirm: async () => {
         try {
+          const target = workshops.find(w => w.id === id);
+          if (target?.documents) {
+            for (const d of target.documents) {
+              if (d.id && d.isChunked) {
+                deleteDocumentChunks(d.id, d.chunkCount);
+              }
+            }
+          }
           await deleteDoc(doc(db, 'workshops', id));
           showToast('Atividade excluída com sucesso!');
         } catch (err) {
@@ -9031,7 +9152,12 @@ const WorkshopsSection = ({
 
                       {/* Carregar Documentos (PDF, DOCX, etc.) */}
                       <div className="space-y-3 bg-white dark:bg-gray-800/40 p-4 rounded-2xl border border-green-100/30">
-                        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">Documentos (PDF, DOC, etc.)</span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 block uppercase tracking-wider">Documentos (PDF, DOC, etc.)</span>
+                          <span className="text-[10px] font-black text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/40 px-2 py-0.5 rounded-full">
+                            Limite ampliado: até {MAX_DOCUMENT_FILE_SIZE_LABEL}
+                          </span>
+                        </div>
                         
                         <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
                           {(workshopFormData.documents || []).map((doc, idx) => (
@@ -9042,16 +9168,23 @@ const WorkshopsSection = ({
                                   <p className="text-xs font-bold text-gray-700 dark:text-gray-300 truncate max-w-[140px] md:max-w-[180px]" title={doc.name}>
                                     {doc.name}
                                   </p>
-                                  <p className="text-[9px] text-gray-400 font-medium">{doc.size || 'N/A'}</p>
+                                  <p className="text-[9px] text-gray-400 font-medium">
+                                    {doc.size || 'N/A'} {doc.isChunked ? '• Otimizado' : ''}
+                                  </p>
                                 </div>
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
+                                  const docToDelete = (workshopFormData.documents || [])[idx];
+                                  if (docToDelete?.id && docToDelete.isChunked) {
+                                    deleteDocumentChunks(docToDelete.id, docToDelete.chunkCount);
+                                  }
                                   const updated = (workshopFormData.documents || []).filter((_, i) => i !== idx);
                                   setWorkshopFormData({ ...workshopFormData, documents: updated });
                                 }}
                                 className="p-1 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                                title="Remover anexo"
                               >
                                 <Trash2 size={12} />
                               </button>
@@ -9063,8 +9196,16 @@ const WorkshopsSection = ({
                           )}
                         </div>
 
+                        {uploadingDocStatus && (
+                          <div className="flex items-center justify-center gap-2 py-2 px-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold animate-pulse">
+                            <Loader2 size={14} className="animate-spin" />
+                            <span>{uploadingDocStatus}</span>
+                          </div>
+                        )}
+
                         <button
                           type="button"
+                          disabled={!!uploadingDocStatus}
                           onClick={() => {
                             const input = document.createElement('input');
                             input.type = 'file';
@@ -9074,41 +9215,33 @@ const WorkshopsSection = ({
                               const files: File[] = Array.from(e.target.files || []);
                               if (files.length === 0) return;
 
-                              const loadedDocs: Array<{ name: string; type: string; base64: string; size?: string }> = [];
-                              for (const file of files) {
-                                if (file.size > 800 * 1024) {
-                                  showToast(`O arquivo ${file.name} excede o limite de 800KB.`, 'error');
-                                  continue;
+                              setUploadingDocStatus('Processando documentos...');
+                              try {
+                                const loadedDocs: AttachedDocument[] = [];
+                                for (const file of files) {
+                                  setUploadingDocStatus(`Processando ${file.name}...`);
+                                  const attached = await processAndStoreFile(file, (msg) => setUploadingDocStatus(msg));
+                                  loadedDocs.push(attached);
                                 }
-                                const base64 = await new Promise<string>((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => resolve(reader.result as string);
-                                  reader.readAsDataURL(file);
-                                });
-                                
-                                const formattedSize = file.size > 1024 * 1024 
-                                  ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-                                  : `${(file.size / 1024).toFixed(0)} KB`;
 
-                                loadedDocs.push({
-                                  name: file.name,
-                                  type: file.type || file.name.split('.').pop() || '',
-                                  base64,
-                                  size: formattedSize
-                                });
+                                setWorkshopFormData(prev => ({
+                                  ...prev,
+                                  documents: [...(prev.documents || []), ...loadedDocs]
+                                }));
+                                showToast(`${files.length} documento(s) anexado(s) com sucesso!`);
+                              } catch (err: any) {
+                                console.error('Erro ao anexar arquivo:', err);
+                                showToast(err.message || 'Erro ao processar anexo.', 'error');
+                              } finally {
+                                setUploadingDocStatus(null);
                               }
-
-                              setWorkshopFormData({
-                                ...workshopFormData,
-                                documents: [...(workshopFormData.documents || []), ...loadedDocs]
-                              });
                             };
                             input.click();
                           }}
-                          className="w-full py-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-xs font-black text-gray-500 hover:text-blue-600 flex items-center justify-center gap-1.5 transition-colors"
+                          className="w-full py-2.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl text-xs font-black text-gray-500 hover:text-blue-600 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                         >
                           <Upload size={14} />
-                          Anexar Documento (PDF, Word, etc.)
+                          Anexar Documento (PDF até 25MB, Word, Excel)
                         </button>
                       </div>
                     </div>
@@ -9257,29 +9390,67 @@ const WorkshopsSection = ({
                 {/* Seção de Documentos Anexados */}
                 {selectedWorkshop.documents && selectedWorkshop.documents.length > 0 && (
                   <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl">
-                    <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Documentos Anexados ({selectedWorkshop.documents.length})</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-black text-gray-400 uppercase">Documentos Anexados ({selectedWorkshop.documents.length})</p>
+                      <span className="text-[10px] font-bold text-gray-400">PDFs até 25MB</span>
+                    </div>
                     <div className="space-y-2">
                       {selectedWorkshop.documents.map((doc, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3.5 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                        <div key={idx} className="flex items-center justify-between p-3.5 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm gap-2">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
+                            <div className="p-2.5 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl shrink-0">
                               <FileText size={18} />
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate" title={doc.name}>
                                 {doc.name}
                               </p>
-                              <p className="text-[10px] text-gray-400 font-medium">{doc.size || 'N/A'}</p>
+                              <p className="text-[10px] text-gray-400 font-medium">
+                                {doc.size || 'N/A'} {doc.isChunked ? '• Otimizado' : ''}
+                              </p>
                             </div>
                           </div>
                           
-                          <a
-                            href={doc.base64}
-                            download={doc.name}
-                            className="p-2 bg-gray-50 hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-950/20 text-gray-500 hover:text-green-600 rounded-xl transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold"
-                          >
-                            <FileDown size={14} /> Baixar
-                          </a>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await openAttachedDocument(doc);
+                                } catch (err: any) {
+                                  showToast(err.message || 'Erro ao abrir documento.', 'error');
+                                }
+                              }}
+                              className="p-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl transition-all shadow-sm flex items-center gap-1 text-xs font-bold"
+                              title="Visualizar em nova aba"
+                            >
+                              <Eye size={14} />
+                              <span className="hidden sm:inline">Visualizar</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isDocDownloading === (doc.name || `doc-${idx}`)}
+                              onClick={async () => {
+                                try {
+                                  setIsDocDownloading(doc.name || `doc-${idx}`);
+                                  await downloadAttachedDocument(doc);
+                                } catch (err: any) {
+                                  showToast(err.message || 'Erro ao baixar documento.', 'error');
+                                } finally {
+                                  setIsDocDownloading(null);
+                                }
+                              }}
+                              className="p-2 bg-gray-50 hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-950/20 text-gray-500 hover:text-green-600 rounded-xl transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold disabled:opacity-50"
+                              title="Baixar arquivo"
+                            >
+                              {isDocDownloading === (doc.name || `doc-${idx}`) ? (
+                                <Loader2 size={14} className="animate-spin text-green-600" />
+                              ) : (
+                                <FileDown size={14} />
+                              )}
+                              <span>Baixar</span>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -10042,6 +10213,85 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
     registrationNumber?: string;
   }>({ id: '', name: '', role: 'FABRICANTE_FRALDAS', email: '', registrationNumber: '' });
 
+  const [treasurerInfo, setTreasurerInfo] = useState<{
+    name: string;
+    email: string;
+  }>({ name: 'Tesoureira OAMI', email: 'tesouraria@oami.org.br' });
+  const [isEditingTreasurer, setIsEditingTreasurer] = useState(false);
+  const [treasurerForm, setTreasurerForm] = useState({
+    name: 'Tesoureira OAMI',
+    email: 'tesouraria@oami.org.br'
+  });
+
+  useEffect(() => {
+    const loadTreasurerDoc = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'settings', 'treasurer'));
+        if (snap.exists()) {
+          const d = snap.data();
+          const tEmail = d?.email || 'tesouraria@oami.org.br';
+          const tName = d?.name || 'Tesoureira OAMI';
+          setTreasurerInfo({ name: tName, email: tEmail });
+          setTreasurerForm({ name: tName, email: tEmail });
+        }
+      } catch (err) {
+        console.warn("Could not load treasurer doc:", err);
+      }
+    };
+    loadTreasurerDoc();
+  }, []);
+
+  const handleSaveTreasurer = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!treasurerForm.email.trim()) {
+      showToast('Preencha o e-mail da tesoureira', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      const cleanEmail = treasurerForm.email.trim().toLowerCase();
+      const cleanName = treasurerForm.name.trim() || 'Tesoureira OAMI';
+
+      await setDoc(doc(db, 'settings', 'treasurer'), {
+        name: cleanName,
+        email: cleanEmail,
+        role: 'TESOUREIRA',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Atualizar ou criar perfil na coleção profiles
+      const q = query(collection(db, 'profiles'), where('email', '==', cleanEmail));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        for (const d of snap.docs) {
+          await updateDoc(doc(db, 'profiles', d.id), {
+            name: cleanName,
+            role: 'TESOUREIRA',
+            email: cleanEmail
+          });
+        }
+      } else {
+        const profileId = `profile_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        await setDoc(doc(db, 'profiles', profileId), {
+          id: profileId,
+          name: cleanName,
+          role: 'TESOUREIRA',
+          email: cleanEmail,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      setTreasurerInfo({ name: cleanName, email: cleanEmail });
+      setIsEditingTreasurer(false);
+      showToast('Acesso da Tesoureira configurado com sucesso!', 'success');
+    } catch (err) {
+      console.error("Erro ao salvar acesso da tesoureira:", err);
+      showToast('Erro ao salvar acesso da tesoureira', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (institutionalInfo) {
       setInstData(institutionalInfo);
@@ -10298,6 +10548,115 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
                     </div>
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* Widget de Gestão da Tesouraria (Acesso Oficial por E-mail) */}
+            <div className="bg-emerald-50/60 dark:bg-emerald-950/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/40 space-y-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-2">
+                    <Landmark className="w-5 h-5 text-emerald-600" />
+                    Gestão do Acesso da Tesouraria (Login por E-mail)
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    Configure o e-mail oficial da Tesoureira para entrada no sistema. O acesso por e-mail permite login direto e vinculação com privilégios completos de Tesouraria, Financeiro e Estoque.
+                  </p>
+                </div>
+                {!isEditingTreasurer && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTreasurer(true)}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs tracking-wider uppercase rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    Editar Acesso da Tesoureira
+                  </button>
+                )}
+              </div>
+
+              {/* Informações da Tesoureira Atual */}
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-emerald-100 dark:border-gray-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                    <Landmark size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800 dark:text-white text-sm">{treasurerInfo.name}</span>
+                      <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 font-black text-[9px] rounded uppercase tracking-wider">
+                        Tesoureira Oficial
+                      </span>
+                      <span className="px-2 py-0.5 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 font-bold text-[9px] rounded">
+                        Acesso Ativo
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 mt-0.5">
+                      <Mail size={12} />
+                      {treasurerInfo.email}
+                    </p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                      Permissões: Tesouraria, Financeiro, Controle de Estoque, Relatórios Institucionais e Dashboard.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formulário para Alterar E-mail / Dados da Tesoureira */}
+              {isEditingTreasurer && (
+                <form onSubmit={handleSaveTreasurer} className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 space-y-3 animate-in fade-in duration-300">
+                  <h5 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest">
+                    Atualizar Dados de Acesso da Tesoureira
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">
+                        Nome do(a) Tesoureiro(a)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={treasurerForm.name}
+                        onChange={(e) => setTreasurerForm({ ...treasurerForm, name: e.target.value })}
+                        placeholder="Ex: Maria da Silva (Tesoureira)"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">
+                        E-mail de Acesso da Tesouraria *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={treasurerForm.email}
+                        onChange={(e) => setTreasurerForm({ ...treasurerForm, email: e.target.value })}
+                        placeholder="Ex: tesouraria@oami.org.br ou email@gmail.com"
+                        className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTreasurerForm(treasurerInfo);
+                        setIsEditingTreasurer(false);
+                      }}
+                      className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm"
+                    >
+                      {loading ? 'Salvando...' : 'Salvar Acesso da Tesoureira'}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
 
@@ -10862,6 +11221,19 @@ export default function App() {
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [treasurerEmail, setTreasurerEmail] = useState<string>('tesouraria@oami.org.br');
+
+  useEffect(() => {
+    const unsubTreasurer = onSnapshot(doc(db, 'settings', 'treasurer'), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d?.email) {
+          setTreasurerEmail(d.email);
+        }
+      }
+    }, (err) => console.warn("Error listening to treasurer setting:", err));
+    return () => unsubTreasurer();
+  }, []);
 
   // Real-time data states
   const [users, setUsers] = useState<StaffMember[]>([]);
@@ -11588,8 +11960,9 @@ export default function App() {
             const data = docSnap.data();
             const isFranciara = firebaseUser.email === 'franciaraeabreucoelho@gmail.com';
             const isFernanda = firebaseUser.email === 'fernandakellenfk378@gmail.com';
-            const finalRole = isFernanda ? 'AUXILIAR_ADMINISTRATIVO' : (data?.role || (isFranciara ? 'COORDENADORA' : 'COORDENADORA'));
-            const finalName = data?.name || firebaseUser.displayName || (isFranciara ? 'Franciara de Abreú Coelho' : (isFernanda ? 'Fernanda Kellen' : 'Usuário'));
+            const isTreasurer = (firebaseUser.email?.toLowerCase() === (treasurerEmail || 'tesouraria@oami.org.br').toLowerCase()) || (firebaseUser.email?.toLowerCase().includes('tesour'));
+            const finalRole = isTreasurer ? 'TESOUREIRA' : (isFernanda ? 'AUXILIAR_ADMINISTRATIVO' : (data?.role || (isFranciara ? 'COORDENADORA' : 'COORDENADORA')));
+            const finalName = data?.name || firebaseUser.displayName || (isTreasurer ? 'Tesoureira OAMI' : (isFranciara ? 'Franciara de Abreú Coelho' : (isFernanda ? 'Fernanda Kellen' : 'Usuário')));
             const finalEmail = firebaseUser.email || data?.email || '';
 
             if (isFranciara && !data?.role) {
@@ -11608,6 +11981,14 @@ export default function App() {
               }).catch(e => console.error("Error auto-updating Fernanda profile doc:", e));
             }
 
+            if (isTreasurer && (!data?.role || data?.role !== 'TESOUREIRA')) {
+              updateDoc(userDocRef, {
+                role: 'TESOUREIRA',
+                name: finalName,
+                email: finalEmail
+              }).catch(e => console.error("Error auto-updating Treasurer profile doc:", e));
+            }
+
             setUser({
               id: docSnap.id,
               ...data,
@@ -11620,8 +12001,27 @@ export default function App() {
             loadedUidRef.current = firebaseUser.uid;
             console.log("👤 Perfil do usuário carregado em memória:", finalRole);
           } else {
-            // Bypass para a criadora/admin se o documento não existir ou falhar por cota
-            if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
+            // Bypass para a criadora/admin ou tesoureira se o documento não existir ou falhar por cota
+            const isTreasurer = (firebaseUser.email?.toLowerCase() === (treasurerEmail || 'tesouraria@oami.org.br').toLowerCase()) || (firebaseUser.email?.toLowerCase().includes('tesour'));
+            if (isTreasurer) {
+              setDoc(userDocRef, {
+                name: firebaseUser.displayName || 'Tesoureira OAMI',
+                role: 'TESOUREIRA',
+                email: firebaseUser.email || '',
+                photoUrl: firebaseUser.photoURL || '',
+                createdAt: new Date().toISOString()
+              }).catch(e => console.error("Error creating Treasurer profile doc:", e));
+
+              setUser({
+                id: firebaseUser.uid,
+                name: firebaseUser.displayName || 'Tesoureira OAMI',
+                role: 'TESOUREIRA',
+                photoUrl: firebaseUser.photoURL || '',
+                email: firebaseUser.email || ''
+              });
+              setNeedsProfile(false);
+              loadedUidRef.current = firebaseUser.uid;
+            } else if (firebaseUser.email === 'franciaraeabreucoelho@gmail.com') {
               setDoc(userDocRef, {
                 name: 'Franciara de Abreú Coelho',
                 role: 'COORDENADORA',
@@ -11678,6 +12078,7 @@ export default function App() {
           // Se falhar por cota ou erro de rede, permite a entrada usando os dados da conta
           const isFranciara = firebaseUser.email === 'franciaraeabreucoelho@gmail.com';
           const isFernanda = firebaseUser.email === 'fernandakellenfk378@gmail.com';
+          const isTreasurer = (firebaseUser.email?.toLowerCase() === (treasurerEmail || 'tesouraria@oami.org.br').toLowerCase()) || (firebaseUser.email?.toLowerCase().includes('tesour'));
           
           if (err.message?.includes('Quota exceeded') || err.message?.includes('quota') || err.message?.includes('RESOURCE_EXHAUSTED')) {
             window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
@@ -11685,8 +12086,8 @@ export default function App() {
 
           setUser({
             id: firebaseUser.uid,
-            name: firebaseUser.displayName || (isFranciara ? 'Franciara de Abreú Coelho' : (isFernanda ? 'Fernanda Kellen' : (firebaseUser.email?.split('@')[0] || 'Usuário'))),
-            role: isFranciara ? 'COORDENADORA' : (isFernanda ? 'AUXILIAR_ADMINISTRATIVO' : 'CUIDADOR'),
+            name: firebaseUser.displayName || (isTreasurer ? 'Tesoureira OAMI' : (isFranciara ? 'Franciara de Abreú Coelho' : (isFernanda ? 'Fernanda Kellen' : (firebaseUser.email?.split('@')[0] || 'Usuário')))),
+            role: isTreasurer ? 'TESOUREIRA' : (isFranciara ? 'COORDENADORA' : (isFernanda ? 'AUXILIAR_ADMINISTRATIVO' : 'AUXILIAR_ADMINISTRATIVO')),
             photoUrl: firebaseUser.photoURL || '',
             email: firebaseUser.email || ''
           });
@@ -11696,6 +12097,20 @@ export default function App() {
           setIsAuthReady(true);
         });
       } else {
+        const savedSession = localStorage.getItem('oami_email_session');
+        if (savedSession) {
+          try {
+            const parsed = JSON.parse(savedSession);
+            if (parsed && parsed.id && parsed.role) {
+              setUser(parsed);
+              setNeedsProfile(false);
+              setIsAuthReady(true);
+              return;
+            }
+          } catch (e) {
+            console.warn("Could not parse saved session:", e);
+          }
+        }
         loadedUidRef.current = null;
         setUser(null);
         setNeedsProfile(false);
@@ -12045,7 +12460,7 @@ export default function App() {
     }
 
     // 2. Produção de Fraldas (SGPF)
-    if (activeTab === 'diaperProduction') {
+    if (activeTab === 'diaperProduction' || activeTab === 'reports') {
       unsubFinal = onSnapshot(query(collection(db, 'diaperFinalPackings'), where('date', '>=', farPastStr), orderBy('date', 'desc'), limit(200)), (snapshot) => {
         setDiaperFinalPackings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DiaperFinalPacking)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'diaperFinalPackings'));
@@ -12072,7 +12487,7 @@ export default function App() {
     }
 
     // 3. Fisioterapia
-    if (activeTab === 'physio') {
+    if (activeTab === 'physio' || activeTab === 'reports') {
       unsubPhysioPatients = onSnapshot(query(collection(db, 'physioPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setPhysioPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PhysioPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioPatients'));
@@ -12095,7 +12510,7 @@ export default function App() {
     }
 
     // 4. Enfermagem
-    if (activeTab === 'nursing') {
+    if (activeTab === 'nursing' || activeTab === 'reports') {
       unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setNursingPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingPatients'));
@@ -12138,7 +12553,7 @@ export default function App() {
     }
 
     // 5. Psicologia
-    if (activeTab === 'psychology') {
+    if (activeTab === 'psychology' || activeTab === 'reports') {
       unsubPsychPatients = onSnapshot(query(collection(db, 'psychPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setPsychPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PsychPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'psychPatients'));
@@ -12177,7 +12592,7 @@ export default function App() {
     }
 
     // 6. Pedagogia
-    if (activeTab === 'pedagogy') {
+    if (activeTab === 'pedagogy' || activeTab === 'reports') {
       unsubPedagogyPatients = onSnapshot(query(collection(db, 'pedagogyPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setPedagogyPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PedagogyPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'pedagogyPatients'));
@@ -12208,7 +12623,7 @@ export default function App() {
     }
 
     // 7. Serviço Social
-    if (activeTab === 'socialWork') {
+    if (activeTab === 'socialWork' || activeTab === 'reports') {
       unsubSocialPatients = onSnapshot(query(collection(db, 'socialPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setSocialPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SocialPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'socialPatients'));
@@ -12251,7 +12666,7 @@ export default function App() {
     }
 
     // 8. Nutrição
-    if (activeTab === 'nutrition') {
+    if (activeTab === 'nutrition' || activeTab === 'reports') {
       unsubNutritionPatients = onSnapshot(query(collection(db, 'nutritionPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setNutritionPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NutritionPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'nutritionPatients'));
@@ -12270,7 +12685,7 @@ export default function App() {
     }
 
     // 9. Financeiro e Doadores
-    if (['financial', 'treasury', 'donors'].includes(activeTab)) {
+    if (['financial', 'treasury', 'donors', 'reports'].includes(activeTab)) {
       unsubFinancial = onSnapshot(collection(db, 'financial'), (snapshot) => {
         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FinancialRecord));
         list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -12285,13 +12700,13 @@ export default function App() {
     }
 
     // 10. Suporte à Presidência e Apoio Institucional
-    if (activeTab === 'presidency_support') {
+    if (activeTab === 'presidency_support' || activeTab === 'reports') {
       unsubPresidencyDocs = onSnapshot(query(collection(db, 'presidency_support'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
         setPresidencyDocs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PresidencySupportDocument)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'presidency_support'));
     }
 
-    if (activeTab === 'institutional_support') {
+    if (activeTab === 'institutional_support' || activeTab === 'reports') {
       unsubInstitutionalRecords = onSnapshot(query(collection(db, 'institutional_support'), orderBy('createdAt', 'desc'), limit(100)), (snapshot) => {
         setInstitutionalRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InstitutionalSupportRecord)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'institutional_support'));
@@ -12319,14 +12734,14 @@ export default function App() {
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionals'));
 
     // 13. Avaliações Técnicas / Profissional
-    if (activeTab === 'professional') {
+    if (activeTab === 'professional' || activeTab === 'reports') {
       unsubProfessionalEvaluations = onSnapshot(query(collection(db, 'professionalEvaluations'), orderBy('date', 'desc'), limit(100)), (snapshot) => {
         setProfessionalEvaluations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProfessionalEvaluation)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionalEvaluations'));
     }
 
     // 14. Voluntários, Comunidade e Acompanhamento Familiar
-    if (['volunteers', 'family', 'elderly'].includes(activeTab)) {
+    if (['volunteers', 'family', 'elderly', 'reports'].includes(activeTab)) {
       unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
         setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
@@ -12449,6 +12864,111 @@ export default function App() {
     }
   };
 
+  const handleEmailLogin = async (inputEmail: string) => {
+    if (!inputEmail || !inputEmail.trim()) {
+      setLoginError("Por favor, informe seu e-mail de acesso.");
+      return;
+    }
+    const cleanEmail = inputEmail.trim().toLowerCase();
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      // 1. Obter e-mail atualizado da tesouraria do Firestore
+      let currentTreasurerEmail = (treasurerEmail || 'tesouraria@oami.org.br').toLowerCase();
+      let treasurerName = 'Tesoureira OAMI';
+      try {
+        const tSnap = await getDoc(doc(db, 'settings', 'treasurer'));
+        if (tSnap.exists()) {
+          const tData = tSnap.data();
+          if (tData?.email) currentTreasurerEmail = tData.email.toLowerCase();
+          if (tData?.name) treasurerName = tData.name;
+        }
+      } catch (e) {
+        console.warn("Could not check settings/treasurer:", e);
+      }
+
+      const isTreasurer = cleanEmail === currentTreasurerEmail || 
+                          cleanEmail === 'tesouraria@oami.org.br' || 
+                          cleanEmail.includes('tesour');
+
+      // 2. Buscar perfil correspondente na coleção profiles
+      const qProfiles = query(collection(db, 'profiles'), where('email', '==', cleanEmail));
+      const snapProfiles = await getDocs(qProfiles);
+
+      let loggedInUser: User;
+
+      if (isTreasurer) {
+        const profileData = !snapProfiles.empty ? snapProfiles.docs[0].data() : null;
+        const profileId = !snapProfiles.empty ? snapProfiles.docs[0].id : `treasurer_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const finalName = profileData?.name || treasurerName || 'Tesoureira OAMI';
+
+        loggedInUser = {
+          id: profileId,
+          name: finalName,
+          role: 'TESOUREIRA',
+          email: cleanEmail,
+          photoUrl: profileData?.photoUrl || ''
+        };
+
+        // Salvar/sincronizar perfil no Firestore
+        try {
+          await setDoc(doc(db, 'profiles', loggedInUser.id), {
+            id: loggedInUser.id,
+            name: loggedInUser.name,
+            role: 'TESOUREIRA',
+            email: cleanEmail,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch (e) {
+          console.warn("Could not sync treasurer profile doc:", e);
+        }
+      } else if (!snapProfiles.empty) {
+        const pDoc = snapProfiles.docs[0];
+        const pData = pDoc.data();
+        loggedInUser = {
+          id: pDoc.id,
+          name: pData.name || 'Usuário',
+          role: (pData.role as Role) || 'AUXILIAR_ADMINISTRATIVO',
+          email: cleanEmail,
+          photoUrl: pData.photoUrl || ''
+        };
+      } else if (cleanEmail === 'franciaraeabreucoelho@gmail.com') {
+        loggedInUser = {
+          id: 'franciara_coordenadora',
+          name: 'Franciara de Abreú Coelho',
+          role: 'COORDENADORA',
+          email: cleanEmail
+        };
+      } else if (cleanEmail === 'fernandakellenfk378@gmail.com') {
+        loggedInUser = {
+          id: 'fernanda_auxiliar',
+          name: 'Fernanda Kellen',
+          role: 'AUXILIAR_ADMINISTRATIVO',
+          email: cleanEmail
+        };
+      } else {
+        loggedInUser = {
+          id: `user_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          name: cleanEmail.split('@')[0],
+          role: 'AUXILIAR_ADMINISTRATIVO',
+          email: cleanEmail
+        };
+      }
+
+      localStorage.setItem('oami_email_session', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+      setNeedsProfile(false);
+      setIsAuthReady(true);
+      showToast(`Acesso liberado! Bem-vinda(o), ${loggedInUser.name} (${ROLE_LABELS[loggedInUser.role] || loggedInUser.role})`, 'success');
+    } catch (err: any) {
+      console.error("Erro no login por e-mail:", err);
+      setLoginError("Erro ao processar login por e-mail. Tente novamente.");
+      showToast("Erro ao processar login", 'error');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleCompleteProfile = async (role: Role) => {
     if (!auth.currentUser) return;
     
@@ -12476,6 +12996,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('oami_email_session');
       await signOut(auth);
       setUser(null);
       setActiveTab('dashboard');
@@ -14427,10 +14948,12 @@ export default function App() {
     return (
       <Login 
         onGoogleLogin={handleGoogleLogin} 
+        onEmailLogin={handleEmailLogin}
         onCompleteProfile={handleCompleteProfile}
         needsProfile={needsProfile}
         error={loginError}
         isLoggingIn={isLoggingIn}
+        treasurerEmail={treasurerEmail}
       />
     );
   }
@@ -14950,6 +15473,7 @@ export default function App() {
           users={users}
           caregivers={caregivers}
           volunteers={volunteers}
+          communityElderly={communityElderly}
           donors={donors}
           diaperDonations={diaperDonations}
           diaperBeneficiaries={diaperBeneficiaries}

@@ -12,47 +12,79 @@ import {
   Sparkles,
   Package,
   Activity,
-  DollarSign,
   HeartHandshake,
-  Clock,
   RotateCcw,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  SlidersHorizontal,
-  FolderKanban,
-  GraduationCap,
   Boxes,
-  HelpCircle
+  Stethoscope,
+  Brain,
+  BookOpen,
+  Apple,
+  ShieldCheck,
+  Building2,
+  GraduationCap,
+  Award,
+  TrendingUp,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { INSTITUTION_NAME, INSTITUTION_CNPJ, INSTITUTION_ADDRESS, INSTITUTION_LOGO } from '../../constants';
 import {
   GeneralReportProps,
-  ReportCategory,
   DatePreset,
-  UnifiedReportItem
+  UnifiedReportItem,
+  SectorKey,
+  RecordType
 } from './reportsTypes';
 import {
   buildAllSystemRecords,
-  filterSystemRecords,
+  filterUnifiedRecords,
   calculateReportMetrics,
-  getDateRangeForPreset
+  getDateRangeForPreset,
+  buildExecutiveSummaryData
 } from './reportsDataBuilder';
 import {
   exportGeneralReportToPDF,
   exportGeneralReportToExcel
 } from './reportsExportUtils';
 import { ReportItemDetailsModal } from './ReportItemDetailsModal';
-import { StockProduct, StockMovement, TreasuryTransaction, Donor } from '../../types';
+import { ExecutiveSummaryView } from './views/ExecutiveSummaryView';
+import { SectorReportView } from './views/SectorReportView';
+import { ElderlyReportView } from './views/ElderlyReportView';
+import { ProfessionalReportView } from './views/ProfessionalReportView';
+import { MonthlyReportView } from './views/MonthlyReportView';
+import { WorkshopsReportView } from './views/WorkshopsReportView';
+import { StockReportView } from './views/StockReportView';
+import { DiaperProductionReportView } from './views/DiaperProductionReportView';
+import { MonitoringReportView } from './views/MonitoringReportView';
+import { IndicatorsAndChartsView } from './views/IndicatorsAndChartsView';
+import { 
+  StockProduct, 
+  StockMovement, 
+  TreasuryTransaction, 
+  NursingEvolution,
+  PhysioEvolution,
+  PsychEvolution,
+  PedagogyEvolution,
+  PedagogyActivity,
+  SocialEvolution,
+  Workshop
+} from '../../types';
 
 export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
-  // 1. Local live subscriptions for stock and treasury if not already populated
+  // 1. Live Fallback Subscriptions to ensure full live data if not supplied via props
   const [localStockProducts, setLocalStockProducts] = useState<StockProduct[]>(props.stockProducts || []);
   const [localStockMovements, setLocalStockMovements] = useState<StockMovement[]>(props.stockMovements || []);
   const [localTreasuryTxs, setLocalTreasuryTxs] = useState<TreasuryTransaction[]>(props.treasuryTransactions || []);
+  const [localNursingEvolutions, setLocalNursingEvolutions] = useState<NursingEvolution[]>(props.nursingEvolutions || []);
+  const [localPhysioEvolutions, setLocalPhysioEvolutions] = useState<PhysioEvolution[]>(props.physioEvolutions || []);
+  const [localPsychEvolutions, setLocalPsychEvolutions] = useState<PsychEvolution[]>(props.psychEvolutions || []);
+  const [localPedagogyEvolutions, setLocalPedagogyEvolutions] = useState<PedagogyEvolution[]>(props.pedagogyEvolutions || []);
+  const [localPedagogyActivities, setLocalPedagogyActivities] = useState<PedagogyActivity[]>(props.pedagogyActivities || []);
+  const [localSocialEvolutions, setLocalSocialEvolutions] = useState<SocialEvolution[]>(props.socialEvolutions || []);
+  const [localWorkshops, setLocalWorkshops] = useState<Workshop[]>(props.workshops || []);
 
   useEffect(() => {
     if (!props.stockMovements || props.stockMovements.length === 0) {
@@ -87,35 +119,131 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
     }
   }, [props.treasuryTransactions]);
 
-  // Combined props with live local data
+  useEffect(() => {
+    if (!props.nursingEvolutions || props.nursingEvolutions.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'nursingEvolutions'), orderBy('date', 'desc'), limit(500)), snap => {
+        setLocalNursingEvolutions(snap.docs.map(d => ({ id: d.id, ...d.data() } as NursingEvolution)));
+      }, err => console.warn('nursingEvolutions snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.nursingEvolutions]);
+
+  useEffect(() => {
+    if (!props.physioEvolutions || props.physioEvolutions.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'physioEvolutions'), orderBy('date', 'desc'), limit(500)), snap => {
+        setLocalPhysioEvolutions(snap.docs.map(d => ({ id: d.id, ...d.data() } as PhysioEvolution)));
+      }, err => console.warn('physioEvolutions snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.physioEvolutions]);
+
+  useEffect(() => {
+    if (!props.psychEvolutions || props.psychEvolutions.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'psychEvolutions'), orderBy('date', 'desc'), limit(500)), snap => {
+        setLocalPsychEvolutions(snap.docs.map(d => ({ id: d.id, ...d.data() } as PsychEvolution)));
+      }, err => console.warn('psychEvolutions snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.psychEvolutions]);
+
+  useEffect(() => {
+    if (!props.pedagogyEvolutions || props.pedagogyEvolutions.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'pedagogyEvolutions'), orderBy('date', 'desc'), limit(500)), snap => {
+        setLocalPedagogyEvolutions(snap.docs.map(d => ({ id: d.id, ...d.data() } as PedagogyEvolution)));
+      }, err => console.warn('pedagogyEvolutions snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.pedagogyEvolutions]);
+
+  useEffect(() => {
+    if (!props.pedagogyActivities || props.pedagogyActivities.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'pedagogyActivities'), orderBy('date', 'desc'), limit(300)), snap => {
+        setLocalPedagogyActivities(snap.docs.map(d => ({ id: d.id, ...d.data() } as PedagogyActivity)));
+      }, err => console.warn('pedagogyActivities snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.pedagogyActivities]);
+
+  useEffect(() => {
+    if (!props.socialEvolutions || props.socialEvolutions.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'socialEvolutions'), orderBy('date', 'desc'), limit(500)), snap => {
+        setLocalSocialEvolutions(snap.docs.map(d => ({ id: d.id, ...d.data() } as SocialEvolution)));
+      }, err => console.warn('socialEvolutions snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.socialEvolutions]);
+
+  useEffect(() => {
+    if (!props.workshops || props.workshops.length === 0) {
+      const unsub = onSnapshot(query(collection(db, 'workshops'), orderBy('date', 'desc'), limit(300)), snap => {
+        setLocalWorkshops(snap.docs.map(d => ({ id: d.id, ...d.data() } as Workshop)));
+      }, err => console.warn('workshops snapshot error:', err));
+      return () => unsub();
+    }
+  }, [props.workshops]);
+
+  // Combined Props with live state
   const combinedProps: GeneralReportProps = useMemo(() => ({
     ...props,
     stockProducts: props.stockProducts?.length ? props.stockProducts : localStockProducts,
     stockMovements: props.stockMovements?.length ? props.stockMovements : localStockMovements,
-    treasuryTransactions: props.treasuryTransactions?.length ? props.treasuryTransactions : localTreasuryTxs
-  }), [props, localStockProducts, localStockMovements, localTreasuryTxs]);
+    treasuryTransactions: props.treasuryTransactions?.length ? props.treasuryTransactions : localTreasuryTxs,
+    nursingEvolutions: props.nursingEvolutions?.length ? props.nursingEvolutions : localNursingEvolutions,
+    physioEvolutions: props.physioEvolutions?.length ? props.physioEvolutions : localPhysioEvolutions,
+    psychEvolutions: props.psychEvolutions?.length ? props.psychEvolutions : localPsychEvolutions,
+    pedagogyEvolutions: props.pedagogyEvolutions?.length ? props.pedagogyEvolutions : localPedagogyEvolutions,
+    pedagogyActivities: props.pedagogyActivities?.length ? props.pedagogyActivities : localPedagogyActivities,
+    socialEvolutions: props.socialEvolutions?.length ? props.socialEvolutions : localSocialEvolutions,
+    workshops: props.workshops?.length ? props.workshops : localWorkshops
+  }), [
+    props,
+    localStockProducts,
+    localStockMovements,
+    localTreasuryTxs,
+    localNursingEvolutions,
+    localPhysioEvolutions,
+    localPsychEvolutions,
+    localPedagogyEvolutions,
+    localPedagogyActivities,
+    localSocialEvolutions,
+    localWorkshops
+  ]);
 
   // 2. Build All System Records
   const allRecords = useMemo(() => {
     return buildAllSystemRecords(combinedProps);
   }, [combinedProps]);
 
-  // 3. Filters State
+  // 3. Navigation Tabs State
+  type ActiveTab =
+    | 'executive'
+    | 'sectors'
+    | 'elderly'
+    | 'professional'
+    | 'monthly'
+    | 'workshops'
+    | 'stock'
+    | 'diapers'
+    | 'monitoring'
+    | 'indicators';
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>('executive');
+
+  // 4. Filters State (Item 1: Período, Setor, Profissional, Acolhido, Tipo)
   const [datePreset, setDatePreset] = useState<DatePreset>('all');
   const [startDate, setStartDate] = useState<string>('2020-01-01');
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [selectedCategory, setSelectedCategory] = useState<ReportCategory>('ALL');
+  const [selectedSector, setSelectedSector] = useState<SectorKey | 'ALL'>('ALL');
   const [selectedProfessional, setSelectedProfessional] = useState<string>('ALL');
+  const [selectedElderly, setSelectedElderly] = useState<string>('ALL');
+  const [selectedRecordType, setSelectedRecordType] = useState<RecordType | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // View presentation state
-  const [viewMode, setViewMode] = useState<'integrated' | 'category'>('integrated');
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  // Modal and Export State
   const [selectedItemForModal, setSelectedItemForModal] = useState<UnifiedReportItem | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState<boolean>(false);
-  const [visibleItemsLimitPerCategory, setVisibleItemsLimitPerCategory] = useState<Record<string, number>>({});
 
-  // When date preset changes, update start/end date
+  // Handle Preset Change
   const handlePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
     const range = getDateRangeForPreset(preset);
@@ -123,7 +251,7 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
     setEndDate(range.endDate);
   };
 
-  // Extract unique professionals for dropdown
+  // Unique Professionals
   const professionalOptions = useMemo(() => {
     const map = new Map<string, number>();
     allRecords.forEach(r => {
@@ -135,48 +263,62 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [allRecords]);
 
-  // Filtered records
+  // Unique Elderly
+  const elderlyOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    allRecords.forEach(r => {
+      if (r.elderlyId && r.targetOrParticipant) {
+        const current = map.get(r.elderlyId) || { id: r.elderlyId, name: r.targetOrParticipant, count: 0 };
+        current.count += 1;
+        map.set(r.elderlyId, current);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allRecords]);
+
+  // Filtered Records
   const filteredRecords = useMemo(() => {
-    return filterSystemRecords(allRecords, {
+    return filterUnifiedRecords(allRecords, {
       startDate,
       endDate,
-      category: selectedCategory,
+      sectorKey: selectedSector,
       professional: selectedProfessional,
+      elderlyId: selectedElderly,
+      recordType: selectedRecordType,
       searchQuery
     });
-  }, [allRecords, startDate, endDate, selectedCategory, selectedProfessional, searchQuery]);
+  }, [
+    allRecords,
+    startDate,
+    endDate,
+    selectedSector,
+    selectedProfessional,
+    selectedElderly,
+    selectedRecordType,
+    searchQuery
+  ]);
 
-  // Metrics
+  // General Metrics
   const metrics = useMemo(() => {
     return calculateReportMetrics(filteredRecords);
   }, [filteredRecords]);
 
-  // Reset filters
+  // Executive Summary Data
+  const executiveData = useMemo(() => {
+    return buildExecutiveSummaryData(filteredRecords);
+  }, [filteredRecords]);
+
+  // Reset Filters
   const handleResetFilters = () => {
     handlePresetChange('all');
-    setSelectedCategory('ALL');
+    setSelectedSector('ALL');
     setSelectedProfessional('ALL');
+    setSelectedElderly('ALL');
+    setSelectedRecordType('ALL');
     setSearchQuery('');
   };
 
-  // Toggle Section Collapse
-  const toggleSection = (cat: string) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [cat]: !prev[cat]
-    }));
-  };
-
-  const expandAll = () => setCollapsedSections({});
-  const collapseAll = () => {
-    const collapsed: Record<string, boolean> = {};
-    (['PROFESSIONALS', 'WORKSHOPS', 'TRAININGS', 'DIAPERS', 'STOCK', 'MONITORING', 'TREASURY', 'OTHER'] as const).forEach(k => {
-      collapsed[k] = true;
-    });
-    setCollapsedSections(collapsed);
-  };
-
-  // Handlers for export
+  // PDF Export
   const handleExportPDF = async () => {
     try {
       setIsExportingPDF(true);
@@ -185,19 +327,20 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
         metrics,
         startDate,
         endDate,
-        categoryFilter: selectedCategory,
-        professionalFilter: selectedProfessional,
-        generatedBy: props.user?.name || 'Coordenação Geral OAMI'
+        sectorFilter: selectedSector,
+        professionalFilter: selectedProfessional !== 'ALL' ? selectedProfessional : undefined,
+        elderlyFilter: selectedElderly !== 'ALL' ? selectedElderly : undefined,
+        recordTypeFilter: selectedRecordType,
+        generatedBy: 'Coordenação Geral OAMI'
       });
-      props.showToast?.('Relatório Geral em PDF gerado com sucesso!', 'success');
-    } catch (err: any) {
-      console.error('PDF export error:', err);
-      props.showToast?.(`Erro ao exportar PDF: ${err.message || 'Falha na geração'}`, 'error');
+    } catch (err) {
+      console.error('Erro ao gerar PDF institucional:', err);
     } finally {
       setIsExportingPDF(false);
     }
   };
 
+  // Excel Export (16 sheets)
   const handleExportExcel = () => {
     try {
       exportGeneralReportToExcel({
@@ -205,705 +348,435 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
         metrics,
         startDate,
         endDate,
-        categoryFilter: selectedCategory,
-        professionalFilter: selectedProfessional,
-        generatedBy: props.user?.name || 'Coordenação Geral OAMI'
+        sectorFilter: selectedSector,
+        professionalFilter: selectedProfessional !== 'ALL' ? selectedProfessional : undefined,
+        stockProducts: combinedProps.stockProducts,
+        stockMovements: combinedProps.stockMovements
       });
-      props.showToast?.('Planilha Excel gerada com sucesso!', 'success');
-    } catch (err: any) {
-      console.error('Excel export error:', err);
-      props.showToast?.(`Erro ao exportar Excel: ${err.message || 'Falha na geração'}`, 'error');
+    } catch (err) {
+      console.error('Erro ao exportar Excel:', err);
     }
   };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Category Configuration
-  const categoryConfig: Record<Exclude<ReportCategory, 'ALL'>, {
-    label: string;
-    icon: any;
-    color: string;
-    bgHeader: string;
-    borderHeader: string;
-    badgeBg: string;
-    badgeText: string;
-  }> = {
-    PROFESSIONALS: {
-      label: 'Profissionais e Atendimentos',
-      icon: Users,
-      color: 'text-blue-600 dark:text-blue-400',
-      bgHeader: 'bg-blue-50/80 dark:bg-blue-950/40',
-      borderHeader: 'border-blue-200 dark:border-blue-800',
-      badgeBg: 'bg-blue-100 dark:bg-blue-900/60',
-      badgeText: 'text-blue-800 dark:text-blue-200'
-    },
-    WORKSHOPS: {
-      label: 'Oficinas Terapêuticas',
-      icon: FolderKanban,
-      color: 'text-amber-600 dark:text-amber-400',
-      bgHeader: 'bg-amber-50/80 dark:bg-amber-950/40',
-      borderHeader: 'border-amber-200 dark:border-amber-800',
-      badgeBg: 'bg-amber-100 dark:bg-amber-900/60',
-      badgeText: 'text-amber-800 dark:text-amber-200'
-    },
-    TRAININGS: {
-      label: 'Capacitações e Treinamentos',
-      icon: GraduationCap,
-      color: 'text-purple-600 dark:text-purple-400',
-      bgHeader: 'bg-purple-50/80 dark:bg-purple-950/40',
-      borderHeader: 'border-purple-200 dark:border-purple-800',
-      badgeBg: 'bg-purple-100 dark:bg-purple-900/60',
-      badgeText: 'text-purple-800 dark:text-purple-200'
-    },
-    DIAPERS: {
-      label: 'Fabricação e Doação de Fraldas (SGPF)',
-      icon: Package,
-      color: 'text-pink-600 dark:text-pink-400',
-      bgHeader: 'bg-pink-50/80 dark:bg-pink-950/40',
-      borderHeader: 'border-pink-200 dark:border-pink-800',
-      badgeBg: 'bg-pink-100 dark:bg-pink-900/60',
-      badgeText: 'text-pink-800 dark:text-pink-200'
-    },
-    STOCK: {
-      label: 'Estoque e Almoxarifado',
-      icon: Boxes,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgHeader: 'bg-emerald-50/80 dark:bg-emerald-950/40',
-      borderHeader: 'border-emerald-200 dark:border-emerald-800',
-      badgeBg: 'bg-emerald-100 dark:bg-emerald-900/60',
-      badgeText: 'text-emerald-800 dark:text-emerald-200'
-    },
-    MONITORING: {
-      label: 'Monitoramento Clínico dos Acolhidos',
-      icon: Activity,
-      color: 'text-teal-600 dark:text-teal-400',
-      bgHeader: 'bg-teal-50/80 dark:bg-teal-950/40',
-      borderHeader: 'border-teal-200 dark:border-teal-800',
-      badgeBg: 'bg-teal-100 dark:bg-teal-900/60',
-      badgeText: 'text-teal-800 dark:text-teal-200'
-    },
-    TREASURY: {
-      label: 'Tesouraria, Finanças e Doações',
-      icon: DollarSign,
-      color: 'text-slate-600 dark:text-slate-400',
-      bgHeader: 'bg-slate-50 dark:bg-slate-900/60',
-      borderHeader: 'border-slate-200 dark:border-slate-800',
-      badgeBg: 'bg-slate-100 dark:bg-slate-800',
-      badgeText: 'text-slate-800 dark:text-slate-200'
-    },
-    OTHER: {
-      label: 'Demais Áreas e Outros Registros',
-      icon: Layers,
-      color: 'text-gray-600 dark:text-gray-400',
-      bgHeader: 'bg-gray-50 dark:bg-gray-900/60',
-      borderHeader: 'border-gray-200 dark:border-gray-800',
-      badgeBg: 'bg-gray-100 dark:bg-gray-800',
-      badgeText: 'text-gray-800 dark:text-gray-200'
-    }
-  };
-
-  const allCategoryKeys: Array<Exclude<ReportCategory, 'ALL'>> = [
-    'PROFESSIONALS',
-    'WORKSHOPS',
-    'TRAININGS',
-    'DIAPERS',
-    'STOCK',
-    'MONITORING',
-    'TREASURY',
-    'OTHER'
-  ];
 
   return (
-    <div id="general-report-section" className="space-y-8 pb-16 animate-in fade-in duration-300">
-      {/* 1. Official Institutional Header (Print & Screen) */}
-      <div className="bg-white dark:bg-gray-900 p-6 md:p-8 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500" />
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div id="oami-general-report-root" className="space-y-6 pb-20">
+      {/* 1. CABEÇALHO DO RELATÓRIO (Item 1 do pedido) */}
+      <header
+        id="report-institutional-header"
+        className="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 border border-gray-100 dark:border-gray-800 shadow-sm relative overflow-hidden"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          {/* Institution Info */}
           <div className="flex items-start gap-4">
             {INSTITUTION_LOGO && (
               <img
                 src={INSTITUTION_LOGO}
                 alt="Logo OAMI"
-                className="w-16 h-16 rounded-2xl object-cover border border-gray-100 dark:border-gray-800 shadow-sm shrink-0"
+                className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-2xl p-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm shrink-0"
               />
             )}
             <div className="space-y-1">
-              <span className="text-xs font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                Sistema Integrado OAMI • Vitória do Mearim
+              <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Sistema de Gestão Assistencial
               </span>
-              <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                Relatório Geral e Integrado
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                {INSTITUTION_NAME}
               </h1>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed max-w-2xl">
-                {INSTITUTION_NAME} • CNPJ: {INSTITUTION_CNPJ} • {INSTITUTION_ADDRESS}
+              <h2 className="text-sm font-black text-emerald-700 dark:text-emerald-300">
+                RELATÓRIO GERAL E INTEGRADO — DOCUMENTO GERENCIAL
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                CNPJ: {INSTITUTION_CNPJ} • {INSTITUTION_ADDRESS}
               </p>
+              <div className="text-xs text-gray-700 dark:text-gray-300 pt-1 font-semibold">
+                Período selecionado: <strong className="text-gray-900 dark:text-white">{startDate}</strong> → <strong className="text-gray-900 dark:text-white">{endDate}</strong>
+              </div>
             </div>
           </div>
 
-          {/* Export Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+          {/* Action Buttons (PDF, Excel, Print) */}
+          <div className="flex flex-wrap items-center gap-2 print:hidden self-start">
             <button
-              id="export-general-report-pdf"
               onClick={handleExportPDF}
-              disabled={isExportingPDF || filteredRecords.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs md:text-sm rounded-2xl shadow-sm transition-all shadow-rose-600/20 active:scale-95"
-              title="Exportar documento oficial em PDF com timbrado institucional"
+              disabled={isExportingPDF}
+              className="px-4 py-2.5 rounded-2xl font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+              title="Exportar Relatório Geral Institucional em PDF"
             >
-              <FileText size={16} />
-              {isExportingPDF ? 'Gerando PDF...' : 'Exportar PDF'}
+              {isExportingPDF ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+              Exportar PDF Institucional
             </button>
 
             <button
-              id="export-general-report-excel"
               onClick={handleExportExcel}
-              disabled={filteredRecords.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs md:text-sm rounded-2xl shadow-sm transition-all shadow-emerald-600/20 active:scale-95"
-              title="Exportar planilha Excel completa com abas por setor"
+              className="px-4 py-2.5 rounded-2xl font-black text-xs bg-slate-800 hover:bg-slate-900 dark:bg-gray-800 dark:hover:bg-gray-700 text-white shadow-sm flex items-center gap-2 transition-all"
+              title="Exportar Planilha Completa em 16 Abas"
             >
               <FileSpreadsheet size={16} />
-              Exportar Excel
+              Exportar Excel (16 Abas)
             </button>
 
             <button
-              id="print-general-report"
-              onClick={handlePrint}
-              disabled={filteredRecords.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-white text-white dark:text-gray-900 font-bold text-xs md:text-sm rounded-2xl shadow-sm transition-all active:scale-95"
-              title="Imprimir relatório geral"
+              onClick={() => window.print()}
+              className="p-2.5 rounded-2xl text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 transition-all border border-gray-200 dark:border-gray-700"
+              title="Imprimir visualização atual"
             >
               <Printer size={16} />
-              Imprimir
             </button>
           </div>
         </div>
-      </div>
 
-      {/* 2. Executive Dashboard (KPI Summary Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Total Geral</span>
-            <Layers size={14} className="text-emerald-500" />
+        {/* Resumo Geral com Indicadores do Cabeçalho (Item 1) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 pt-6 mt-6 border-t border-gray-100 dark:border-gray-800">
+          {/* Total Registros */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Total Registros</span>
+            <strong className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">{metrics.totalRecords}</strong>
           </div>
-          <p className="text-xl font-black text-gray-900 dark:text-white">
-            {metrics.totalRecords}
-          </p>
-          <p className="text-[10px] text-gray-400">lançamentos</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Atendimentos</span>
-            <Users size={14} className="text-blue-500" />
+          {/* Atendimentos */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Atendimentos</span>
+            <strong className="text-lg sm:text-xl font-black text-blue-600 dark:text-blue-400">{metrics.totalAttendances}</strong>
           </div>
-          <p className="text-xl font-black text-blue-600 dark:text-blue-400">
-            {metrics.totalAttendances}
-          </p>
-          <p className="text-[10px] text-gray-400">evoluções técnicas</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Oficinas</span>
-            <FolderKanban size={14} className="text-amber-500" />
+          {/* Oficinas */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Oficinas</span>
+            <strong className="text-lg sm:text-xl font-black text-amber-600 dark:text-amber-400">{metrics.totalWorkshops}</strong>
           </div>
-          <p className="text-xl font-black text-amber-600 dark:text-amber-400">
-            {metrics.totalWorkshops}
-          </p>
-          <p className="text-[10px] text-gray-400">realizadas</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Capacitações</span>
-            <GraduationCap size={14} className="text-purple-500" />
+          {/* Capacitações */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Capacitações</span>
+            <strong className="text-lg sm:text-xl font-black text-purple-600 dark:text-purple-400">{metrics.totalTrainings}</strong>
           </div>
-          <p className="text-xl font-black text-purple-600 dark:text-purple-400">
-            {metrics.totalTrainings}
-          </p>
-          <p className="text-[10px] text-gray-400">treinamentos</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Fraldas</span>
-            <Package size={14} className="text-pink-500" />
+          {/* Fraldas Produzidas */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Fraldas Prod.</span>
+            <strong className="text-lg sm:text-xl font-black text-pink-600 dark:text-pink-400">{metrics.totalDiaperProduced}</strong>
           </div>
-          <p className="text-xl font-black text-pink-600 dark:text-pink-400">
-            {metrics.totalDiaperProduced}
-          </p>
-          <p className="text-[10px] text-gray-400">unidades cortadas</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Estoque</span>
-            <Boxes size={14} className="text-emerald-500" />
+          {/* Mov. Estoque */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Mov. Estoque</span>
+            <strong className="text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400">{metrics.totalStockMovements}</strong>
           </div>
-          <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-            {metrics.totalStockMovements}
-          </p>
-          <p className="text-[10px] text-gray-400">movimentações</p>
-        </div>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Monitoramentos</span>
-            <Activity size={14} className="text-teal-500" />
+          {/* Monitoramentos */}
+          <div className="p-3 rounded-2xl bg-gray-50/80 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 text-center col-span-2 sm:col-span-2 lg:col-span-1">
+            <span className="text-[10px] text-gray-400 font-bold uppercase block">Monitoramentos</span>
+            <strong className="text-lg sm:text-xl font-black text-teal-600 dark:text-teal-400">{metrics.totalClinicalMonitorings}</strong>
           </div>
-          <p className="text-xl font-black text-teal-600 dark:text-teal-400">
-            {metrics.totalClinicalMonitorings}
-          </p>
-          <p className="text-[10px] text-gray-400">sinais & cuidados</p>
         </div>
+      </header>
 
-        <div className="p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-1">
-          <div className="flex items-center justify-between text-gray-400">
-            <span className="text-[10px] font-black uppercase tracking-wider">Profissionais</span>
-            <Briefcase size={14} className="text-indigo-500" />
+      {/* 2. BARRA DE FILTROS INSTITUCIONAIS (Item 1: Período, Setor, Profissional, Acolhido, Tipo) */}
+      <section
+        id="report-filter-bar"
+        className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4 print:hidden"
+      >
+        {/* Date Presets Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-4">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-500">
+            <Calendar size={14} className="text-emerald-500" />
+            <span>Período Rápido:</span>
           </div>
-          <p className="text-xl font-black text-indigo-600 dark:text-indigo-400">
-            {metrics.activeProfessionalsCount}
-          </p>
-          <p className="text-[10px] text-gray-400">com registros</p>
-        </div>
-      </div>
 
-      {/* 3. Interactive Filter Bar */}
-      <div className="bg-white dark:bg-gray-900 p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-5 print:hidden">
-        {/* Top filter row: Presets & Date pickers */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Preset Buttons */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1 flex items-center gap-1">
-              <Calendar size={13} /> Período:
-            </span>
-            {(
-              [
-                { id: 'all', label: 'Todos os Registros' },
-                { id: 'today', label: 'Hoje' },
-                { id: 'week', label: 'Esta Semana' },
-                { id: 'month', label: 'Este Mês' },
-                { id: 'last_30_days', label: 'Últimos 30 dias' },
-                { id: 'year', label: 'Este Ano' },
-                { id: 'custom', label: 'Personalizado' }
-              ] as const
-            ).map(preset => (
+            {[
+              { id: 'today', label: 'Hoje' },
+              { id: 'week', label: 'Esta Semana' },
+              { id: 'month', label: 'Este Mês' },
+              { id: 'last_30_days', label: 'Últimos 30 Dias' },
+              { id: 'last_month', label: 'Mês Anterior' },
+              { id: 'year', label: 'Este Ano' },
+              { id: 'all', label: 'Todo o Histórico' }
+            ].map(p => (
               <button
-                key={preset.id}
-                onClick={() => handlePresetChange(preset.id)}
+                key={p.id}
+                onClick={() => handlePresetChange(p.id as DatePreset)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  datePreset === preset.id
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                    : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200/60 dark:border-gray-700'
+                  datePreset === p.id
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                 }`}
               >
-                {preset.label}
+                {p.label}
               </button>
             ))}
           </div>
-
-          {/* Custom Date Inputs */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-              <span className="text-[11px] font-bold text-gray-400 uppercase">De:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => {
-                  setDatePreset('custom');
-                  setStartDate(e.target.value);
-                }}
-                className="bg-transparent text-xs font-bold text-gray-800 dark:text-gray-200 outline-none"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700">
-              <span className="text-[11px] font-bold text-gray-400 uppercase">Até:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => {
-                  setDatePreset('custom');
-                  setEndDate(e.target.value);
-                }}
-                className="bg-transparent text-xs font-bold text-gray-800 dark:text-gray-200 outline-none"
-              />
-            </div>
-          </div>
         </div>
 
-        {/* Middle Filter Row: Category Pills */}
-        <div className="space-y-2">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
-            <Filter size={13} /> Filtrar por Área / Seção:
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setSelectedCategory('ALL')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                selectedCategory === 'ALL'
-                  ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
-                  : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 border border-gray-200 dark:border-gray-700'
-              }`}
+        {/* Granular Filters Grid: Custom Dates, Setor, Profissional, Acolhido, Tipo */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+          {/* Data Inicial */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Data Inicial</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => {
+                setDatePreset('custom');
+                setStartDate(e.target.value);
+              }}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* Data Final */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Data Final</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => {
+                setDatePreset('custom');
+                setEndDate(e.target.value);
+              }}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* Filtro: Setor / Área */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Setor / Área</label>
+            <select
+              value={selectedSector}
+              onChange={e => setSelectedSector(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
-              <span>Todas as Áreas</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20">
-                {allRecords.length}
-              </span>
-            </button>
+              <option value="ALL">Todos os Setores</option>
+              <option value="ENFERMAGEM">1. Enfermagem</option>
+              <option value="FISIOTERAPIA">2. Fisioterapia</option>
+              <option value="PSICOLOGIA">3. Psicologia</option>
+              <option value="SERVICO_SOCIAL">4. Serviço Social</option>
+              <option value="PEDAGOGIA">5. Pedagogia</option>
+              <option value="NUTRICAO">6. Nutrição</option>
+              <option value="EQUIPE_TECNICA">7. Equipe Técnica (PIAs)</option>
+              <option value="OUTRAS_AREAS">8. Demais Áreas</option>
+              <option value="OFICINAS">9. Oficinas Coletivas</option>
+              <option value="MONITORAMENTO">10. Monitoramento Clínico</option>
+              <option value="ESTOQUE">11. Estoque & Almoxarifado</option>
+              <option value="PRODUCAO_FRALDAS">12. Produção de Fraldas</option>
+              <option value="CAPACITACOES">13. Capacitações</option>
+            </select>
+          </div>
 
-            {allCategoryKeys.map(catKey => {
-              const cfg = categoryConfig[catKey];
-              const count = allRecords.filter(r => r.category === catKey).length;
-              const Icon = cfg.icon;
-              return (
-                <button
-                  key={catKey}
-                  onClick={() => setSelectedCategory(catKey)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    selectedCategory === catKey
-                      ? `${cfg.badgeBg} ${cfg.badgeText} ring-2 ring-emerald-500/50 shadow-sm`
-                      : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 border border-gray-200 dark:border-gray-700'
-                  }`}
-                >
-                  <Icon size={13} />
-                  <span>{cfg.label.split(' ')[0]}</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+          {/* Filtro: Profissional */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Profissional</label>
+            <select
+              value={selectedProfessional}
+              onChange={e => setSelectedProfessional(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="ALL">Todos os Profissionais ({professionalOptions.length})</option>
+              {professionalOptions.map(([name, count]) => (
+                <option key={name} value={name}>
+                  {name} ({count} reg.)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro: Acolhido */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Acolhido</label>
+            <select
+              value={selectedElderly}
+              onChange={e => setSelectedElderly(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="ALL">Todos os Acolhidos ({elderlyOptions.length})</option>
+              {elderlyOptions.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.name} ({e.count} reg.)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro: Tipo de Registro */}
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 block mb-1">Tipo de Registro</label>
+            <select
+              value={selectedRecordType}
+              onChange={e => setSelectedRecordType(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="ALL">Todos os Tipos</option>
+              <option value="EVOLUCAO">Evoluções</option>
+              <option value="ATENDIMENTO">Atendimentos Individuais</option>
+              <option value="AVALIACAO">Avaliações / PIAs</option>
+              <option value="VISITA">Visitas Familiares</option>
+              <option value="OFICINA">Oficinas / Dinâmicas</option>
+              <option value="CAPACITACAO">Capacitações</option>
+              <option value="PRODUCAO">Produção de Fraldas</option>
+              <option value="ESTOQUE">Estoque</option>
+              <option value="MONITORAMENTO">Monitoramento Clínico</option>
+              <option value="OUTRO">Outros</option>
+            </select>
           </div>
         </div>
 
-        {/* Bottom Filter Row: Professional dropdown, Text Search, Reset */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Professional Select */}
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-64">
-              <Briefcase size={14} className="text-gray-400 shrink-0" />
-              <select
-                value={selectedProfessional}
-                onChange={e => setSelectedProfessional(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-gray-800 dark:text-gray-200 outline-none w-full"
-              >
-                <option value="ALL">Todos os Profissionais</option>
-                {professionalOptions.map(([name, count]) => (
-                  <option key={name} value={name}>
-                    {name} ({count} registros)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Universal Text Search */}
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 w-full sm:w-80">
-              <Search size={14} className="text-gray-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Buscar por acolhido, atividade, tema, produto..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-gray-800 dark:text-gray-200 outline-none w-full placeholder:text-gray-400"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
+        {/* Text Search & Reset Filters */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="relative flex-1 sm:max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por termo, conduta, descrição ou título..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
           </div>
 
-          <div className="flex items-center justify-between w-full md:w-auto gap-3">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-              Exibindo <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{filteredRecords.length}</strong> de {allRecords.length} registros
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-gray-500 dark:text-gray-400">
+              <strong className="text-gray-900 dark:text-white font-black">{filteredRecords.length}</strong> registros filtrados
             </span>
-
             <button
               onClick={handleResetFilters}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
-              title="Limpar todos os filtros aplicados"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 transition-all"
             >
               <RotateCcw size={13} /> Limpar Filtros
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 4. Controls Bar (Expand/Collapse, View Layouts) */}
-      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 print:hidden">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={expandAll}
-            className="hover:text-gray-800 dark:hover:text-gray-200 font-semibold flex items-center gap-1"
-          >
-            <ChevronDown size={14} /> Expandir todas
-          </button>
-          <span>•</span>
-          <button
-            onClick={collapseAll}
-            className="hover:text-gray-800 dark:hover:text-gray-200 font-semibold flex items-center gap-1"
-          >
-            <ChevronUp size={14} /> Recolher todas
-          </button>
-        </div>
+      {/* 3. NAVEGAÇÃO POR ABAS DO RELATÓRIO INSTITUCIONAL */}
+      <nav
+        id="report-navigation-tabs"
+        className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-gray-200 dark:border-gray-800 text-xs font-bold print:hidden"
+      >
+        {[
+          { id: 'executive', label: 'Resumo Executivo', icon: CheckCircle2 },
+          { id: 'sectors', label: 'Relatório por Setor', icon: Layers },
+          { id: 'elderly', label: 'Por Acolhido', icon: Users },
+          { id: 'professional', label: 'Por Profissional', icon: Briefcase },
+          { id: 'monthly', label: 'Relatório Mensal', icon: Calendar },
+          { id: 'workshops', label: 'Oficinas & Dinâmicas', icon: Sparkles },
+          { id: 'stock', label: 'Estoque & Consumo', icon: Boxes },
+          { id: 'diapers', label: 'Fábrica de Fraldas', icon: Package },
+          { id: 'monitoring', label: 'Monitoramento Clínico', icon: Activity },
+          { id: 'indicators', label: 'Indicadores & Gráficos', icon: Award }
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
 
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">Modo de Exibição:</span>
-          <button
-            onClick={() => setViewMode('integrated')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-              viewMode === 'integrated'
-                ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white'
-                : 'hover:bg-gray-100 text-gray-500'
-            }`}
-          >
-            Todas as Seções
-          </button>
-          <button
-            onClick={() => setViewMode('category')}
-            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-              viewMode === 'category'
-                ? 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white'
-                : 'hover:bg-gray-100 text-gray-500'
-            }`}
-          >
-            Por Seção Ativa
-          </button>
-        </div>
-      </div>
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as ActiveTab)}
+              className={`px-4 py-2.5 rounded-2xl whitespace-nowrap flex items-center gap-2 transition-all shrink-0 ${
+                isActive
+                  ? 'bg-emerald-600 text-white shadow-sm font-black'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <Icon size={15} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
 
-      {/* 5. Categorized Data Sections */}
-      {filteredRecords.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 p-12 text-center rounded-3xl border border-gray-100 dark:border-gray-800 space-y-3">
-          <HelpCircle size={40} className="mx-auto text-gray-300 dark:text-gray-700" />
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Nenhum registro encontrado para os filtros selecionados
-          </h3>
-          <p className="text-sm text-gray-500 max-w-md mx-auto">
-            Tente selecionar "Todos os Registros", remover termos de busca ou selecionar outro profissional.
-          </p>
-          <button
-            onClick={handleResetFilters}
-            className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-sm hover:bg-emerald-700 transition-all"
-          >
-            Redefinir Filtros
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {allCategoryKeys.map(catKey => {
-            // If in category view mode and not active, skip
-            if (viewMode === 'category' && selectedCategory !== 'ALL' && selectedCategory !== catKey) {
-              return null;
-            }
+      {/* 4. CONTEÚDO DA ABA SELECIONADA */}
+      <main id="report-tab-content">
+        {activeTab === 'executive' && (
+          <ExecutiveSummaryView
+            data={executiveData}
+            metrics={metrics}
+            startDate={startDate}
+            endDate={endDate}
+            onSelectSector={(sectorKey) => {
+              setSelectedSector(sectorKey);
+              setActiveTab('sectors');
+            }}
+          />
+        )}
 
-            const catItems = filteredRecords.filter(r => r.category === catKey);
-            if (catItems.length === 0) return null;
+        {activeTab === 'sectors' && (
+          <SectorReportView
+            items={filteredRecords}
+            startDate={startDate}
+            endDate={endDate}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+          />
+        )}
 
-            const cfg = categoryConfig[catKey];
-            const Icon = cfg.icon;
-            const isCollapsed = Boolean(collapsedSections[catKey]);
-            const limit = visibleItemsLimitPerCategory[catKey] || 25;
-            const displayedItems = catItems.slice(0, limit);
+        {activeTab === 'elderly' && (
+          <ElderlyReportView
+            items={filteredRecords}
+            elderlyList={combinedProps.elderly || []}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+          />
+        )}
 
-            return (
-              <div
-                key={catKey}
-                id={`report-section-${catKey.toLowerCase()}`}
-                className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden transition-all"
-              >
-                {/* Section Header Banner */}
-                <div
-                  onClick={() => toggleSection(catKey)}
-                  className={`p-4 md:p-5 flex items-center justify-between cursor-pointer select-none border-b border-gray-100 dark:border-gray-800 ${cfg.bgHeader}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-2xl bg-white dark:bg-gray-900 shadow-sm ${cfg.color}`}>
-                      <Icon size={20} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-base md:text-lg font-black text-gray-900 dark:text-white">
-                          {cfg.label}
-                        </h2>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${cfg.badgeBg} ${cfg.badgeText}`}>
-                          {catItems.length} registro(s)
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {catKey === 'PROFESSIONALS' && 'Registros técnicos, acompanhamentos, condutas e planos multidisciplinares'}
-                        {catKey === 'WORKSHOPS' && 'Atividades lúdicas, terapêuticas e de convivência social realizadas na OAMI'}
-                        {catKey === 'TRAININGS' && 'Treinamentos internos e externos, palestras e capacitação de colaboradores'}
-                        {catKey === 'DIAPERS' && 'Corte bruto, montagem, acabamento e distribuição assistencial de fraldas'}
-                        {catKey === 'STOCK' && 'Entradas, saídas, catálogo de suprimentos, doações de insumos e saldos'}
-                        {catKey === 'MONITORING' && 'Sinais vitais, administração de medicamentos, curativos e rotinas diárias'}
-                        {catKey === 'TREASURY' && 'Receitas, despesas, doações financeiras e histórico de lançamentos'}
-                        {catKey === 'OTHER' && 'Atos institucionais, presidência, engajamento familiar e voluntariado'}
-                      </p>
-                    </div>
-                  </div>
+        {activeTab === 'professional' && (
+          <ProfessionalReportView
+            items={filteredRecords}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+          />
+        )}
 
-                  <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-xl print:hidden">
-                    {isCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-                  </button>
-                </div>
+        {activeTab === 'monthly' && (
+          <MonthlyReportView items={filteredRecords} />
+        )}
 
-                {/* Section Body */}
-                {!isCollapsed && (
-                  <div>
-                    {/* Subtotal Banner */}
-                    <div className="px-6 py-2.5 bg-gray-50/50 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between text-xs text-gray-600 dark:text-gray-300">
-                      <span>
-                        Subtotal da Seção: <strong className="font-bold text-gray-900 dark:text-white">{catItems.length} lançamentos</strong>
-                      </span>
-                      {catKey === 'DIAPERS' && (
-                        <span className="font-semibold text-pink-600 dark:text-pink-400">
-                          Total de unidades produzidas/cortadas no período: <strong>{metrics.totalDiaperProduced} un</strong>
-                        </span>
-                      )}
-                      {catKey === 'STOCK' && (
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                          Entradas: <strong>{metrics.totalStockInputs}</strong> • Saídas: <strong>{metrics.totalStockOutputs}</strong>
-                        </span>
-                      )}
-                      {catKey === 'WORKSHOPS' && (
-                        <span className="font-semibold text-amber-600 dark:text-amber-400">
-                          Total de oficinas: <strong>{metrics.totalWorkshops}</strong> • Participantes: <strong>{metrics.totalParticipants}</strong>
-                        </span>
-                      )}
-                    </div>
+        {activeTab === 'workshops' && (
+          <WorkshopsReportView
+            items={filteredRecords}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+          />
+        )}
 
-                    {/* Table */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs text-gray-700 dark:text-gray-300 border-collapse">
-                        <thead>
-                          <tr className="bg-gray-100/60 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 uppercase font-black tracking-wider text-[10px] border-b border-gray-100 dark:border-gray-800">
-                            <th className="py-3 px-4 w-28">Data</th>
-                            <th className="py-3 px-4 w-36">Setor / Área</th>
-                            <th className="py-3 px-4">Atividade / Registro</th>
-                            <th className="py-3 px-4 w-44">Profissional / Resp.</th>
-                            <th className="py-3 px-4 w-44">Acolhido / Público / Item</th>
-                            <th className="py-3 px-4 w-28 text-center">Qtd / Status</th>
-                            <th className="py-3 px-4 text-right print:hidden w-24">Ações</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
-                          {displayedItems.map(item => (
-                            <tr
-                              key={item.id}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group"
-                            >
-                              {/* Date */}
-                              <td className="py-3.5 px-4 font-mono font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                                {item.date ? item.date.slice(0, 10) : '—'}
-                              </td>
+        {activeTab === 'stock' && (
+          <StockReportView
+            products={combinedProps.stockProducts || []}
+            movements={combinedProps.stockMovements || []}
+            startDate={startDate}
+            endDate={endDate}
+          />
+        )}
 
-                              {/* Sector */}
-                              <td className="py-3.5 px-4">
-                                <span className="inline-block px-2 py-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-bold text-[11px]">
-                                  {item.sector}
-                                </span>
-                              </td>
+        {activeTab === 'diapers' && (
+          <DiaperProductionReportView
+            items={filteredRecords}
+            rawProductions={combinedProps.diaperRawProductions || []}
+            finalPackings={combinedProps.diaperFinalPackings || []}
+            donations={combinedProps.diaperDonations || []}
+          />
+        )}
 
-                              {/* Title & Description preview */}
-                              <td className="py-3.5 px-4">
-                                <div className="font-bold text-gray-900 dark:text-white text-xs">
-                                  {item.title}
-                                </div>
-                                {item.description && (
-                                  <div className="text-[11px] text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">
-                                    {item.description}
-                                  </div>
-                                )}
-                              </td>
+        {activeTab === 'monitoring' && (
+          <MonitoringReportView
+            items={filteredRecords}
+            onSelectItem={(item) => setSelectedItemForModal(item)}
+          />
+        )}
 
-                              {/* Responsible */}
-                              <td className="py-3.5 px-4">
-                                <div className="font-semibold text-gray-900 dark:text-white">
-                                  {item.responsible || '—'}
-                                </div>
-                                {item.roleOrFunction && (
-                                  <div className="text-[10px] text-gray-400">
-                                    {item.roleOrFunction}
-                                  </div>
-                                )}
-                              </td>
+        {activeTab === 'indicators' && (
+          <IndicatorsAndChartsView
+            items={filteredRecords}
+            metrics={metrics}
+            stockProducts={combinedProps.stockProducts || []}
+            stockMovements={combinedProps.stockMovements || []}
+            diaperDonations={combinedProps.diaperDonations || []}
+          />
+        )}
+      </main>
 
-                              {/* Target / Participant */}
-                              <td className="py-3.5 px-4">
-                                <div className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[180px]">
-                                  {item.targetOrParticipant || '—'}
-                                </div>
-                              </td>
-
-                              {/* Quantity / Status */}
-                              <td className="py-3.5 px-4 text-center">
-                                {item.quantityOrValue !== undefined ? (
-                                  <span className="font-mono font-bold text-gray-900 dark:text-gray-100">
-                                    {item.quantityOrValue}
-                                  </span>
-                                ) : item.typeOrStatus ? (
-                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-                                    {item.typeOrStatus}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400">—</span>
-                                )}
-                              </td>
-
-                              {/* Actions */}
-                              <td className="py-3.5 px-4 text-right print:hidden">
-                                <button
-                                  onClick={() => setSelectedItemForModal(item)}
-                                  className="px-2.5 py-1 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs inline-flex items-center gap-1 transition-all"
-                                  title="Ver ficha completa com todos os campos e anexos"
-                                >
-                                  <Eye size={12} /> Detalhes
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Pagination / Show More if exceeding initial limit */}
-                    {catItems.length > limit && (
-                      <div className="p-4 bg-gray-50/50 dark:bg-gray-800/30 text-center border-t border-gray-100 dark:border-gray-800 print:hidden">
-                        <button
-                          onClick={() => {
-                            setVisibleItemsLimitPerCategory(prev => ({
-                              ...prev,
-                              [catKey]: limit + 50
-                            }));
-                          }}
-                          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 transition-all shadow-sm"
-                        >
-                          Carregar mais 50 registros ({catItems.length - limit} restantes)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {/* 5. MODAL "VER REGISTRO COMPLETO" (Sem alterar nenhum dado existente) */}
+      {selectedItemForModal && (
+        <ReportItemDetailsModal
+          item={selectedItemForModal}
+          onClose={() => setSelectedItemForModal(null)}
+        />
       )}
-
-      {/* 6. Modal for Viewing Complete Record Details */}
-      <ReportItemDetailsModal
-        item={selectedItemForModal}
-        onClose={() => setSelectedItemForModal(null)}
-      />
     </div>
   );
 };

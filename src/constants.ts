@@ -10,6 +10,7 @@ export const MOCK_USERS: User[] = [
   { id: '7', name: 'Fisioterapeuta', role: 'FISIOTERAPEUTA', password: '123' },
   { id: '8', name: 'Fabricante de Fraldas', role: 'FABRICANTE_FRALDAS', password: '123' },
   { id: '9', name: 'Projetista OAMI', role: 'PROJETISTA', password: '123' },
+  { id: '10', name: 'Tesoureira OAMI', role: 'TESOUREIRA', email: 'tesouraria@oami.org.br', password: '123' },
 ];
 
 export const ROLE_LABELS: Record<Role, string> = {

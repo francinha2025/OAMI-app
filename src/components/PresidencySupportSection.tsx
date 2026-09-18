@@ -14,7 +14,10 @@ import {
   Clock,
   Archive,
   User as UserIcon,
-  Tag
+  Tag,
+  Eye,
+  FileDown,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -23,6 +26,13 @@ import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { generateModernPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
+import { 
+  processAndStoreFile, 
+  downloadAttachedDocument, 
+  openAttachedDocument, 
+  deleteDocumentChunks, 
+  MAX_DOCUMENT_FILE_SIZE_LABEL 
+} from '../lib/documentStorage';
 
 interface PresidencySupportSectionProps {
   documents: PresidencySupportDocument[];
@@ -40,6 +50,8 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
   const [exporting, setExporting] = useState(false);
   const [editingDoc, setEditingDoc] = useState<PresidencySupportDocument | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<PresidencySupportDocument | null>(null);
+  const [uploadingDocStatus, setUploadingDocStatus] = useState<string | null>(null);
+  const [isDocDownloading, setIsDocDownloading] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
@@ -51,6 +63,11 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
     date: new Date().toISOString().split('T')[0],
     description: '',
     url: '',
+    attachmentName: '',
+    attachmentSize: '',
+    attachmentId: '',
+    attachmentChunked: false,
+    attachmentChunkCount: 0,
     status: 'EM_ELABORACAO' as 'EM_ELABORACAO' | 'APROVADO' | 'ARQUIVADO'
   });
 
@@ -63,6 +80,11 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
       date: new Date().toISOString().split('T')[0],
       description: '',
       url: '',
+      attachmentName: '',
+      attachmentSize: '',
+      attachmentId: '',
+      attachmentChunked: false,
+      attachmentChunkCount: 0,
       status: 'EM_ELABORACAO'
     });
   };
@@ -75,6 +97,11 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
       date: docItem.date || new Date().toISOString().split('T')[0],
       description: docItem.description || '',
       url: docItem.url || '',
+      attachmentName: docItem.attachmentName || '',
+      attachmentSize: docItem.attachmentSize || '',
+      attachmentId: docItem.attachmentId || '',
+      attachmentChunked: !!docItem.attachmentChunked,
+      attachmentChunkCount: docItem.attachmentChunkCount || 0,
       status: docItem.status || 'EM_ELABORACAO'
     });
     setIsModalOpen(true);
@@ -84,6 +111,9 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
     if (!deletingDoc) return;
     setLoading(true);
     try {
+      if (deletingDoc.attachmentId && deletingDoc.attachmentChunked) {
+        await deleteDocumentChunks(deletingDoc.attachmentId, deletingDoc.attachmentChunkCount);
+      }
       await deleteDoc(doc(db, 'presidency_support', deletingDoc.id));
       showToast('Documento excluído com sucesso!');
       setDeletingDoc(null);
@@ -110,6 +140,11 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
         date: formData.date,
         description: formData.description,
         url: formData.url,
+        attachmentName: formData.attachmentName,
+        attachmentSize: formData.attachmentSize,
+        attachmentId: formData.attachmentId,
+        attachmentChunked: formData.attachmentChunked,
+        attachmentChunkCount: formData.attachmentChunkCount,
         status: formData.status,
         author: editingDoc ? editingDoc.author : user.name,
         createdAt: editingDoc ? editingDoc.createdAt : new Date().toISOString()
@@ -305,6 +340,13 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
                       <div>
                         <p className="text-sm font-bold text-gray-800 dark:text-white line-clamp-1">{docItem.title}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{docItem.description}</p>
+                        {docItem.attachmentName && (
+                          <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-md w-fit">
+                            <FileText size={12} />
+                            <span className="truncate max-w-[180px]">{docItem.attachmentName}</span>
+                            {docItem.attachmentSize && <span className="text-[10px] text-gray-400 font-normal">({docItem.attachmentSize})</span>}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -339,17 +381,66 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
                     </span>
                   </td>
                   <td className="p-4 text-right">
-                    <div className="flex justify-end items-center gap-2">
-                      {docItem.url && (
-                        <a 
-                          href={docItem.url} 
-                          target="_blank" 
-                          referrerPolicy="no-referrer"
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-amber-600 hover:text-amber-700 transition-colors flex items-center justify-center"
-                          title="Ver link/documento externo"
-                        >
-                          <FileText size={14} />
-                        </a>
+                    <div className="flex justify-end items-center gap-1.5">
+                      {(docItem.attachmentId || docItem.url) && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                if (docItem.attachmentId) {
+                                  await openAttachedDocument({
+                                    id: docItem.attachmentId,
+                                    name: docItem.attachmentName || docItem.title,
+                                    url: docItem.url,
+                                    isChunked: docItem.attachmentChunked,
+                                    chunkCount: docItem.attachmentChunkCount
+                                  });
+                                } else if (docItem.url) {
+                                  window.open(docItem.url, '_blank');
+                                }
+                              } catch (err: any) {
+                                showToast(err.message || 'Erro ao visualizar arquivo.', 'error');
+                              }
+                            }}
+                            className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400 transition-colors flex items-center justify-center"
+                            title="Visualizar documento anexo"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isDocDownloading === docItem.id}
+                            onClick={async () => {
+                              try {
+                                setIsDocDownloading(docItem.id);
+                                if (docItem.attachmentId) {
+                                  await downloadAttachedDocument({
+                                    id: docItem.attachmentId,
+                                    name: docItem.attachmentName || `${docItem.title}.pdf`,
+                                    url: docItem.url,
+                                    isChunked: docItem.attachmentChunked,
+                                    chunkCount: docItem.attachmentChunkCount
+                                  });
+                                } else if (docItem.url) {
+                                  window.open(docItem.url, '_blank');
+                                }
+                              } catch (err: any) {
+                                showToast(err.message || 'Erro ao baixar documento.', 'error');
+                              } finally {
+                                setIsDocDownloading(null);
+                              }
+                            }}
+                            className="p-1.5 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg text-green-600 dark:text-green-400 transition-colors flex items-center justify-center disabled:opacity-50"
+                            title="Baixar anexo"
+                          >
+                            {isDocDownloading === docItem.id ? (
+                              <Loader2 size={15} className="animate-spin text-green-600" />
+                            ) : (
+                              <FileDown size={15} />
+                            )}
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={() => handleEditClick(docItem)}
@@ -456,6 +547,95 @@ export const PresidencySupportSection: React.FC<PresidencySupportSectionProps> =
                       onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Anexo de Arquivo PDF (até 25MB) */}
+                <div className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/40 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase">
+                      Anexo Oficial (PDF, Word, etc.)
+                    </label>
+                    <span className="text-[10px] font-black text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-950/50 px-2 py-0.5 rounded-full">
+                      Limite ampliado: até {MAX_DOCUMENT_FILE_SIZE_LABEL}
+                    </span>
+                  </div>
+
+                  {formData.attachmentName ? (
+                    <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileText size={18} className="text-amber-600 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-800 dark:text-white truncate">{formData.attachmentName}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">{formData.attachmentSize || 'Pronto'}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (formData.attachmentId && formData.attachmentChunked) {
+                            deleteDocumentChunks(formData.attachmentId, formData.attachmentChunkCount);
+                          }
+                          setFormData({
+                            ...formData,
+                            attachmentName: '',
+                            attachmentSize: '',
+                            attachmentId: '',
+                            attachmentChunked: false,
+                            attachmentChunkCount: 0
+                          });
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        title="Remover anexo"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      {uploadingDocStatus ? (
+                        <div className="flex items-center justify-center gap-2 py-3 px-4 bg-amber-100/70 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-xl text-xs font-bold animate-pulse">
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>{uploadingDocStatus}</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt';
+                            input.onchange = async (e: any) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingDocStatus(`Processando ${file.name}...`);
+                              try {
+                                const attached = await processAndStoreFile(file, (msg) => setUploadingDocStatus(msg));
+                                setFormData(prev => ({
+                                  ...prev,
+                                  attachmentName: attached.name,
+                                  attachmentSize: attached.size,
+                                  attachmentId: attached.id || '',
+                                  attachmentChunked: !!attached.isChunked,
+                                  attachmentChunkCount: attached.chunkCount || 0
+                                }));
+                                showToast(`Arquivo "${file.name}" anexado com sucesso!`);
+                              } catch (err: any) {
+                                console.error('Erro ao anexar documento:', err);
+                                showToast(err.message || 'Erro ao processar anexo.', 'error');
+                              } finally {
+                                setUploadingDocStatus(null);
+                              }
+                            };
+                            input.click();
+                          }}
+                          className="w-full py-2.5 bg-white dark:bg-gray-900 hover:bg-amber-100/40 dark:hover:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-800 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <Upload size={14} />
+                          Anexar Documento PDF (até 25MB)
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
