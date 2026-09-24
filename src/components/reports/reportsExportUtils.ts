@@ -12,6 +12,7 @@ import {
 } from './reportsTypes';
 import { buildExecutiveSummaryData, buildMonthlyStockConsumption } from './reportsDataBuilder';
 import { StockProduct, StockMovement } from '../../types';
+import { formatLocalDate } from '../../lib/utils';
 
 interface ExportParams {
   items: UnifiedReportItem[];
@@ -257,7 +258,7 @@ export async function exportGeneralReportToPDF({
 
     // Build Table Rows: DATA | TIPO DE ATENDIMENTO | PROFISSIONAL | ACOLHIDO | RESUMO DO REGISTRO
     const tableRows = sectorItems.map(item => {
-      const dateStr = item.date ? item.date.slice(0, 10) : '—';
+      const dateStr = item.date ? formatLocalDate(item.date) : '—';
       const typeStr = item.recordTypeLabel || item.typeOrStatus || item.recordType;
       const respStr = item.responsible || '—';
       const targetStr = item.targetOrParticipant || '—';
@@ -401,7 +402,7 @@ export function exportGeneralReportToExcel({
     if (subset.length === 0) return;
 
     const rows = subset.map(item => [
-      item.date ? item.date.slice(0, 10) : '',
+      item.date ? formatLocalDate(item.date) : '',
       item.recordTypeLabel || item.typeOrStatus || item.recordType,
       item.responsible,
       item.targetOrParticipant || '',

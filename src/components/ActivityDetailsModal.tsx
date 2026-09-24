@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Calendar, User, Users, Clipboard, Briefcase, FileText, Sparkles, Smile, MessageSquare, ClipboardList } from 'lucide-react';
 import { Professional, Elderly } from '../types';
+import { formatLocalDate } from '../lib/utils';
 
 interface ActivityDetailsModalProps {
   activity: {
@@ -87,7 +88,7 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
               <span className="text-[8.5px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Estágio</span>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-text-gray-250">
                 <Calendar size={13} className="text-gray-400" />
-                {new Date(date).toLocaleDateString('pt-BR')}
+                {formatLocalDate(date)}
               </div>
             </div>
             <div className="space-y-1">

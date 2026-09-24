@@ -97,16 +97,17 @@ export const ReportsSection: React.FC<GeneralReportProps> = (props) => {
     return {
       evolutions: unifiedEvolutions.filter(ev => filterFn(ev.date)),
       pias: pias.filter(p => filterFn(p.date)),
+      workshops: (props.workshops || []).filter(w => filterFn(w.date || (w as any).when)),
       periodLabel: reportPeriod === 'daily' ? format(start, 'dd/MM/yyyy') : 
                    reportPeriod === 'weekly' ? `${format(start, 'dd/MM')} a ${format(end, 'dd/MM/yyyy')}` :
                    reportPeriod === 'monthly' ? format(start, 'MMMM yyyy', { locale: ptBR }) :
                    reportPeriod === 'semi-annually' ? `${start.getMonth() === 0 ? '1º' : '2º'} Semestre ${selectedYear}` :
                    selectedYear
     };
-  }, [reportPeriod, selectedDate, selectedMonth, selectedYear, unifiedEvolutions, pias]);
+  }, [reportPeriod, selectedDate, selectedMonth, selectedYear, unifiedEvolutions, pias, props.workshops]);
 
   const getReportData = () => {
-    const { evolutions: periodEvolutions, pias: periodPIAs } = filteredData;
+    const { evolutions: periodEvolutions, pias: periodPIAs, workshops: periodWorkshops } = filteredData;
     const roles = [...new Set(periodEvolutions.map(e => e.professionalRole))];
     const columns = ['Categoria', 'Informação'];
     const data = [
@@ -114,6 +115,8 @@ export const ReportsSection: React.FC<GeneralReportProps> = (props) => {
       ['Total de Idosos Atendidos', elderly.filter(e => e.status === 'ATIVO').length.toString()],
       ['Evoluções Registradas no Período', periodEvolutions.length.toString()],
       ['Novos PIAs/Revisões', periodPIAs.length.toString()],
+      ['Oficinas Terapêuticas no Período', periodWorkshops.filter(w => w.type !== 'CAPACITACAO').length.toString()],
+      ['Capacitações Profissionais no Período', periodWorkshops.filter(w => w.type === 'CAPACITACAO').length.toString()],
       ['', ''],
       ['ATENDIMENTOS POR ÁREA', ''],
       ...roles.map(role => [

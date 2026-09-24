@@ -658,7 +658,7 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
           { id: 'elderly', label: 'Por Acolhido', icon: Users },
           { id: 'professional', label: 'Por Profissional', icon: Briefcase },
           { id: 'monthly', label: 'Relatório Mensal', icon: Calendar },
-          { id: 'workshops', label: 'Oficinas & Dinâmicas', icon: Sparkles },
+          { id: 'workshops', label: 'Oficinas e Capacitações', icon: Sparkles },
           { id: 'stock', label: 'Estoque & Consumo', icon: Boxes },
           { id: 'diapers', label: 'Fábrica de Fraldas', icon: Package },
           { id: 'monitoring', label: 'Monitoramento Clínico', icon: Activity },
@@ -730,6 +730,8 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
         {activeTab === 'workshops' && (
           <WorkshopsReportView
             items={filteredRecords}
+            startDate={startDate}
+            endDate={endDate}
             onSelectItem={(item) => setSelectedItemForModal(item)}
           />
         )}

@@ -194,9 +194,35 @@ export async function compressImage(base64Str: string, maxWidth = 800, maxHeight
   });
 }
 
+export function formatLocalDate(dateStr: string | undefined | null, formatStr = 'dd/MM/yyyy'): string {
+  if (!dateStr) return '';
+  try {
+    const trimmed = String(dateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [year, month, day] = trimmed.split('-').map(Number);
+      if (formatStr === 'dd/MM/yyyy') {
+        return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+      }
+      return format(new Date(year, month - 1, day), formatStr, { locale: ptBR });
+    }
+    const d = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return format(d, formatStr, { locale: ptBR });
+    }
+    return String(dateStr);
+  } catch {
+    return String(dateStr || '');
+  }
+}
+
 export function safeFormat(dateStr: string | undefined | null, formatStr: string, fallback = '--/--'): string {
   if (!dateStr) return fallback;
   try {
+    const trimmed = String(dateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [year, month, day] = trimmed.split('-').map(Number);
+      return format(new Date(year, month - 1, day), formatStr, { locale: ptBR });
+    }
     const d = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
     if (isNaN(d.getTime())) return fallback;
     return format(d, formatStr, { locale: ptBR });

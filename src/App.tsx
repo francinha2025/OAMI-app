@@ -110,7 +110,7 @@ import {
   ScatterChart,
   Scatter
 } from 'recharts';
-import { cn, safeReplace, cleanData, compressImage, getProfessionalName, getProfessionalRole } from './lib/utils';
+import { cn, safeReplace, cleanData, compressImage, getProfessionalName, getProfessionalRole, formatLocalDate } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { ActivityDetailsModal } from './components/ActivityDetailsModal';
 import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, AttachedDocument, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
@@ -3264,7 +3264,7 @@ const ElderlySection = ({
               </div>
               <div>
                 <h4 className="font-bold text-gray-800 dark:text-white">{elderly.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Entrada: {new Date(elderly.entryDate).toLocaleDateString('pt-BR')}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Entrada: {formatLocalDate(elderly.entryDate)}</p>
                 <span className="inline-block mt-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-full uppercase">
                   {elderly.status}
                 </span>
@@ -3305,7 +3305,7 @@ const ElderlySection = ({
                       <div className="flex flex-wrap gap-x-6 gap-y-2 mt-2">
                         <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1">
                           <Calendar size={14} />
-                          Nascimento: {new Date(selectedElderly.birthDate).toLocaleDateString('pt-BR')}
+                          Nascimento: {formatLocalDate(selectedElderly.birthDate)}
                         </p>
                         <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1">
                           <Activity size={14} />
@@ -3371,7 +3371,7 @@ const ElderlySection = ({
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Data de Entrada</p>
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{new Date(selectedElderly.entryDate).toLocaleDateString('pt-BR')}</p>
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{formatLocalDate(selectedElderly.entryDate)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Status Institucional</p>
@@ -3433,7 +3433,7 @@ const ElderlySection = ({
                               <div className="flex justify-between items-center mb-2">
                                 <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase">{ROLE_LABELS[ev.professionalRole]}</span>
                                 <div className="flex items-center gap-3">
-                                  <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(ev.date).toLocaleDateString('pt-BR')}</span>
+                                  <span className="text-xs text-gray-400 dark:text-gray-500">{formatLocalDate(ev.date)}</span>
                                   <button 
                                     onClick={() => setDeleteConfirm({ isOpen: true, type: 'EVOLUCAO', id: ev.id })}
                                     className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -6269,7 +6269,7 @@ const DiaperDonationSection = ({ donations, stock, user, communityElderly, elder
                   {donations.map((d) => (
                     <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                       <td className="p-4 text-sm font-bold text-gray-800 dark:text-white capitalize">{d.beneficiaryName}</td>
-                      <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{new Date(d.date).toLocaleDateString('pt-BR')}</td>
+                      <td className="p-4 text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(d.date)}</td>
                       <td className="p-4 text-sm font-bold text-right text-gray-800 dark:text-white">{d.quantity} un</td>
                       <td className="p-4 text-xs text-gray-500">{d.registeredBy}</td>
                     </tr>
@@ -6822,7 +6822,7 @@ const DiaperFactorySection = ({ stock, logs, user }: { stock: DiaperStock | null
               {(logs || []).map((log) => (
                 <tr key={log.id} className="text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                   <td className="py-4 font-medium">
-                    {new Date(log.date).toLocaleDateString('pt-BR')}
+                    {formatLocalDate(log.date)}
                   </td>
                   <td className="py-4">
                     <span className={cn(
@@ -6963,7 +6963,7 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
       const data = volunteers.map(v => [
         v.name,
         v.type,
-        new Date(v.startDate).toLocaleDateString('pt-BR'),
+        formatLocalDate(v.startDate),
         v.cpf || '-',
         v.address || '-',
         v.activities
@@ -6988,7 +6988,7 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
       const data = volunteers.map(v => [
         v.name,
         v.type,
-        new Date(v.startDate).toLocaleDateString('pt-BR'),
+        formatLocalDate(v.startDate),
         v.cpf || '-',
         v.address || '-',
         v.activities
@@ -7161,7 +7161,7 @@ const VolunteersSection = ({ volunteers, showToast, user }: {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                   <Calendar size={12} />
-                  <span>Início: {new Date(v.startDate).toLocaleDateString('pt-BR')}</span>
+                  <span>Início: {formatLocalDate(v.startDate)}</span>
                 </div>
                 <p className="text-sm text-gray-700 dark:text-gray-300 mt-3 font-medium line-clamp-2 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-xl border border-gray-100 dark:border-gray-700/50">
                   {v.activities}
@@ -7523,7 +7523,7 @@ const FamilySection = ({ engagements, elderly, showToast }: { engagements: Famil
             </h4>
             <div className="flex items-center gap-2 mt-1 text-gray-400 dark:text-gray-500">
               <Calendar size={14} />
-              <p className="text-xs font-medium">{new Date(e.date).toLocaleDateString('pt-BR')}</p>
+              <p className="text-xs font-medium">{formatLocalDate(e.date)}</p>
             </div>
             
             <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-50 dark:border-gray-800">
@@ -8451,6 +8451,59 @@ const WorkshopsSection = ({
     setIsWorkshopModalOpen(true);
   };
 
+  const [isExportingWorkshopsPDF, setIsExportingWorkshopsPDF] = useState(false);
+
+  const handleExportWorkshopsPDF = async () => {
+    if (workshops.length === 0) {
+      showToast('Nenhuma oficina ou capacitação cadastrada para exportar.', 'error');
+      return;
+    }
+    setIsExportingWorkshopsPDF(true);
+    try {
+      const sortedWorkshops = [...workshops].sort((a, b) => {
+        const da = a.date || '';
+        const db = b.date || '';
+        return db.localeCompare(da);
+      });
+
+      const columns = [
+        'Data',
+        'Tipo',
+        'Título da Atividade',
+        'Responsável / Facilitador',
+        'Participantes',
+        'Objetivo / Metas / Descrição',
+        'Local'
+      ];
+
+      const data = sortedWorkshops.map(w => [
+        w.date ? formatLocalDate(w.date) : '—',
+        w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina',
+        w.title || '—',
+        w.who || '—',
+        `${Array.isArray(w.participants) ? w.participants.length : 0} participante(s)`,
+        [w.what || w.description, w.why].filter(Boolean).join(' • ').replace(/\s+/g, ' ').trim() || '—',
+        w.where || 'Sede OAMI'
+      ]);
+
+      await generateModernPDF({
+        title: 'Relatório de Oficinas e Capacitações',
+        subtitle: `Total: ${workshops.length} atividades cadastradas • Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
+        columns,
+        data,
+        fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}`,
+        orientation: 'landscape'
+      });
+
+      showToast('Relatório de Oficinas e Capacitações baixado em PDF com sucesso!');
+    } catch (error) {
+      console.error('Erro ao gerar PDF de oficinas:', error);
+      showToast('Erro ao gerar relatório em PDF.', 'error');
+    } finally {
+      setIsExportingWorkshopsPDF(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -8459,6 +8512,15 @@ const WorkshopsSection = ({
           <p className="text-gray-500 text-sm">Gestão de atividades institucionais e comunitárias</p>
         </div>
         <div className="flex flex-wrap gap-3 justify-end">
+          <button 
+            onClick={handleExportWorkshopsPDF}
+            disabled={isExportingWorkshopsPDF || workshops.length === 0}
+            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            title="Baixar Relatório em PDF de Oficinas e Capacitações"
+          >
+            {isExportingWorkshopsPDF ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />}
+            Baixar Relatório (PDF)
+          </button>
           <button 
             onClick={() => setIsElderlyModalOpen(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -8496,7 +8558,7 @@ const WorkshopsSection = ({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 dark:text-gray-500">{new Date(w.date).toLocaleDateString('pt-BR')}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">{formatLocalDate(w.date)}</span>
                 <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-800 ml-2 pl-2">
                   <button onClick={() => { setSelectedWorkshop(w); setIsDetailsModalOpen(true); }} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Visualizar 👁️">
                     <Eye size={14} />
@@ -9292,7 +9354,7 @@ const WorkshopsSection = ({
                     {selectedWorkshop.type}
                   </div>
                   <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedWorkshop.title}</h3>
-                  <p className="text-sm text-gray-400 font-medium">{format(parseISO(selectedWorkshop.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  <p className="text-sm text-gray-400 font-medium">{formatLocalDate(selectedWorkshop.date, "dd 'de' MMMM 'de' yyyy")}</p>
                 </div>
                 <button 
                   onClick={() => setIsDetailsModalOpen(false)} 
@@ -10136,7 +10198,7 @@ const ProfileModal = ({
                       </div>
                       <div className="flex items-center justify-between text-[9.5px] font-medium text-gray-400 uppercase tracking-widest">
                         <span>{act.type}</span>
-                        <span>{new Date(act.date).toLocaleDateString('pt-BR')}</span>
+                        <span>{formatLocalDate(act.date)}</span>
                       </div>
                       {(() => {
                         const creatorUser = users.find(u => u.id === act.registeredBy || u.email === act.registeredBy) 

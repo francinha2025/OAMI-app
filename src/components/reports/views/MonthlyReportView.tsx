@@ -12,7 +12,8 @@ import {
   Brain,
   HeartHandshake,
   BookOpen,
-  Apple
+  Apple,
+  GraduationCap
 } from 'lucide-react';
 import { UnifiedReportItem, MonthlySummaryItem } from '../reportsTypes';
 import { buildMonthlyReportData } from '../reportsDataBuilder';
@@ -180,6 +181,17 @@ export const MonthlyReportView: React.FC<Props> = ({ items }) => {
                     </div>
                     <div className="text-xl font-black text-gray-900 dark:text-white">
                       {month.workshopsCount} <span className="text-xs font-normal text-gray-400">sessões</span>
+                    </div>
+                  </div>
+
+                  {/* Capacitações Realizadas */}
+                  <div className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/40">
+                    <div className="flex items-center justify-between text-purple-700 dark:text-purple-400 font-bold mb-1">
+                      <span>Capacitações</span>
+                      <GraduationCap size={15} />
+                    </div>
+                    <div className="text-xl font-black text-gray-900 dark:text-white">
+                      {month.trainingsCount || 0} <span className="text-xs font-normal text-gray-400">sessões</span>
                     </div>
                   </div>
 
