@@ -109,3 +109,37 @@ export async function analyzeInvoice(base64Image: string, mimeType: string): Pro
     return null;
   }
 }
+
+export async function refineCaregiverSpeech(rawText: string): Promise<string> {
+  try {
+    const response = await fetch("/api/gemini/refine-caregiver-speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: rawText }),
+    });
+    if (!response.ok) return rawText;
+    const data = await response.json();
+    return data.text || rawText;
+  } catch (err) {
+    console.warn("Could not refine speech via AI, keeping original:", err);
+    return rawText;
+  }
+}
+
+export async function transcribeCaregiverNote(base64Image: string, mimeType = "image/jpeg"): Promise<string> {
+  try {
+    const response = await fetch("/api/gemini/transcribe-caregiver-note", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64Image, mimeType }),
+    });
+    if (!response.ok) {
+      throw new Error("Erro na transcrição da foto");
+    }
+    const data = await response.json();
+    return data.text || "";
+  } catch (err) {
+    console.error("Error transcribing caregiver note:", err);
+    throw err;
+  }
+}

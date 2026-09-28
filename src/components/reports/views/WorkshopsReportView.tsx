@@ -16,16 +16,31 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UnifiedReportItem } from '../reportsTypes';
 import { formatLocalDate } from '../../../lib/utils';
-import { generateModernPDF } from '../../../lib/pdfUtils';
+import { generateWorkshopsInstitutionalPdf } from '../../../lib/workshopsPdfGenerator';
 
 interface Props {
   items: UnifiedReportItem[];
   startDate?: string;
   endDate?: string;
+  elderly?: any[];
+  communityElderly?: any[];
+  caregivers?: any[];
+  professionals?: any[];
+  users?: any[];
   onSelectItem: (item: UnifiedReportItem) => void;
 }
 
-export const WorkshopsReportView: React.FC<Props> = ({ items, startDate, endDate, onSelectItem }) => {
+export const WorkshopsReportView: React.FC<Props> = ({
+  items,
+  startDate,
+  endDate,
+  elderly = [],
+  communityElderly = [],
+  caregivers = [],
+  professionals = [],
+  users = [],
+  onSelectItem
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'ALL' | 'OFICINA' | 'CAPACITACAO'>('ALL');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
@@ -60,35 +75,17 @@ export const WorkshopsReportView: React.FC<Props> = ({ items, startDate, endDate
     if (filtered.length === 0) return;
     setIsExportingPDF(true);
     try {
-      const columns = [
-        'Data',
-        'Tipo',
-        'Título / Atividade',
-        'Responsável / Facilitador',
-        'Público / Acolhidos',
-        'Participantes',
-        'Objetivo / Metas / Relato'
-      ];
-
-      const data = filtered.map(w => [
-        w.date ? formatLocalDate(w.date) : '—',
-        w.recordType === 'CAPACITACAO' || w.sectorKey === 'CAPACITACOES' ? 'Capacitação' : 'Oficina',
-        w.title || '—',
-        w.responsible || '—',
-        w.targetOrParticipant || 'Acolhidos OAMI',
-        `${w.participantsCount || 1} participante(s)`,
-        [w.description, w.conductOrOutcome].filter(Boolean).join(' • ') || 'Atividade institucional registrada.'
-      ]);
-
-      const periodText = startDate && endDate ? `Período: ${startDate} até ${endDate} • ` : '';
-
-      await generateModernPDF({
-        title: 'Relatório de Oficinas e Capacitações',
-        subtitle: `${periodText}Total: ${filtered.length} registros • Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
-        columns,
-        data,
-        fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}`,
-        orientation: 'landscape'
+      await generateWorkshopsInstitutionalPdf({
+        workshops: filtered,
+        elderly,
+        communityElderly,
+        caregivers,
+        professionals,
+        users,
+        startDate,
+        endDate,
+        periodLabel: startDate && endDate ? `${startDate} até ${endDate}` : undefined,
+        fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`
       });
     } catch (err) {
       console.error('Erro ao gerar PDF de oficinas:', err);

@@ -71,6 +71,7 @@ interface DiaperConsumptionTabProps {
   elderly?: Elderly[];
   finalPackings?: DiaperFinalPacking[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  isCaregiverMode?: boolean;
 }
 
 const DIAPERS_PER_PACKAGE = 14;
@@ -80,8 +81,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
   user,
   elderly = [],
   finalPackings = [],
-  showToast
+  showToast,
+  isCaregiverMode = false
 }) => {
+  const isCaregiverUser = Boolean(
+    isCaregiverMode ||
+    user.role === 'CUIDADORA' ||
+    (user.role as string) === 'CUIDADOR' ||
+    user.role?.toString().toUpperCase().includes('CUIDADOR')
+  );
   const getTodayString = () => new Date().toISOString().split('T')[0];
   const getYesterdayString = () => {
     const d = new Date();
@@ -795,13 +803,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
           </div>
 
           <div className="flex flex-wrap lg:flex-col gap-2.5 shrink-0">
-            <button
-              onClick={() => setIsStockModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-gray-900 rounded-2xl font-black text-xs transition-all shadow-lg active:scale-95 border border-emerald-300"
-            >
-              <PackagePlus size={18} />
-              + Lançar Entrada de Estoque
-            </button>
+            {!isCaregiverUser && (
+              <button
+                onClick={() => setIsStockModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-gray-900 rounded-2xl font-black text-xs transition-all shadow-lg active:scale-95 border border-emerald-300"
+              >
+                <PackagePlus size={18} />
+                + Lançar Entrada de Estoque
+              </button>
+            )}
 
             <button
               onClick={() => setIsReportModalOpen(true)}
@@ -840,14 +850,16 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-              <button
-                onClick={() => setIsStockModalOpen(true)}
-                className="px-4 py-2.5 bg-white text-red-700 hover:bg-red-50 rounded-xl text-xs font-black shadow-md transition-all active:scale-95 flex items-center gap-2"
-              >
-                <PlusCircle size={16} /> Reabastecer Estoque
-              </button>
-            </div>
+            {!isCaregiverUser && (
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="px-4 py-2.5 bg-white text-red-700 hover:bg-red-50 rounded-xl text-xs font-black shadow-md transition-all active:scale-95 flex items-center gap-2"
+                >
+                  <PlusCircle size={16} /> Reabastecer Estoque
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -863,13 +875,15 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
             </h3>
           </div>
 
-          <button
-            onClick={() => setIsStockModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-xl text-xs font-bold transition-all border border-emerald-200 dark:border-emerald-800"
-          >
-            <PackagePlus size={16} />
-            + Nova Entrada de Estoque
-          </button>
+          {!isCaregiverUser && (
+            <button
+              onClick={() => setIsStockModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900 rounded-xl text-xs font-bold transition-all border border-emerald-200 dark:border-emerald-800"
+            >
+              <PackagePlus size={16} />
+              + Nova Entrada de Estoque
+            </button>
+          )}
         </div>
 
         {/* Grid de 4 Pilares do Estoque */}
@@ -998,15 +1012,17 @@ export const DiaperConsumptionTab: React.FC<DiaperConsumptionTabProps> = ({
               </p>
             </div>
 
-            <div className="pt-2">
-              <button
-                onClick={() => setIsStockModalOpen(true)}
-                className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 rounded-xl text-xs font-black transition-all shadow-xs flex items-center justify-center gap-1.5"
-              >
-                <PlusCircle size={14} />
-                {stockSummary.isLowStock ? "Reabastecer Agora" : "Adicionar Entrada"}
-              </button>
-            </div>
+            {!isCaregiverUser && (
+              <div className="pt-2">
+                <button
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="w-full py-2 bg-white text-gray-900 hover:bg-gray-100 rounded-xl text-xs font-black transition-all shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  <PlusCircle size={14} />
+                  {stockSummary.isLowStock ? "Reabastecer Agora" : "Adicionar Entrada"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

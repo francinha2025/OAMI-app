@@ -12,7 +12,8 @@ export type Role =
   | 'PROJETISTA'
   | 'AUXILIAR_ADMINISTRATIVO'
   | 'ADMIN'
-  | 'TESOUREIRA';
+  | 'TESOUREIRA'
+  | 'CUIDADORA';
 
 export interface GalleryItem {
   id: string;
@@ -577,6 +578,65 @@ export interface ShiftSchedule {
   staffMemberIds?: string[];
   observations?: string;
   activities: string;
+}
+
+export interface CaregiverShiftReport {
+  id: string;
+  date: string; // YYYY-MM-DD
+  shift: 'MANHA' | 'TARDE' | 'NOITE' | '24_HORAS';
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  caregiverId: string;
+  caregiverName: string;
+  caregiverEmail: string;
+  teamMembers: Array<{
+    id?: string;
+    name: string;
+    role?: string;
+  }>;
+  status: 'TRANQUILO' | 'COM_OCORRENCIAS' | 'INTERCORRENCIA';
+  generalNotes: string;
+  audioTranscript?: string;
+  photoTranscript?: string;
+  residentNotes: Array<{
+    elderlyId: string;
+    elderlyName: string;
+    statusTags: string[];
+    observation: string;
+  }>;
+  hasIncidents: boolean;
+  incidents: Array<{
+    elderlyId: string;
+    elderlyName: string;
+    time?: string;
+    description: string;
+    actionTaken: string;
+    notifiedPeople: string[];
+  }>;
+  diapersUsed: Array<{
+    elderlyId: string;
+    elderlyName: string;
+    size: string;
+    quantity: number;
+    time?: string;
+  }>;
+  totalDiapersCount: number;
+  isDraft: boolean;
+  createdAt: string;
+  createdByUserId: string;
+  createdByName: string;
+  createdByEmail: string;
+  finishedAt?: string;
+  updatedAt?: string;
+  updatedByUserId?: string;
+  updatedByName?: string;
+  changeLog?: Array<{
+    timestamp: string;
+    userId: string;
+    userName: string;
+    action: string;
+    details?: string;
+  }>;
 }
 
 export type StaffRole = 'CUIDADOR' | 'SERVICO_GERAIS' | 'COZINHEIRA' | 'VIGIA';

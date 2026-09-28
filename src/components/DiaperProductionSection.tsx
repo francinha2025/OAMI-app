@@ -25,7 +25,8 @@ import {
   MapPin,
   Users,
   IdCard,
-  Heart
+  Heart,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -82,6 +83,9 @@ interface DiaperProductionSectionProps {
   onSaveGoal: (data: Partial<DiaperProductionGoal>) => Promise<void>;
   onDeleteRecord: (collection: string, id: string) => Promise<void>;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  initialTab?: TabType;
+  caregiverMode?: boolean;
+  onBackToCaregivers?: () => void;
 }
 
 type TabType = 'raw' | 'wip' | 'final' | 'dashboard' | 'donations' | 'beneficiaries' | 'consumption';
@@ -102,15 +106,38 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
   onSaveFinal,
   onSaveGoal,
   onDeleteRecord,
-  showToast
+  showToast,
+  initialTab,
+  caregiverMode,
+  onBackToCaregivers
 }: DiaperProductionSectionProps) => {
+  const isCaregiver = Boolean(
+    caregiverMode ||
+    user.role === 'CUIDADORA' ||
+    (user.role as string) === 'CUIDADOR' ||
+    user.role?.toString().toUpperCase().includes('CUIDADOR')
+  );
+
   const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (isCaregiver) return 'consumption';
+    if (initialTab) return initialTab;
     const saved = localStorage.getItem('oami-diaper-tab');
     return (saved as TabType) || 'dashboard';
   });
+
   useEffect(() => {
-    localStorage.setItem('oami-diaper-tab', activeTab);
-  }, [activeTab]);
+    if (isCaregiver) {
+      setActiveTab('consumption');
+    } else if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isCaregiver, initialTab]);
+
+  useEffect(() => {
+    if (!isCaregiver) {
+      localStorage.setItem('oami-diaper-tab', activeTab);
+    }
+  }, [activeTab, isCaregiver]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1896,12 +1923,70 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
     }
   };
 
+  if (isCaregiver) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-6 pb-20">
+        {/* Banner Exclusivo: Consumo e Controle de Fraldas pelos Idosos */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 p-6 sm:p-7 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+          <div className="relative z-10 space-y-1.5">
+            <span className="px-3.5 py-1 rounded-full bg-white/20 text-white text-xs font-black uppercase tracking-wider inline-flex items-center gap-2">
+              <Heart size={14} className="text-red-200 fill-current" /> Consumo e Controle de Fraldas pelos Idosos
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+              Lançamento e Controle de Fraldas dos Acolhidos
+            </h2>
+            <p className="text-xs sm:text-sm text-emerald-100 font-medium max-w-xl">
+              Registre as trocas diárias de cada acolhido, consulte o estoque disponível e acompanhe o histórico de consumo.
+            </p>
+          </div>
+
+          {onBackToCaregivers && (
+            <button
+              type="button"
+              onClick={onBackToCaregivers}
+              className="relative z-10 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-black transition-all shadow-md active:scale-95 shrink-0"
+            >
+              <ArrowLeft size={16} />
+              <span>Voltar para o Espaço das Cuidadoras</span>
+            </button>
+          )}
+        </div>
+
+        {/* ÚNICA ABA PERMITIDA: CONSUMO DE IDOSOS */}
+        <DiaperConsumptionTab 
+          user={user} 
+          elderly={elderly}
+          finalPackings={finalPackings}
+          showToast={showToast}
+          isCaregiverMode={true}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
+      {/* Botão de Retorno para Cuidadoras */}
+      {(onBackToCaregivers || isCaregiver) && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onBackToCaregivers}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-xs font-black transition-all shadow-sm border border-emerald-100 dark:border-emerald-900/40 active:scale-95"
+          >
+            <ArrowLeft size={16} />
+            <span>Voltar para o Espaço das Cuidadoras</span>
+          </button>
+        </div>
+      )}
+
       {/* Header com Tabs */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white dark:bg-gray-900 p-2 md:p-4 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800 backdrop-blur-md sticky top-0 z-30">
         <div className="flex bg-gray-50 dark:bg-gray-800 p-1 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
-          {[
+          {(isCaregiver ? [
+            { id: 'consumption', label: 'Consumo e Controle de Fraldas pelos Idosos', icon: Heart }
+          ] : [
             { id: 'dashboard', label: 'Balanço', icon: BarChart3 },
             { id: 'consumption', label: 'Consumo Idosos', icon: Heart },
             { id: 'raw', label: 'Bruta', icon: Scissors },
@@ -1909,7 +1994,7 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
             { id: 'final', label: 'Embalagem', icon: Truck },
             { id: 'donations', label: 'Doações', icon: Package },
             { id: 'beneficiaries', label: 'Beneficiários', icon: Users }
-          ].map((tab) => (
+          ]).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as TabType)}
@@ -1921,20 +2006,22 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
               )}
             >
               <tab.icon size={18} />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="inline">{tab.label}</span>
             </button>
           ))}
         </div>
         
         <div className="hidden md:flex items-center gap-4 px-4">
           <div className="text-right">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status da Produção</p>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              {isCaregiver ? "Área de Cuidadoras" : "Status da Produção"}
+            </p>
             <p className="text-xs font-bold text-green-600 flex items-center gap-1 justify-end">
-              <CheckCircle2 size={12} /> Operacional
+              <CheckCircle2 size={12} /> {isCaregiver ? "Acesso Liberado" : "Operacional"}
             </p>
           </div>
           <div className="w-10 h-10 bg-green-50 dark:bg-green-900/20 rounded-xl flex items-center justify-center text-green-600 dark:text-green-400">
-            <Package size={20} />
+            {isCaregiver ? <Heart size={20} /> : <Package size={20} />}
           </div>
         </div>
       </div>
@@ -1947,12 +2034,12 @@ export const DiaperProductionSection: React.FC<DiaperProductionSectionProps> = (
            exit={{ opacity: 0, y: -20 }}
            transition={{ duration: 0.2 }}
         >
-          {activeTab === 'raw' && renderRawTab()}
-          {activeTab === 'wip' && renderWipTab()}
-          {activeTab === 'final' && renderFinalTab()}
-          {activeTab === 'donations' && renderDonationsTab()}
-          {activeTab === 'beneficiaries' && renderBeneficiariesTab()}
-          {activeTab === 'dashboard' && renderDashboardTab()}
+          {!isCaregiver && activeTab === 'raw' && renderRawTab()}
+          {!isCaregiver && activeTab === 'wip' && renderWipTab()}
+          {!isCaregiver && activeTab === 'final' && renderFinalTab()}
+          {!isCaregiver && activeTab === 'donations' && renderDonationsTab()}
+          {!isCaregiver && activeTab === 'beneficiaries' && renderBeneficiariesTab()}
+          {!isCaregiver && activeTab === 'dashboard' && renderDashboardTab()}
           {activeTab === 'consumption' && (
             <DiaperConsumptionTab 
               user={user} 

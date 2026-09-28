@@ -799,10 +799,27 @@
         "link": { "type": "string" }
       },
       "required": ["title", "message", "type", "date", "read"]
+    },
+    "CaregiverShiftReport": {
+      "title": "CaregiverShiftReport",
+      "description": "Daily caregiver shift reports, resident observations, incidents and diaper usage",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "shift": { "type": "string", "enum": ["MANHA", "TARDE", "NOITE", "24_HORAS"] },
+        "caregiverId": { "type": "string" },
+        "caregiverName": { "type": "string" },
+        "status": { "type": "string" },
+        "generalNotes": { "type": "string" },
+        "isDraft": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "shift", "caregiverName", "status"]
     }
   },
   "firestore": {
     "profiles": { "schema": "User", "description": "System user profiles" },
+    "caregiverShifts": { "schema": "CaregiverShiftReport", "description": "Daily caregiver shift reports" },
     "elderly": { "schema": "Elderly", "description": "Institutionalized elderly" },
     "pias": { "schema": "PIA", "description": "Care plans" },
     "evolutions": { "schema": "EvolutionRecord", "description": "Professional evolutions" },

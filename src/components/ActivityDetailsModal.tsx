@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Calendar, User, Users, Clipboard, Briefcase, FileText, Sparkles, Smile, MessageSquare, ClipboardList } from 'lucide-react';
 import { Professional, Elderly } from '../types';
 import { formatLocalDate } from '../lib/utils';
+import { resolveCollaborator } from '../lib/collaboratorResolver';
 
 interface ActivityDetailsModalProps {
   activity: {
@@ -120,11 +121,11 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
                   <div className="space-y-1">
                     <span className="text-xs text-gray-500 block">Outros Profissionais Marcados:</span>
                     <div className="flex flex-wrap gap-1.5">
-                      {coWorkers.map((cwId) => {
-                        const prof = professionals.find(p => p.id === cwId || p.email === cwId || p.name === cwId);
+                      {coWorkers.map((cwId, idx) => {
+                        const resolved = resolveCollaborator(cwId, professionals);
                         return (
-                          <span key={cwId} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-[10px] font-semibold rounded-lg border border-green-150/50 dark:border-green-900/30">
-                            {prof?.name || cwId}
+                          <span key={cwId || idx} className="px-2 py-0.5 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-[10px] font-semibold rounded-lg border border-green-150/50 dark:border-green-900/30">
+                            {resolved.name} ({resolved.role})
                           </span>
                         );
                       })}

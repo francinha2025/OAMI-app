@@ -64,7 +64,8 @@ import {
   Award,
   Boxes,
   Mail,
-  Key
+  Key,
+  HeartHandshake
 } from 'lucide-react';
 import { 
   format, 
@@ -113,12 +114,14 @@ import {
 import { cn, safeReplace, cleanData, compressImage, getProfessionalName, getProfessionalRole, formatLocalDate } from './lib/utils';
 import { TranscriptionButton } from './components/TranscriptionButton';
 import { ActivityDetailsModal } from './components/ActivityDetailsModal';
-import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, AttachedDocument, Caregiver, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
+import { Role, User, Elderly, EvolutionRecord, FinancialRecord, PIA, Donor, DiaperDonation, DiaperStock, DiaperProductionLog, FinancialDocument, CalendarEvent, Volunteer, CommunityElderly, Workshop, AttachedDocument, Caregiver, CaregiverShiftReport, Professional, PhysioPatient, PhysioAssessment, PhysioEvolution, PhysioExercise, PhysioAppointment, NursingPatient, Medication, MedicationAdministration, VitalSigns, DressingRecord, NursingEvolution, IncidentRecord, ShiftSchedule, StaffRole, StaffMember, AVDRecord, DiaperChangeRecord, PsychPatient, PsychInitialAssessment, PsychEvolution, PsychAppointment, PsychEmotionalMonitoring, PsychFamilyBond, PsychActivity, PsychCognitionAssessment, PsychInterventionPlan, PedagogyPatient, PedagogyInitialAssessment, PedagogyEvolution, PedagogyActivity, PedagogyStimulationTracking, PedagogySocialParticipation, PedagogyIndividualPlan, PedagogyLifeHistory, SocialPatient, SocialFamilyTie, SocialDocumentation, SocialLegalSituation, SocialStudy, SocialEvolution, SocialReferral, SocialFamilyVisit, SocialRiskSituation, NutritionPatient, NutritionEvolution, NutritionAnthropometry, NutritionMealPlan, DiaperRawProduction, DiaperWIPProcessing, DiaperFinalPacking, DiaperProductionGoal, DiaperBeneficiary, GalleryItem, InstitutionalInfo, FamilyEngagement, AppNotification, ProfessionalEvaluation, PresidencySupportDocument, InstitutionalSupportRecord, StockProduct, StockMovement } from './types';
 import { processAndStoreFile, downloadAttachedDocument, openAttachedDocument, deleteDocumentChunks, MAX_DOCUMENT_FILE_SIZE_LABEL } from './lib/documentStorage';
 import { MOCK_USERS, ROLE_LABELS, MOCK_GALLERY, INSTITUTION_LOGO } from './constants';
 import { generateModernPDF } from './lib/pdfUtils';
 import { generateModernWord } from './lib/wordUtils';
 import { generateModernExcel } from './lib/excelUtils';
+import { generateWorkshopsInstitutionalPdf } from './lib/workshopsPdfGenerator';
+import { resolveCollaborator } from './lib/collaboratorResolver';
 import { Table as TableIcon } from 'lucide-react';
 import { processSmartIA, AISmartCommandResult, analyzeInvoice } from './services/geminiService';
 import { db, auth, testConnection } from './firebase';
@@ -142,6 +145,7 @@ import { DigitizeButton } from './components/DigitizeButton';
 import { ProductivitySection } from './components/ProductivitySection';
 import { CameraModal } from './components/CameraModal';
 import { PhotoUpload } from './components/PhotoUpload';
+import { CaregiversSection } from './components/caregivers/CaregiversSection';
 import LogoOami from './components/LogoOami';
 import { 
   collection, 
@@ -1596,8 +1600,14 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
     {
       title: 'Operacional',
       items: [
+        { id: 'caregiversArea', label: 'Cuidadoras', icon: HeartHandshake, roles: ['ANY'] },
         { id: 'stock', label: 'Controle de Estoque', icon: Boxes, roles: ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'AUXILIAR_ADMINISTRATIVO'] },
-        { id: 'diaperProduction', label: 'Produção (SGPF)', icon: Package, roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE'] },
+        { 
+          id: 'diaperProduction', 
+          label: (user.role === 'CUIDADORA' || (user.role as string) === 'CUIDADOR' || user.role?.toString().toUpperCase().includes('CUIDADOR')) ? 'Consumo de Fraldas' : 'Produção (SGPF)', 
+          icon: Heart, 
+          roles: ['FABRICANTE_FRALDAS', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'PRESIDENTE', 'CUIDADORA', 'CUIDADOR'] 
+        },
         { id: 'workshops', label: 'Oficinas e Capacitações', icon: BookOpen, roles: ['ANY'] },
         { id: 'monitoring', label: 'Monitoramento', icon: Activity, roles: ['ADMIN', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO'] },
         { id: 'reports', label: 'Relatórios', icon: FileText, roles: ['ADMIN', 'PRESIDENTE', 'COORDENADORA', 'PROJETISTA', 'AUXILIAR_ADMINISTRATIVO', 'TESOUREIRA'] },
@@ -1660,9 +1670,18 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
 
         <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
           {menuGroups.map((group, groupIdx) => {
-            const filteredItems = group.items.filter(item => 
-              item.roles.includes('ANY') || item.roles.includes(user.role)
-            );
+            const isCaregiverUser = user.role === 'CUIDADORA' || 
+              (user.role as string) === 'CUIDADOR' || 
+              user.role?.toString().toUpperCase().includes('CUIDADOR');
+
+            const filteredItems = group.items.filter(item => {
+              if (isCaregiverUser) {
+                // Cuidadoras têm acesso restrito ao Espaço das Cuidadoras, Consumo de Fraldas, Idosos, Cronograma e Galeria
+                const allowedForCaregivers = ['caregiversArea', 'diaperProduction', 'elderly', 'schedule', 'gallery'];
+                return allowedForCaregivers.includes(item.id);
+              }
+              return item.roles.includes('ANY') || item.roles.includes(user.role);
+            });
 
             if (filteredItems.length === 0) return null;
 
@@ -8189,6 +8208,7 @@ const WorkshopsSection = ({
   caregivers, 
   elderly, 
   professionals = [], 
+  users = [],
   showToast,
   user,
   sendNotification,
@@ -8199,6 +8219,7 @@ const WorkshopsSection = ({
   caregivers: Caregiver[],
   elderly: Elderly[],
   professionals?: Professional[],
+  users?: any[],
   showToast: (msg: string, type?: 'success' | 'error') => void;
   user: User;
   sendNotification: (notification: Omit<AppNotification, 'id' | 'read' | 'date'>) => Promise<void>;
@@ -8460,42 +8481,18 @@ const WorkshopsSection = ({
     }
     setIsExportingWorkshopsPDF(true);
     try {
-      const sortedWorkshops = [...workshops].sort((a, b) => {
-        const da = a.date || '';
-        const db = b.date || '';
-        return db.localeCompare(da);
+      await generateWorkshopsInstitutionalPdf({
+        workshops,
+        elderly,
+        communityElderly,
+        caregivers,
+        professionals,
+        users,
+        periodLabel: 'Histórico Completo de Atividades',
+        fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`
       });
 
-      const columns = [
-        'Data',
-        'Tipo',
-        'Título da Atividade',
-        'Responsável / Facilitador',
-        'Participantes',
-        'Objetivo / Metas / Descrição',
-        'Local'
-      ];
-
-      const data = sortedWorkshops.map(w => [
-        w.date ? formatLocalDate(w.date) : '—',
-        w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina',
-        w.title || '—',
-        w.who || '—',
-        `${Array.isArray(w.participants) ? w.participants.length : 0} participante(s)`,
-        [w.what || w.description, w.why].filter(Boolean).join(' • ').replace(/\s+/g, ' ').trim() || '—',
-        w.where || 'Sede OAMI'
-      ]);
-
-      await generateModernPDF({
-        title: 'Relatório de Oficinas e Capacitações',
-        subtitle: `Total: ${workshops.length} atividades cadastradas • Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
-        columns,
-        data,
-        fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}`,
-        orientation: 'landscape'
-      });
-
-      showToast('Relatório de Oficinas e Capacitações baixado em PDF com sucesso!');
+      showToast('Relatório Institucional de Oficinas e Capacitações baixado em PDF com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar PDF de oficinas:', error);
       showToast('Erro ao gerar relatório em PDF.', 'error');
@@ -9405,14 +9402,12 @@ const WorkshopsSection = ({
                   <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-2xl md:col-span-2 border border-emerald-100/40 dark:border-emerald-900/10">
                     <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase mb-2">Colaboradores da Ação ({selectedWorkshop.coWorkers.length})</p>
                     <div className="flex flex-wrap gap-2">
-                      {selectedWorkshop.coWorkers.map(id => {
-                        const prof = (professionals || []).find(p => p.id === id || p.uid === id || p.email === id || p.name === id);
-                        const displayName = prof ? prof.name : getProfessionalName(id, professionals);
-                        const roleName = prof?.role ? (ROLE_LABELS[prof.role] || prof.role) : getProfessionalRole(id, professionals);
+                      {selectedWorkshop.coWorkers.map((id, idx) => {
+                        const resolved = resolveCollaborator(id, professionals, users);
                         return (
-                          <div key={id} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-xl shadow-sm text-xs border border-emerald-100/30">
-                            <span className="font-bold text-gray-700 dark:text-gray-200">{displayName}</span>
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">({roleName})</span>
+                          <div key={id || idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-xl shadow-sm text-xs border border-emerald-100/30">
+                            <span className="font-bold text-gray-700 dark:text-gray-200">{resolved.name}</span>
+                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">({resolved.role})</span>
                           </div>
                         );
                       })}
@@ -11165,6 +11160,7 @@ export default function App() {
     const saved = localStorage.getItem('oami-active-tab');
     return saved || 'dashboard';
   });
+  const [isCaregiverDiaperView, setIsCaregiverDiaperView] = useState<boolean>(false);
 
   const [tabHistory, setTabHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('oami-active-tab');
@@ -11175,6 +11171,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('oami-active-tab', activeTab);
     
+    if (activeTab !== 'diaperProduction') {
+      setIsCaregiverDiaperView(false);
+    }
+
     if (isGoingBack) {
       setIsGoingBack(false);
       return;
@@ -11318,6 +11318,7 @@ export default function App() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [communityElderly, setCommunityElderly] = useState<CommunityElderly[]>([]);
   const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
+  const [caregiverShifts, setCaregiverShifts] = useState<CaregiverShiftReport[]>([]);
   const [familyEngagements, setFamilyEngagements] = useState<FamilyEngagement[]>([]);
   const [institutionalInfo, setInstitutionalInfo] = useState<InstitutionalInfo | null>(null);
   const [presidencyDocs, setPresidencyDocs] = useState<PresidencySupportDocument[]>([]);
@@ -12484,6 +12485,7 @@ export default function App() {
     let unsubCommunityElderly = () => {};
     let unsubVolunteers = () => {};
     let unsubCaregivers = () => {};
+    let unsubCaregiverShifts = () => {};
     let unsubFamilyEngagements = () => {};
     let unsubProfessionals = () => {};
     let unsubProfessionalEvaluations = () => {};
@@ -12501,7 +12503,7 @@ export default function App() {
     const oneYearAgoStr = oneYearAgo.toISOString();
 
     // 1. Dashboard / Cronograma / General
-    if (['dashboard', 'overview', 'productivity', 'schedule', 'workshops', 'monitoring', 'reports'].includes(activeTab)) {
+    if (['dashboard', 'overview', 'productivity', 'schedule', 'workshops', 'monitoring', 'reports', 'caregiversArea'].includes(activeTab)) {
       const qEvolutions = query(
         collection(db, 'evolutions'), 
         where('date', '>=', farPastStr),
@@ -12571,8 +12573,8 @@ export default function App() {
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'physioAppointments'));
     }
 
-    // 4. Enfermagem
-    if (activeTab === 'nursing' || activeTab === 'reports') {
+    // 4. Enfermagem & Plantões
+    if (['nursing', 'caregiversArea', 'schedule', 'reports'].includes(activeTab)) {
       unsubNursingPatients = onSnapshot(query(collection(db, 'nursingPatients'), orderBy('name'), limit(100)), (snapshot) => {
         setNursingPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NursingPatient)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'nursingPatients'));
@@ -12802,8 +12804,8 @@ export default function App() {
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'professionalEvaluations'));
     }
 
-    // 14. Voluntários, Comunidade e Acompanhamento Familiar
-    if (['volunteers', 'family', 'elderly', 'reports'].includes(activeTab)) {
+    // 14. Voluntários, Comunidade e Cuidadoras
+    if (['volunteers', 'family', 'elderly', 'reports', 'caregiversArea', 'monitoring'].includes(activeTab) || user?.role === 'CUIDADORA' || (user?.role as string) === 'CUIDADOR' || user?.role?.toString().toUpperCase().includes('CUIDADOR')) {
       unsubVolunteers = onSnapshot(query(collection(db, 'volunteers'), orderBy('name'), limit(100)), (snapshot) => {
         setVolunteers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Volunteer)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'volunteers'));
@@ -12815,6 +12817,16 @@ export default function App() {
       unsubCaregivers = onSnapshot(query(collection(db, 'caregivers'), orderBy('name'), limit(100)), (snapshot) => {
         setCaregivers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Caregiver)));
       }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregivers'));
+
+      unsubCaregiverShifts = onSnapshot(query(collection(db, 'caregiverShifts'), limit(300)), (snapshot) => {
+        const shifts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CaregiverShiftReport));
+        shifts.sort((a, b) => {
+          const timeA = (a.createdAt ? new Date(a.createdAt).getTime() : 0) || (a.date ? new Date(a.date).getTime() : 0);
+          const timeB = (b.createdAt ? new Date(b.createdAt).getTime() : 0) || (b.date ? new Date(b.date).getTime() : 0);
+          return timeB - timeA;
+        });
+        setCaregiverShifts(shifts);
+      }, (err) => handleFirestoreError(err, OperationType.LIST, 'caregiverShifts'));
 
       unsubFamilyEngagements = onSnapshot(query(collection(db, 'familyEngagements'), where('date', '>=', thirtyDaysAgoStr), orderBy('date', 'desc'), limit(50)), (snapshot) => {
         setFamilyEngagements(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FamilyEngagement)));
@@ -12886,6 +12898,7 @@ export default function App() {
       unsubCommunityElderly();
       unsubVolunteers();
       unsubCaregivers();
+      unsubCaregiverShifts();
       unsubFamilyEngagements();
       unsubProfessionals();
       unsubProfessionalEvaluations();
@@ -15393,6 +15406,24 @@ export default function App() {
         />
       );
       case 'schedule': return <ScheduleSection events={calendarEvents} user={user} showConfirm={showConfirm} sendNotification={sendNotification} />;
+      case 'caregiversArea': return (
+        <CaregiversSection 
+          user={user!} 
+          elderlyList={elderly}
+          staffList={users}
+          professionalsList={combinedProfessionals}
+          shiftSchedules={shiftSchedules}
+          caregiverShifts={caregiverShifts}
+          showToast={showToast}
+          onNavigateToDiapers={() => {
+            setIsCaregiverDiaperView(true);
+            try {
+              localStorage.setItem('oami-diaper-tab', 'consumption');
+            } catch {}
+            setActiveTab('diaperProduction');
+          }}
+        />
+      );
       case 'workshops': return (
         <WorkshopsSection 
           workshops={workshops} 
@@ -15400,6 +15431,7 @@ export default function App() {
           caregivers={caregivers} 
           elderly={elderly} 
           professionals={combinedProfessionals} 
+          users={users}
           showToast={showToast} 
           user={user!}
           sendNotification={sendNotification}
@@ -15450,6 +15482,7 @@ export default function App() {
           users={users}
           caregivers={caregivers}
           volunteers={volunteers}
+          communityElderly={communityElderly}
           donors={donors}
           diaperDonations={diaperDonations}
           diaperBeneficiaries={diaperBeneficiaries}
@@ -15556,7 +15589,7 @@ export default function App() {
       case 'donors': return <TreasurySection user={user!} showToast={showToast} showConfirm={showConfirm} donors={donors} initialTab="donors" />;
       case 'diaperProduction': return (
         <DiaperProductionSection 
-          user={user}
+          user={user!}
           elderly={elderly}
           rawProductions={diaperRawProductions}
           wipProcessings={diaperWIPProcessings}
@@ -15572,6 +15605,17 @@ export default function App() {
           onSaveGoal={handleSaveDiaperProductionGoal}
           onDeleteRecord={handleDeleteDiaperRecord}
           showToast={showToast}
+          caregiverMode={
+            isCaregiverDiaperView || 
+            user?.role === 'CUIDADORA' || 
+            (user?.role as string) === 'CUIDADOR' || 
+            user?.role?.toString().toUpperCase().includes('CUIDADOR')
+          }
+          initialTab="consumption"
+          onBackToCaregivers={() => {
+            setIsCaregiverDiaperView(false);
+            setActiveTab('caregiversArea');
+          }}
         />
       );
       case 'productivity': return (
@@ -15608,7 +15652,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <div className="notranslate flex min-h-screen bg-gray-50 dark:bg-gray-950 font-sans text-gray-900 dark:text-gray-100 transition-colors duration-300" translate="no">
       <Sidebar 
         user={user} 
         activeTab={activeTab} 
@@ -15669,10 +15713,11 @@ export default function App() {
                  activeTab === 'treasury' ? 'Tesouraria' : 
                  activeTab === 'stock' ? 'Controle de Estoque' :
                  activeTab === 'donors' ? 'Doadores e Sócios' :
-                 activeTab === 'diaperProduction' ? 'Produção de Fraldas (SGPF)' : 
+                 activeTab === 'diaperProduction' ? ((isCaregiverDiaperView || user?.role === 'CUIDADORA' || (user?.role as string) === 'CUIDADOR' || user?.role?.toString().toUpperCase().includes('CUIDADOR')) ? 'Consumo e Controle de Fraldas pelos Idosos' : 'Produção de Fraldas (SGPF)') : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :
                  activeTab === 'settings' ? 'Configurações' : 
                  activeTab === 'gallery' ? 'Galeria Multidisciplinar' : 
+                 activeTab === 'caregiversArea' ? 'Espaço das Cuidadoras' : 
                  activeTab === 'reports' ? 'Relatórios & Painel Geral' : 'Institucional'}
               </h1>
               <p className="hidden md:block text-gray-500 dark:text-gray-400 mt-1">Bem-vindo ao sistema OAMI, {user.name.split(' ')[0]}.</p>

@@ -732,6 +732,11 @@ export const GeneralReportSection: React.FC<GeneralReportProps> = (props) => {
             items={filteredRecords}
             startDate={startDate}
             endDate={endDate}
+            elderly={combinedProps.elderly}
+            communityElderly={combinedProps.communityElderly}
+            caregivers={combinedProps.caregivers}
+            professionals={combinedProps.professionals}
+            users={combinedProps.users}
             onSelectItem={(item) => setSelectedItemForModal(item)}
           />
         )}

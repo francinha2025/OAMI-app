@@ -6,11 +6,18 @@ import { format } from "date-fns";
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  // Dev server must always bind to port 3000 as required by AI Studio and Nginx reverse proxy
+  const PORT = 3000;
 
   // Configure middleware with generous limits for scanning PDFs / photos
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Explicitly inform browsers that this application is strictly Brazilian Portuguese (prevents harmful auto-translation)
+  app.use((req, res, next) => {
+    res.setHeader('Content-Language', 'pt-BR');
+    next();
+  });
 
   // Helper to get GoogleGenAI client safely
   function getAIClient() {
@@ -63,6 +70,79 @@ async function startServer() {
   }
 
   // --- API ROUTES FIRST ---
+
+  // Caregiver Voice Transcript Refiner (without hallucinating)
+  app.post("/api/gemini/refine-caregiver-speech", async (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text) {
+        res.status(400).json({ error: "Texto é obrigatório" });
+        return;
+      }
+
+      const ai = getAIClient();
+      const prompt = `Você é um assistente da Casa OAMI para apoio às cuidadoras de idosos.
+A cuidadora gravou um relato por voz sobre o plantão.
+Sua ÚNICA missão é:
+1. Adicionar pontuação adequada (pontos finais, vírgulas, parágrafos quando cabível), corrigir a acentuação e pequenos erros gramaticais/fonéticos da fala, sempre na norma culta do Português do Brasil (pt-BR).
+2. NUNCA inventar fatos, diagnósticos, sintomas, medicações, nomes ou acontecimentos que a cuidadora NÃO falou.
+3. Preserve fielmente o vocabulário, o tom acolhedor e o sentido original do relato.
+Retorne APENAS o texto final transcrito e corrigido em Português do Brasil, sem saudações ou comentários.
+
+TEXTO FALADO PELA CUIDADORA:
+${text}`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: "gemini-3.8-flash",
+        contents: [{ parts: [{ text: prompt }] }],
+      });
+
+      res.json({ text: response.text ? response.text.trim() : text });
+    } catch (error: any) {
+      console.error("Error in refine-caregiver-speech:", error);
+      res.status(500).json({ error: error.message || "Erro interno do servidor" });
+    }
+  });
+
+  // Caregiver Handwritten/Paper Note Photo OCR
+  app.post("/api/gemini/transcribe-caregiver-note", async (req, res) => {
+    try {
+      const { base64Image, mimeType } = req.body;
+      if (!base64Image) {
+        res.status(400).json({ error: "base64Image é obrigatório" });
+        return;
+      }
+
+      const ai = getAIClient();
+      const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
+
+      const imagePart = {
+        inlineData: {
+          mimeType: mimeType || "image/jpeg",
+          data: cleanBase64,
+        },
+      };
+
+      const prompt = `Você é um assistente de OCR da Casa OAMI.
+A cuidadora tirou uma foto de uma anotação em papel ou caderno de plantão.
+Sua missão:
+1. Extraia e transcreva com máxima fidelidade todo o texto escrito à mão ou impresso visível na anotação, na norma padrão do Português do Brasil (pt-BR).
+2. Preserve a estrutura em parágrafos e a organização original das anotações.
+3. Corrija eventuais falhas evidentes de digitalização de caracteres, respeitando as palavras reais escritas.
+4. NUNCA invente informações não escritas no papel.
+5. Retorne APENAS o texto extraído em Português do Brasil, sem introdução, explicações ou aspas.`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: "gemini-3.8-flash",
+        contents: [imagePart, { text: prompt }],
+      });
+
+      res.json({ text: response.text ? response.text.trim() : "" });
+    } catch (error: any) {
+      console.error("Error in transcribe-caregiver-note:", error);
+      res.status(500).json({ error: error.message || "Erro interno do servidor" });
+    }
+  });
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -355,8 +435,12 @@ Retorne APENAS um objeto JSON válido correspondente ao esquema solicitado.`;
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`[Server] running on http://localhost:${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+  });
+
+  server.on("error", (err: any) => {
+    console.error("[Server] Error in HTTP server:", err);
   });
 }
 

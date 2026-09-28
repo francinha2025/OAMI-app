@@ -28,6 +28,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   AUXILIAR_ADMINISTRATIVO: 'Auxiliar Administrativo',
   ADMIN: 'Administrador',
   TESOUREIRA: 'Tesoureira',
+  CUIDADORA: 'Cuidadora',
 };
 
 // Adicione aqui a URL ou Base64 do seu timbrado (Logo)
