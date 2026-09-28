@@ -40,7 +40,8 @@ import {
   Receipt,
   Trash2,
   Pencil,
-  Tag
+  Tag,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   collection, 
@@ -78,6 +79,8 @@ interface StockSectionProps {
   user: User;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
   showConfirm: (message: string, onConfirm: () => void) => void;
+  caregiverMode?: boolean;
+  onBackToCaregivers?: () => void;
 }
 
 export const CATEGORIES = [
@@ -224,10 +227,21 @@ const UNITS = [
 
 const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
 
-export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, showConfirm }) => {
+export const StockSection: React.FC<StockSectionProps> = ({ 
+  user, 
+  showToast, 
+  showConfirm,
+  caregiverMode,
+  onBackToCaregivers 
+}) => {
   // Check Access Role
-  const allowedRoles = ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'TESOURARIA', 'AUXILIAR_ADMINISTRATIVO'];
-  const hasAccess = allowedRoles.includes(user.role);
+  const isCaregiver = caregiverMode || 
+    user.role === 'CUIDADORA' || 
+    (user.role as string) === 'CUIDADOR' || 
+    user.role?.toString().toUpperCase().includes('CUIDADOR');
+
+  const allowedRoles = ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'TESOURARIA', 'AUXILIAR_ADMINISTRATIVO', 'CUIDADORA'];
+  const hasAccess = allowedRoles.includes(user.role) || isCaregiver;
 
   if (!hasAccess) {
     return (
@@ -237,7 +251,7 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
         </div>
         <h2 className="text-2xl font-black text-gray-800 dark:text-white">Acesso Restrito ao Controle de Estoque</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
-          Este módulo é restrito para os perfis de Presidente, Coordenadora, Tesouraria e Auxiliar Administrativo.
+          Este módulo é restrito para os perfis de Presidente, Coordenadora, Tesouraria, Auxiliar Administrativo e Cuidadoras.
         </p>
       </div>
     );
@@ -1704,6 +1718,20 @@ export const StockSection: React.FC<StockSectionProps> = ({ user, showToast, sho
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Botão de Retorno para Cuidadoras */}
+      {(onBackToCaregivers || isCaregiver) && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onBackToCaregivers}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-xs font-black transition-all shadow-sm border border-emerald-100 dark:border-emerald-900/40 active:scale-95"
+          >
+            <ArrowLeft size={16} />
+            <span>Voltar para o Espaço das Cuidadoras</span>
+          </button>
+        </div>
+      )}
+
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 dark:from-emerald-900 dark:to-teal-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none p-6">

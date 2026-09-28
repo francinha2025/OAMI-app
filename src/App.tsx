@@ -1601,7 +1601,7 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
       title: 'Operacional',
       items: [
         { id: 'caregiversArea', label: 'Cuidadoras', icon: HeartHandshake, roles: ['ANY'] },
-        { id: 'stock', label: 'Controle de Estoque', icon: Boxes, roles: ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'AUXILIAR_ADMINISTRATIVO'] },
+        { id: 'stock', label: 'Controle de Estoque', icon: Boxes, roles: ['PRESIDENTE', 'COORDENADORA', 'TESOUREIRA', 'AUXILIAR_ADMINISTRATIVO', 'CUIDADORA', 'CUIDADOR'] },
         { 
           id: 'diaperProduction', 
           label: (user.role === 'CUIDADORA' || (user.role as string) === 'CUIDADOR' || user.role?.toString().toUpperCase().includes('CUIDADOR')) ? 'Consumo de Fraldas' : 'Produção (SGPF)', 
@@ -1676,8 +1676,8 @@ const Sidebar = ({ user, activeTab, setActiveTab, onLogout, onOpenProfile, isOpe
 
             const filteredItems = group.items.filter(item => {
               if (isCaregiverUser) {
-                // Cuidadoras têm acesso restrito ao Espaço das Cuidadoras, Consumo de Fraldas, Idosos, Cronograma e Galeria
-                const allowedForCaregivers = ['caregiversArea', 'diaperProduction', 'elderly', 'schedule', 'gallery'];
+                // Cuidadoras têm acesso ao Espaço das Cuidadoras, Consumo de Fraldas, Idosos, Cronograma, Galeria e Estoque
+                const allowedForCaregivers = ['caregiversArea', 'diaperProduction', 'elderly', 'schedule', 'gallery', 'stock'];
                 return allowedForCaregivers.includes(item.id);
               }
               return item.roles.includes('ANY') || item.roles.includes(user.role);
@@ -11161,6 +11161,7 @@ export default function App() {
     return saved || 'dashboard';
   });
   const [isCaregiverDiaperView, setIsCaregiverDiaperView] = useState<boolean>(false);
+  const [isCaregiverStockView, setIsCaregiverStockView] = useState<boolean>(false);
 
   const [tabHistory, setTabHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('oami-active-tab');
@@ -11173,6 +11174,9 @@ export default function App() {
     
     if (activeTab !== 'diaperProduction') {
       setIsCaregiverDiaperView(false);
+    }
+    if (activeTab !== 'stock') {
+      setIsCaregiverStockView(false);
     }
 
     if (isGoingBack) {
@@ -15384,7 +15388,23 @@ export default function App() {
       );
       case 'financial': return <FinancialSection financialRecords={financialRecords} user={user!} showToast={showToast} />;
       case 'treasury': return <TreasurySection user={user!} showToast={showToast} showConfirm={showConfirm} donors={donors} />;
-      case 'stock': return <StockSection user={user!} showToast={showToast} showConfirm={showConfirm} />;
+      case 'stock': return (
+        <StockSection 
+          user={user!} 
+          showToast={showToast} 
+          showConfirm={showConfirm} 
+          caregiverMode={
+            isCaregiverStockView || 
+            user?.role === 'CUIDADORA' || 
+            (user?.role as string) === 'CUIDADOR' || 
+            user?.role?.toString().toUpperCase().includes('CUIDADOR')
+          }
+          onBackToCaregivers={() => {
+            setIsCaregiverStockView(false);
+            setActiveTab('caregiversArea');
+          }}
+        />
+      );
       case 'presidency_support': return <PresidencySupportSection documents={presidencyDocs} user={user!} showToast={showToast} />;
       case 'institutional_support': return <InstitutionalSupportSection records={institutionalRecords} user={user!} showToast={showToast} />;
       case 'institutional': return <InstitutionalSection institutionalInfo={institutionalInfo} />;
@@ -15421,6 +15441,10 @@ export default function App() {
               localStorage.setItem('oami-diaper-tab', 'consumption');
             } catch {}
             setActiveTab('diaperProduction');
+          }}
+          onNavigateToStock={() => {
+            setIsCaregiverStockView(true);
+            setActiveTab('stock');
           }}
         />
       );
@@ -15711,7 +15735,7 @@ export default function App() {
                  activeTab === 'professional' ? 'Avaliação & Monitoramento' : 
                  activeTab === 'financial' ? 'Financeiro' : 
                  activeTab === 'treasury' ? 'Tesouraria' : 
-                 activeTab === 'stock' ? 'Controle de Estoque' :
+                 activeTab === 'stock' ? ((isCaregiverStockView || user?.role === 'CUIDADORA' || (user?.role as string) === 'CUIDADOR' || user?.role?.toString().toUpperCase().includes('CUIDADOR')) ? 'Controle de Estoque & Materiais' : 'Controle de Estoque') :
                  activeTab === 'donors' ? 'Doadores e Sócios' :
                  activeTab === 'diaperProduction' ? ((isCaregiverDiaperView || user?.role === 'CUIDADORA' || (user?.role as string) === 'CUIDADOR' || user?.role?.toString().toUpperCase().includes('CUIDADOR')) ? 'Consumo e Controle de Fraldas pelos Idosos' : 'Produção de Fraldas (SGPF)') : 
                  activeTab === 'adminAssistant' ? 'Painel Auxiliar Administrativo' :

@@ -4,7 +4,7 @@ import {
   Calendar, Clock, User as UserIcon, Users, CheckCircle2, 
   AlertTriangle, Eye, Download, Search, Filter, RefreshCw,
   Sparkles, ShieldCheck, ArrowRight, ChevronRight, FileText,
-  Edit3, Trash2
+  Edit3, Trash2, Boxes
 } from 'lucide-react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -27,6 +27,7 @@ interface CaregiversSectionProps {
   caregiverShifts: CaregiverShiftReport[];
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onNavigateToDiapers?: () => void;
+  onNavigateToStock?: () => void;
 }
 
 export const CaregiversSection: React.FC<CaregiversSectionProps> = ({
@@ -37,7 +38,8 @@ export const CaregiversSection: React.FC<CaregiversSectionProps> = ({
   shiftSchedules = [],
   caregiverShifts = [],
   showToast,
-  onNavigateToDiapers
+  onNavigateToDiapers,
+  onNavigateToStock
 }) => {
   // Navegação interna
   const [activeSubTab, setActiveSubTab] = useState<'HOME' | 'HISTORY'>('HOME');
@@ -295,6 +297,35 @@ export const CaregiversSection: React.FC<CaregiversSectionProps> = ({
                 </h3>
                 <p className="text-xs sm:text-sm text-blue-100 font-medium mt-1">
                   Acesse o Consumo e Controle de Fraldas pelos Idosos, estoque e registros de trocas.
+                </p>
+              </div>
+            </button>
+
+            {/* 3. CONTROLE DE ESTOQUE & INSUMOS */}
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigateToStock) {
+                  onNavigateToStock();
+                }
+              }}
+              className="group text-left p-6 sm:p-7 rounded-[2rem] bg-gradient-to-br from-teal-500 via-teal-600 to-emerald-700 text-white shadow-xl hover:shadow-2xl hover:scale-[1.01] active:scale-[0.99] transition-all flex flex-col justify-between min-h-[170px] relative overflow-hidden border border-teal-400/30"
+            >
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-15 pointer-events-none group-hover:scale-110 transition-transform">
+                <Boxes size={140} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-3xl">📦</span>
+                <span className="px-3 py-1 rounded-full bg-white/20 text-white text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5">
+                  Controle de Estoque <ArrowRight size={13} />
+                </span>
+              </div>
+              <div className="mt-4">
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight">
+                  ESTOQUE & INSUMOS
+                </h3>
+                <p className="text-xs sm:text-sm text-teal-100 font-medium mt-1">
+                  Cadastre produtos, registre entradas e saídas de materiais e acompanhe o almoxarifado.
                 </p>
               </div>
             </button>
