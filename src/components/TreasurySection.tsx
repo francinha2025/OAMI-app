@@ -8,6 +8,7 @@ import {
   Trash2,
   Pencil,
   FileText, 
+  FilePlus,
   Printer,
   Heart,
   UserCheck,
@@ -15,6 +16,7 @@ import {
   PieChart as PieChartIcon,
   BarChart3,
   CheckCheck,
+  CheckCircle2,
   Package,
   ShoppingBag,
   Home,
@@ -226,6 +228,9 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     phone: '',
     observations: '',
     saveAsDonor: true,
+    generateReceipt: false, // Por padrão NÃO gera automaticamente o recibo
+    downloadPdfAfterSave: false,
+    generateReceiptPdf: false,
     // Stock Integration fields
     addToStock: true,
     stockProductId: 'NEW',
@@ -236,6 +241,7 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     stockMinQuantity: '5'
   });
 
+  const [lastSavedDonation, setLastSavedDonation] = useState<TreasuryTransaction | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<TreasuryTransaction | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -613,45 +619,50 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
 
     setSubmitting(true);
     try {
-      const receiptNum = nextReceiptNumber;
+      const shouldGenerateReceipt = !!(revenueForm.generateReceipt || revenueForm.generateReceiptPdf);
+      const receiptNum = shouldGenerateReceipt ? nextReceiptNumber : null;
       const chosenCategory = isMaterial
         ? revenueForm.materialCategory
         : (revenueForm.category === 'Outra Contribuição' && revenueForm.customCategory ? revenueForm.customCategory : revenueForm.category);
 
       const nowIso = new Date().toISOString();
 
-      // 1. Create Receipt Document in treasury_receipts
-      const receiptDocRef = await addDoc(collection(db, 'treasury_receipts'), {
-        receiptNumber: receiptNum,
-        date: revenueForm.date,
-        amount: amountVal,
-        paymentMethod: isMaterial ? 'DOACAO_EM_BENS' : revenueForm.paymentMethod,
-        category: chosenCategory,
-        description: isMaterial 
-          ? (revenueForm.itemDetails.trim() || `Doação de materiais: ${chosenCategory}`)
-          : (revenueForm.description || `Doação de ${revenueForm.payerName.trim()} - Casa OAMI`),
-        payerName: revenueForm.payerName.trim(),
-        cpf: revenueForm.cpf?.trim() || null,
-        registeredBy: user.name,
-        observations: revenueForm.observations?.trim() || null,
-        createdAt: nowIso,
-        status: 'ATIVO',
-        donorId: revenueForm.selectedDonorId || null,
-        donationType: revenueForm.donationType,
-        finality: isMaterial ? revenueForm.destination : revenueForm.finality,
-        donationKind: revenueForm.donationKind,
-        materialCategory: isMaterial ? revenueForm.materialCategory : null,
-        itemDetails: isMaterial ? revenueForm.itemDetails.trim() : null,
-        quantityOrVolume: isMaterial ? revenueForm.quantityOrVolume.trim() : null,
-        itemCondition: isMaterial ? revenueForm.itemCondition : null,
-        estimatedValue: isMaterial ? amountVal : null,
-        destination: isMaterial ? revenueForm.destination : null
-      });
+      // 1. Create Receipt Document in treasury_receipts ONLY IF shouldGenerateReceipt is true
+      let receiptDocRefId: string | null = null;
+      if (shouldGenerateReceipt && receiptNum) {
+        const receiptDocRef = await addDoc(collection(db, 'treasury_receipts'), cleanData({
+          receiptNumber: receiptNum,
+          date: revenueForm.date,
+          amount: amountVal,
+          paymentMethod: isMaterial ? 'DOACAO_EM_BENS' : revenueForm.paymentMethod,
+          category: chosenCategory,
+          description: isMaterial 
+            ? (revenueForm.itemDetails.trim() || `Doação de materiais: ${chosenCategory}`)
+            : (revenueForm.description || `Doação de ${revenueForm.payerName.trim()} - Casa OAMI`),
+          payerName: revenueForm.payerName.trim(),
+          cpf: revenueForm.cpf?.trim() || null,
+          registeredBy: user.name,
+          observations: revenueForm.observations?.trim() || null,
+          createdAt: nowIso,
+          status: 'ATIVO',
+          donorId: revenueForm.selectedDonorId || null,
+          donationType: revenueForm.donationType,
+          finality: isMaterial ? revenueForm.destination : revenueForm.finality,
+          donationKind: revenueForm.donationKind,
+          materialCategory: isMaterial ? revenueForm.materialCategory : null,
+          itemDetails: isMaterial ? revenueForm.itemDetails.trim() : null,
+          quantityOrVolume: isMaterial ? revenueForm.quantityOrVolume.trim() : null,
+          itemCondition: isMaterial ? revenueForm.itemCondition : null,
+          estimatedValue: isMaterial ? amountVal : null,
+          destination: isMaterial ? revenueForm.destination : null
+        }));
+        receiptDocRefId = receiptDocRef.id;
+      }
 
       // 2. Create Transaction Document in treasury_transactions
-      await addDoc(collection(db, 'treasury_transactions'), {
+      const txDocRef = await addDoc(collection(db, 'treasury_transactions'), cleanData({
         type: 'RECEITA',
-        receiptId: receiptDocRef.id,
+        receiptId: receiptDocRefId,
         receiptNumber: receiptNum,
         date: revenueForm.date,
         amount: amountVal,
@@ -677,7 +688,7 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         itemCondition: isMaterial ? revenueForm.itemCondition : null,
         estimatedValue: isMaterial ? amountVal : null,
         destination: isMaterial ? revenueForm.destination : null
-      });
+      }));
 
       // 3. Update or Add Donor record if requested or linked
       if (revenueForm.selectedDonorId) {
@@ -715,6 +726,10 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
       if (isMaterial && revenueForm.addToStock) {
         const qtyToAdd = parseFloat(revenueForm.stockQuantity) || 1;
         if (qtyToAdd > 0) {
+          const notesText = receiptNum 
+            ? `Entrada via Doação de Material (Recibo #${receiptNum}) - ${revenueForm.itemDetails || revenueForm.materialCategory}`
+            : `Entrada via Doação de Material - ${revenueForm.itemDetails || revenueForm.materialCategory}`;
+
           if (revenueForm.stockProductId === 'NEW') {
             const prodName = revenueForm.stockProductName.trim() || revenueForm.itemDetails.trim() || revenueForm.materialCategory;
             const newProdCode = `EST-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -744,13 +759,13 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
               stockAfter: qtyToAdd,
               supplier: `Doador: ${revenueForm.payerName.trim()}`,
               responsible: user.name,
-              notes: `Entrada via Doação de Material (Recibo #${receiptNum}) - ${revenueForm.itemDetails || prodName}`,
+              notes: notesText,
               date: revenueForm.date,
               timestamp: nowIso,
               origin: 'DOACAO',
               estimatedValue: amountVal,
               donorName: revenueForm.payerName.trim(),
-              financialTransactionId: receiptDocRef.id
+              financialTransactionId: txDocRef.id
             });
             stockEntrySummary = ` (Com entrada automática no Estoque: +${qtyToAdd} ${revenueForm.stockProductUnit || 'unidades'} em "${prodName}")`;
           } else {
@@ -774,13 +789,13 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                 stockAfter: stockAfter,
                 supplier: `Doador: ${revenueForm.payerName.trim()}`,
                 responsible: user.name,
-                notes: `Entrada via Doação de Material (Recibo #${receiptNum}) - ${revenueForm.itemDetails || targetProd.name}`,
+                notes: notesText,
                 date: revenueForm.date,
                 timestamp: nowIso,
                 origin: 'DOACAO',
                 estimatedValue: amountVal,
                 donorName: revenueForm.payerName.trim(),
-                financialTransactionId: receiptDocRef.id
+                financialTransactionId: txDocRef.id
               });
               stockEntrySummary = ` (Com entrada automática no Estoque: +${qtyToAdd} ${targetProd.unit} em "${targetProd.name}")`;
             }
@@ -791,32 +806,41 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
       // 4. System Log
       await logSystemEvent(
         isMaterial ? 'LANÇAMENTO DE DOAÇÃO DE MATERIAL' : 'LANÇAMENTO DE DOAÇÃO',
-        isMaterial
-          ? `Doação de material (${chosenCategory}) ${receiptNum} registrada para ${revenueForm.payerName.trim()}${stockEntrySummary}`
-          : `Doação ${receiptNum} de R$ ${amountVal.toFixed(2)} registrada para ${revenueForm.payerName.trim()}`,
+        receiptNum
+          ? `Doação ${receiptNum} de ${revenueForm.payerName.trim()} registrada com emissão de recibo oficial${stockEntrySummary}`
+          : `Doação de ${revenueForm.payerName.trim()} registrada sem emissão de recibo${stockEntrySummary}`,
         { receiptNumber: receiptNum, amount: amountVal, donor: revenueForm.payerName.trim(), donationKind: revenueForm.donationKind }
       );
 
-      // 5. Generate PDF Receipt
-      await generateTreasuryReceiptPDF({
-        receiptNumber: receiptNum,
-        date: revenueForm.date,
-        amount: amountVal,
-        paymentMethod: isMaterial ? 'Doação em Bens/Insumos' : revenueForm.paymentMethod,
-        category: chosenCategory,
-        description: isMaterial ? revenueForm.itemDetails.trim() : (revenueForm.description || `Doação - Casa OAMI (${revenueForm.finality})`),
-        payerName: revenueForm.payerName.trim(),
-        cpf: revenueForm.cpf.trim() || undefined,
-        registeredBy: user.name,
-        observations: revenueForm.observations.trim() || undefined,
-        donationKind: revenueForm.donationKind,
-        itemDetails: revenueForm.itemDetails.trim(),
-        quantityOrVolume: revenueForm.quantityOrVolume.trim(),
-        itemCondition: revenueForm.itemCondition,
-        destination: revenueForm.destination
-      });
+      // 5. Generate PDF Receipt only if explicitly requested
+      if (shouldGenerateReceipt && receiptNum) {
+        if (revenueForm.downloadPdfAfterSave || revenueForm.generateReceiptPdf) {
+          await generateTreasuryReceiptPDF({
+            receiptNumber: receiptNum,
+            date: revenueForm.date,
+            amount: amountVal,
+            paymentMethod: isMaterial ? 'Doação em Bens/Insumos' : revenueForm.paymentMethod,
+            category: chosenCategory,
+            description: isMaterial ? revenueForm.itemDetails.trim() : (revenueForm.description || `Doação - Casa OAMI (${revenueForm.finality})`),
+            payerName: revenueForm.payerName.trim(),
+            cpf: revenueForm.cpf.trim() || undefined,
+            registeredBy: user.name,
+            observations: revenueForm.observations.trim() || undefined,
+            donationKind: revenueForm.donationKind,
+            itemDetails: revenueForm.itemDetails.trim(),
+            quantityOrVolume: revenueForm.quantityOrVolume.trim(),
+            itemCondition: revenueForm.itemCondition,
+            destination: revenueForm.destination
+          });
+          showToast(`Doação registrada e Recibo Oficial Nº ${receiptNum} baixado em PDF!`, 'success');
+        } else {
+          showToast(`Doação registrada e Recibo Oficial Nº ${receiptNum} gerado com sucesso!`, 'success');
+        }
+      } else {
+        showToast(`Doação de ${revenueForm.payerName.trim()} registrada com sucesso na Tesouraria!`, 'success');
+      }
 
-      showToast(`Doação ${receiptNum} registrada com sucesso e recibo PDF gerado!`, 'success');
+      setLastSavedDonation(null);
 
       // Reset Form
       setRevenueForm({
@@ -842,6 +866,9 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         phone: '',
         observations: '',
         saveAsDonor: true,
+        generateReceipt: false, // Default: FALSE
+        downloadPdfAfterSave: false,
+        generateReceiptPdf: false,
         addToStock: true,
         stockProductId: 'NEW',
         stockProductName: '',
@@ -997,12 +1024,93 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
     }
   };
 
-  // Download PDF for existing Receipt
+  // Gerar Recibo Oficial sob demanda para uma doação que ainda não possui recibo
+  const handleGenerateReceiptForTransaction = async (tx: TreasuryTransaction) => {
+    try {
+      setSubmitting(true);
+      const receiptNum = nextReceiptNumber;
+      const nowIso = new Date().toISOString();
+      const isMat = tx.donationKind === 'MATERIAL' || !!tx.materialCategory;
+      const amountVal = Number(tx.estimatedValue || tx.amount) || 0;
+
+      // 1. Criar registro oficial em treasury_receipts
+      const receiptDocRef = await addDoc(collection(db, 'treasury_receipts'), cleanData({
+        receiptNumber: receiptNum,
+        date: tx.date,
+        amount: amountVal,
+        paymentMethod: isMat ? 'DOACAO_EM_BENS' : tx.paymentMethod,
+        category: tx.category,
+        description: tx.description,
+        payerName: tx.payerOrFavored,
+        cpf: tx.cpf || null,
+        registeredBy: user.name,
+        observations: tx.observations || null,
+        createdAt: nowIso,
+        status: 'ATIVO',
+        donorId: tx.donorId || null,
+        donationType: tx.donationType || 'EVENTUAL',
+        finality: tx.finality || 'Livre Destinação',
+        donationKind: tx.donationKind || (isMat ? 'MATERIAL' : 'FINANCIAL'),
+        materialCategory: tx.materialCategory || null,
+        itemDetails: tx.itemDetails || null,
+        quantityOrVolume: tx.quantityOrVolume || null,
+        itemCondition: tx.itemCondition || null,
+        estimatedValue: tx.estimatedValue || null,
+        destination: tx.destination || null
+      }));
+
+      // 2. Atualizar transação com o número e ID do recibo
+      await updateDoc(doc(db, 'treasury_transactions', tx.id), {
+        receiptId: receiptDocRef.id,
+        receiptNumber: receiptNum,
+        updatedAt: nowIso
+      });
+
+      // 3. Registrar log do sistema
+      await logSystemEvent(
+        'EMISSÃO DE RECIBO OFICIAL',
+        `Recibo oficial ${receiptNum} emitido sob demanda para o lançamento de ${tx.payerOrFavored} (R$ ${amountVal.toFixed(2)})`,
+        { transactionId: tx.id, receiptNumber: receiptNum, amount: amountVal }
+      );
+
+      // 4. Gerar e baixar o PDF do recibo
+      await generateTreasuryReceiptPDF({
+        receiptNumber: receiptNum,
+        date: tx.date,
+        amount: amountVal,
+        paymentMethod: isMat ? 'Doação em Bens/Insumos' : tx.paymentMethod,
+        category: tx.category,
+        description: tx.description,
+        payerName: tx.payerOrFavored,
+        cpf: tx.cpf,
+        registeredBy: user.name,
+        observations: tx.observations,
+        donationKind: isMat ? 'MATERIAL' : 'FINANCIAL',
+        itemDetails: tx.itemDetails || tx.description,
+        quantityOrVolume: tx.quantityOrVolume,
+        itemCondition: tx.itemCondition,
+        destination: tx.destination || tx.finality
+      });
+
+      showToast(`Recibo Oficial Nº ${receiptNum} gerado com sucesso e baixado em PDF!`, 'success');
+    } catch (err: any) {
+      console.error('Erro ao gerar recibo oficial:', err);
+      showToast('Erro ao emitir recibo: ' + (err.message || ''), 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Download PDF para recibo existente (ou gera recibo oficial sob demanda)
   const handleDownloadPDF = async (tx: TreasuryTransaction) => {
+    if (!tx.receiptNumber) {
+      await handleGenerateReceiptForTransaction(tx);
+      return;
+    }
     try {
       const isMat = tx.donationKind === 'MATERIAL' || !!tx.materialCategory;
       await generateTreasuryReceiptPDF({
-        receiptNumber: tx.receiptNumber || 'REC-0000',
+        receiptNumber: tx.receiptNumber,
         date: tx.date,
         amount: Number(tx.estimatedValue || tx.amount) || 0,
         paymentMethod: isMat ? 'Doação em Bens/Insumos' : tx.paymentMethod,
@@ -1018,7 +1126,7 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
         itemCondition: tx.itemCondition,
         destination: tx.destination || tx.finality
       });
-      showToast('Recibo de doação em PDF gerado com sucesso.', 'success');
+      showToast(`Recibo Oficial Nº ${tx.receiptNumber} baixado em PDF com sucesso!`, 'success');
     } catch (e) {
       console.error("Error downloading receipt PDF:", e);
       showToast('Erro ao gerar PDF do recibo.', 'error');
@@ -1541,7 +1649,13 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                     {transactions.slice(0, 5).map(t => (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                         <td className="py-3 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {t.receiptNumber || '-'}
+                          {t.receiptNumber ? (
+                            `#${t.receiptNumber}`
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                              Sem Recibo
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
                           {t.date.split('-').reverse().join('/')}
@@ -1559,16 +1673,28 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                           + {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                         <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleDownloadPDF(t)}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
-                            title="Baixar Recibo PDF"
-                          >
-                            <Printer size={16} />
-                          </button>
+                          {t.receiptNumber ? (
+                            <button
+                              onClick={() => handleDownloadPDF(t)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 rounded-lg transition-colors border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer"
+                              title="Baixar Recibo Oficial em PDF"
+                            >
+                              <FileText size={13} />
+                              <span>Recibo</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleGenerateReceiptForTransaction(t)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 rounded-lg transition-colors border border-indigo-200/60 dark:border-indigo-800/40 cursor-pointer"
+                              title="Gerar Recibo Oficial para esta doação"
+                            >
+                              <FilePlus size={13} />
+                              <span>Gerar Recibo</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenEditModal(t)}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
                             title="Editar Lançamento"
                           >
                             <Pencil size={16} />
@@ -2171,22 +2297,100 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
               </div>
             </div>
 
-            <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-gray-700">
+            {/* Opção de Geração de Recibo Oficial */}
+            <div className={`p-4 rounded-2xl border transition-colors ${
+              revenueForm.generateReceipt 
+                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800' 
+                : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700'
+            }`}>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                    revenueForm.generateReceipt 
+                      ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300' 
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                  }`}>
+                    <FileText size={20} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-800 dark:text-gray-100 block">
+                      Emissão de Recibo Oficial (Opcional)
+                    </span>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {revenueForm.generateReceipt 
+                        ? `Será emitido o Recibo Oficial Nº ${nextReceiptNumber} no sistema.`
+                        : 'O recibo NÃO é gerado automaticamente. Marque a opção para gerar a numeração oficial agora, ou gere mais tarde pelo Histórico.'}
+                    </span>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none self-end sm:self-auto bg-white dark:bg-gray-900 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm hover:border-emerald-500 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={revenueForm.generateReceipt}
+                    onChange={(e) => setRevenueForm(prev => ({ 
+                      ...prev, 
+                      generateReceipt: e.target.checked,
+                      generateReceiptPdf: e.target.checked,
+                      downloadPdfAfterSave: e.target.checked ? prev.downloadPdfAfterSave : false
+                    }))}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    Gerar Recibo Oficial
+                  </span>
+                </label>
+              </div>
+
+              {revenueForm.generateReceipt && (
+                <div className="mt-3 pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-2">
+                  <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={revenueForm.downloadPdfAfterSave}
+                      onChange={(e) => setRevenueForm(prev => ({ ...prev, downloadPdfAfterSave: e.target.checked, generateReceiptPdf: e.target.checked }))}
+                      className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="font-medium">Baixar arquivo PDF do recibo após salvar</span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 flex flex-col sm:flex-row justify-end items-center gap-3 border-t border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => setActiveTab('overview')}
-                className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-bold text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 font-bold text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               >
                 Cancelar
               </button>
+
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 cursor-pointer"
               >
-                <Printer size={16} />
-                {submitting ? 'Registrando...' : (revenueForm.donationKind === 'MATERIAL' ? 'Salvar Doação de Material e Emitir Comprovante PDF' : 'Salvar Doação e Emitir Recibo PDF')}
+                <CheckCircle2 size={16} />
+                {submitting ? 'Registrando...' : (revenueForm.donationKind === 'MATERIAL' ? 'Salvar Doação de Material' : 'Salvar Doação')}
               </button>
+
+              {!revenueForm.generateReceipt && (
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={(e) => {
+                    setRevenueForm(prev => ({ ...prev, generateReceipt: true, generateReceiptPdf: true, downloadPdfAfterSave: true }));
+                    const form = (e.currentTarget.closest('form') as HTMLFormElement);
+                    if (form) form.requestSubmit();
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Salvar a doação e emitir recibo oficial em PDF"
+                >
+                  <FileText size={15} />
+                  Salvar e Gerar Recibo PDF
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -2287,7 +2491,13 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                     {materialList.map(t => (
                       <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                         <td className="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
-                          {t.receiptNumber || '-'}
+                          {t.receiptNumber ? (
+                            `#${t.receiptNumber}`
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                              Sem Recibo
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-gray-600 dark:text-gray-300">
                           {t.date.split('-').reverse().join('/')}
@@ -2316,16 +2526,28 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                             : 'N/A'}
                         </td>
                         <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleDownloadPDF(t)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
-                            title="Baixar Comprovante em PDF"
-                          >
-                            <Printer size={16} />
-                          </button>
+                          {t.receiptNumber ? (
+                            <button
+                              onClick={() => handleDownloadPDF(t)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 rounded-lg transition-colors border border-blue-200/60 dark:border-blue-800/40 cursor-pointer"
+                              title="Baixar Comprovante Oficial em PDF"
+                            >
+                              <FileText size={13} />
+                              <span>Recibo</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleGenerateReceiptForTransaction(t)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 rounded-lg transition-colors border border-indigo-200/60 dark:border-indigo-800/40 cursor-pointer"
+                              title="Gerar Recibo Oficial para esta doação de material"
+                            >
+                              <FilePlus size={13} />
+                              <span>Gerar Recibo</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => handleOpenEditModal(t)}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
                             title="Editar Lançamento"
                           >
                             <Pencil size={16} />
@@ -2431,7 +2653,13 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                   {filteredTransactions.map(t => (
                     <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                       <td className="py-3.5 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {t.receiptNumber || '-'}
+                        {t.receiptNumber ? (
+                          `#${t.receiptNumber}`
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                            Sem Recibo
+                          </span>
+                        )}
                       </td>
                       <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300">
                         {t.date.split('-').reverse().join('/')}
@@ -2449,16 +2677,28 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                         + {Number(t.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
                       <td className="py-3.5 px-4 text-center flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleDownloadPDF(t)}
-                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
-                          title="Baixar Recibo PDF"
-                        >
-                          <Printer size={16} />
-                        </button>
+                        {t.receiptNumber ? (
+                          <button
+                            onClick={() => handleDownloadPDF(t)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 rounded-lg transition-colors border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer"
+                            title="Baixar Recibo Oficial em PDF"
+                          >
+                            <FileText size={13} />
+                            <span>Recibo</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleGenerateReceiptForTransaction(t)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 rounded-lg transition-colors border border-indigo-200/60 dark:border-indigo-800/40 cursor-pointer"
+                            title="Gerar Recibo Oficial para esta doação"
+                          >
+                            <FilePlus size={13} />
+                            <span>Gerar Recibo</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => handleOpenEditModal(t)}
-                          className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                          className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
                           title="Editar Lançamento"
                         >
                           <Pencil size={16} />
@@ -2757,14 +2997,15 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                         <td className="py-3 px-4 text-center flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleDownloadPDF(t)}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors"
-                            title="Baixar Recibo PDF"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 rounded-lg transition-colors border border-emerald-200/60 dark:border-emerald-800/40 cursor-pointer"
+                            title="Gerar / Baixar Recibo PDF"
                           >
-                            <Printer size={16} />
+                            <FileText size={13} />
+                            <span>Recibo</span>
                           </button>
                           <button
                             onClick={() => handleOpenEditModal(t)}
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors"
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
                             title="Editar Lançamento"
                           >
                             <Pencil size={16} />
@@ -3013,25 +3254,126 @@ export const TreasurySection: React.FC<TreasurySectionProps> = ({ user, showToas
                 />
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-gray-800">
+              <div className="pt-3 flex items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800">
                 <button
                   type="button"
-                  onClick={() => { setIsEditModalOpen(false); setEditingTransaction(null); }}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  onClick={() => {
+                    if (editingTransaction) handleDownloadPDF(editingTransaction);
+                  }}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title={editingTransaction?.receiptNumber ? "Baixar o recibo oficial desta doação" : "Gerar e emitir o recibo oficial desta doação"}
                 >
-                  Cancelar
+                  <FileText size={15} />
+                  {editingTransaction?.receiptNumber ? 'Baixar Recibo PDF' : 'Gerar Recibo Oficial (PDF)'}
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                >
-                  <CheckCheck size={16} />
-                  {submitting ? 'Salvando...' : 'Salvar Alterações'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setIsEditModalOpen(false); setEditingTransaction(null); }}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    <CheckCheck size={16} />
+                    {submitting ? 'Salvando...' : 'Salvar Alterações'}
+                  </button>
+                </div>
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL / DIALOG: OPÇÃO DE GERAR RECIBO APÓS SALVAR DOAÇÃO */}
+      {lastSavedDonation && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[95] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100 dark:border-gray-800 space-y-5 animate-in zoom-in-95 duration-200 my-auto">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 size={32} />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white">
+                Doação Registrada com Sucesso!
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                O registro foi gravado no sistema com a numeração oficial:
+              </p>
+              <div className="inline-block px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-emerald-700 dark:text-emerald-300 font-mono font-black text-sm mt-1">
+                {lastSavedDonation.receiptNumber || 'REC-OAMI'}
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-800 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Doador / Contribuinte:</span>
+                <span className="font-bold text-gray-800 dark:text-gray-200 truncate max-w-[200px]">{lastSavedDonation.payerOrFavored}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Valor / Estimado:</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400">
+                  {Number(lastSavedDonation.amount || lastSavedDonation.estimatedValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Modalidade:</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {lastSavedDonation.donationKind === 'MATERIAL' ? 'Doação Física / Material' : 'Doação Financeira'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Data do Lançamento:</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{lastSavedDonation.date.split('-').reverse().join('/')}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleDownloadPDF(lastSavedDonation);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer"
+              >
+                <FileText size={18} />
+                Gerar Recibo Oficial em PDF
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLastSavedDonation(null);
+                    setActiveTab('new-revenue');
+                  }}
+                  className="py-2.5 px-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold text-xs transition-colors text-center cursor-pointer"
+                >
+                  Nova Doação
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const kind = lastSavedDonation.donationKind;
+                    setLastSavedDonation(null);
+                    if (kind === 'MATERIAL') {
+                      setActiveTab('material-donations');
+                    } else {
+                      setActiveTab('history');
+                    }
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold text-xs transition-colors text-center cursor-pointer"
+                >
+                  Ver no Histórico
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

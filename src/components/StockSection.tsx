@@ -264,9 +264,10 @@ export const StockSection: React.FC<StockSectionProps> = ({
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters State
+  // Filters State - Products
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('TODAS');
+  const [productsGroupBy, setProductsGroupBy] = useState<'CATEGORY' | 'FLAT'>('CATEGORY');
   const [selectedStatus, setSelectedStatus] = useState<'TODOS' | 'ATIVO' | 'INATIVO'>('ATIVO');
   const [quickFilter, setQuickFilter] = useState<'ALL' | 'LOW' | 'EXPIRED' | 'NEAR' | 'ZERO'>('ALL');
 
@@ -274,6 +275,8 @@ export const StockSection: React.FC<StockSectionProps> = ({
   const [movementSearch, setMovementSearch] = useState('');
   const [movementTypeFilter, setMovementTypeFilter] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS');
   const [movementOriginFilter, setMovementOriginFilter] = useState<'TODOS' | 'COMPRA' | 'DOACAO'>('TODOS');
+  const [movementCategoryFilter, setMovementCategoryFilter] = useState<string>('TODAS');
+  const [movementGroupBy, setMovementGroupBy] = useState<'CATEGORY' | 'FLAT'>('CATEGORY');
 
   // Modals
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -282,6 +285,7 @@ export const StockSection: React.FC<StockSectionProps> = ({
   const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
   const [movementType, setMovementType] = useState<'ENTRADA' | 'SAIDA'>('ENTRADA');
   const [selectedProductForMovement, setSelectedProductForMovement] = useState<StockProduct | null>(null);
+  const [modalProductSearch, setModalProductSearch] = useState('');
   const [selectedMovementForDetails, setSelectedMovementForDetails] = useState<StockMovement | null>(null);
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
 
@@ -540,6 +544,12 @@ export const StockSection: React.FC<StockSectionProps> = ({
     return activeProducts.reduce((sum, p) => sum + (p.quantity * (p.unitPrice || 0)), 0);
   }, [activeProducts]);
 
+  // Helper to find category of a product
+  const getProductCategory = (productId: string, productName?: string) => {
+    const found = products.find(p => p.id === productId || (productName && p.name.toLowerCase() === productName.toLowerCase()));
+    return found?.category || 'Outros';
+  };
+
   // Report Specific Memos (Categorized & Filtered)
   const reportProducts = useMemo(() => {
     let baseList: StockProduct[] = [];
@@ -580,13 +590,55 @@ export const StockSection: React.FC<StockSectionProps> = ({
     });
   }, [reportProducts, reportType]);
 
+  // Grouped Movements by Category (For Period Movements Report)
+  const reportGroupedMovementsByCategory = useMemo(() => {
+    if (reportType !== 'MOVEMENTS') return [];
+
+    const activeStart = reportPeriodInfo.startDate;
+    const activeEnd = reportPeriodInfo.endDate;
+    const periodMovements = movements.filter(m => {
+      if (!m.date) return false;
+      const inDate = m.date >= activeStart && m.date <= activeEnd;
+      if (!inDate) return false;
+      const cat = (m as any).category || getProductCategory(m.productId, m.productName);
+      if (reportCategoryFilter !== 'TODAS' && cat !== reportCategoryFilter) return false;
+      return true;
+    });
+
+    const categoriesPresent = Array.from(new Set(periodMovements.map(m => (m as any).category || getProductCategory(m.productId, m.productName)))).sort();
+
+    return categoriesPresent.map(cat => {
+      const catMovements = periodMovements.filter(m => ((m as any).category || getProductCategory(m.productId, m.productName)) === cat);
+      const totalEntradas = catMovements.filter(m => m.type === 'ENTRADA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+      const totalSaidas = catMovements.filter(m => m.type === 'SAIDA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+      const saldoLiquido = totalEntradas - totalSaidas;
+
+      return {
+        category: cat,
+        movements: catMovements,
+        movementsCount: catMovements.length,
+        totalEntradas,
+        totalSaidas,
+        saldoLiquido
+      };
+    });
+  }, [reportType, movements, reportPeriodInfo, reportCategoryFilter, products]);
+
   const reportOverallTotals = useMemo(() => {
     if (reportType === 'MOVEMENTS') {
       const activeStart = reportPeriodInfo.startDate;
       const activeEnd = reportPeriodInfo.endDate;
-      const periodMovements = movements.filter(m => m.date && m.date >= activeStart && m.date <= activeEnd);
+      const periodMovements = movements.filter(m => {
+        if (!m.date) return false;
+        const inDate = m.date >= activeStart && m.date <= activeEnd;
+        if (!inDate) return false;
+        const cat = (m as any).category || getProductCategory(m.productId, m.productName);
+        if (reportCategoryFilter !== 'TODAS' && cat !== reportCategoryFilter) return false;
+        return true;
+      });
       const totalEntradas = periodMovements.filter(m => m.type === 'ENTRADA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
       const totalSaidas = periodMovements.filter(m => m.type === 'SAIDA').reduce((a, b) => a + (Number(b.quantity) || 0), 0);
+      const distinctCats = new Set(periodMovements.map(m => (m as any).category || getProductCategory(m.productId, m.productName))).size;
       return {
         totalMovements: periodMovements.length,
         totalEntradas,
@@ -594,7 +646,7 @@ export const StockSection: React.FC<StockSectionProps> = ({
         totalItems: periodMovements.length,
         totalQuantity: totalEntradas - totalSaidas,
         totalValue: 0,
-        totalCategories: 0
+        totalCategories: distinctCats
       };
     }
 
@@ -610,7 +662,7 @@ export const StockSection: React.FC<StockSectionProps> = ({
       totalSaidas: 0,
       totalMovements: 0
     };
-  }, [reportProducts, reportGroupedByCategory, reportType, movements, reportPeriodInfo]);
+  }, [reportProducts, reportGroupedByCategory, reportType, movements, reportPeriodInfo, reportCategoryFilter, products]);
 
   // Displayed Products for the Alert Manager
   const displayedAlertProducts = useMemo(() => {
@@ -684,6 +736,23 @@ export const StockSection: React.FC<StockSectionProps> = ({
     });
   }, [products, selectedStatus, selectedCategory, quickFilter, searchTerm, todayStr, in30DaysStr]);
 
+  // Grouped Products by Category (For Products / Movements launching Tab)
+  const productsGroupedByCategory = useMemo(() => {
+    const categoriesPresent = Array.from(new Set(filteredProducts.map(p => p.category || 'Outros'))).sort();
+    return categoriesPresent.map(category => {
+      const items = filteredProducts.filter(p => (p.category || 'Outros') === category);
+      const totalQuantity = items.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0);
+      const totalEstimatedValue = items.reduce((acc, p) => acc + ((Number(p.quantity) || 0) * (Number(p.unitPrice) || 0)), 0);
+      return {
+        category,
+        items,
+        itemsCount: items.length,
+        totalQuantity,
+        totalEstimatedValue
+      };
+    });
+  }, [filteredProducts]);
+
   // Filtered Movements
   const filteredMovements = useMemo(() => {
     return movements.filter(m => {
@@ -692,12 +761,16 @@ export const StockSection: React.FC<StockSectionProps> = ({
       if (movementOriginFilter === 'COMPRA' && m.origin !== 'COMPRA') return false;
       if (movementOriginFilter === 'DOACAO' && m.origin !== 'DOACAO') return false;
 
+      const cat = (m as any).category || getProductCategory(m.productId, m.productName);
+      if (movementCategoryFilter !== 'TODAS' && cat !== movementCategoryFilter) return false;
+
       if (movementSearch.trim()) {
         const term = movementSearch.toLowerCase();
         return (
           m.productName.toLowerCase().includes(term) ||
           m.productCode.toLowerCase().includes(term) ||
           m.responsible.toLowerCase().includes(term) ||
+          cat.toLowerCase().includes(term) ||
           (m.destination && m.destination.toLowerCase().includes(term)) ||
           (m.supplier && m.supplier.toLowerCase().includes(term)) ||
           (m.donorName && m.donorName.toLowerCase().includes(term)) ||
@@ -706,7 +779,42 @@ export const StockSection: React.FC<StockSectionProps> = ({
       }
       return true;
     });
-  }, [movements, movementTypeFilter, movementOriginFilter, movementSearch]);
+  }, [movements, movementTypeFilter, movementOriginFilter, movementCategoryFilter, movementSearch, products]);
+
+  // Grouped Movements by Category (For Movements Tab)
+  const movementsGroupedByCategory = useMemo(() => {
+    const categoriesPresent = Array.from(new Set(filteredMovements.map(m => (m as any).category || getProductCategory(m.productId, m.productName)))).sort();
+    return categoriesPresent.map(category => {
+      const items = filteredMovements.filter(m => ((m as any).category || getProductCategory(m.productId, m.productName)) === category);
+      const totalEntradas = items.filter(m => m.type === 'ENTRADA').reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
+      const totalSaidas = items.filter(m => m.type === 'SAIDA').reduce((acc, m) => acc + (Number(m.quantity) || 0), 0);
+      const saldoLiquido = totalEntradas - totalSaidas;
+      return {
+        category,
+        items,
+        itemsCount: items.length,
+        totalEntradas,
+        totalSaidas,
+        saldoLiquido
+      };
+    });
+  }, [filteredMovements, products]);
+
+  // Filtered Products for Movement Modal Select
+  const modalFilteredProducts = useMemo(() => {
+    if (!modalProductSearch.trim()) return activeProducts;
+    const term = modalProductSearch.toLowerCase();
+    return activeProducts.filter(p =>
+      p.name.toLowerCase().includes(term) ||
+      (p.code && p.code.toLowerCase().includes(term)) ||
+      (p.category && p.category.toLowerCase().includes(term)) ||
+      (p.supplier && p.supplier.toLowerCase().includes(term))
+    );
+  }, [activeProducts, modalProductSearch]);
+
+  const modalCategoriesPresent = useMemo(() => {
+    return Array.from(new Set(modalFilteredProducts.map(p => p.category || 'Outros'))).sort();
+  }, [modalFilteredProducts]);
 
   // Open Create Product Modal
   const handleOpenCreateModal = () => {
@@ -833,7 +941,8 @@ export const StockSection: React.FC<StockSectionProps> = ({
   // Open Movement Modal
   const handleOpenMovementModal = (prod?: StockProduct, type: 'ENTRADA' | 'SAIDA' = 'ENTRADA') => {
     setMovementType(type);
-    const targetProd = prod || (activeProducts.length > 0 ? activeProducts[0] : null);
+    setModalProductSearch('');
+    const targetProd = prod || null;
     setSelectedProductForMovement(targetProd);
 
     const initialUnitPrice = targetProd && targetProd.unitPrice ? String(targetProd.unitPrice) : '';
@@ -1247,8 +1356,81 @@ export const StockSection: React.FC<StockSectionProps> = ({
         subtitle = `Período: ${reportPeriodInfo.label} • Emitido por ${user.name}`;
       }
 
-      // CATEGORIZED EXPORT (For Inventory, Low Stock, Expired)
-      if (reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS') {
+      // CATEGORIZED EXPORT (For Movements, Inventory, Low Stock, Expired)
+      if (reportGroupBy === 'CATEGORY') {
+        if (reportType === 'MOVEMENTS') {
+          if (reportGroupedMovementsByCategory.length === 0) {
+            showToast('Nenhuma movimentação encontrada para os filtros selecionados.', 'info');
+            return;
+          }
+
+          const sections = reportGroupedMovementsByCategory.map(group => {
+            const sectionColumns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd Mov.', 'Saldo Ant.', 'Saldo Pós', 'Origem / Destino', 'Responsável'];
+            const sectionData = group.movements.map(m => [
+              m.date ? m.date.split('-').reverse().join('/') : '-',
+              m.type,
+              m.productCode || 'S/C',
+              m.productName,
+              m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`,
+              m.stockBefore,
+              m.stockAfter,
+              m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I'),
+              m.responsible
+            ]);
+
+            // Subtotal Row for this Category
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.movementsCount} movimentações`,
+              '-',
+              '-',
+              `Entradas: +${group.totalEntradas} | Saídas: -${group.totalSaidas} (Saldo: ${group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un)`,
+              '-',
+              '-',
+              '-',
+              '-'
+            ]);
+
+            const theme = getCategoryTheme(group.category);
+            return {
+              title: `CATEGORIA: ${group.category.toUpperCase()} (${group.movementsCount} movimentações • Entradas: +${group.totalEntradas} un • Saídas: -${group.totalSaidas} un • Saldo Líquido: ${group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un)`,
+              columns: sectionColumns,
+              data: sectionData,
+              color: theme.pdfColor,
+              bannerBgColor: theme.pdfBgColor,
+              textColor: theme.pdfTextColor
+            };
+          });
+
+          // Consolidated Total Section
+          sections.push({
+            title: 'RESUMO CONSOLIDADO DE MOVIMENTAÇÕES DO PERÍODO',
+            columns: ['Categorias Ativas', 'Total de Movimentações', 'Total de Entradas (+)', 'Total de Saídas (-)', 'Saldo Líquido do Período'],
+            data: [
+              [
+                `${reportOverallTotals.totalCategories} categorias`,
+                `${reportOverallTotals.totalMovements} movimentações`,
+                `+${reportOverallTotals.totalEntradas} un`,
+                `-${reportOverallTotals.totalSaidas} un`,
+                `${reportOverallTotals.totalQuantity >= 0 ? `+${reportOverallTotals.totalQuantity}` : reportOverallTotals.totalQuantity} un`
+              ]
+            ],
+            color: [15, 23, 42],
+            bannerBgColor: [241, 245, 249],
+            textColor: [15, 23, 42]
+          });
+
+          await generateMultiSectionPDF({
+            title,
+            subtitle,
+            sections,
+            fileName: `Relatorio_Movimentacoes_Categorizado_${new Date().toISOString().substring(0, 10)}.pdf`,
+            orientation: 'landscape'
+          });
+          showToast('Relatório em PDF gerado com sucesso!', 'success');
+          return;
+        }
+
         if (reportGroupedByCategory.length === 0) {
           showToast('Nenhum produto encontrado para os filtros selecionados.', 'info');
           return;
@@ -1521,7 +1703,70 @@ export const StockSection: React.FC<StockSectionProps> = ({
         subtitle = `Período: ${reportPeriodInfo.label} • Emitido por ${user.name}`;
       }
 
-      if (reportGroupBy === 'CATEGORY' && reportType !== 'MOVEMENTS') {
+      if (reportGroupBy === 'CATEGORY') {
+        if (reportType === 'MOVEMENTS') {
+          if (reportGroupedMovementsByCategory.length === 0) {
+            showToast('Nenhuma movimentação encontrada para os filtros selecionados.', 'info');
+            return;
+          }
+
+          const sections = reportGroupedMovementsByCategory.map(group => {
+            const sectionColumns = ['Data', 'Tipo', 'Código', 'Produto', 'Qtd Mov.', 'Saldo Ant.', 'Saldo Pós', 'Origem / Destino', 'Responsável'];
+            const sectionData = group.movements.map(m => [
+              m.date ? m.date.split('-').reverse().join('/') : '-',
+              m.type,
+              m.productCode || 'S/C',
+              m.productName,
+              m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`,
+              m.stockBefore,
+              m.stockAfter,
+              m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I'),
+              m.responsible
+            ]);
+
+            sectionData.push([
+              `SUBTOTAL: ${group.category.toUpperCase()}`,
+              `${group.movementsCount} movimentações`,
+              '-',
+              '-',
+              `Entradas: +${group.totalEntradas} | Saídas: -${group.totalSaidas} (Saldo: ${group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un)`,
+              '-',
+              '-',
+              '-',
+              '-'
+            ]);
+
+            return {
+              title: `CATEGORIA: ${group.category.toUpperCase()} (${group.movementsCount} movimentações • Entradas: +${group.totalEntradas} un • Saídas: -${group.totalSaidas} un • Saldo Líquido: ${group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un)`,
+              columns: sectionColumns,
+              data: sectionData
+            };
+          });
+
+          sections.push({
+            title: 'RESUMO CONSOLIDADO DE MOVIMENTAÇÕES DO PERÍODO',
+            columns: ['Categorias Ativas', 'Total de Movimentações', 'Total de Entradas (+)', 'Total de Saídas (-)', 'Saldo Líquido do Período'],
+            data: [
+              [
+                `${reportOverallTotals.totalCategories} categorias`,
+                `${reportOverallTotals.totalMovements} movimentações`,
+                `+${reportOverallTotals.totalEntradas} un`,
+                `-${reportOverallTotals.totalSaidas} un`,
+                `${reportOverallTotals.totalQuantity >= 0 ? `+${reportOverallTotals.totalQuantity}` : reportOverallTotals.totalQuantity} un`
+              ]
+            ]
+          });
+
+          await generateMultiSectionWord({
+            title,
+            subtitle,
+            sections,
+            fileName: `Relatorio_Movimentacoes_Categorizado_${new Date().toISOString().substring(0, 10)}.docx`
+          });
+          showToast('Relatório em Word gerado com sucesso!', 'success');
+          return;
+        }
+
         if (reportGroupedByCategory.length === 0) {
           showToast('Nenhum produto encontrado para os filtros selecionados.', 'info');
           return;
@@ -1790,24 +2035,24 @@ export const StockSection: React.FC<StockSectionProps> = ({
 
         <button
           onClick={() => setActiveTab('products')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTab === 'products'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
         >
-          <Package size={16} /> Catálogo de Produtos ({activeProducts.length})
+          <Package size={16} /> Catálogo & Lançar Entradas e Saídas ({activeProducts.length})
         </button>
 
         <button
           onClick={() => setActiveTab('movements')}
-          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 whitespace-nowrap ${
+          className={`px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTab === 'movements'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
         >
-          <History size={16} /> Histórico de Movimentações ({movements.length})
+          <History size={16} /> Movimentações por Período & Histórico ({movements.length})
         </button>
 
         <button
@@ -2306,52 +2551,127 @@ export const StockSection: React.FC<StockSectionProps> = ({
         <div className="space-y-6 animate-in fade-in duration-200">
           
           {/* SEARCH & FILTERS BAR */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
             
-            {/* Search input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Pesquisar por nome, código, categoria ou fornecedor..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              {/* Search input */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Pesquisar por nome, código, categoria ou fornecedor..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status Filter */}
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value as any)}
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="ATIVO">Status: Ativos</option>
+                  <option value="INATIVO">Status: Inativos</option>
+                  <option value="TODOS">Status: Todos</option>
+                </select>
+
+                {/* Add Product Button */}
+                <button
+                  onClick={handleOpenCreateModal}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={16} /> Novo Produto
+                </button>
+
+                {/* Quick Movement Launch Buttons */}
+                <button
+                  onClick={() => handleOpenMovementModal(undefined, 'ENTRADA')}
+                  className="bg-emerald-600/90 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Registrar Entrada (+) no estoque"
+                >
+                  <ArrowDownLeft size={16} /> Lançar Entrada (+)
+                </button>
+
+                <button
+                  onClick={() => handleOpenMovementModal(undefined, 'SAIDA')}
+                  className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Registrar Saída (-) do estoque"
+                >
+                  <ArrowUpRight size={16} /> Lançar Saída (-)
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Category Filter */}
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="TODAS">Todas Categorias</option>
-                {CATEGORIES.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            {/* MODO DE AGRUPAMENTO DOS PRODUTOS & FILTRAR CATEGORIA ESPECÍFICA */}
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              
+              {/* Modo de Agrupamento */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                  Modo de Agrupamento dos Produtos:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProductsGroupBy('CATEGORY')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      productsGroupBy === 'CATEGORY'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Layers size={15} />
+                    Separar por Categoria (com Faixas e Subtotais)
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setProductsGroupBy('FLAT')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      productsGroupBy === 'FLAT'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText size={15} />
+                    Listagem Contínua Geral
+                  </button>
+                </div>
+              </div>
 
-              {/* Status Filter */}
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="ATIVO">Status: Ativos</option>
-                <option value="INATIVO">Status: Inativos</option>
-                <option value="TODOS">Status: Todos</option>
-              </select>
+              {/* Filtrar Categoria Específica */}
+              <div className="space-y-1.5 w-full md:w-auto">
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                  Filtrar Categoria Específica:
+                </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full md:w-64 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                  >
+                    <option value="TODAS">📁 Todas as Categorias (Consolidado)</option>
+                    {CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>🏷️ {cat}</option>
+                    ))}
+                  </select>
+                  {selectedCategory !== 'TODAS' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCategory('TODAS')}
+                      className="text-xs text-gray-400 hover:text-red-500 underline font-bold whitespace-nowrap cursor-pointer"
+                    >
+                      Limpar filtro
+                    </button>
+                  )}
+                </div>
+              </div>
 
-              {/* Add Product Button */}
-              <button
-                onClick={handleOpenCreateModal}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
-              >
-                <Plus size={16} /> Novo Produto
-              </button>
             </div>
+
           </div>
 
           {/* QUICK ALERTS FILTER CHIPS */}
@@ -2414,211 +2734,478 @@ export const StockSection: React.FC<StockSectionProps> = ({
             </button>
           </div>
 
-          {/* PRODUCTS TABLE LIST */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
-                  <tr>
-                    <th className="py-3.5 px-4">Código / Produto</th>
-                    <th className="py-3.5 px-4">Categoria</th>
-                    <th className="py-3.5 px-4">Localização</th>
-                    <th className="py-3.5 px-4 text-center">Saldo Atual</th>
-                    <th className="py-3.5 px-4 text-center">Estoque Mínimo</th>
-                    <th className="py-3.5 px-4">Fornecedor</th>
-                    <th className="py-3.5 px-4">Validade / Lote</th>
-                    <th className="py-3.5 px-4 text-center">Status</th>
-                    <th className="py-3.5 px-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {filteredProducts.map(p => {
-                    const isLow = p.quantity < p.minQuantity && p.quantity > 0;
-                    const isZero = p.quantity === 0;
-                    const isExpired = p.expirationDate && p.expirationDate < todayStr;
-                    const isNearExpiry = p.expirationDate && p.expirationDate >= todayStr && p.expirationDate <= in30DaysStr;
+          {/* CATEGORIZED PRODUCTS VIEW */}
+          {productsGroupBy === 'CATEGORY' && (
+            <div className="space-y-8">
+              {productsGroupedByCategory.map((group) => {
+                const theme = getCategoryTheme(group.category);
 
-                    return (
-                      <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
-                        
-                        {/* Name & Code */}
-                        <td className="py-3.5 px-4">
-                          <div className="font-extrabold text-gray-900 dark:text-white text-sm">{p.name}</div>
-                          <div className="text-[10px] text-gray-400 font-mono flex items-center gap-2 mt-0.5">
-                            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{p.code}</span>
-                            <span>{p.unit}</span>
+                return (
+                  <div key={group.category} className={`rounded-3xl overflow-hidden border ${theme.border} shadow-lg transition-all`}>
+                    
+                    {/* CATEGORY COLOR BANNER */}
+                    <div className={`p-4 sm:p-5 ${theme.bannerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+                      <div className="flex items-center gap-3.5">
+                        <div className={`p-2.5 rounded-2xl shadow-inner ${theme.iconBg} backdrop-blur-md`}>
+                          <Tag size={22} className="stroke-[2.5]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/80 bg-black/20 px-2 py-0.5 rounded-md backdrop-blur-xs">
+                              Setor / Categoria
+                            </span>
                           </div>
-                        </td>
+                          <h3 className="text-lg sm:text-xl font-black tracking-wide uppercase text-white mt-0.5 drop-shadow-xs">
+                            {group.category}
+                          </h3>
+                        </div>
+                      </div>
 
-                        {/* Category */}
-                        <td className="py-3.5 px-4 font-semibold text-gray-700 dark:text-gray-300">
-                          {p.category}
-                        </td>
+                      {/* Category Badges Summary */}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <span className="px-3.5 py-1.5 bg-black/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/20 shadow-xs flex items-center gap-1.5">
+                          📦 <span>{group.itemsCount} produtos</span>
+                        </span>
+                        <span className="px-3.5 py-1.5 bg-white/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                          🔢 <span>Qtd Total: {group.totalQuantity} un</span>
+                        </span>
+                        <span className="px-4 py-1.5 bg-white text-gray-950 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5">
+                          💰 <span>Total: {group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </span>
+                      </div>
+                    </div>
 
-                        {/* Location */}
-                        <td className="py-3.5 px-4 text-gray-600 dark:text-gray-400 font-medium">
-                          <div className="flex items-center gap-1">
-                            <MapPin size={12} className="text-gray-400" />
-                            {p.location}
-                          </div>
-                        </td>
+                    {/* CATEGORY PRODUCTS TABLE */}
+                    <div className="overflow-x-auto p-2 sm:p-4 bg-white dark:bg-gray-800">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
+                          <tr>
+                            <th className="py-3 px-3">Código / Produto</th>
+                            <th className="py-3 px-3">Localização</th>
+                            <th className="py-3 px-3 text-center">Saldo Atual</th>
+                            <th className="py-3 px-3 text-center">Estoque Mínimo</th>
+                            <th className="py-3 px-3">Fornecedor</th>
+                            <th className="py-3 px-3">Validade / Lote</th>
+                            <th className="py-3 px-3 text-center">Status</th>
+                            <th className="py-3 px-3 text-right">Lançar Movimentação & Ações</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                          {group.items.map(p => {
+                            const isLow = p.quantity < p.minQuantity && p.quantity > 0;
+                            const isZero = p.quantity === 0;
+                            const isExpired = p.expirationDate && p.expirationDate < todayStr;
+                            const isNearExpiry = p.expirationDate && p.expirationDate >= todayStr && p.expirationDate <= in30DaysStr;
 
-                        {/* Quantity */}
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`inline-block px-3 py-1 rounded-xl font-black text-xs ${
-                            isZero
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                              : isLow
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          }`}>
-                            {p.quantity} {p.unit}s
-                          </span>
-                        </td>
+                            return (
+                              <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                                
+                                {/* Name & Code */}
+                                <td className="py-3 px-3">
+                                  <div className="font-extrabold text-gray-900 dark:text-white text-sm">{p.name}</div>
+                                  <div className="text-[10px] text-gray-400 font-mono flex items-center gap-2 mt-0.5">
+                                    <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{p.code}</span>
+                                    <span>{p.unit}</span>
+                                  </div>
+                                </td>
 
-                        {/* Min Quantity */}
-                        <td className="py-3.5 px-4 text-center font-bold text-gray-500">
-                          {editingMinQuantityId === p.id ? (
-                            <div className="flex items-center justify-center gap-1">
-                              <input
-                                type="number"
-                                min="0"
-                                value={tempMinQuantity}
-                                onChange={(e) => setTempMinQuantity(Number(e.target.value))}
-                                className="w-16 p-1 text-center bg-white dark:bg-gray-800 border border-emerald-500 rounded-lg text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleUpdateMinQuantity(p.id, tempMinQuantity)}
-                                disabled={savingMinId === p.id}
-                                className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                                title="Salvar Estoque Mínimo"
-                              >
-                                <CheckCircle2 size={14} />
-                              </button>
-                              <button
-                                onClick={() => setEditingMinQuantityId(null)}
-                                className="p-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-                                title="Cancelar"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setEditingMinQuantityId(p.id);
-                                setTempMinQuantity(p.minQuantity);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group"
-                              title="Clique para editar o estoque mínimo de alerta deste produto"
-                            >
-                              <span>{p.minQuantity}</span>
-                              <Edit size={12} className="text-gray-400 group-hover:text-emerald-600 transition-colors" />
-                            </button>
-                          )}
-                        </td>
+                                {/* Location */}
+                                <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-medium">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin size={12} className="text-gray-400" />
+                                    {p.location}
+                                  </div>
+                                </td>
 
-                        {/* Supplier */}
-                        <td className="py-3.5 px-4 text-gray-600 dark:text-gray-400 font-medium">
-                          {p.supplier || '—'}
-                        </td>
+                                {/* Quantity */}
+                                <td className="py-3 px-3 text-center">
+                                  <span className={`inline-block px-3 py-1 rounded-xl font-black text-xs ${
+                                    isZero
+                                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                      : isLow
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                  }`}>
+                                    {p.quantity} {p.unit}s
+                                  </span>
+                                </td>
 
-                        {/* Expiration & Batch */}
-                        <td className="py-3.5 px-4">
-                          {p.expirationDate ? (
-                            <div>
-                              <span className={`font-bold text-[11px] ${
-                                isExpired
-                                  ? 'text-red-600 dark:text-red-400'
-                                  : isNearExpiry
-                                  ? 'text-orange-600 dark:text-orange-400'
-                                  : 'text-gray-700 dark:text-gray-300'
-                              }`}>
-                                {p.expirationDate.split('-').reverse().join('/')}
-                              </span>
-                              {p.batchNumber && (
-                                <div className="text-[10px] text-gray-400">Lote: {p.batchNumber}</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 italic">Não aplicável</span>
-                          )}
-                        </td>
+                                {/* Min Quantity */}
+                                <td className="py-3 px-3 text-center font-bold text-gray-500">
+                                  {editingMinQuantityId === p.id ? (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={tempMinQuantity}
+                                        onChange={(e) => setTempMinQuantity(Number(e.target.value))}
+                                        className="w-16 p-1 text-center bg-white dark:bg-gray-800 border border-emerald-500 rounded-lg text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleUpdateMinQuantity(p.id, tempMinQuantity)}
+                                        disabled={savingMinId === p.id}
+                                        className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                        title="Salvar Estoque Mínimo"
+                                      >
+                                        <CheckCircle2 size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingMinQuantityId(null)}
+                                        className="p-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                                        title="Cancelar"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setEditingMinQuantityId(p.id);
+                                        setTempMinQuantity(p.minQuantity);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group"
+                                      title="Clique para editar o estoque mínimo de alerta deste produto"
+                                    >
+                                      <span>{p.minQuantity}</span>
+                                      <Edit size={12} className="text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                                    </button>
+                                  )}
+                                </td>
 
-                        {/* Status */}
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                            p.status === 'ATIVO'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                              : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </td>
+                                {/* Supplier */}
+                                <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-medium">
+                                  {p.supplier || '—'}
+                                </td>
 
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            
-                            {/* Entrada rápida */}
-                            <button
-                              onClick={() => handleOpenMovementModal(p, 'ENTRADA')}
-                              title="Registrar Entrada"
-                              className="p-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                            >
-                              <ArrowDownLeft size={16} />
-                            </button>
+                                {/* Expiration & Batch */}
+                                <td className="py-3 px-3">
+                                  {p.expirationDate ? (
+                                    <div>
+                                      <span className={`font-bold text-[11px] ${
+                                        isExpired
+                                          ? 'text-red-600 dark:text-red-400'
+                                          : isNearExpiry
+                                          ? 'text-orange-600 dark:text-orange-400'
+                                          : 'text-gray-700 dark:text-gray-300'
+                                      }`}>
+                                        {p.expirationDate.split('-').reverse().join('/')}
+                                      </span>
+                                      {p.batchNumber && (
+                                        <div className="text-[10px] text-gray-400">Lote: {p.batchNumber}</div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400 italic">Não aplicável</span>
+                                  )}
+                                </td>
 
-                            {/* Saída rápida */}
-                            <button
-                              onClick={() => handleOpenMovementModal(p, 'SAIDA')}
-                              title="Registrar Saída"
-                              className="p-1.5 bg-rose-50 dark:bg-rose-900/30 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors"
-                            >
-                              <ArrowUpRight size={16} />
-                            </button>
+                                {/* Status */}
+                                <td className="py-3 px-3 text-center">
+                                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                    p.status === 'ATIVO'
+                                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                      : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                                  }`}>
+                                    {p.status}
+                                  </span>
+                                </td>
 
-                            {/* Editar */}
-                            <button
-                              onClick={() => handleOpenEditModal(p)}
-                              title="Editar Produto"
-                              className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
-                            >
-                              <Edit size={16} />
-                            </button>
+                                {/* Actions */}
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    
+                                    {/* Entrada rápida */}
+                                    <button
+                                      onClick={() => handleOpenMovementModal(p, 'ENTRADA')}
+                                      title="Registrar Entrada (+) deste produto"
+                                      className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:hover:bg-emerald-900/70 text-emerald-700 dark:text-emerald-300 rounded-xl font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <ArrowDownLeft size={14} />
+                                      <span>Entrada</span>
+                                    </button>
 
-                            {/* Inativar / Reativar */}
-                            <button
-                              onClick={() => handleToggleProductStatus(p)}
-                              title={p.status === 'ATIVO' ? 'Inativar Produto' : 'Reativar Produto'}
-                              className={`p-1.5 rounded-xl transition-colors ${
-                                p.status === 'ATIVO'
-                                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
-                                  : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 hover:bg-emerald-200'
-                              }`}
-                            >
-                              {p.status === 'ATIVO' ? <XCircle size={16} /> : <RefreshCw size={16} />}
-                            </button>
+                                    {/* Saída rápida */}
+                                    <button
+                                      onClick={() => handleOpenMovementModal(p, 'SAIDA')}
+                                      title="Registrar Saída (-) deste produto"
+                                      className="px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200 dark:bg-rose-900/40 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 rounded-xl font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <ArrowUpRight size={14} />
+                                      <span>Saída</span>
+                                    </button>
 
-                          </div>
-                        </td>
+                                    {/* Editar */}
+                                    <button
+                                      onClick={() => handleOpenEditModal(p)}
+                                      title="Editar Informações do Produto"
+                                      className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
+                                    >
+                                      <Edit size={15} />
+                                    </button>
 
-                      </tr>
-                    );
-                  })}
+                                    {/* Inativar / Reativar */}
+                                    <button
+                                      onClick={() => handleToggleProductStatus(p)}
+                                      title={p.status === 'ATIVO' ? 'Inativar Produto' : 'Reativar Produto'}
+                                      className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                                        p.status === 'ATIVO'
+                                          ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
+                                          : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 hover:bg-emerald-200'
+                                      }`}
+                                    >
+                                      {p.status === 'ATIVO' ? <XCircle size={15} /> : <RefreshCw size={15} />}
+                                    </button>
 
-                  {filteredProducts.length === 0 && (
-                    <tr>
-                      <td colSpan={9} className="py-12 text-center text-gray-400 italic">
-                        Nenhum produto encontrado com os filtros aplicados.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                                  </div>
+                                </td>
+
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+
+                        {/* SUBTOTAL ROW FOR THIS CATEGORY */}
+                        <tfoot>
+                          <tr className={`${theme.subtotalBg} text-xs font-black`}>
+                            <td colSpan={2} className={`py-3 px-3 ${theme.subtotalText} uppercase font-extrabold tracking-wide`}>
+                              SUBTOTAL DA CATEGORIA: {group.category} ({group.itemsCount} ITENS)
+                            </td>
+                            <td className={`py-3 px-3 text-center ${theme.subtotalText} font-black`}>
+                              {group.totalQuantity} un
+                            </td>
+                            <td colSpan={4} className="py-3 px-3 text-right text-gray-500 dark:text-gray-400 uppercase text-[10px] font-bold">
+                              Subtotal Financeiro:
+                            </td>
+                            <td className={`py-3 px-3 text-right font-black ${theme.subtotalText} font-mono text-xs`}>
+                              {group.totalEstimatedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                  </div>
+                );
+              })}
+
+              {productsGroupedByCategory.length === 0 && (
+                <div className="py-12 text-center text-gray-400 italic bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
+                  Nenhum produto encontrado com os filtros aplicados.
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* FLAT PRODUCTS TABLE LIST */}
+          {productsGroupBy === 'FLAT' && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
+                    <tr>
+                      <th className="py-3.5 px-4">Código / Produto</th>
+                      <th className="py-3.5 px-4">Categoria</th>
+                      <th className="py-3.5 px-4">Localização</th>
+                      <th className="py-3.5 px-4 text-center">Saldo Atual</th>
+                      <th className="py-3.5 px-4 text-center">Estoque Mínimo</th>
+                      <th className="py-3.5 px-4">Fornecedor</th>
+                      <th className="py-3.5 px-4">Validade / Lote</th>
+                      <th className="py-3.5 px-4 text-center">Status</th>
+                      <th className="py-3.5 px-4 text-right">Lançar Movimentação & Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {filteredProducts.map(p => {
+                      const isLow = p.quantity < p.minQuantity && p.quantity > 0;
+                      const isZero = p.quantity === 0;
+                      const isExpired = p.expirationDate && p.expirationDate < todayStr;
+                      const isNearExpiry = p.expirationDate && p.expirationDate >= todayStr && p.expirationDate <= in30DaysStr;
+
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                          
+                          {/* Name & Code */}
+                          <td className="py-3.5 px-4">
+                            <div className="font-extrabold text-gray-900 dark:text-white text-sm">{p.name}</div>
+                            <div className="text-[10px] text-gray-400 font-mono flex items-center gap-2 mt-0.5">
+                              <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{p.code}</span>
+                              <span>{p.unit}</span>
+                            </div>
+                          </td>
+
+                          {/* Category */}
+                          <td className="py-3.5 px-4 font-semibold text-gray-700 dark:text-gray-300">
+                            {p.category}
+                          </td>
+
+                          {/* Location */}
+                          <td className="py-3.5 px-4 text-gray-600 dark:text-gray-400 font-medium">
+                            <div className="flex items-center gap-1">
+                              <MapPin size={12} className="text-gray-400" />
+                              {p.location}
+                            </div>
+                          </td>
+
+                          {/* Quantity */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-block px-3 py-1 rounded-xl font-black text-xs ${
+                              isZero
+                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                : isLow
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                            }`}>
+                              {p.quantity} {p.unit}s
+                            </span>
+                          </td>
+
+                          {/* Min Quantity */}
+                          <td className="py-3.5 px-4 text-center font-bold text-gray-500">
+                            {editingMinQuantityId === p.id ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={tempMinQuantity}
+                                  onChange={(e) => setTempMinQuantity(Number(e.target.value))}
+                                  className="w-16 p-1 text-center bg-white dark:bg-gray-800 border border-emerald-500 rounded-lg text-xs font-bold text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleUpdateMinQuantity(p.id, tempMinQuantity)}
+                                  disabled={savingMinId === p.id}
+                                  className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                                  title="Salvar Estoque Mínimo"
+                                >
+                                  <CheckCircle2 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setEditingMinQuantityId(null)}
+                                  className="p-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setEditingMinQuantityId(p.id);
+                                  setTempMinQuantity(p.minQuantity);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 transition-all group"
+                                title="Clique para editar o estoque mínimo de alerta deste produto"
+                              >
+                                <span>{p.minQuantity}</span>
+                                <Edit size={12} className="text-gray-400 group-hover:text-emerald-600 transition-colors" />
+                              </button>
+                            )}
+                          </td>
+
+                          {/* Supplier */}
+                          <td className="py-3.5 px-4 text-gray-600 dark:text-gray-400 font-medium">
+                            {p.supplier || '—'}
+                          </td>
+
+                          {/* Expiration & Batch */}
+                          <td className="py-3.5 px-4">
+                            {p.expirationDate ? (
+                              <div>
+                                <span className={`font-bold text-[11px] ${
+                                  isExpired
+                                    ? 'text-red-600 dark:text-red-400'
+                                    : isNearExpiry
+                                    ? 'text-orange-600 dark:text-orange-400'
+                                    : 'text-gray-700 dark:text-gray-300'
+                                }`}>
+                                  {p.expirationDate.split('-').reverse().join('/')}
+                                </span>
+                                {p.batchNumber && (
+                                  <div className="text-[10px] text-gray-400">Lote: {p.batchNumber}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic">Não aplicável</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                              p.status === 'ATIVO'
+                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                            }`}>
+                              {p.status}
+                            </span>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              
+                              {/* Entrada rápida */}
+                              <button
+                                onClick={() => handleOpenMovementModal(p, 'ENTRADA')}
+                                title="Registrar Entrada (+) deste produto"
+                                className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:hover:bg-emerald-900/70 text-emerald-700 dark:text-emerald-300 rounded-xl font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <ArrowDownLeft size={14} />
+                                <span>Entrada</span>
+                              </button>
+
+                              {/* Saída rápida */}
+                              <button
+                                onClick={() => handleOpenMovementModal(p, 'SAIDA')}
+                                title="Registrar Saída (-) deste produto"
+                                className="px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200 dark:bg-rose-900/40 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 rounded-xl font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <ArrowUpRight size={14} />
+                                <span>Saída</span>
+                              </button>
+
+                              {/* Editar */}
+                              <button
+                                onClick={() => handleOpenEditModal(p)}
+                                title="Editar Informações do Produto"
+                                className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
+                              >
+                                <Edit size={15} />
+                              </button>
+
+                              {/* Inativar / Reativar */}
+                              <button
+                                onClick={() => handleToggleProductStatus(p)}
+                                title={p.status === 'ATIVO' ? 'Inativar Produto' : 'Reativar Produto'}
+                                className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                                  p.status === 'ATIVO'
+                                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:bg-gray-200'
+                                    : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 hover:bg-emerald-200'
+                                }`}
+                              >
+                                {p.status === 'ATIVO' ? <XCircle size={15} /> : <RefreshCw size={15} />}
+                              </button>
+
+                            </div>
+                          </td>
+
+                        </tr>
+                      );
+                    })}
+
+                    {filteredProducts.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-gray-400 italic">
+                          Nenhum produto encontrado com os filtros aplicados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         </div>
       )}
@@ -2628,191 +3215,481 @@ export const StockSection: React.FC<StockSectionProps> = ({
         <div className="space-y-6 animate-in fade-in duration-200">
           
           {/* SEARCH & FILTER FOR MOVEMENTS */}
-          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Pesquisar por produto, código, responsável, doador, NF ou fornecedor..."
-                value={movementSearch}
-                onChange={(e) => setMovementSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+            
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Pesquisar por produto, código, responsável, doador, NF ou fornecedor..."
+                  value={movementSearch}
+                  onChange={(e) => setMovementSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={movementTypeFilter}
+                  onChange={(e) => setMovementTypeFilter(e.target.value as any)}
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="TODOS">Todos os Tipos</option>
+                  <option value="ENTRADA">Apenas Entradas (+)</option>
+                  <option value="SAIDA">Apenas Saídas (-)</option>
+                </select>
+
+                <select
+                  value={movementOriginFilter}
+                  onChange={(e) => setMovementOriginFilter(e.target.value as any)}
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="TODOS">Todas as Origens</option>
+                  <option value="COMPRA">🛒 Apenas Compras</option>
+                  <option value="DOACAO">🎁 Apenas Doações</option>
+                </select>
+
+                <button
+                  onClick={() => handleOpenMovementModal(undefined, 'ENTRADA')}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Registrar Entrada (+) no estoque"
+                >
+                  <ArrowDownLeft size={16} /> Nova Entrada (+)
+                </button>
+
+                <button
+                  onClick={() => handleOpenMovementModal(undefined, 'SAIDA')}
+                  className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Registrar Saída (-) do estoque"
+                >
+                  <ArrowUpRight size={16} /> Nova Saída (-)
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <select
-                value={movementTypeFilter}
-                onChange={(e) => setMovementTypeFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="TODOS">Todos os Tipos</option>
-                <option value="ENTRADA">Apenas Entradas (+)</option>
-                <option value="SAIDA">Apenas Saídas (-)</option>
-              </select>
+            {/* MODO DE AGRUPAMENTO DOS PRODUTOS & FILTRAR CATEGORIA ESPECÍFICA */}
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              
+              {/* Modo de Agrupamento */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                  Modo de Agrupamento dos Produtos:
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMovementGroupBy('CATEGORY')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      movementGroupBy === 'CATEGORY'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Layers size={15} />
+                    Separar por Categoria (com Faixas e Subtotais)
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setMovementGroupBy('FLAT')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                      movementGroupBy === 'FLAT'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText size={15} />
+                    Listagem Contínua Geral
+                  </button>
+                </div>
+              </div>
 
-              <select
-                value={movementOriginFilter}
-                onChange={(e) => setMovementOriginFilter(e.target.value as any)}
-                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-3 py-2.5 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
-              >
-                <option value="TODOS">Todas as Origens</option>
-                <option value="COMPRA">🛒 Apenas Compras</option>
-                <option value="DOACAO">🎁 Apenas Doações</option>
-              </select>
-
-              <button
-                onClick={() => handleOpenMovementModal(undefined, 'ENTRADA')}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold text-xs shadow-md transition-all flex items-center gap-2"
-              >
-                <Plus size={16} /> Nova Movimentação
-              </button>
-            </div>
-          </div>
-
-          {/* MOVEMENTS HISTORY TABLE */}
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
-                  <tr>
-                    <th className="py-3.5 px-4">Data</th>
-                    <th className="py-3.5 px-4 text-center">Tipo</th>
-                    <th className="py-3.5 px-4">Origem</th>
-                    <th className="py-3.5 px-4">Código / Produto</th>
-                    <th className="py-3.5 px-4 text-center">Qtd Movimentada</th>
-                    <th className="py-3.5 px-4 text-center">Saldo Ant.</th>
-                    <th className="py-3.5 px-4 text-center">Saldo Pós</th>
-                    <th className="py-3.5 px-4">Destino / Fornecedor / Doador</th>
-                    <th className="py-3.5 px-4">Responsável</th>
-                    <th className="py-3.5 px-4 text-center">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {filteredMovements.map(m => (
-                    <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-gray-700 dark:text-gray-300">
-                        {m.date ? m.date.split('-').reverse().join('/') : '-'}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
-                          m.type === 'ENTRADA'
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                            : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                        }`}>
-                          {m.type}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        {m.type === 'ENTRADA' ? (
-                          <div className="flex flex-col gap-1">
-                            {m.origin === 'DOACAO' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
-                                <Gift size={12} /> Doação
-                              </span>
-                            ) : m.origin === 'COMPRA' ? (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
-                                <ShoppingBag size={12} /> Compra
-                              </span>
-                            ) : (
-                              <span className="text-gray-400 italic text-[10px]">Entrada padrão</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 italic text-[10px]">Saída de Estoque</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <div className="font-extrabold text-gray-900 dark:text-white">{m.productName}</div>
-                        <div className="text-[10px] text-gray-400">{m.productCode}</div>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center font-black text-sm">
-                        <span className={m.type === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}>
-                          {m.type === 'ENTRADA' ? '+' : '-'}{m.quantity}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center text-gray-500 font-medium">
-                        {m.stockBefore}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center font-extrabold text-gray-800 dark:text-gray-200">
-                        {m.stockAfter}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
-                        {m.type === 'ENTRADA' ? (
-                          <div>
-                            {m.origin === 'DOACAO' ? (
-                              <>
-                                <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-bold uppercase">Doador</span>
-                                {m.donorName || m.supplier || 'Anônimo'}
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-[10px] text-gray-400 block uppercase">Fornecedor</span>
-                                {m.supplier || 'Não informado'}
-                                {m.invoiceNumber && (
-                                  <span className="text-[10px] text-gray-500 block">NF: {m.invoiceNumber}</span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        ) : (
-                          <div>
-                            <span className="text-[10px] text-gray-400 block uppercase">Destino: {m.destination || 'N/I'}</span>
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 block">Motivo: {m.reason || 'N/I'}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300 font-bold">
-                        {m.responsible}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          <button
-                            onClick={() => setSelectedMovementForDetails(m)}
-                            className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
-                            title="Ver Detalhes e Vínculo Financeiro"
-                          >
-                            <Eye size={14} /> Detalhes
-                          </button>
-                          <button
-                            onClick={() => handleOpenEditMovementModal(m)}
-                            className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
-                            title={m.type === 'ENTRADA' ? "Editar Entrada de Estoque" : "Editar Movimentação de Saída"}
-                          >
-                            <Pencil size={14} /> Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMovement(m)}
-                            className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold"
-                            title={m.type === 'ENTRADA' ? "Excluir Entrada e Estornar Saldo" : "Excluir Saída e Restaurar Saldo"}
-                          >
-                            <Trash2 size={14} /> Excluir
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {filteredMovements.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="py-12 text-center text-gray-400 italic">
-                        Nenhuma movimentação localizada no histórico com os filtros selecionados.
-                      </td>
-                    </tr>
+              {/* Filtrar Categoria Específica */}
+              <div className="space-y-1.5 w-full md:w-auto">
+                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                  Filtrar Categoria Específica:
+                </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={movementCategoryFilter}
+                    onChange={(e) => setMovementCategoryFilter(e.target.value)}
+                    className="w-full md:w-64 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                  >
+                    <option value="TODAS">📁 Todas as Categorias (Consolidado)</option>
+                    {CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>🏷️ {cat}</option>
+                    ))}
+                  </select>
+                  {movementCategoryFilter !== 'TODAS' && (
+                    <button
+                      type="button"
+                      onClick={() => setMovementCategoryFilter('TODAS')}
+                      className="text-xs text-gray-400 hover:text-red-500 underline font-bold whitespace-nowrap cursor-pointer"
+                    >
+                      Limpar filtro
+                    </button>
                   )}
-                </tbody>
-              </table>
+                </div>
+              </div>
+
             </div>
+
           </div>
+
+          {/* CATEGORIZED MOVEMENTS VIEW */}
+          {movementGroupBy === 'CATEGORY' && (
+            <div className="space-y-8">
+              {movementsGroupedByCategory.map((group) => {
+                const theme = getCategoryTheme(group.category);
+
+                return (
+                  <div key={group.category} className={`rounded-3xl overflow-hidden border ${theme.border} shadow-lg transition-all`}>
+                    
+                    {/* CATEGORY COLOR BANNER */}
+                    <div className={`p-4 sm:p-5 ${theme.bannerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+                      <div className="flex items-center gap-3.5">
+                        <div className={`p-2.5 rounded-2xl shadow-inner ${theme.iconBg} backdrop-blur-md`}>
+                          <Tag size={22} className="stroke-[2.5]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/80 bg-black/20 px-2 py-0.5 rounded-md backdrop-blur-xs">
+                              Setor / Categoria
+                            </span>
+                          </div>
+                          <h3 className="text-lg sm:text-xl font-black tracking-wide uppercase text-white mt-0.5 drop-shadow-xs">
+                            {group.category}
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* Category Badges Summary */}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                        <span className="px-3.5 py-1.5 bg-black/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/20 shadow-xs flex items-center gap-1.5">
+                          📋 <span>{group.itemsCount} movimentações</span>
+                        </span>
+                        <span className="px-3.5 py-1.5 bg-emerald-500/40 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                          ⬆️ <span>Entradas: +{group.totalEntradas} un</span>
+                        </span>
+                        <span className="px-3.5 py-1.5 bg-rose-500/40 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                          ⬇️ <span>Saídas: -{group.totalSaidas} un</span>
+                        </span>
+                        <span className="px-4 py-1.5 bg-white text-gray-950 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5">
+                          ⚖️ <span>Saldo: {group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* CATEGORY MOVEMENTS TABLE */}
+                    <div className="overflow-x-auto p-2 sm:p-4 bg-white dark:bg-gray-800">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
+                          <tr>
+                            <th className="py-3.5 px-4">Data</th>
+                            <th className="py-3.5 px-4 text-center">Tipo</th>
+                            <th className="py-3.5 px-4">Origem</th>
+                            <th className="py-3.5 px-4">Código / Produto</th>
+                            <th className="py-3.5 px-4 text-center">Qtd Movimentada</th>
+                            <th className="py-3.5 px-4 text-center">Saldo Ant.</th>
+                            <th className="py-3.5 px-4 text-center">Saldo Pós</th>
+                            <th className="py-3.5 px-4">Destino / Fornecedor / Doador</th>
+                            <th className="py-3.5 px-4">Responsável</th>
+                            <th className="py-3.5 px-4 text-center">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                          {group.items.map(m => (
+                            <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                              <td className="py-3.5 px-4 font-bold text-gray-700 dark:text-gray-300">
+                                {m.date ? m.date.split('-').reverse().join('/') : '-'}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                                  m.type === 'ENTRADA'
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                    : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                                }`}>
+                                  {m.type}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                {m.type === 'ENTRADA' ? (
+                                  <div className="flex flex-col gap-1">
+                                    {m.origin === 'DOACAO' ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
+                                        <Gift size={12} /> Doação
+                                      </span>
+                                    ) : m.origin === 'COMPRA' ? (
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
+                                        <ShoppingBag size={12} /> Compra
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 italic text-[10px]">Entrada padrão</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic text-[10px]">Saída de Estoque</span>
+                                )}
+                              </td>
+
+                              <td className="py-3.5 px-4">
+                                <div className="font-extrabold text-gray-900 dark:text-white">{m.productName}</div>
+                                <div className="text-[10px] text-gray-400">{m.productCode}</div>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center font-black text-sm">
+                                <span className={m.type === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                                  {m.type === 'ENTRADA' ? '+' : '-'}{m.quantity}
+                                </span>
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center text-gray-500 font-medium">
+                                {m.stockBefore}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center font-extrabold text-gray-800 dark:text-gray-200">
+                                {m.stockAfter}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
+                                {m.type === 'ENTRADA' ? (
+                                  <div>
+                                    {m.origin === 'DOACAO' ? (
+                                      <>
+                                        <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-bold uppercase">Doador</span>
+                                        {m.donorName || m.supplier || 'Anônimo'}
+                                      </>
+                                    ) : (
+                                      <>
+                                        <span className="text-[10px] text-gray-400 block uppercase">Fornecedor</span>
+                                        {m.supplier || 'Não informado'}
+                                        {m.invoiceNumber && (
+                                          <span className="text-[10px] text-gray-500 block">NF: {m.invoiceNumber}</span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="text-[10px] text-gray-400 block uppercase">Destino: {m.destination || 'N/I'}</span>
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 block">Motivo: {m.reason || 'N/I'}</span>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300 font-bold">
+                                {m.responsible}
+                              </td>
+
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                  <button
+                                    onClick={() => setSelectedMovementForDetails(m)}
+                                    className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                    title="Ver Detalhes e Vínculo Financeiro"
+                                  >
+                                    <Eye size={14} /> Detalhes
+                                  </button>
+                                  <button
+                                    onClick={() => handleOpenEditMovementModal(m)}
+                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                    title={m.type === 'ENTRADA' ? "Editar Entrada de Estoque" : "Editar Movimentação de Saída"}
+                                  >
+                                    <Pencil size={14} /> Editar
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteMovement(m)}
+                                    className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                    title={m.type === 'ENTRADA' ? "Excluir Entrada e Estornar Saldo" : "Excluir Saída e Restaurar Saldo"}
+                                  >
+                                    <Trash2 size={14} /> Excluir
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+
+                        {/* SUBTOTAL ROW FOR THIS CATEGORY */}
+                        <tfoot>
+                          <tr className={`${theme.subtotalBg} text-xs font-black`}>
+                            <td colSpan={4} className={`py-3.5 px-4 ${theme.subtotalText} uppercase font-extrabold tracking-wide`}>
+                              SUBTOTAL DA CATEGORIA: {group.category} ({group.itemsCount} MOVIMENTAÇÕES)
+                            </td>
+                            <td className={`py-3.5 px-4 text-center ${theme.subtotalText} font-black`}>
+                              Entradas: +{group.totalEntradas} | Saídas: -{group.totalSaidas}
+                            </td>
+                            <td colSpan={3} className="py-3.5 px-4 text-right text-gray-500 dark:text-gray-400 uppercase text-[10px] font-bold">
+                              Saldo Líquido da Categoria:
+                            </td>
+                            <td colSpan={2} className={`py-3.5 px-4 text-right font-black ${theme.subtotalText} font-mono text-sm`}>
+                              {group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                  </div>
+                );
+              })}
+
+              {movementsGroupedByCategory.length === 0 && (
+                <div className="py-12 text-center text-gray-400 italic bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700">
+                  Nenhuma movimentação localizada no histórico com os filtros selecionados.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FLAT MOVEMENTS HISTORY TABLE */}
+          {movementGroupBy === 'FLAT' && (
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-50 dark:bg-gray-900/80 text-gray-500 font-bold uppercase border-b border-gray-100 dark:border-gray-700">
+                    <tr>
+                      <th className="py-3.5 px-4">Data</th>
+                      <th className="py-3.5 px-4 text-center">Tipo</th>
+                      <th className="py-3.5 px-4">Origem</th>
+                      <th className="py-3.5 px-4">Código / Produto</th>
+                      <th className="py-3.5 px-4 text-center">Qtd Movimentada</th>
+                      <th className="py-3.5 px-4 text-center">Saldo Ant.</th>
+                      <th className="py-3.5 px-4 text-center">Saldo Pós</th>
+                      <th className="py-3.5 px-4">Destino / Fornecedor / Doador</th>
+                      <th className="py-3.5 px-4">Responsável</th>
+                      <th className="py-3.5 px-4 text-center">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {filteredMovements.map(m => (
+                      <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-gray-700 dark:text-gray-300">
+                          {m.date ? m.date.split('-').reverse().join('/') : '-'}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                            m.type === 'ENTRADA'
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
+                          }`}>
+                            {m.type}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          {m.type === 'ENTRADA' ? (
+                            <div className="flex flex-col gap-1">
+                              {m.origin === 'DOACAO' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 w-fit">
+                                  <Gift size={12} /> Doação
+                                </span>
+                              ) : m.origin === 'COMPRA' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-extrabold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 w-fit">
+                                  <ShoppingBag size={12} /> Compra
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 italic text-[10px]">Entrada padrão</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic text-[10px]">Saída de Estoque</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <div className="font-extrabold text-gray-900 dark:text-white">{m.productName}</div>
+                          <div className="text-[10px] text-gray-400">{m.productCode}</div>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center font-black text-sm">
+                          <span className={m.type === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>
+                            {m.type === 'ENTRADA' ? '+' : '-'}{m.quantity}
+                          </span>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center text-gray-500 font-medium">
+                          {m.stockBefore}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center font-extrabold text-gray-800 dark:text-gray-200">
+                          {m.stockAfter}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-gray-600 dark:text-gray-300 font-medium">
+                          {m.type === 'ENTRADA' ? (
+                            <div>
+                              {m.origin === 'DOACAO' ? (
+                                <>
+                                  <span className="text-[10px] text-purple-600 dark:text-purple-400 block font-bold uppercase">Doador</span>
+                                  {m.donorName || m.supplier || 'Anônimo'}
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[10px] text-gray-400 block uppercase">Fornecedor</span>
+                                  {m.supplier || 'Não informado'}
+                                  {m.invoiceNumber && (
+                                    <span className="text-[10px] text-gray-500 block">NF: {m.invoiceNumber}</span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="text-[10px] text-gray-400 block uppercase">Destino: {m.destination || 'N/I'}</span>
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 block">Motivo: {m.reason || 'N/I'}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-gray-700 dark:text-gray-300 font-bold">
+                          {m.responsible}
+                        </td>
+
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => setSelectedMovementForDetails(m)}
+                              className="p-1.5 bg-gray-100 hover:bg-emerald-50 dark:bg-gray-700 dark:hover:bg-emerald-950/50 text-gray-600 hover:text-emerald-600 dark:text-gray-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                              title="Ver Detalhes e Vínculo Financeiro"
+                            >
+                              <Eye size={14} /> Detalhes
+                            </button>
+                            <button
+                              onClick={() => handleOpenEditMovementModal(m)}
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                              title={m.type === 'ENTRADA' ? "Editar Entrada de Estoque" : "Editar Movimentação de Saída"}
+                            >
+                              <Pencil size={14} /> Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteMovement(m)}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-xl transition-colors inline-flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                              title={m.type === 'ENTRADA' ? "Excluir Entrada e Estornar Saldo" : "Excluir Saída e Restaurar Saldo"}
+                            >
+                              <Trash2 size={14} /> Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredMovements.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="py-12 text-center text-gray-400 italic">
+                          Nenhuma movimentação localizada no histórico com os filtros selecionados.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         </div>
       )}
@@ -3127,67 +4004,63 @@ export const StockSection: React.FC<StockSectionProps> = ({
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 
                 {/* Mode: Categorized vs Flat */}
-                {reportType !== 'MOVEMENTS' && (
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
-                      Modo de Agrupamento dos Produtos:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setReportGroupBy('CATEGORY')}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                          reportGroupBy === 'CATEGORY'
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <Layers size={15} />
-                        Separar por Categoria (com Faixas e Subtotais)
-                      </button>
-                      
-                      <button
-                        onClick={() => setReportGroupBy('FLAT')}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-                          reportGroupBy === 'FLAT'
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <FileText size={15} />
-                        Listagem Contínua Geral
-                      </button>
-                    </div>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                    Modo de Agrupamento dos Produtos:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setReportGroupBy('CATEGORY')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        reportGroupBy === 'CATEGORY'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Layers size={15} />
+                      Separar por Categoria (com Faixas e Subtotais)
+                    </button>
+                    
+                    <button
+                      onClick={() => setReportGroupBy('FLAT')}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                        reportGroupBy === 'FLAT'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <FileText size={15} />
+                      Listagem Contínua Geral
+                    </button>
                   </div>
-                )}
+                </div>
 
                 {/* Filter specific category */}
-                {reportType !== 'MOVEMENTS' && (
-                  <div className="space-y-1.5 w-full md:w-auto">
-                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
-                      Filtrar Categoria Específica:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={reportCategoryFilter}
-                        onChange={(e) => setReportCategoryFilter(e.target.value)}
-                        className="w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                <div className="space-y-1.5 w-full md:w-auto">
+                  <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                    Filtrar Categoria Específica:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={reportCategoryFilter}
+                      onChange={(e) => setReportCategoryFilter(e.target.value)}
+                      className="w-full md:w-64 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+                    >
+                      <option value="TODAS">📁 Todas as Categorias (Consolidado)</option>
+                      {CATEGORIES.map(cat => (
+                        <option key={cat} value={cat}>🏷️ {cat}</option>
+                      ))}
+                    </select>
+                    {reportCategoryFilter !== 'TODAS' && (
+                      <button
+                        onClick={() => setReportCategoryFilter('TODAS')}
+                        className="text-xs text-gray-400 hover:text-red-500 underline font-bold whitespace-nowrap cursor-pointer"
                       >
-                        <option value="TODAS">📁 Todas as Categorias (Consolidado)</option>
-                        {CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>🏷️ {cat}</option>
-                        ))}
-                      </select>
-                      {reportCategoryFilter !== 'TODAS' && (
-                        <button
-                          onClick={() => setReportCategoryFilter('TODAS')}
-                          className="text-xs text-gray-400 hover:text-red-500 underline font-bold whitespace-nowrap"
-                        >
-                          Limpar filtro
-                        </button>
-                      )}
-                    </div>
+                        Limpar filtro
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
 
               </div>
             </div>
@@ -3197,11 +4070,13 @@ export const StockSection: React.FC<StockSectionProps> = ({
               <div className="p-3.5 bg-gray-50 dark:bg-gray-900/60 rounded-2xl border border-gray-200 dark:border-gray-700">
                 <span className="text-[10px] font-bold uppercase text-gray-400 block">Categorias Ativas</span>
                 <span className="text-lg font-black text-gray-900 dark:text-white">
-                  {reportType === 'MOVEMENTS' ? '—' : reportGroupedByCategory.length}
+                  {reportType === 'MOVEMENTS' ? reportOverallTotals.totalCategories : reportGroupedByCategory.length}
                 </span>
               </div>
               <div className="p-3.5 bg-gray-50 dark:bg-gray-900/60 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <span className="text-[10px] font-bold uppercase text-gray-400 block">Produtos Listados</span>
+                <span className="text-[10px] font-bold uppercase text-gray-400 block">
+                  {reportType === 'MOVEMENTS' ? 'Movimentações Listadas' : 'Produtos Listados'}
+                </span>
                 <span className="text-lg font-black text-gray-900 dark:text-white">
                   {reportOverallTotals.totalItems}
                 </span>
@@ -3215,9 +4090,13 @@ export const StockSection: React.FC<StockSectionProps> = ({
                 </span>
               </div>
               <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 rounded-2xl border border-blue-200 dark:border-blue-800/40">
-                <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 block">Valor Patrimonial Total</span>
+                <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400 block">
+                  {reportType === 'MOVEMENTS' ? 'Entradas (+) / Saídas (-)' : 'Valor Patrimonial Total'}
+                </span>
                 <span className="text-lg font-black text-blue-700 dark:text-blue-300">
-                  {reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {reportType === 'MOVEMENTS' 
+                    ? `+${reportOverallTotals.totalEntradas} / -${reportOverallTotals.totalSaidas}`
+                    : reportOverallTotals.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
             </div>
@@ -3441,8 +4320,130 @@ export const StockSection: React.FC<StockSectionProps> = ({
                   </div>
                 )}
 
-                {/* FLAT VIEW OR MOVEMENTS */}
-                {(reportGroupBy === 'FLAT' || reportType === 'MOVEMENTS') && (
+                {/* CATEGORIZED VIEW FOR MOVEMENTS */}
+                {reportGroupBy === 'CATEGORY' && reportType === 'MOVEMENTS' && (
+                  <div className="space-y-8">
+                    {reportGroupedMovementsByCategory.map((group) => {
+                      const theme = getCategoryTheme(group.category);
+
+                      return (
+                        <div key={group.category} className={`space-y-0 rounded-3xl overflow-hidden border ${theme.border} shadow-lg transition-all`}>
+                          
+                          {/* CATEGORY COLOR BANNER */}
+                          <div className={`p-4 sm:p-5 ${theme.bannerBg} flex flex-col sm:flex-row sm:items-center justify-between gap-4`}>
+                            <div className="flex items-center gap-3.5">
+                              <div className={`p-2.5 rounded-2xl shadow-inner ${theme.iconBg} backdrop-blur-md`}>
+                                <Tag size={22} className="stroke-[2.5]" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-white/80 bg-black/20 px-2 py-0.5 rounded-md backdrop-blur-xs">
+                                    Setor / Categoria
+                                  </span>
+                                </div>
+                                <h3 className="text-lg sm:text-xl font-black tracking-wide uppercase text-white mt-0.5 drop-shadow-xs">
+                                  {group.category}
+                                </h3>
+                              </div>
+                            </div>
+
+                            {/* Category Badges Summary */}
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                              <span className="px-3.5 py-1.5 bg-black/25 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/20 shadow-xs flex items-center gap-1.5">
+                                📋 <span>{group.movementsCount} movimentações</span>
+                              </span>
+                              <span className="px-3.5 py-1.5 bg-emerald-500/40 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                                ⬆️ <span>Entradas: +{group.totalEntradas} un</span>
+                              </span>
+                              <span className="px-3.5 py-1.5 bg-rose-500/40 backdrop-blur-md rounded-xl text-xs font-black text-white border border-white/30 shadow-xs flex items-center gap-1.5">
+                                ⬇️ <span>Saídas: -{group.totalSaidas} un</span>
+                              </span>
+                              <span className="px-4 py-1.5 bg-white text-gray-950 rounded-xl text-xs font-black shadow-md flex items-center gap-1.5">
+                                ⚖️ <span>Saldo: {group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un</span>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* CATEGORY MOVEMENTS TABLE */}
+                          <div className="overflow-x-auto p-2 sm:p-4 bg-white dark:bg-gray-800/80">
+                            <table className="w-full text-left text-xs">
+                              <thead>
+                                <tr className="border-b-2 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-extrabold uppercase text-[10px]">
+                                  <th className="py-3 px-3">Data</th>
+                                  <th className="py-3 px-3 text-center">Tipo</th>
+                                  <th className="py-3 px-3">Código</th>
+                                  <th className="py-3 px-3">Produto</th>
+                                  <th className="py-3 px-3 text-center">Qtd Movimentada</th>
+                                  <th className="py-3 px-3 text-center">Saldo Ant.</th>
+                                  <th className="py-3 px-3 text-center">Saldo Pós</th>
+                                  <th className="py-3 px-3">Origem / Destino</th>
+                                  <th className="py-3 px-3">Responsável</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {group.movements.map((m) => (
+                                  <tr key={m.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-750 transition-colors">
+                                    <td className="py-3 px-3 font-bold text-gray-700 dark:text-gray-300">
+                                      {m.date ? m.date.split('-').reverse().join('/') : '—'}
+                                    </td>
+                                    <td className="py-3 px-3 text-center">
+                                      <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                                        m.type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200'
+                                      }`}>
+                                        {m.type}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 font-mono text-gray-500">{m.productCode || 'S/C'}</td>
+                                    <td className="py-3 px-3 font-bold text-gray-900 dark:text-white">{m.productName}</td>
+                                    <td className={`py-3 px-3 text-center font-black ${
+                                      m.type === 'ENTRADA' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                    }`}>
+                                      {m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`}
+                                    </td>
+                                    <td className="py-3 px-3 text-center text-gray-500">{m.stockBefore}</td>
+                                    <td className="py-3 px-3 text-center font-bold text-gray-800 dark:text-gray-200">{m.stockAfter}</td>
+                                    <td className="py-3 px-3 text-gray-600 dark:text-gray-400">
+                                      {m.type === 'ENTRADA' ? (m.supplier || 'N/I') : (m.destination || 'N/I')}
+                                    </td>
+                                    <td className="py-3 px-3 font-medium text-gray-700 dark:text-gray-300">{m.responsible}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+
+                              {/* SUBTOTAL ROW FOR THIS CATEGORY */}
+                              <tfoot>
+                                <tr className={`${theme.subtotalBg} text-xs font-black`}>
+                                  <td colSpan={4} className={`py-3.5 px-3.5 ${theme.subtotalText} uppercase font-extrabold tracking-wide`}>
+                                    SUBTOTAL DA CATEGORIA: {group.category} ({group.movementsCount} MOVIMENTAÇÕES)
+                                  </td>
+                                  <td className={`py-3.5 px-3.5 text-center ${theme.subtotalText} font-black`}>
+                                    Entradas: +{group.totalEntradas} | Saídas: -{group.totalSaidas}
+                                  </td>
+                                  <td colSpan={2} className="py-3.5 px-3.5 text-right text-gray-500 dark:text-gray-400 uppercase text-[10px] font-bold">
+                                    Saldo Líquido da Categoria:
+                                  </td>
+                                  <td colSpan={2} className={`py-3.5 px-3.5 text-right font-black ${theme.subtotalText} font-mono text-sm`}>
+                                    {group.saldoLiquido >= 0 ? `+${group.saldoLiquido}` : group.saldoLiquido} un
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+
+                        </div>
+                      );
+                    })}
+
+                    {reportGroupedMovementsByCategory.length === 0 && (
+                      <div className="py-12 text-center text-gray-400 italic">
+                        Nenhuma movimentação encontrada para o período e categoria selecionados.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* FLAT VIEW */}
+                {reportGroupBy === 'FLAT' && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
@@ -3479,7 +4480,11 @@ export const StockSection: React.FC<StockSectionProps> = ({
                           movements
                             .filter(m => {
                               if (!m.date) return false;
-                              return m.date >= reportPeriodInfo.startDate && m.date <= reportPeriodInfo.endDate;
+                              const inDate = m.date >= reportPeriodInfo.startDate && m.date <= reportPeriodInfo.endDate;
+                              if (!inDate) return false;
+                              const cat = (m as any).category || getProductCategory(m.productId, m.productName);
+                              if (reportCategoryFilter !== 'TODAS' && cat !== reportCategoryFilter) return false;
+                              return true;
                             })
                             .map(m => (
                               <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
@@ -3769,21 +4774,57 @@ export const StockSection: React.FC<StockSectionProps> = ({
 
             <form onSubmit={handleSaveMovement} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               
-              {/* Select Product */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Selecione o Produto *</label>
+              {/* Select Product with Search and Category Grouping */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-500 uppercase">
+                    Selecione o Produto *
+                  </label>
+                  {selectedProductForMovement && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductForMovement(null);
+                        setMovementForm(prev => ({ ...prev, productId: '', unitPrice: '', totalPrice: '' }));
+                      }}
+                      className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      Trocar produto
+                    </button>
+                  )}
+                </div>
+
+                {/* Busca Rápida de Produtos */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 text-gray-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Filtrar produtos por nome, código ou categoria..."
+                    value={modalProductSearch}
+                    onChange={(e) => setModalProductSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
                 <select
                   required
                   value={movementForm.productId}
                   onChange={(e) => handleMovementProductSelect(e.target.value)}
                   className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  <option value="">-- Escolha um produto --</option>
-                  {activeProducts.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.code}) — Saldo Atual: {p.quantity} {p.unit}s
-                    </option>
-                  ))}
+                  <option value="">-- Escolha um produto da lista --</option>
+                  {modalCategoriesPresent.map(cat => {
+                    const catItems = modalFilteredProducts.filter(p => (p.category || 'Outros') === cat);
+                    return (
+                      <optgroup key={cat} label={`🏷️ ${cat} (${catItems.length})`}>
+                        {catItems.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.code}) — Saldo Atual: {p.quantity} {p.unit}s
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </select>
               </div>
 

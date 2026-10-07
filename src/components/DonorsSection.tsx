@@ -16,7 +16,7 @@ import { doc, deleteDoc, addDoc, collection, updateDoc, getDocs } from 'firebase
 import { db } from '../firebase';
 import { Donor, User } from '../types';
 import { cleanData, cn } from '../lib/utils';
-import { generateModernPDF } from '../lib/pdfUtils';
+import { generateModernPDF, generateTreasuryReceiptPDF } from '../lib/pdfUtils';
 import { generateModernWord } from '../lib/wordUtils';
 import { format } from 'date-fns';
 
@@ -36,12 +36,24 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
 
   // Modal para lançamento rápido de doação de doador existente
   const [donationModalDonor, setDonationModalDonor] = useState<Donor | null>(null);
+  const [lastRegisteredReceipt, setLastRegisteredReceipt] = useState<{
+    receiptNumber: string;
+    donorName: string;
+    amount: number;
+    date: string;
+    paymentMethod: string;
+    finality?: string;
+    observations?: string;
+  } | null>(null);
+
   const [donationForm, setDonationForm] = useState({
     date: new Date().toISOString().split('T')[0],
     amount: 0,
     paymentMethod: 'PIX',
     finality: 'MANUTENCAO_GERAL',
-    observations: ''
+    observations: '',
+    generateReceipt: false, // Default: FALSE
+    generateReceiptPdf: false
   });
 
   // Formulário do Doador
@@ -55,7 +67,8 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
     paymentMethod: 'PIX',
     status: 'ATIVO' as 'ATIVO' | 'INATIVO',
     startDate: new Date().toISOString().split('T')[0],
-    registerInTreasury: true
+    registerInTreasury: true,
+    generateReceipt: false // Default: FALSE
   });
 
   const handleCloseModal = () => {
@@ -71,7 +84,8 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
       paymentMethod: 'PIX',
       status: 'ATIVO',
       startDate: new Date().toISOString().split('T')[0],
-      registerInTreasury: true
+      registerInTreasury: true,
+      generateReceipt: false
     });
   };
 
@@ -87,7 +101,8 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
       paymentMethod: 'PIX',
       status: donor.status || 'ATIVO',
       startDate: donor.startDate || new Date().toISOString().split('T')[0],
-      registerInTreasury: true
+      registerInTreasury: true,
+      generateReceipt: false
     });
     setIsModalOpen(true);
   };
@@ -141,34 +156,40 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
     donationType: 'RECORRENTE' | 'EVENTUAL';
     finality?: string;
     observations?: string;
+    generateReceipt?: boolean;
   }) => {
-    const receiptNum = await generateNextReceiptNumber();
+    const shouldGenerateReceipt = !!params.generateReceipt;
+    const receiptNum = shouldGenerateReceipt ? await generateNextReceiptNumber() : null;
     const nowIso = new Date().toISOString();
     const category = params.donationType === 'RECORRENTE' ? 'Sócio Contribuinte / Mensalidade' : 'Doação Eventual / Diversas';
 
-    // 1. Recibo em treasury_receipts
-    const receiptDocRef = await addDoc(collection(db, 'treasury_receipts'), {
-      receiptNumber: receiptNum,
-      date: params.date,
-      amount: params.amount,
-      paymentMethod: params.paymentMethod || 'PIX',
-      category,
-      description: `Doação/Contribuição de ${params.donorName.trim()} - Casa OAMI`,
-      payerName: params.donorName.trim(),
-      cpf: params.donorCpf || null,
-      registeredBy: user?.name || 'Tesouraria',
-      observations: params.observations || 'Lançado do módulo Doadores e Sócios',
-      createdAt: nowIso,
-      status: 'ATIVO',
-      donorId: params.donorId,
-      donationType: params.donationType,
-      finality: params.finality || 'MANUTENCAO_GERAL'
-    });
+    let receiptDocRefId: string | null = null;
+    // 1. Recibo em treasury_receipts apenas se solicitado explicitamente
+    if (shouldGenerateReceipt && receiptNum) {
+      const receiptDocRef = await addDoc(collection(db, 'treasury_receipts'), cleanData({
+        receiptNumber: receiptNum,
+        date: params.date,
+        amount: params.amount,
+        paymentMethod: params.paymentMethod || 'PIX',
+        category,
+        description: `Doação/Contribuição de ${params.donorName.trim()} - Casa OAMI`,
+        payerName: params.donorName.trim(),
+        cpf: params.donorCpf || null,
+        registeredBy: user?.name || 'Tesouraria',
+        observations: params.observations || 'Lançado do módulo Doadores e Sócios',
+        createdAt: nowIso,
+        status: 'ATIVO',
+        donorId: params.donorId,
+        donationType: params.donationType,
+        finality: params.finality || 'MANUTENCAO_GERAL'
+      }));
+      receiptDocRefId = receiptDocRef.id;
+    }
 
     // 2. Transação em treasury_transactions (Visão geral e histórico)
-    await addDoc(collection(db, 'treasury_transactions'), {
+    await addDoc(collection(db, 'treasury_transactions'), cleanData({
       type: 'RECEITA',
-      receiptId: receiptDocRef.id,
+      receiptId: receiptDocRefId,
       receiptNumber: receiptNum,
       date: params.date,
       amount: params.amount,
@@ -185,7 +206,7 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
       donationType: params.donationType,
       finality: params.finality || 'MANUTENCAO_GERAL',
       isDonation: true
-    });
+    }));
 
     // 3. Atualizar totais do doador
     const donorSnap = donors.find(d => d.id === params.donorId);
@@ -198,6 +219,29 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
       lastDonationDate: params.date,
       updatedAt: nowIso
     });
+
+    // Se gerou recibo, emite o PDF
+    if (shouldGenerateReceipt && receiptNum) {
+      try {
+        await generateTreasuryReceiptPDF({
+          receiptNumber: receiptNum,
+          date: params.date,
+          amount: params.amount,
+          paymentMethod: params.paymentMethod || 'PIX',
+          category,
+          description: `Doação/Contribuição de ${params.donorName.trim()} - Casa OAMI`,
+          payerName: params.donorName.trim(),
+          cpf: params.donorCpf || undefined,
+          registeredBy: user?.name || 'Tesouraria',
+          observations: params.observations || undefined,
+          donationKind: 'FINANCIAL'
+        });
+      } catch (err) {
+        console.error('Erro ao gerar recibo PDF:', err);
+      }
+    }
+
+    return receiptNum;
   };
 
   // Sincronizar todas as doações cadastradas em Doadores que não estão no histórico (Acionado apenas por botão manual)
@@ -305,7 +349,7 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
 
     setLoading(true);
     try {
-      await launchTreasuryDonationForDonor({
+      const generatedReceiptNum = await launchTreasuryDonationForDonor({
         donorId: donationModalDonor.id,
         donorName: donationModalDonor.name,
         donorCpf: (donationModalDonor as any).cpfOrCnpj || null,
@@ -314,10 +358,15 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
         paymentMethod: donationForm.paymentMethod,
         donationType: donationModalDonor.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL',
         finality: donationForm.finality,
-        observations: donationForm.observations
+        observations: donationForm.observations,
+        generateReceipt: donationForm.generateReceipt
       });
 
-      showToast(`Doação de R$ ${amountVal.toFixed(2)} de ${donationModalDonor.name} registrada no Histórico e Visão Geral!`, 'success');
+      if (generatedReceiptNum) {
+        showToast(`Doação de R$ ${amountVal.toFixed(2)} registrada e Recibo Oficial Nº ${generatedReceiptNum} emitido em PDF!`, 'success');
+      } else {
+        showToast(`Doação de R$ ${amountVal.toFixed(2)} de ${donationModalDonor.name} registrada com sucesso na Tesouraria!`, 'success');
+      }
       setDonationModalDonor(null);
     } catch (err) {
       console.error('Erro ao lançar doação:', err);
@@ -413,20 +462,26 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
 
         await updateDoc(doc(db, 'donors', editingDonor.id), cleanedDonor);
 
-        // Sempre sincroniza automaticamente se houver valor financeiro
+        // Sincroniza se houver valor financeiro
         if (amountVal > 0) {
-          await launchTreasuryDonationForDonor({
+          const recNum = await launchTreasuryDonationForDonor({
             donorId: editingDonor.id,
             donorName: formData.name.trim(),
             donorCpf: formData.cpfOrCnpj || null,
             amount: amountVal,
             date: formData.startDate,
             paymentMethod: formData.paymentMethod,
-            donationType: formData.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL'
+            donationType: formData.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL',
+            generateReceipt: formData.generateReceipt
           });
+          if (recNum) {
+            showToast(`Cadastro atualizado e Recibo Oficial Nº ${recNum} emitido em PDF!`, 'success');
+          } else {
+            showToast('Cadastro de doador/sócio atualizado e sincronizado com a Tesouraria!', 'success');
+          }
+        } else {
+          showToast('Cadastro de doador/sócio atualizado com sucesso!', 'success');
         }
-
-        showToast('Cadastro de doador/sócio atualizado e sincronizado com a Tesouraria!', 'success');
       } else {
         const cleanedDonor = cleanData({
           name: formData.name,
@@ -445,20 +500,26 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
 
         const docRef = await addDoc(collection(db, 'donors'), cleanedDonor);
 
-        // Sempre lança na Tesouraria (Visão Geral e Histórico) se for doação financeira (> 0)
+        // Lança na Tesouraria se for doação financeira (> 0)
         if (amountVal > 0) {
-          await launchTreasuryDonationForDonor({
+          const recNum = await launchTreasuryDonationForDonor({
             donorId: docRef.id,
             donorName: formData.name.trim(),
             donorCpf: formData.cpfOrCnpj || null,
             amount: amountVal,
             date: formData.startDate,
             paymentMethod: formData.paymentMethod,
-            donationType: formData.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL'
+            donationType: formData.type === 'SOCIO_MENSAL' ? 'RECORRENTE' : 'EVENTUAL',
+            generateReceipt: formData.generateReceipt
           });
+          if (recNum) {
+            showToast(`Cadastro realizado e Recibo Oficial Nº ${recNum} emitido em PDF!`, 'success');
+          } else {
+            showToast('Cadastro realizado! Doação sincronizada na Tesouraria com sucesso.', 'success');
+          }
+        } else {
+          showToast('Cadastro realizado com sucesso!', 'success');
         }
-
-        showToast('Cadastro realizado! Doação sincronizada automaticamente na Visão Geral e no Histórico.', 'success');
       }
       handleCloseModal();
     } catch (err) {
@@ -648,16 +709,29 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
                     />
                   </div>
 
-                  <div className="col-span-2 bg-emerald-50 dark:bg-emerald-950/40 p-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center gap-3">
-                    <CheckCircle2 size={22} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    <div>
-                      <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                        Sincronização Automática com a Tesouraria
-                      </p>
-                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-0.5">
-                        Toda doação financeira cadastrada é lançada automaticamente na Visão Geral das Doações e no Histórico da Tesouraria com geração de recibo oficial.
-                      </p>
-                    </div>
+                  <div className={`col-span-2 p-4 rounded-2xl border transition-colors ${
+                    formData.generateReceipt 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800' 
+                      : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700'
+                  }`}>
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input 
+                        type="checkbox"
+                        checked={formData.generateReceipt}
+                        onChange={(e) => setFormData({ ...formData, generateReceipt: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <div>
+                        <p className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                          Gerar Recibo Oficial para esta contribuição inicial
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          {formData.generateReceipt 
+                            ? 'Será emitida a numeração oficial de recibo e o comprovante em PDF será baixado.' 
+                            : 'O recibo NÃO é gerado automaticamente. A doação é registrada na Tesouraria e o recibo pode ser emitido a qualquer momento pelo Histórico.'}
+                        </p>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
@@ -772,6 +846,31 @@ export const DonorsSection: React.FC<DonorsSectionProps> = ({ donors, showToast,
                     value={donationForm.observations}
                     onChange={(e) => setDonationForm({ ...donationForm, observations: e.target.value })}
                   />
+                </div>
+
+                <div className={`p-3.5 rounded-xl border transition-colors ${
+                  donationForm.generateReceipt 
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800' 
+                    : 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700'
+                }`}>
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input 
+                      type="checkbox"
+                      checked={donationForm.generateReceipt}
+                      onChange={(e) => setDonationForm({ ...donationForm, generateReceipt: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                        Gerar Recibo Oficial para esta doação
+                      </span>
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 block mt-0.5">
+                        {donationForm.generateReceipt 
+                          ? 'Será emitido o número oficial de recibo e o comprovante em PDF será baixado.' 
+                          : 'Por padrão o recibo não é gerado automaticamente. Marque caso deseje emitir a numeração e o PDF agora.'}
+                      </span>
+                    </div>
+                  </label>
                 </div>
 
                 <div className="pt-3 flex gap-3">
