@@ -15,7 +15,39 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Casa OAMI" />
+    <meta name="description" content="Sistema de gestão para a Instituição de Longa Permanência para Idosos OAMI em Vitória do Mearim-MA." />
     <link rel="apple-touch-icon" href="https://i.ibb.co/vC49wFB8/a3068c33-2467-4266-a9c3-da7b27dc78b8.jpg" />
+    <script>
+      (function() {
+        try {
+          // Garante que window.fetch tenha getter e setter para que extensões do Chrome
+          // e interceptores de requisição possam sobrescrever window.fetch sem erro de getter-only
+          var _origFetch = window.fetch;
+          var _activeFetch = _origFetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return _activeFetch; },
+            set: function(newFetch) { _activeFetch = newFetch; },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {}
+
+        // Impede que erros injetados por extensões do navegador afetem a aplicação
+        window.addEventListener('error', function(event) {
+          if (event && (
+            (event.filename && event.filename.indexOf('chrome-extension://') !== -1) ||
+            (event.message && (
+              event.message.indexOf('Cannot set property fetch of') !== -1 ||
+              event.message.indexOf('fetch of #<Window>') !== -1
+            ))
+          )) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
   </head>
   <body class="notranslate" translate="no">
     <div id="root" class="notranslate" translate="no"></div>

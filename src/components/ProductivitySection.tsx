@@ -39,6 +39,7 @@ import {
 import { db } from '../firebase';
 import { cn, getProfessionalName } from '../lib/utils';
 import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
 
 interface ProductivitySectionProps {
   user: User;
@@ -88,11 +89,23 @@ export const ProductivitySection = ({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [editConduct, setEditConduct] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(nursingEvolutions || []).map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(physioEvolutions || []).map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(psychEvolutions || []).map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...(pedagogyEvolutions || []).map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(socialEvolutions || []).map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(nutritionEvolutions || []).map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions]);
 
   // 1. Resolve logged in professional clinical record
   const activeProf = useMemo(() => {
@@ -331,13 +344,15 @@ export const ProductivitySection = ({
     (workshops || []).forEach(w => {
       const { isCreator, isTagged } = isAssociated(w.registeredBy || '', w.coWorkers);
       if (isCreator || isTagged) {
+        const prefix = w.type === 'ACAO_MES' ? 'Ação do Mês' : w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina';
+        const sector = w.type === 'ACAO_MES' ? 'Ações do Mês' : w.type === 'CAPACITACAO' ? 'Capacitações' : 'Oficinas';
         list.push({
           id: w.id,
-          title: `Oficina: ${w.title}`,
-          type: 'OFICINA',
-          sector: 'Oficinas',
+          title: `${prefix}: ${w.title}`,
+          type: w.type === 'ACAO_MES' ? 'ACAO_MES' : w.type === 'CAPACITACAO' ? 'CAPACITACAO' : 'OFICINA',
+          sector,
           date: w.date,
-          content: w.description || '',
+          content: w.description || w.what || '',
           isCreator,
           isTagged,
           creatorIdOrName: w.registeredBy || '',
@@ -398,7 +413,7 @@ export const ProductivitySection = ({
     const list = participationHistory;
     const created = list.filter(a => a.isCreator).length;
     const collaborated = list.filter(a => a.isTagged).length;
-    const workshopsCount = list.filter(a => a.type === 'OFICINA').length;
+    const workshopsCount = list.filter(a => a.type === 'OFICINA' || a.type === 'CAPACITACAO' || a.type === 'ACAO_MES').length;
     const total = list.length;
     
     // Collaboration percentage
@@ -424,14 +439,20 @@ export const ProductivitySection = ({
         (act.conduct || '').toLowerCase().includes(searchLower) ||
         (elderly.find(el => el.id === act.patientId)?.name || '').toLowerCase().includes(searchLower);
 
+      // Selected Professional filter
+      const matchesProf = !selectedProfFilter || (() => {
+        const { isDirect, isCoWorker } = matchesEvolutionToProfessional(act.raw || act, { name: selectedProfFilter });
+        return isDirect || isCoWorker;
+      })();
+
       // Tab/Type filter
-      if (typeFilter === 'ALL') return matchesSearch;
-      if (typeFilter === 'CREATOR') return matchesSearch && act.isCreator;
-      if (typeFilter === 'COLLABORATOR') return matchesSearch && act.isTagged;
-      if (typeFilter === 'OFICINA') return matchesSearch && act.type === 'OFICINA';
-      return matchesSearch && act.type === typeFilter;
+      if (typeFilter === 'ALL') return matchesSearch && matchesProf;
+      if (typeFilter === 'CREATOR') return matchesSearch && matchesProf && act.isCreator;
+      if (typeFilter === 'COLLABORATOR') return matchesSearch && matchesProf && act.isTagged;
+      if (typeFilter === 'OFICINA') return matchesSearch && matchesProf && (act.type === 'OFICINA' || act.type === 'CAPACITACAO' || act.type === 'ACAO_MES');
+      return matchesSearch && matchesProf && act.type === typeFilter;
     });
-  }, [participationHistory, searchTerm, typeFilter, elderly]);
+  }, [participationHistory, searchTerm, typeFilter, elderly, selectedProfFilter]);
 
   const handleEditClick = (act: any) => {
     setSelectedActivity(act);
@@ -601,6 +622,17 @@ export const ProductivitySection = ({
           </div>
         </div>
       </div>
+
+      {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+      <EvolutionProfessionalCounter
+        evolutions={allMultidisciplinaryEvolutions}
+        allEvolutions={allMultidisciplinaryEvolutions}
+        professionals={professionals}
+        selectedProfessional={selectedProfFilter}
+        onSelectProfessional={setSelectedProfFilter}
+        sectorName={activeProf.setor || 'Painel de Colaboração'}
+        title="Contagem dos Lançamentos das Profissionais (Painel de Colaboração)"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* 3. Real-time Participation History List Panel (2 Cols) */}

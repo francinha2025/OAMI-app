@@ -635,28 +635,29 @@ export function buildAllSystemRecords(props: GeneralReportProps): UnifiedReportI
     });
   });
 
-  // 2. OFICINAS & CAPACITAÇÕES
+  // 2. OFICINAS & CAPACITAÇÕES & AÇÕES DO MÊS
   (props.workshops || []).forEach(w => {
+    const isActionMonth = w.type === 'ACAO_MES';
     const isTraining = w.type === 'CAPACITACAO';
     const participantsList = Array.isArray(w.participants) ? w.participants : [];
     const count = participantsList.length;
-    const resp = normalizeProfessionalName(w.who || w.registeredBy, isTraining ? 'Capacitações' : 'Oficinas');
+    const resp = normalizeProfessionalName(w.who || w.registeredBy, isActionMonth ? 'Ações do Mês' : (isTraining ? 'Capacitações' : 'Oficinas'));
 
     items.push({
       id: `ws-${w.id || Math.random()}`,
-      category: isTraining ? 'TRAININGS' : 'WORKSHOPS',
-      categoryLabel: isTraining ? 'Capacitações' : 'Oficinas',
+      category: isActionMonth ? 'WORKSHOPS' : (isTraining ? 'TRAININGS' : 'WORKSHOPS'),
+      categoryLabel: isActionMonth ? 'Ações do Mês' : (isTraining ? 'Capacitações' : 'Oficinas'),
       sectorKey: isTraining ? 'CAPACITACOES' : 'OFICINAS',
-      sector: isTraining ? 'Capacitações Profissionais' : 'Oficinas Terapêuticas',
-      recordType: isTraining ? 'CAPACITACAO' : 'OFICINA',
-      recordTypeLabel: isTraining ? 'Capacitação Profissional' : 'Oficina Terapêutica / Recreativa',
+      sector: isActionMonth ? 'Ações Temáticas do Mês' : (isTraining ? 'Capacitações Profissionais' : 'Oficinas Terapêuticas'),
+      recordType: isActionMonth ? 'ACAO_MES' : (isTraining ? 'CAPACITACAO' : 'OFICINA'),
+      recordTypeLabel: isActionMonth ? 'Ação Temática / Comemorativa do Mês' : (isTraining ? 'Capacitação Profissional' : 'Oficina Terapêutica / Recreativa'),
       date: w.date || (w as any).when || new Date().toISOString(),
-      title: w.title || (isTraining ? 'Capacitação Institucional' : 'Oficina OAMI'),
+      title: w.title || (isActionMonth ? 'Ação Comemorativa do Mês' : (isTraining ? 'Capacitação Institucional' : 'Oficina OAMI')),
       responsible: resp,
-      roleOrFunction: isTraining ? 'Palestrante / Facilitador' : 'Oficineiro / Responsável',
+      roleOrFunction: isActionMonth ? 'Organizador / Facilitador' : (isTraining ? 'Palestrante / Facilitador' : 'Oficineiro / Responsável'),
       targetOrParticipant: count > 0 ? `${count} participante(s): ${participantsList.slice(0, 3).join(', ')}${count > 3 ? '...' : ''}` : 'Público Geral',
       participantsCount: count,
-      typeOrStatus: isTraining ? 'CAPACITAÇÃO' : 'OFICINA',
+      typeOrStatus: isActionMonth ? 'AÇÃO DO MÊS' : (isTraining ? 'CAPACITAÇÃO' : 'OFICINA'),
       description: w.description || w.what || '',
       conductOrOutcome: [
         w.why ? `Objetivo: ${w.why}` : '',

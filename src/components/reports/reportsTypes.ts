@@ -83,6 +83,7 @@ export type RecordType =
   | 'VISITA'
   | 'REUNIAO'
   | 'CAPACITACAO'
+  | 'ACAO_MES'
   | 'ESTOQUE'
   | 'PRODUCAO'
   | 'OUTRO';

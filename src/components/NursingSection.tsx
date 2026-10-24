@@ -35,6 +35,8 @@ import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 import { MultiPatientSelector } from './MultiPatientSelector';
 import { ProductivitySection } from './ProductivitySection';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
+import { VitalSignsCounter, matchesVitalSignToProfessional, isVitalSignAltered, getVitalSignAlertTags } from './VitalSignsCounter';
 import { Award } from 'lucide-react';
 
 interface NursingSectionProps {
@@ -112,6 +114,9 @@ export const NursingSection = (props: NursingSectionProps) => {
   const [editingData, setEditingData] = useState<any | null>(null);
   const [viewingEvo, setViewingEvo] = useState<NursingEvolution | null>(null);
   const [vitalsPatientFilter, setVitalsPatientFilter] = useState('');
+  const [vitalsProfFilter, setVitalsProfFilter] = useState<string | null>(null);
+  const [vitalsStatusFilter, setVitalsStatusFilter] = useState<'ALL' | 'ALTERED' | 'NORMAL' | null>(null);
+  const [vitalsSpecificAlertFilter, setVitalsSpecificAlertFilter] = useState<string | null>(null);
   const [dressingsPatientFilter, setDressingsPatientFilter] = useState('');
   const [incidentsPatientFilter, setIncidentsPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
@@ -903,6 +908,17 @@ export const NursingSection = (props: NursingSectionProps) => {
     </div>
   );
 
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(props.evolutions || []).map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(props.physioEvolutions || []).map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(props.psychEvolutions || []).map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...(props.pedagogyEvolutions || []).map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(props.socialEvolutions || []).map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(props.nutritionEvolutions || []).map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [props.evolutions, props.physioEvolutions, props.psychEvolutions, props.pedagogyEvolutions, props.socialEvolutions, props.nutritionEvolutions]);
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
       <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent">
@@ -980,8 +996,16 @@ export const NursingSection = (props: NursingSectionProps) => {
               <VitalSignsView 
                 patients={props.patients}
                 vitals={props.vitalSigns}
+                elderly={props.elderly}
+                professionals={props.professionals}
                 filter={vitalsPatientFilter}
                 setFilter={setVitalsPatientFilter}
+                profFilter={vitalsProfFilter}
+                setProfFilter={setVitalsProfFilter}
+                statusFilter={vitalsStatusFilter}
+                setStatusFilter={setVitalsStatusFilter}
+                specificAlertFilter={vitalsSpecificAlertFilter}
+                setSpecificAlertFilter={setVitalsSpecificAlertFilter}
                 onAdd={() => { setModalType('vital'); setIsModalOpen(true); }}
                 onEdit={(v) => { setEditingData(v); setModalType('vital'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'vital' })}
@@ -1008,6 +1032,8 @@ export const NursingSection = (props: NursingSectionProps) => {
                 onEdit={(e) => { setEditingData(e); setModalType('evolution'); setIsModalOpen(true); }}
                 onDelete={(id) => setDeleteConfirm({ id, type: 'evolution' })}
                 showToast={props.showToast}
+                professionals={props.professionals}
+                allEvolutions={allMultidisciplinaryEvolutions}
               />
             )}
             {activeTab === 'incidents' && (
@@ -2466,99 +2492,253 @@ const AVDSelect = ({ label, value, onChange }: { label: string, value?: string, 
   </div>
 );
 
-const VitalSignsView = ({ patients, vitals, onAdd, onEdit, onDelete, filter, setFilter }: { 
-  patients: NursingPatient[], 
-  vitals: VitalSigns[], 
-  onAdd: () => void,
-  onEdit: (v: VitalSigns) => void,
-  onDelete: (id: string) => void,
-  filter: string,
-  setFilter: (f: string) => void
-}) => (
-  <div className="space-y-6 animate-in fade-in duration-500">
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <h2 className="text-2xl font-black text-gray-800 dark:text-white">Sinais Vitais</h2>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+const VitalSignsView = ({ 
+  patients, 
+  vitals, 
+  elderly,
+  professionals,
+  onAdd, 
+  onEdit, 
+  onDelete, 
+  filter, 
+  setFilter,
+  profFilter,
+  setProfFilter,
+  statusFilter,
+  setStatusFilter,
+  specificAlertFilter,
+  setSpecificAlertFilter
+}: { 
+  patients: NursingPatient[]; 
+  vitals: VitalSigns[]; 
+  elderly?: Elderly[];
+  professionals?: Professional[];
+  onAdd: () => void;
+  onEdit: (v: VitalSigns) => void;
+  onDelete: (id: string) => void;
+  filter: string;
+  setFilter: (f: string) => void;
+  profFilter?: string | null;
+  setProfFilter?: (p: string | null) => void;
+  statusFilter?: 'ALL' | 'ALTERED' | 'NORMAL' | null;
+  setStatusFilter?: (s: 'ALL' | 'ALTERED' | 'NORMAL' | null) => void;
+  specificAlertFilter?: string | null;
+  setSpecificAlertFilter?: (a: string | null) => void;
+}) => {
+  // Filtered vitals based on all combined dimensions
+  const filteredVitals = useMemo(() => {
+    return (vitals || []).filter(v => {
+      // 1. Patient filter
+      if (filter && v.patientId !== filter && !(v as any).patientIds?.includes(filter)) {
+        return false;
+      }
+      // 2. Professional filter
+      if (profFilter) {
+        const matchesProf = matchesVitalSignToProfessional(v, { name: profFilter });
+        if (!matchesProf) return false;
+      }
+      // 3. Status filter (Normal vs Altered)
+      if (statusFilter && statusFilter !== 'ALL') {
+        const altered = isVitalSignAltered(v);
+        if (statusFilter === 'ALTERED' && !altered) return false;
+        if (statusFilter === 'NORMAL' && altered) return false;
+      }
+      // 4. Specific Alert filter
+      if (specificAlertFilter) {
+        if (specificAlertFilter === 'PA' && !(v.systolicBP > 140 || v.diastolicBP > 90 || (v.systolicBP < 90 && v.systolicBP > 0))) return false;
+        if (specificAlertFilter === 'FC' && !(v.heartRate > 100 || (v.heartRate < 60 && v.heartRate > 0))) return false;
+        if (specificAlertFilter === 'TEMP' && !(v.temperature > 37.5 || (v.temperature < 35.5 && v.temperature > 0))) return false;
+        if (specificAlertFilter === 'SAT' && !(v.saturation < 92 && v.saturation > 0)) return false;
+        if (specificAlertFilter === 'GLUCOSE' && !(v.bloodGlucose && (v.bloodGlucose > 180 || v.bloodGlucose < 70))) return false;
+      }
+      return true;
+    });
+  }, [vitals, filter, profFilter, statusFilter, specificAlertFilter]);
+
+  const isFiltering = Boolean(filter || profFilter || (statusFilter && statusFilter !== 'ALL') || specificAlertFilter);
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Opção de Contagem dos Lançamentos dos Sinais Vitais */}
+      <VitalSignsCounter
+        vitals={vitals || []}
+        patients={patients}
+        elderly={elderly}
+        professionals={professionals}
+        selectedProfessional={profFilter}
+        onSelectProfessional={setProfFilter}
+        selectedPatientId={filter || null}
+        onSelectPatient={(pid) => setFilter(pid || '')}
+        selectedStatus={statusFilter}
+        onSelectStatus={setStatusFilter}
+        selectedSpecificAlert={specificAlertFilter}
+        onSelectSpecificAlert={setSpecificAlertFilter}
+      />
+
+      {/* Barra de Filtro Rápido e Botão Novo Registro */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-gray-900 p-4 sm:p-5 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
+            <Activity className="text-red-600" size={20} />
+            <h3 className="text-lg font-black text-gray-900 dark:text-white">Registros de Aferição</h3>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
+              {filteredVitals.length} {filteredVitals.length === 1 ? 'registro' : 'registros'}
+            </span>
+          </div>
+
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-bold focus:outline-none focus:ring-2 focus:ring-red-500 min-w-[170px]"
+          >
+            <option value="">Filtrar p/ Idoso (Todos)</option>
+            {(patients || []).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+
+          {isFiltering && (
+            <button
+              onClick={() => {
+                setFilter('');
+                if (setProfFilter) setProfFilter(null);
+                if (setStatusFilter) setStatusFilter(null);
+                if (setSpecificAlertFilter) setSpecificAlertFilter(null);
+              }}
+              className="text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 flex items-center gap-1 cursor-pointer bg-red-50 dark:bg-red-950/40 px-3 py-2 rounded-xl transition-all"
+            >
+              <X size={14} />
+              <span>Limpar Filtros</span>
+            </button>
+          )}
+        </div>
+
+        <button 
+          onClick={onAdd} 
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-2xl font-black text-xs shadow-lg shadow-red-600/20 transition-all cursor-pointer shrink-0"
         >
-          <option value="">Todos os Idosos</option>
-          {(patients || []).map(p => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+          <Plus size={18} />
+          <span>Nova Aferição</span>
+        </button>
       </div>
-      <button onClick={onAdd} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-green-700 transition-all">
-        <Plus size={20} />
-        Novo Registro
-      </button>
-    </div>
-    <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 dark:bg-gray-800/50">
-            <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              <th className="px-6 py-4">Paciente</th>
-              <th className="px-6 py-4">Data/Hora</th>
-              <th className="px-6 py-4">PA</th>
-              <th className="px-6 py-4">FC</th>
-              <th className="px-6 py-4">Temp</th>
-              <th className="px-6 py-4">Sat</th>
-              <th className="px-6 py-4">Glic</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm divide-y divide-gray-50 dark:divide-gray-800">
-            {(vitals || []).filter(v => !filter || v.patientId === filter || (v as any).patientIds?.includes(filter)).map(v => {
-              const patient = (patients || []).find(p => p.id === v.patientId);
-              const displayName = (v as any).patientIds && (v as any).patientIds.length > 1
-                ? (v as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
-                : (patient?.name || 'N/A');
-              const isAltered = v.systolicBP > 140 || v.systolicBP < 90 || v.temperature > 37.5 || v.saturation < 92;
-              return (
-                <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                  <td className="px-6 py-4 font-bold">{displayName}</td>
-                  <td className="px-6 py-4 text-gray-500">{(v.date || (v as any).createdAt || '').split('T')[0]} {v.time || ''}</td>
-                  <td className="px-6 py-4 font-bold">{v.systolicBP}/{v.diastolicBP}</td>
-                  <td className="px-6 py-4">{v.heartRate} bpm</td>
-                  <td className="px-6 py-4">{v.temperature}°C</td>
-                  <td className="px-6 py-4">{v.saturation}%</td>
-                  <td className="px-6 py-4">{v.bloodGlucose ? `${v.bloodGlucose} mg/dL` : '-'}</td>
-                  <td className="px-6 py-4">
-                    <span className={cn("px-2 py-1 rounded-lg text-[10px] font-bold", 
-                      isAltered ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
-                    )}>
-                      {isAltered ? 'ALTERADO' : 'NORMAL'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => onEdit(v)}
-                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+
+      {/* Tabela de Lançamentos de Sinais Vitais */}
+      <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-gray-50 dark:bg-gray-800/50">
+              <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <th className="px-6 py-4">Paciente</th>
+                <th className="px-6 py-4">Data/Hora</th>
+                <th className="px-6 py-4">PA (mmHg)</th>
+                <th className="px-6 py-4">FC (bpm)</th>
+                <th className="px-6 py-4">Temp</th>
+                <th className="px-6 py-4">SatO2</th>
+                <th className="px-6 py-4">Glicemia</th>
+                <th className="px-6 py-4">Status / Alertas</th>
+                <th className="px-6 py-4">Responsável</th>
+                <th className="px-6 py-4 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm divide-y divide-gray-50 dark:divide-gray-800">
+              {filteredVitals.map(v => {
+                const patient = (patients || []).find(p => p.id === v.patientId);
+                const displayName = (v as any).patientIds && (v as any).patientIds.length > 1
+                  ? (v as any).patientIds.map((pid: string) => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                  : (patient?.name || (v as any).patientName || 'N/A');
+
+                const isAltered = isVitalSignAltered(v);
+                const alertTags = getVitalSignAlertTags(v);
+                const dateStr = v.date ? v.date.substring(0, 10).split('-').reverse().join('/') : '--/--';
+                const timeStr = v.time || '';
+
+                return (
+                  <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">{displayName}</td>
+                    <td className="px-6 py-4 text-gray-500 text-xs">
+                      {dateStr} {timeStr && <span className="font-semibold text-gray-700 dark:text-gray-300">({timeStr})</span>}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
+                      {v.systolicBP}/{v.diastolicBP}
+                    </td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{v.heartRate} bpm</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{v.temperature}°C</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">{v.saturation}%</td>
+                    <td className="px-6 py-4 text-gray-700 dark:text-gray-300">
+                      {v.bloodGlucose ? `${v.bloodGlucose} mg/dL` : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[10px] font-black uppercase", 
+                          isAltered 
+                            ? "bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800" 
+                            : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                        )}>
+                          {isAltered ? 'ALTERADO' : 'NORMAL'}
+                        </span>
+                        {alertTags.slice(0, 2).map((tag, tIdx) => (
+                          <span key={tIdx} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold text-gray-600 dark:text-gray-400">
+                      {v.registeredBy || 'Enfermagem'}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button 
+                          onClick={() => onEdit(v)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="Editar Aferição"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => onDelete(v.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 transition-colors rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                          title="Excluir Aferição"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredVitals.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-400 font-medium">
+                    <Activity className="mx-auto text-gray-300 dark:text-gray-600 mb-2" size={28} />
+                    <p className="text-sm font-bold text-gray-600 dark:text-gray-400">
+                      Nenhum registro de sinal vital encontrado para os filtros selecionados.
+                    </p>
+                    {isFiltering && (
+                      <button
+                        onClick={() => {
+                          setFilter('');
+                          if (setProfFilter) setProfFilter(null);
+                          if (setStatusFilter) setStatusFilter(null);
+                          if (setSpecificAlertFilter) setSpecificAlertFilter(null);
+                        }}
+                        className="mt-3 px-4 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold cursor-pointer"
                       >
-                        <Edit2 size={16} />
+                        Limpar Filtros
                       </button>
-                      <button 
-                        onClick={() => onDelete(v.id)}
-                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                    )}
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, setFilter }: { 
   patients: NursingPatient[], 
@@ -2643,7 +2823,18 @@ const DressingsView = ({ patients, dressings, onAdd, onEdit, onDelete, filter, s
   </div>
 );
 
-const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter, setFilter, showToast }: { 
+const EvolutionsView = ({ 
+  patients, 
+  evolutions, 
+  onAdd, 
+  onEdit, 
+  onDelete, 
+  filter, 
+  setFilter, 
+  showToast,
+  professionals = [],
+  allEvolutions = []
+}: { 
   patients: NursingPatient[], 
   evolutions: NursingEvolution[], 
   onAdd: () => void,
@@ -2651,9 +2842,12 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter,
   onDelete: (id: string) => void,
   filter: string,
   setFilter: (f: string) => void,
-  showToast?: (msg: string, type?: 'success' | 'error') => void
+  showToast?: (msg: string, type?: 'success' | 'error') => void,
+  professionals?: Professional[],
+  allEvolutions?: any[]
 }) => {
   const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string | null>(null);
 
   const toggleSelectEvolution = (id: string) => {
     setSelectedEvolutionIds(prev => 
@@ -2703,7 +2897,15 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter,
     });
   };
 
-  const displayedEvolutions = (evolutions || []).filter(e => !filter || e.patientId === filter || (e as any).patientIds?.includes(filter));
+  const displayedEvolutions = (evolutions || []).filter(e => {
+    const matchesPatient = !filter || e.patientId === filter || (e as any).patientIds?.includes(filter);
+    const matchesProf = !selectedProfFilter || (() => {
+      const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: selectedProfFilter });
+      return isDirect || isCoWorker;
+    })();
+    return matchesPatient && matchesProf;
+  });
+
   const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
   const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
 
@@ -2728,6 +2930,16 @@ const EvolutionsView = ({ patients, evolutions, onAdd, onEdit, onDelete, filter,
           Nova Evolução
         </button>
       </div>
+
+      {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+      <EvolutionProfessionalCounter
+        evolutions={evolutions}
+        allEvolutions={allEvolutions}
+        professionals={professionals}
+        selectedProfessional={selectedProfFilter}
+        onSelectProfessional={setSelectedProfFilter}
+        sectorName="Enfermagem"
+      />
 
       {/* Barra de Seleção em Lote */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">

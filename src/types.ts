@@ -156,6 +156,8 @@ export interface Elderly {
   fullName?: string;
   cpf?: string;
   birthCertificate?: string;
+  naturalidade?: string;
+  naturalness?: string;
   lastProfession?: string;
   birthDate: string;
   gender?: 'M' | 'F' | 'OUTRO';
@@ -272,7 +274,7 @@ export interface Workshop {
   date: string;
   description: string;
   participants: string[];
-  type: 'OFICINA' | 'CAPACITACAO';
+  type: 'OFICINA' | 'CAPACITACAO' | 'ACAO_MES';
   // 5W2H fields
   what: string;
   why: string;

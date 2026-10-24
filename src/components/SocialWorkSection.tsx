@@ -10,7 +10,7 @@ import {
   Moon, Sun, Smile, Meh, Frown, History,
   Lightbulb, Target, Star, ShieldAlert, Loader2, Zap,
   Home, MapPin, Briefcase, DollarSign, Activity,
-  FileCheck, FileWarning, FileX, Landmark
+  FileCheck, FileWarning, FileX, Landmark, UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -31,13 +31,15 @@ import {
   SocialLegalSituation, SocialStudy, SocialEvolution,
   SocialReferral, SocialFamilyVisit, SocialRiskSituation,
   PIA, Elderly,
-  NursingEvolution, PhysioEvolution, PsychEvolution, PedagogyEvolution, NutritionEvolution, Workshop, AppNotification, Professional
+  NursingEvolution, PhysioEvolution, PsychEvolution, PedagogyEvolution, NutritionEvolution, Workshop, AppNotification, Professional, Role
 } from '../types';
 import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 import { ProductivitySection } from './ProductivitySection';
 import { MultiPatientSelector } from './MultiPatientSelector';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
+import { VisitRecordsCounter, matchesVisitToProfessional } from './VisitRecordsCounter';
 import { Award } from 'lucide-react';
 
 interface SocialWorkSectionProps {
@@ -201,6 +203,18 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
   const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
   const [isMulti, setIsMulti] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [evolutionProfFilter, setEvolutionProfFilter] = useState<string | null>(null);
+
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map((e: any) => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(nursingEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(physioEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(psychEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Psicologia' })),
+      ...(pedagogyEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(nutritionEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [evolutions, nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, nutritionEvolutions]);
   const [profSearch, setProfSearch] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; collection: string; label: string } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<any | null>(null);
@@ -324,6 +338,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
   const [referralPatientFilter, setReferralPatientFilter] = useState('');
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   const [visitPatientFilter, setVisitPatientFilter] = useState('');
+  const [visitProfFilter, setVisitProfFilter] = useState<string | null>(null);
+  const [visitKinshipFilter, setVisitKinshipFilter] = useState<string | null>(null);
   const [riskPatientFilter, setRiskPatientFilter] = useState('');
   const [piaPatientFilter, setPiaPatientFilter] = useState('');
 
@@ -2955,6 +2971,20 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Opção de Contagem dos Lançamentos do Controle de Visitas */}
+          <VisitRecordsCounter
+            visits={familyVisits || []}
+            patients={patients}
+            elderly={elderly}
+            professionals={professionals}
+            selectedProfessional={visitProfFilter}
+            onSelectProfessional={setVisitProfFilter}
+            selectedPatientId={visitPatientFilter || null}
+            onSelectPatient={(pid) => setVisitPatientFilter(pid || '')}
+            selectedKinship={visitKinshipFilter}
+            onSelectKinship={setVisitKinshipFilter}
+          />
+
           {/* Bulk action strip for Visits */}
           {selectedVisitIds.length > 0 && (
             <motion.div 
@@ -3044,7 +3074,8 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
                       try {
                         const data = {
                           ...newVisitForm,
-                          date: newVisitForm.date || new Date().toISOString()
+                          date: newVisitForm.date || new Date().toISOString(),
+                          registeredBy: user?.name ? `${user.name} (${ROLE_LABELS[user.role as Role] || user.role || 'Assistente Social'})` : 'Jardeline Amorim (Assistente Social)'
                         };
                         await onSaveFamilyVisit(data);
                         setIsAddingVisit(false);
@@ -3142,242 +3173,284 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
           </AnimatePresence>
 
           {/* Master visits list table */}
-          <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-[#FAF9F6] dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                  <tr>
-                    <th className="p-4 pl-6 w-12 text-center">
-                      <input 
-                        type="checkbox"
-                        checked={(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).length > 0 && (familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).every(v => selectedVisitIds.includes(v.id))}
-                        onChange={(e) => {
-                          const tableVisits = (familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter);
-                          if (e.target.checked) {
-                            const toAdd = tableVisits.map(v => v.id);
-                            setSelectedVisitIds(prev => Array.from(new Set([...prev, ...toAdd])));
-                          } else {
-                            const toRemove = tableVisits.map(v => v.id);
-                            setSelectedVisitIds(prev => prev.filter(id => !toRemove.includes(id)));
-                          }
-                        }}
-                        className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-36">Data</th>
-                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-64">Idoso</th>
-                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Visitante</th>
-                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-40">Parentesco</th>
-                    <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Observações</th>
-                    <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest text-right w-36">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {(familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter || v.patientIds?.includes(visitPatientFilter)).map((visit) => {
-                    const patient = (patients || []).find(p => p.id === visit.patientId);
-                    const isEditing = editingVisitId === visit.id;
+          {(() => {
+            const displayedVisits = (familyVisits || []).filter((visit) => {
+              const matchesPatient = !visitPatientFilter || visit.patientId === visitPatientFilter || visit.patientIds?.includes(visitPatientFilter);
+              const matchesProf = !visitProfFilter || matchesVisitToProfessional(visit, { name: visitProfFilter });
+              const matchesKinship = !visitKinshipFilter || (visit.kinship && visit.kinship.trim().toLowerCase() === visitKinshipFilter.trim().toLowerCase());
+              return matchesPatient && matchesProf && matchesKinship;
+            });
 
-                    return (
-                      <tr 
-                        key={visit.id} 
-                        className={cn(
-                          "hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors",
-                          isEditing && "bg-blue-50/50 dark:bg-blue-950/20",
-                          selectedVisitIds.includes(visit.id) && "bg-red-50/20 dark:bg-red-950/10 font-bold"
-                        )}
-                      >
-                        {/* Checkbox column */}
-                        <td className="p-4 pl-6 w-12 text-center">
+            return (
+              <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-[#FAF9F6] dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                      <tr>
+                        <th className="p-4 pl-6 w-12 text-center">
                           <input 
                             type="checkbox"
-                            checked={selectedVisitIds.includes(visit.id)}
+                            checked={displayedVisits.length > 0 && displayedVisits.every(v => selectedVisitIds.includes(v.id))}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedVisitIds(prev => [...prev, visit.id]);
+                                const toAdd = displayedVisits.map(v => v.id);
+                                setSelectedVisitIds(prev => Array.from(new Set([...prev, ...toAdd])));
                               } else {
-                                setSelectedVisitIds(prev => prev.filter(item => item !== visit.id));
+                                const toRemove = displayedVisits.map(v => v.id);
+                                setSelectedVisitIds(prev => prev.filter(id => !toRemove.includes(id)));
                               }
                             }}
                             className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
-                        </td>
-
-                        {/* Date column */}
-                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold tracking-tighter">
-                          {isEditing ? (
-                            <input
-                              type="date"
-                              required
-                              value={inlineVisitForm.date ? inlineVisitForm.date.substring(0, 10) : ''}
-                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, date: e.target.value })}
-                              className="text-xs p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                              <span>{safeFormat(visit.date, 'dd/MM/yyyy')}</span>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Patient column */}
-                        <td className="px-5 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight capitalize">
-                          {isEditing ? (
-                            <select
-                              value={inlineVisitForm.patientId || ''}
-                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, patientId: e.target.value })}
-                              className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
-                            >
-                              {(patients || []).map(p => (
-                                <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">
-                              {visit.patientIds && visit.patientIds.length > 1
-                                ? visit.patientIds.map(pid => {
-                                    const pat = (patients || []).find(p => p.id === pid);
-                                    const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
-                                    return lk?.name || pat?.name;
-                                  }).filter(Boolean).join(', ')
-                                : (patient?.name || 'Não identificado')}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Visitor Name column */}
-                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold capitalize">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              required
-                              value={inlineVisitForm.visitorName || ''}
-                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, visitorName: e.target.value })}
-                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
-                            />
-                          ) : (
-                            <span>{visit.visitorName}</span>
-                          )}
-                        </td>
-
-                        {/* Kinship column */}
-                        <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              required
-                              value={inlineVisitForm.kinship || ''}
-                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, kinship: e.target.value })}
-                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
-                            />
-                          ) : (
-                            <span>{visit.kinship}</span>
-                          )}
-                        </td>
-
-                        {/* Observations column */}
-                        <td className="px-5 py-4">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={inlineVisitForm.observations || ''}
-                              onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, observations: e.target.value })}
-                              className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
-                            />
-                          ) : (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium max-w-xs truncate" title={visit.observations}>
-                              {visit.observations || '--'}
-                            </p>
-                          )}
-                        </td>
-
-                        {/* Actions column */}
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            {isEditing ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (!inlineVisitForm.patientId || !inlineVisitForm.visitorName) {
-                                      showToast('Campos obrigatórios não preenchidos!', 'error');
-                                      return;
-                                    }
-                                    try {
-                                      await onSaveFamilyVisit(inlineVisitForm, visit.id);
-                                      setEditingVisitId(null);
-                                      setInlineVisitForm({});
-                                      showToast('Visita familiar atualizada com sucesso!', 'success');
-                                    } catch (err) {
-                                      console.error(err);
-                                      showToast('Erro ao atualizar a visita', 'error');
-                                    }
-                                  }}
-                                  className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded-xl transition-all shadow-sm border border-green-100 dark:border-none"
-                                  title="Salvar"
-                                >
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingVisitId(null);
-                                    setInlineVisitForm({});
-                                  }}
-                                  className="p-2 text-gray-500 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all"
-                                  title="Cancelar"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingVisitId(visit.id);
-                                    setInlineVisitForm({ ...visit });
-                                  }}
-                                  className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
-                                  title="Editar instantaneamente"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (window.confirm(`Deseja realmente excluir a visita de ${visit.visitorName}?`)) {
-                                      onDeleteRecord('socialFamilyVisits', visit.id);
-                                      showToast('Visita excluída com sucesso!', 'success');
-                                    }
-                                  }}
-                                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
-                                  title="Excluir"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
+                        </th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-36">Data</th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-64">Idoso</th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Visitante</th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-36">Parentesco</th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest w-44">Registrado Por</th>
+                        <th className="px-5 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Observações</th>
+                        <th className="px-6 py-4 text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest text-right w-36">Ações</th>
                       </tr>
-                    );
-                  })}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {displayedVisits.map((visit) => {
+                        const patient = (patients || []).find(p => p.id === visit.patientId);
+                        const isEditing = editingVisitId === visit.id;
 
-                  {((familyVisits || []).filter(v => !visitPatientFilter || v.patientId === visitPatientFilter).length === 0) && (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-16 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-2">
-                          <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600" />
-                          <p className="text-sm text-gray-400 dark:text-gray-500 font-bold italic">Nenhum registro de visita filtrado.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        return (
+                          <tr 
+                            key={visit.id} 
+                            className={cn(
+                              "hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors",
+                              isEditing && "bg-blue-50/50 dark:bg-blue-950/20",
+                              selectedVisitIds.includes(visit.id) && "bg-red-50/20 dark:bg-red-950/10 font-bold"
+                            )}
+                          >
+                            {/* Checkbox column */}
+                            <td className="p-4 pl-6 w-12 text-center">
+                              <input 
+                                type="checkbox"
+                                checked={selectedVisitIds.includes(visit.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedVisitIds(prev => [...prev, visit.id]);
+                                  } else {
+                                    setSelectedVisitIds(prev => prev.filter(item => item !== visit.id));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-gray-300 dark:border-gray-700 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                            </td>
+
+                            {/* Date column */}
+                            <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold tracking-tighter">
+                              {isEditing ? (
+                                <input
+                                  type="date"
+                                  required
+                                  value={inlineVisitForm.date ? inlineVisitForm.date.substring(0, 10) : ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, date: e.target.value })}
+                                  className="text-xs p-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                                  <span>{safeFormat(visit.date, 'dd/MM/yyyy')}</span>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Patient column */}
+                            <td className="px-5 py-4 font-black text-gray-900 dark:text-white uppercase tracking-tight capitalize">
+                              {isEditing ? (
+                                <select
+                                  value={inlineVisitForm.patientId || ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, patientId: e.target.value })}
+                                  className="text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold w-full focus:ring-2 focus:ring-green-500 outline-none"
+                                >
+                                  {(patients || []).map(p => (
+                                    <option key={p.id} value={p.id}>{p.name.toUpperCase()}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className="text-gray-900 dark:text-white truncate font-bold text-sm tracking-tight">
+                                  {visit.patientIds && visit.patientIds.length > 1
+                                    ? visit.patientIds.map(pid => {
+                                        const pat = (patients || []).find(p => p.id === pid);
+                                        const lk = pat?.elderlyId ? (elderly || []).find(e => e.id === pat.elderlyId) : null;
+                                        return lk?.name || pat?.name;
+                                      }).filter(Boolean).join(', ')
+                                    : (patient?.name || 'Não identificado')}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Visitor Name column */}
+                            <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 font-bold capitalize">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  required
+                                  value={inlineVisitForm.visitorName || ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, visitorName: e.target.value })}
+                                  className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                              ) : (
+                                <span>{visit.visitorName}</span>
+                              )}
+                            </td>
+
+                            {/* Kinship column */}
+                            <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300 capitalize">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  required
+                                  value={inlineVisitForm.kinship || ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, kinship: e.target.value })}
+                                  className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                              ) : (
+                                <span>{visit.kinship}</span>
+                              )}
+                            </td>
+
+                            {/* Registered By column */}
+                            <td className="px-5 py-4 text-xs">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={inlineVisitForm.registeredBy || ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, registeredBy: e.target.value })}
+                                  placeholder="Assistente Social"
+                                  className="text-xs p-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none w-full"
+                                />
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-100 dark:border-emerald-800/60 text-[11px]">
+                                  <UserCheck size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  <span className="truncate max-w-[130px]">{visit.registeredBy || 'Jardeline Amorim'}</span>
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Observations column */}
+                            <td className="px-5 py-4">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={inlineVisitForm.observations || ''}
+                                  onChange={(e) => setInlineVisitForm({ ...inlineVisitForm, observations: e.target.value })}
+                                  className="text-xs p-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-850 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                              ) : (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium max-w-xs truncate" title={visit.observations}>
+                                  {visit.observations || '--'}
+                                </p>
+                              )}
+                            </td>
+
+                            {/* Actions column */}
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!inlineVisitForm.patientId || !inlineVisitForm.visitorName) {
+                                          showToast('Campos obrigatórios não preenchidos!', 'error');
+                                          return;
+                                        }
+                                        try {
+                                          await onSaveFamilyVisit(inlineVisitForm, visit.id);
+                                          setEditingVisitId(null);
+                                          setInlineVisitForm({});
+                                          showToast('Visita familiar atualizada com sucesso!', 'success');
+                                        } catch (err) {
+                                          console.error(err);
+                                          showToast('Erro ao atualizar a visita', 'error');
+                                        }
+                                      }}
+                                      className="p-2 text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded-xl transition-all shadow-sm border border-green-100 dark:border-none"
+                                      title="Salvar"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingVisitId(null);
+                                        setInlineVisitForm({});
+                                      }}
+                                      className="p-2 text-gray-500 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all"
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingVisitId(visit.id);
+                                        setInlineVisitForm({ ...visit });
+                                      }}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                                      title="Editar instantaneamente"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm(`Deseja realmente excluir a visita de ${visit.visitorName}?`)) {
+                                          onDeleteRecord('socialFamilyVisits', visit.id);
+                                          showToast('Visita excluída com sucesso!', 'success');
+                                        }
+                                      }}
+                                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                      {displayedVisits.length === 0 && (
+                        <tr>
+                          <td colSpan={8} className="px-6 py-16 text-center">
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <Calendar className="w-10 h-10 text-gray-300 dark:text-gray-600" />
+                              <p className="text-sm text-gray-400 dark:text-gray-500 font-bold italic">Nenhum registro de visita filtrado.</p>
+                              {(visitPatientFilter || visitProfFilter || visitKinshipFilter) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVisitPatientFilter('');
+                                    setVisitProfFilter(null);
+                                    setVisitKinshipFilter(null);
+                                  }}
+                                  className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline pt-2"
+                                >
+                                  Limpar filtros ativos da contagem
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -3845,8 +3918,14 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
 
   const renderEvolution = () => {
     const displayedEvolutions = (evolutions || []).filter(e => {
-      if (evolutionPatientFilter === 'GENERAL') return !e.patientId;
-      return !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+      const matchesPatient = evolutionPatientFilter === 'GENERAL' 
+        ? !e.patientId 
+        : (!evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter));
+      const matchesProf = !evolutionProfFilter || (() => {
+        const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+        return isDirect || isCoWorker;
+      })();
+      return matchesPatient && matchesProf;
     });
 
     return (
@@ -3894,6 +3973,16 @@ export const SocialWorkSection: React.FC<SocialWorkSectionProps> = (props) => {
             </button>
           </div>
         </div>
+
+        {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+        <EvolutionProfessionalCounter
+          evolutions={evolutions || []}
+          allEvolutions={allMultidisciplinaryEvolutions}
+          professionals={professionals}
+          selectedProfessional={evolutionProfFilter}
+          onSelectProfessional={setEvolutionProfFilter}
+          sectorName="Serviço Social"
+        />
 
         {/* Barra de Seleção em Lote */}
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">

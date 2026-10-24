@@ -30,6 +30,7 @@ import { generateModernExcel } from '../../lib/excelUtils';
 import { ROLE_LABELS } from '../../constants';
 import { safeReplace } from '../../lib/utils';
 import { Role } from '../../types';
+import { EvolutionProfessionalCounter } from '../EvolutionProfessionalCounter';
 
 export const ReportsSection: React.FC<GeneralReportProps> = (props) => {
   // Tab within Reports: 'general' (Relatório Geral) or 'periodic' (Relatórios Periódicos)
@@ -41,6 +42,7 @@ export const ReportsSection: React.FC<GeneralReportProps> = (props) => {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [selectedYear, setSelectedYear] = useState(format(new Date(), 'yyyy'));
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string | null>(null);
 
   const evolutions = props.evolutions || [];
   const socialEvolutions = props.socialEvolutions || [];
@@ -327,6 +329,16 @@ export const ReportsSection: React.FC<GeneralReportProps> = (props) => {
                 </div>
               </div>
             </div>
+
+            {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+            <EvolutionProfessionalCounter
+              evolutions={filteredData.evolutions}
+              allEvolutions={unifiedEvolutions}
+              selectedProfessional={selectedProfFilter}
+              onSelectProfessional={setSelectedProfFilter}
+              sectorName="Relatórios Periódicos"
+              title="Contagem dos Lançamentos das Profissionais (Relatórios)"
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-6 bg-green-50 dark:bg-green-900/10 rounded-2xl border border-green-100 dark:border-green-900/30">

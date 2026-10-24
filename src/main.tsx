@@ -19,9 +19,18 @@ if (localStorage.getItem('app_version') !== APP_VERSION) {
   localStorage.setItem('app_version', APP_VERSION);
 }
 
-// Global handlers to prevent Firestore internal assertion or quota limits from crashing the UI
+// Global handlers to prevent Firestore internal assertion or browser extension errors from crashing the UI
 window.addEventListener('error', (event) => {
   const msg = event.message || '';
+  const file = event.filename || '';
+  if (
+    file.includes('chrome-extension://') || 
+    msg.includes('Cannot set property fetch of') || 
+    msg.includes('fetch of #<Window>')
+  ) {
+    event.preventDefault();
+    return;
+  }
   if (msg.includes('FIRESTORE') || msg.includes('ASSERTION FAILED') || msg.includes('Quota exceeded') || msg.includes('quota')) {
     event.preventDefault();
     console.warn('Caught Firestore stream exception:', msg);
@@ -31,6 +40,14 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason?.message || String(event.reason || '');
+  if (
+    reason.includes('chrome-extension://') || 
+    reason.includes('Cannot set property fetch of') || 
+    reason.includes('fetch of #<Window>')
+  ) {
+    event.preventDefault();
+    return;
+  }
   if (reason.includes('FIRESTORE') || reason.includes('ASSERTION FAILED') || reason.includes('Quota exceeded') || reason.includes('quota')) {
     event.preventDefault();
     console.warn('Caught unhandled Firestore promise rejection:', reason);

@@ -13,13 +13,34 @@ export interface ResolvedParticipant {
 }
 
 const MOCK_MAP: Record<string, { name: string; role: string }> = {
-  'p1': { name: 'Franciara Coelho', role: 'Coordenadora Geral' },
-  'p2': { name: 'Dra. Ana Paula', role: 'Assistente Social' },
-  'p3': { name: 'Dra. Camila Santos', role: 'Psicóloga' },
-  'p4': { name: 'Prof. Marina Silva', role: 'Pedagoga' },
-  'p5': { name: 'Dr. Roberto Oliveira', role: 'Fisioterapeuta' },
-  'p6': { name: 'Enf. Juliana Rocha', role: 'Enfermeira' },
-  'p7': { name: 'Nutr. Beatriz Costa', role: 'Nutricionista' },
+  'p1': { name: 'Franciara Coelho', role: 'Coordenadora de Equipe' },
+  // Equipe Oficial OAMI
+  'prof_jardeline': { name: 'Jardeline Amorim', role: 'Assistente Social' },
+  'jardeline amorim': { name: 'Jardeline Amorim', role: 'Assistente Social' },
+  'prof_tenaelen': { name: 'Tenaelen Marinho', role: 'Psicóloga' },
+  'tenaelen marinho': { name: 'Tenaelen Marinho', role: 'Psicóloga' },
+  'prof_amanda': { name: 'Amanda Velez', role: 'Pedagoga' },
+  'amanda velez': { name: 'Amanda Velez', role: 'Pedagoga' },
+  'prof_jordana': { name: 'Jordana Viero', role: 'Enfermeira' },
+  'jordana viero': { name: 'Jordana Viero', role: 'Enfermeira' },
+  'prof_lysllie': { name: 'Lysllie Vieira', role: 'Fisioterapeuta' },
+  'lysllie vieira': { name: 'Lysllie Vieira', role: 'Fisioterapeuta' },
+  'prof_franciara': { name: 'Franciara Coelho', role: 'Coordenadora de Equipe' },
+  'franciara coelho': { name: 'Franciara Coelho', role: 'Coordenadora de Equipe' },
+  'franciara de abreu coelho': { name: 'Franciara Coelho', role: 'Coordenadora de Equipe' },
+  'franciara e abreu coelho': { name: 'Franciara Coelho', role: 'Coordenadora de Equipe' },
+  'prof_rodrigo': { name: 'Rodrigo', role: 'Projetista' },
+  'rodrigo': { name: 'Rodrigo', role: 'Projetista' },
+  'prof_lucas': { name: 'Lucas Emanuel Barbosa', role: 'Fabricante de Fraldas' },
+  'lucas emanuel': { name: 'Lucas Emanuel Barbosa', role: 'Fabricante de Fraldas' },
+  'lucas emanuel barbosa': { name: 'Lucas Emanuel Barbosa', role: 'Fabricante de Fraldas' },
+  'lucas emanoel barbosa': { name: 'Lucas Emanuel Barbosa', role: 'Fabricante de Fraldas' },
+  'prof_maria_enilde': { name: 'Maria Enilde', role: 'Presidente' },
+  'maria enilde': { name: 'Maria Enilde', role: 'Presidente' },
+  'prof_fernanda': { name: 'Fernanda Kellen', role: 'Auxiliar Administrativo' },
+  'fernanda kellen': { name: 'Fernanda Kellen', role: 'Auxiliar Administrativo' },
+  'prof_vania': { name: 'Vania Vieira Lima', role: 'Cuidadora' },
+  'vania vieira lima': { name: 'Vania Vieira Lima', role: 'Cuidadora' }
 };
 
 /**

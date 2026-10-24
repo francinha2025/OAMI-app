@@ -67,7 +67,7 @@ export async function generateWorkshopsInstitutionalPdf({
       title: String(raw.title || w.title || 'Atividade Institucional').trim(),
       date: String(raw.date || (w as any).date || raw.when || '').trim(),
       description: String(raw.description || raw.what || raw.how || '').trim(),
-      type: (raw.type || (w.recordType === 'CAPACITACAO' || w.sectorKey === 'CAPACITACOES' ? 'CAPACITACAO' : 'OFICINA')) as 'OFICINA' | 'CAPACITACAO',
+      type: (raw.type === 'ACAO_MES' ? 'ACAO_MES' : (raw.type === 'CAPACITACAO' || w.recordType === 'CAPACITACAO' || w.sectorKey === 'CAPACITACOES' ? 'CAPACITACAO' : 'OFICINA')) as 'OFICINA' | 'CAPACITACAO' | 'ACAO_MES',
       what: String(raw.what || raw.description || '').trim(),
       why: String(raw.why || raw.objective || raw.justification || '').trim(),
       where: String(raw.where || raw.location || raw.room || 'Sede OAMI').trim(),
@@ -94,6 +94,7 @@ export async function generateWorkshopsInstitutionalPdf({
   const totalActivities = workshops.length;
   const totalWorkshops = workshops.filter(w => w.type === 'OFICINA').length;
   const totalTrainings = workshops.filter(w => w.type === 'CAPACITACAO').length;
+  const totalMonthActions = workshops.filter(w => w.type === 'ACAO_MES').length;
   const totalParticipants = workshops.reduce((sum, w) => sum + (w.participants?.length || 0), 0);
 
   // Initialize jsPDF A4 portrait
@@ -161,6 +162,7 @@ export async function generateWorkshopsInstitutionalPdf({
   // ─────────────────────────────────────────────────────────────
   for (let index = 0; index < workshops.length; index++) {
     const w = workshops[index];
+    const isActionMonth = w.type === 'ACAO_MES';
     const isTraining = w.type === 'CAPACITACAO';
 
     // 1. PAGE BREAK CHECK FOR START OF ACTIVITY
@@ -169,7 +171,9 @@ export async function generateWorkshopsInstitutionalPdf({
     ensureSpace(65);
 
     // Activity Card Top Accent Line
-    if (isTraining) {
+    if (isActionMonth) {
+      doc.setFillColor(225, 29, 72); // rose 600
+    } else if (isTraining) {
       doc.setFillColor(124, 58, 237); // violet 600
     } else {
       doc.setFillColor(5, 150, 105); // emerald 600
@@ -178,12 +182,16 @@ export async function generateWorkshopsInstitutionalPdf({
     currentY += 5;
 
     // Type Badge Pill
-    const badgeText = isTraining ? 'CAPACITAÇÃO PROFISSIONAL' : 'OFICINA TERAPÊUTICA';
+    const badgeText = isActionMonth ? 'AÇÃO DO MÊS / TEMÁTICA' : (isTraining ? 'CAPACITAÇÃO PROFISSIONAL' : 'OFICINA TERAPÊUTICA');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     const badgeWidth = doc.getTextWidth(badgeText) + 8;
     
-    if (isTraining) {
+    if (isActionMonth) {
+      doc.setFillColor(255, 241, 242); // rose 50
+      doc.setDrawColor(254, 205, 211); // rose 200
+      doc.setTextColor(190, 18, 60); // rose 700
+    } else if (isTraining) {
       doc.setFillColor(245, 243, 255); // violet 50
       doc.setDrawColor(221, 214, 254); // violet 200
       doc.setTextColor(109, 40, 217); // violet 700
@@ -608,47 +616,57 @@ export async function generateWorkshopsInstitutionalPdf({
       doc.setLineWidth(0.3);
       doc.roundedRect(marginX, 35, contentWidth, 14, 2, 2, 'FD');
 
-      const kpiColW = contentWidth / 4;
+      const kpiColW = contentWidth / 5;
 
       // Col 1: Total Atividades
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(100, 116, 139);
-      doc.text('TOTAL DE ATIVIDADES', marginX + 4, 39.5);
+      doc.text('TOTAL ATIVIDADES', marginX + 3, 39.5);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
+      doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(`${totalActivities}`, marginX + 4, 45.5);
+      doc.text(`${totalActivities}`, marginX + 3, 45.5);
 
       // Col 2: Oficinas
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(100, 116, 139);
-      doc.text('OFICINAS TERAPÊUTICAS', marginX + kpiColW + 4, 39.5);
+      doc.text('OFICINAS', marginX + kpiColW + 3, 39.5);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
+      doc.setFontSize(10);
       doc.setTextColor(5, 150, 105);
-      doc.text(`${totalWorkshops}`, marginX + kpiColW + 4, 45.5);
+      doc.text(`${totalWorkshops}`, marginX + kpiColW + 3, 45.5);
 
       // Col 3: Capacitações
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(100, 116, 139);
-      doc.text('CAPACITAÇÕES TÉCNICAS', marginX + kpiColW * 2 + 4, 39.5);
+      doc.text('CAPACITAÇÕES', marginX + kpiColW * 2 + 3, 39.5);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
+      doc.setFontSize(10);
       doc.setTextColor(124, 58, 237);
-      doc.text(`${totalTrainings}`, marginX + kpiColW * 2 + 4, 45.5);
+      doc.text(`${totalTrainings}`, marginX + kpiColW * 2 + 3, 45.5);
 
-      // Col 4: Participantes Totais
+      // Col 4: Ações do Mês
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.5);
+      doc.setFontSize(6);
       doc.setTextColor(100, 116, 139);
-      doc.text('PARTICIPANTES REGISTRADOS', marginX + kpiColW * 3 + 4, 39.5);
+      doc.text('AÇÕES DO MÊS', marginX + kpiColW * 3 + 3, 39.5);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10.5);
+      doc.setFontSize(10);
+      doc.setTextColor(225, 29, 72);
+      doc.text(`${totalMonthActions}`, marginX + kpiColW * 3 + 3, 45.5);
+
+      // Col 5: Participantes Totais
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 116, 139);
+      doc.text('PARTICIPANTES', marginX + kpiColW * 4 + 3, 39.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text(`${totalParticipants} pessoas`, marginX + kpiColW * 3 + 4, 45.5);
+      doc.text(`${totalParticipants} p.`, marginX + kpiColW * 4 + 3, 45.5);
     } else {
       // ──────────────── PAGE 2+: REPEATING DISCREET HEADER ────────────────
       doc.setFillColor(5, 150, 105);

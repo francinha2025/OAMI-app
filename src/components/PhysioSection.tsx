@@ -34,6 +34,7 @@ import { PhotoUpload } from './PhotoUpload';
 import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 import { ProductivitySection } from './ProductivitySection';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
 import { Award } from 'lucide-react';
 
 interface PhysioSectionProps {
@@ -264,6 +265,18 @@ export const PhysioSection = ({
   const [editingData, setEditingData] = useState<any>(null);
   const [isDetailView, setIsDetailView] = useState(false);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [evolutionProfFilter, setEvolutionProfFilter] = useState<string | null>(null);
+
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map(e => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(nursingEvolutions || []).map(e => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(psychEvolutions || []).map(e => ({ ...e, sectorName: 'Psicologia' })),
+      ...(pedagogyEvolutions || []).map(e => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(socialEvolutions || []).map(e => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(nutritionEvolutions || []).map(e => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [evolutions, nursingEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions]);
   const [assessmentPatientFilter, setAssessmentPatientFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string, type: 'patient' | 'assessment' | 'evolution' | 'exercise' | 'appointment' } | null>(null);
   const [viewingEvo, setViewingEvo] = useState<PhysioEvolution | null>(null);
@@ -1473,9 +1486,26 @@ export const PhysioSection = ({
                 </button>
               </div>
 
+              {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+              <EvolutionProfessionalCounter
+                evolutions={evolutions || []}
+                allEvolutions={allMultidisciplinaryEvolutions}
+                professionals={professionals}
+                selectedProfessional={evolutionProfFilter}
+                onSelectProfessional={setEvolutionProfFilter}
+                sectorName="Fisioterapia"
+              />
+
               {/* Barra de Seleção em Lote */}
               {(() => {
-                const displayedEvolutions = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter));
+                const displayedEvolutions = (evolutions || []).filter(e => {
+                  const matchesPatient = !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+                  const matchesProf = !evolutionProfFilter || (() => {
+                    const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+                    return isDirect || isCoWorker;
+                  })();
+                  return matchesPatient && matchesProf;
+                });
                 const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
                 const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
 
@@ -1522,7 +1552,14 @@ export const PhysioSection = ({
 
               <div className="space-y-4">
                 {(() => {
-                  const displayed = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter));
+                  const displayed = (evolutions || []).filter(e => {
+                    const matchesPatient = !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+                    const matchesProf = !evolutionProfFilter || (() => {
+                      const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+                      return isDirect || isCoWorker;
+                    })();
+                    return matchesPatient && matchesProf;
+                  });
                   return displayed.map((e) => {
                     const patient = (patients || []).find(p => p.id === e.patientId);
                     const isSelected = selectedEvolutionIds.includes(e.id);

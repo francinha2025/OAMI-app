@@ -10,7 +10,8 @@ import {
   FileDown,
   Loader2,
   BookOpen,
-  GraduationCap
+  GraduationCap,
+  Heart
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,23 +43,27 @@ export const WorkshopsReportView: React.FC<Props> = ({
   onSelectItem
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'ALL' | 'OFICINA' | 'CAPACITACAO'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'OFICINA' | 'CAPACITACAO' | 'ACAO_MES'>('ALL');
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
-  // Filter both workshops and capacitações / group activities
+  // Filter both workshops, capacitações and ações do mês
   const allWorkshopsAndTrainings = items.filter(
     i => i.sectorKey === 'OFICINAS' || i.recordType === 'OFICINA' ||
-         i.sectorKey === 'CAPACITACOES' || i.recordType === 'CAPACITACAO'
+         i.sectorKey === 'CAPACITACOES' || i.recordType === 'CAPACITACAO' ||
+         i.recordType === 'ACAO_MES'
   );
 
   const totalCount = allWorkshopsAndTrainings.length;
-  const workshopsCount = allWorkshopsAndTrainings.filter(i => i.sectorKey === 'OFICINAS' || i.recordType === 'OFICINA').length;
+  const workshopsCount = allWorkshopsAndTrainings.filter(i => i.recordType === 'OFICINA' && i.sectorKey !== 'CAPACITACOES').length;
   const trainingsCount = allWorkshopsAndTrainings.filter(i => i.sectorKey === 'CAPACITACOES' || i.recordType === 'CAPACITACAO').length;
+  const monthActionsCount = allWorkshopsAndTrainings.filter(i => i.recordType === 'ACAO_MES').length;
 
   const filtered = allWorkshopsAndTrainings.filter(w => {
+    const isActionMonth = w.recordType === 'ACAO_MES';
     const isTraining = w.recordType === 'CAPACITACAO' || w.sectorKey === 'CAPACITACOES';
-    if (filterType === 'OFICINA' && isTraining) return false;
+    if (filterType === 'OFICINA' && (isTraining || isActionMonth)) return false;
     if (filterType === 'CAPACITACAO' && !isTraining) return false;
+    if (filterType === 'ACAO_MES' && !isActionMonth) return false;
 
     if (!searchTerm.trim()) return true;
     const lower = searchTerm.toLowerCase();
@@ -182,6 +187,21 @@ export const WorkshopsReportView: React.FC<Props> = ({
             {trainingsCount}
           </span>
         </button>
+
+        <button
+          onClick={() => setFilterType('ACAO_MES')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+            filterType === 'ACAO_MES'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+          }`}
+        >
+          <Heart size={13} />
+          <span>Ações do Mês</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-black/10 dark:bg-white/20 font-black">
+            {monthActionsCount}
+          </span>
+        </button>
       </div>
 
       {/* Table */}
@@ -189,7 +209,7 @@ export const WorkshopsReportView: React.FC<Props> = ({
         {filtered.length === 0 ? (
           <div className="p-12 text-center text-gray-400">
             <BookOpen size={36} className="mx-auto mb-2 opacity-40" />
-            <p className="font-bold text-sm">Nenhuma oficina ou capacitação encontrada no período selecionado.</p>
+            <p className="font-bold text-sm">Nenhuma atividade encontrada no período selecionado.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -208,6 +228,7 @@ export const WorkshopsReportView: React.FC<Props> = ({
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800/60">
                 {filtered.map(w => {
+                  const isActionMonth = w.recordType === 'ACAO_MES';
                   const isTraining = w.recordType === 'CAPACITACAO' || w.sectorKey === 'CAPACITACOES';
 
                   return (
@@ -220,12 +241,14 @@ export const WorkshopsReportView: React.FC<Props> = ({
                       {/* Tipo */}
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          isTraining
+                          isActionMonth
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                            : isTraining
                             ? 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                         }`}>
-                          {isTraining ? <GraduationCap size={11} /> : <Sparkles size={11} />}
-                          {isTraining ? 'Capacitação' : 'Oficina'}
+                          {isActionMonth ? <Heart size={11} /> : isTraining ? <GraduationCap size={11} /> : <Sparkles size={11} />}
+                          {isActionMonth ? 'Ação do Mês' : isTraining ? 'Capacitação' : 'Oficina'}
                         </span>
                       </td>
 

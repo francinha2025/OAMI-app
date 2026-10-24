@@ -64,6 +64,12 @@ export type PeriodPreset = 'today' | 'week' | 'month' | 'last_month' | 'year' | 
 
 export type MonitoringTab =
   | 'overview'
+  | 'control_all'
+  | 'colab'
+  | 'tecnicos'
+  | 'administrativo'
+  | 'institucional'
+  | 'operacional'
   | 'elderly'
   | 'multidisciplinary'
   | 'activities'
@@ -172,6 +178,8 @@ export interface MonitoringSectionProps {
   diaperProductionGoals?: DiaperProductionGoal[];
   financialRecords?: FinancialRecord[];
   allPhotos?: GalleryItem[];
+  communityElderly?: any[];
+  onNavigateTab?: (tab: string) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   showConfirm?: (message: string, onConfirm: () => void) => void;
 }

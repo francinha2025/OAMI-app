@@ -19,6 +19,7 @@ import {
   NursingEvolution, PhysioEvolution, PedagogyEvolution, SocialEvolution, NutritionEvolution, Workshop, AppNotification, Professional
 } from '../types';
 import { ProductivitySection } from './ProductivitySection';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
 import { Award } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn, safeReplace, getProfessionalName } from '../lib/utils';
@@ -98,7 +99,12 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     onSaveEmotionalMonitoring, onSaveFamilyBond, onSaveActivity,
     onSaveCognitionAssessment, onSaveInterventionPlan, onDeleteRecord,
     onDeletePatient, onSavePhotos, user, onUpdateProfile,
-    professionals = []
+    professionals = [],
+    nursingEvolutions = [],
+    physioEvolutions = [],
+    pedagogyEvolutions = [],
+    socialEvolutions = [],
+    nutritionEvolutions = []
   } = props;
   const [activeTab, setActiveTab] = useState<PsychTab>(() => {
     const saved = localStorage.getItem('oami-psychology-tab');
@@ -1401,6 +1407,17 @@ export const PsychologySection = (props: PsychologySectionProps) => {
     </div>
   );
 
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map((e: any) => ({ ...e, sectorName: 'Psicologia' })),
+      ...(nursingEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(physioEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(pedagogyEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(socialEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(nutritionEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [evolutions, nursingEvolutions, physioEvolutions, pedagogyEvolutions, socialEvolutions, nutritionEvolutions]);
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
       <aside className="w-full lg:w-64 flex lg:flex-col overflow-x-auto lg:overflow-y-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 md:mx-0 md:px-0 snap-x scroll-smooth sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 lg:static lg:bg-transparent custom-scrollbar">
@@ -1516,6 +1533,8 @@ export const PsychologySection = (props: PsychologySectionProps) => {
                 onDelete={(id: string) => setDeleteConfirm({ id, type: 'evolution' })}
                 onView={setViewingEvo}
                 showToast={showToast}
+                professionals={professionals}
+                allEvolutions={allMultidisciplinaryEvolutions}
               />
             )}
             {activeTab === 'cognition' && (
@@ -2323,8 +2342,9 @@ const InitialAssessmentView = ({ patients, elderly, assessments, monitorings, co
   </div>
 );
 
-const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, onView, filter, setFilter, showToast }: any) => {
+const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete, onView, filter, setFilter, showToast, professionals = [], allEvolutions = [] }: any) => {
   const [selectedEvolutionIds, setSelectedEvolutionIds] = useState<string[]>([]);
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string | null>(null);
 
   const toggleSelectEvolution = (id: string) => {
     setSelectedEvolutionIds(prev => 
@@ -2377,7 +2397,15 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
     });
   };
 
-  const displayedEvolutions = (evolutions || []).filter((e: any) => !filter || e.patientId === filter || e.patientIds?.includes(filter));
+  const displayedEvolutions = (evolutions || []).filter((e: any) => {
+    const matchesPatient = !filter || e.patientId === filter || e.patientIds?.includes(filter);
+    const matchesProf = !selectedProfFilter || (() => {
+      const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: selectedProfFilter });
+      return isDirect || isCoWorker;
+    })();
+    return matchesPatient && matchesProf;
+  });
+
   const allSelected = displayedEvolutions.length > 0 && displayedEvolutions.every(e => selectedEvolutionIds.includes(e.id));
   const someSelected = displayedEvolutions.some(e => selectedEvolutionIds.includes(e.id));
 
@@ -2407,6 +2435,16 @@ const EvolutionView = ({ patients, elderly, evolutions, onAdd, onEdit, onDelete,
           <Plus size={18} /> Nova Evolução
         </button>
       </div>
+
+      {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+      <EvolutionProfessionalCounter
+        evolutions={evolutions || []}
+        allEvolutions={allEvolutions}
+        professionals={professionals}
+        selectedProfessional={selectedProfFilter}
+        onSelectProfessional={setSelectedProfFilter}
+        sectorName="Psicologia"
+      />
 
       {/* Barra de Seleção em Lote */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">

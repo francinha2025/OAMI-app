@@ -35,6 +35,7 @@ import { DigitizeButton } from './DigitizeButton';
 import { VoiceTranscriptionButton } from './VoiceTranscriptionButton';
 import { MultiPatientSelector } from './MultiPatientSelector';
 import { ProductivitySection } from './ProductivitySection';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
 import { Award } from 'lucide-react';
 
 // Movendo componentes auxiliares para o topo para evitar problemas de inicialização
@@ -117,7 +118,7 @@ interface PedagogySectionProps {
   defaultTab?: string;
 }
 
-type TabType = 'dashboard' | 'residents' | 'activities' | 'monitoring' | 'productivity' | 'reports' | 'settings';
+type TabType = 'dashboard' | 'residents' | 'activities' | 'evolutions' | 'monitoring' | 'productivity' | 'reports' | 'settings';
 
 const NavButton: React.FC<{ active: boolean, onClick: () => void, icon: any, label: string }> = ({ active, onClick, icon: Icon, label }) => (
   <button
@@ -199,6 +200,18 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
   const [modalType, setModalType] = useState<string>('');
   const [selectedPatient, setSelectedPatient] = useState<PedagogyPatient | null>(null);
   const [evolutionPatientFilter, setEvolutionPatientFilter] = useState('');
+  const [evolutionProfFilter, setEvolutionProfFilter] = useState<string | null>(null);
+
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map((e: any) => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(nursingEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(physioEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(psychEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Psicologia' })),
+      ...(socialEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Serviço Social' })),
+      ...(nutritionEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Nutrição' }))
+    ];
+  }, [evolutions, nursingEvolutions, physioEvolutions, psychEvolutions, socialEvolutions, nutritionEvolutions]);
   const [stimulationPatientFilter, setStimulationPatientFilter] = useState('');
   const [socialPatientFilter, setSocialPatientFilter] = useState('');
   const [formData, setFormData] = useState<any>({});
@@ -2113,6 +2126,162 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
 
 
 
+  const renderEvolutionsTab = () => {
+    const displayedEvos = (evolutions || []).filter(e => {
+      const matchesPatient = !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+      const matchesProf = !evolutionProfFilter || (() => {
+        const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+        return isDirect || isCoWorker;
+      })();
+      return matchesPatient && matchesProf;
+    }).slice().sort((a, b) => {
+      const dateDiff = b.date.localeCompare(a.date);
+      if (dateDiff !== 0) return dateDiff;
+      return (b.time || '').localeCompare(a.time || '');
+    });
+
+    const allSelected = displayedEvos.length > 0 && displayedEvos.every(e => selectedEvolutionIds.includes(e.id));
+    const someSelected = displayedEvos.some(e => selectedEvolutionIds.includes(e.id));
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h3 className="text-xl font-black text-gray-900 dark:text-white" translate="no">Evoluções Pedagógicas</h3>
+            <select
+              value={evolutionPatientFilter}
+              onChange={(e) => setEvolutionPatientFilter(e.target.value)}
+              className="text-xs p-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos os Idosos</option>
+              {(patients || []).map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => openModal('evolution')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-bold shadow-md"
+          >
+            <Plus className="w-5 h-5" />
+            Nova Evolução
+          </button>
+        </div>
+
+        {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+        <EvolutionProfessionalCounter
+          evolutions={evolutions || []}
+          allEvolutions={allMultidisciplinaryEvolutions}
+          professionals={professionals}
+          selectedProfessional={evolutionProfFilter}
+          onSelectProfessional={setEvolutionProfFilter}
+          sectorName="Pedagogia"
+        />
+
+        {/* Barra de Seleção em Lote */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox"
+              checked={allSelected}
+              ref={el => {
+                if (el) {
+                  el.indeterminate = someSelected && !allSelected;
+                }
+              }}
+              onChange={() => handleSelectAllEvolutions(displayedEvos)}
+              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {selectedEvolutionIds.length === 0 
+                ? 'Nenhuma evolução selecionada' 
+                : `${selectedEvolutionIds.length} evolução(ões) selecionada(s)`}
+            </span>
+          </div>
+          {selectedEvolutionIds.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedEvolutionIds([])}
+                className="text-xs font-bold text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Limpar Seleção
+              </button>
+              <button
+                onClick={handleDownloadSelectedEvolutions}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-green-700 transition-colors shadow-md"
+              >
+                <Printer size={14} />
+                Imprimir Selecionadas
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {displayedEvos.map((evolution) => {
+            const patient = (patients || []).find(p => p.id === evolution.patientId);
+            const isSelected = selectedEvolutionIds.includes(evolution.id);
+            return (
+              <div key={evolution.id} className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200 dark:border-gray-800 flex gap-4 items-center justify-between hover:shadow-sm transition-shadow">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <input 
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectEvolution(evolution.id)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer"
+                  />
+                  <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm shrink-0">
+                    {patient?.photoUrl ? <img src={patient.photoUrl} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-5 h-5 text-gray-400 m-2.5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-gray-900 dark:text-white truncate">
+                      {evolution.patientIds && evolution.patientIds.length > 1 
+                        ? evolution.patientIds.map(pid => (patients || []).find(p => p.id === pid)?.name).filter(Boolean).join(', ')
+                        : (patient?.name || 'N/A')}
+                    </p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300 font-bold truncate">
+                      {evolution.activityTitle} • {evolution.observations || evolution.response}
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+                      {safeDateFormat(evolution.date, 'dd/MM/yyyy')}{evolution.time ? ` às ${evolution.time}` : ''} • Por: {evolution.registeredBy || 'Amanda Velez'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={cn(
+                    "text-[10px] font-black px-2.5 py-1 rounded-full uppercase border",
+                    evolution.participation === 'ATIVO' ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                  )}>
+                    {evolution.participation}
+                  </span>
+                  <button 
+                    onClick={() => openModal('evolution', evolution)} 
+                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl"
+                    title="Editar"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setDeleteConfirm({ id: evolution.id, type: 'evolution' })} 
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
+                    title="Excluir"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {displayedEvos.length === 0 && (
+            <div className="p-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+              Nenhuma evolução pedagógica encontrada para os filtros selecionados.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderActivitiesTab = () => (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -2236,9 +2405,26 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
             </select>
           </div>
 
+          {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+          <EvolutionProfessionalCounter
+            evolutions={evolutions || []}
+            allEvolutions={allMultidisciplinaryEvolutions}
+            professionals={professionals}
+            selectedProfessional={evolutionProfFilter}
+            onSelectProfessional={setEvolutionProfFilter}
+            sectorName="Pedagogia"
+          />
+
           {/* Barra de Seleção em Lote */}
           {(() => {
-            const displayedEvos = (evolutions || []).filter(e => !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter)).slice().sort((a, b) => {
+            const displayedEvos = (evolutions || []).filter(e => {
+              const matchesPatient = !evolutionPatientFilter || e.patientId === evolutionPatientFilter || e.patientIds?.includes(evolutionPatientFilter);
+              const matchesProf = !evolutionProfFilter || (() => {
+                const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+                return isDirect || isCoWorker;
+              })();
+              return matchesPatient && matchesProf;
+            }).slice().sort((a, b) => {
               const dateDiff = b.date.localeCompare(a.date);
               if (dateDiff !== 0) return dateDiff;
               return (b.time || '').localeCompare(a.time || '');
@@ -3129,6 +3315,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'residents', label: 'Residentes', icon: Users },
           { id: 'activities', label: 'Oficinas & Atividades', icon: Palette },
+          { id: 'evolutions', label: 'Evoluções', icon: ClipboardList },
           { id: 'monitoring', label: 'Monitoramento', icon: TrendingUp },
           { id: 'productivity', label: 'Painel e Colaboração', icon: Award },
           { id: 'reports', label: 'Relatórios', icon: FileText },
@@ -3299,6 +3486,7 @@ export const PedagogySection: React.FC<PedagogySectionProps> = (props) => {
               />
             )}
             {activeTab === 'activities' && renderActivitiesTab()}
+            {activeTab === 'evolutions' && renderEvolutionsTab()}
             {activeTab === 'monitoring' && renderMonitoring()}
             {activeTab === 'reports' && renderReports()}
           </motion.div>

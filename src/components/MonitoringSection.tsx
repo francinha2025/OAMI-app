@@ -58,6 +58,8 @@ import {
 import { ElderlyDetailModal } from './monitoring/ElderlyDetailModal';
 import { MonitoringCharts } from './monitoring/MonitoringCharts';
 import { safeFormat, cn, appendAgeToName } from '../lib/utils';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
+import { InstitutionalControlHub } from './monitoring/InstitutionalControlHub';
 
 export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
   const {
@@ -112,6 +114,8 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
     diaperProductionGoals = [],
     financialRecords = [],
     allPhotos = [],
+    communityElderly = [],
+    onNavigateTab,
     showToast
   } = props;
 
@@ -135,6 +139,7 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
 
   // Selected Elderly for Drill-down Modal
   const [selectedElderlyForModal, setSelectedElderlyForModal] = useState<Elderly | null>(null);
+  const [selectedProfFilter, setSelectedProfFilter] = useState<string | null>(null);
 
   // Export State
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -747,9 +752,14 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
       <div className="flex items-center gap-2 overflow-x-auto pb-2 shrink-0 no-print">
         {[
           { id: 'overview', label: 'Painel Geral', icon: LayoutDashboard },
-          { id: 'elderly', label: 'Idosos & Acolhidos', icon: Users, badge: elderly.length },
-          { id: 'multidisciplinary', label: 'Multidisciplinar', icon: Activity, badge: totalAttendances },
-          { id: 'activities', label: 'Atividades e Oficinas', icon: Sparkles, badge: allPeriodActivities.length },
+          { id: 'control_all', label: 'Controle Total (23 Abas)', icon: ShieldAlert, badge: 'IA' },
+          { id: 'colab', label: 'Painel e Colaboração', icon: Users, badge: elderly.length },
+          { id: 'tecnicos', label: 'Serviços Técnicos', icon: HeartPulse, badge: totalAttendances },
+          { id: 'administrativo', label: 'Administrativo', icon: DollarSign },
+          { id: 'institucional', label: 'Institucional', icon: UserCheck },
+          { id: 'operacional', label: 'Operacional', icon: Boxes },
+          { id: 'multidisciplinary', label: 'Evoluções & Lançamentos', icon: Activity, badge: periodUnifiedEvolutions.length },
+          { id: 'elderly', label: 'Idosos 360°', icon: Users },
           { id: 'diapers', label: 'Controle de Fraldas', icon: Package, badge: diaperConsumptionCount },
           { id: 'stock', label: 'Estoque Geral', icon: Boxes, badge: stockProducts.length },
           { id: 'treasury', label: 'Doações & Tesouraria', icon: DollarSign },
@@ -793,6 +803,119 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div className="space-y-8 animate-in fade-in duration-300">
+          {/* Macro-Sectors Control 360° Banner */}
+          <div className="p-6 bg-gradient-to-r from-slate-900 via-gray-900 to-emerald-950 text-white rounded-3xl border border-emerald-900/40 shadow-xl space-y-5">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Controle Total Integrado • 23 Abas com IA
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
+                  Mapeamento Geral dos 5 Macro Setores OAMI
+                </h3>
+                <p className="text-xs text-gray-300 mt-0.5">
+                  Auditoria quantitativa e qualitativa com atualização automática a cada novo registro.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setActiveTab('control_all')}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/30 shrink-0"
+              >
+                <span>Auditar Todas as 23 Abas (Visão IA)</span>
+                <ArrowUpRight size={16} />
+              </button>
+            </div>
+
+            {/* 5 Sectors Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+              {/* 1. Painel e Colaboração */}
+              <div
+                onClick={() => setActiveTab('colab')}
+                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-blue-400">1. Colaboração</span>
+                  <span className="text-[10px] text-gray-400 font-bold group-hover:text-white transition-colors">3 abas →</span>
+                </div>
+                <h4 className="text-sm font-black text-white leading-tight">Painel e Colaboração</h4>
+                <p className="text-[10px] text-gray-400">Idosos, Cronograma e Galeria de Fotos.</p>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                  <span className="text-gray-300 font-bold">{elderly.length} idosos</span>
+                  <span className="text-emerald-400 font-black">{allPhotos.length} fotos</span>
+                </div>
+              </div>
+
+              {/* 2. Serviços Técnicos */}
+              <div
+                onClick={() => setActiveTab('tecnicos')}
+                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-emerald-400">2. Clínico</span>
+                  <span className="text-[10px] text-gray-400 font-bold group-hover:text-white transition-colors">7 abas →</span>
+                </div>
+                <h4 className="text-sm font-black text-white leading-tight">Serviços Técnicos</h4>
+                <p className="text-[10px] text-gray-400">Fisio, Enferm, Psico, Pedag, Social, Nutrição, PIA.</p>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                  <span className="text-gray-300 font-bold">{totalAttendances} evoluções</span>
+                  <span className="text-emerald-400 font-black">Nota A+</span>
+                </div>
+              </div>
+
+              {/* 3. Administrativo */}
+              <div
+                onClick={() => setActiveTab('administrativo')}
+                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-amber-400">3. Gestão</span>
+                  <span className="text-[10px] text-gray-400 font-bold group-hover:text-white transition-colors">6 abas →</span>
+                </div>
+                <h4 className="text-sm font-black text-white leading-tight">Administrativo</h4>
+                <p className="text-[10px] text-gray-400">Painel Aux, Tesouraria, Usuários, Fin, Presidência, Apoio.</p>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                  <span className="text-gray-300 font-bold">{treasuryTransactions.length} txs</span>
+                  <span className="text-amber-400 font-black">Compliance</span>
+                </div>
+              </div>
+
+              {/* 4. Institucional */}
+              <div
+                onClick={() => setActiveTab('institucional')}
+                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-pink-400">4. Comunidade</span>
+                  <span className="text-[10px] text-gray-400 font-bold group-hover:text-white transition-colors">2 abas →</span>
+                </div>
+                <h4 className="text-sm font-black text-white leading-tight">Institucional</h4>
+                <p className="text-[10px] text-gray-400">Voluntários/Estagiários e Acompanhamento Familiar.</p>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                  <span className="text-gray-300 font-bold">{volunteers.length} voluntários</span>
+                  <span className="text-pink-400 font-black">{socialFamilyVisits.length} visitas</span>
+                </div>
+              </div>
+
+              {/* 5. Operacional */}
+              <div
+                onClick={() => setActiveTab('operacional')}
+                className="p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all cursor-pointer group space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-purple-400">5. Operação</span>
+                  <span className="text-[10px] text-gray-400 font-bold group-hover:text-white transition-colors">4 abas →</span>
+                </div>
+                <h4 className="text-sm font-black text-white leading-tight">Operacional</h4>
+                <p className="text-[10px] text-gray-400">Cuidadoras, Estoque, Produção SGPF, Oficinas.</p>
+                <div className="pt-2 border-t border-white/10 flex justify-between items-center text-xs">
+                  <span className="text-gray-300 font-bold">{caregivers.length} cuidadoras</span>
+                  <span className="text-purple-400 font-black">{stockProducts.length} itens</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Executive KPI Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Card 1: Elderly */}
@@ -978,7 +1101,31 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. ELDERLY 360° MONITORING */}
+      {/* 2. CONTROLE TOTAL DAS 23 ABAS & AUDITORIA INSTITUCIONAL COM IA */}
+      {/* ========================================================================= */}
+      {(activeTab === 'control_all' ||
+        activeTab === 'colab' ||
+        activeTab === 'tecnicos' ||
+        activeTab === 'administrativo' ||
+        activeTab === 'institucional' ||
+        activeTab === 'operacional') && (
+        <InstitutionalControlHub
+          props={props}
+          startDate={startDate}
+          endDate={endDate}
+          stockProducts={stockProducts}
+          stockMovements={stockMovements}
+          treasuryTransactions={treasuryTransactions}
+          localDonors={localDonors.length > 0 ? localDonors : donors}
+          onNavigateTab={onNavigateTab}
+          selectedCategoryFilter={
+            activeTab === 'control_all' ? 'all' : activeTab
+          }
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. ELDERLY 360° MONITORING */}
       {/* ========================================================================= */}
       {activeTab === 'elderly' && (
         <div className="p-6 md:p-8 bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-6 animate-in fade-in duration-300">
@@ -1139,13 +1286,9 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
             </div>
           </div>
 
-          {/* Sector Specific Evolutions Table */}
-          <div className="space-y-4">
-            <h3 className="font-bold text-gray-800 dark:text-white text-sm">
-              Registros no Período ({startDate} a {endDate})
-            </h3>
-
-            {periodUnifiedEvolutions.filter(ev => {
+          {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+          <EvolutionProfessionalCounter
+            evolutions={periodUnifiedEvolutions.filter(ev => {
               if (activeSector === 'all') return true;
               if (activeSector === 'nursing') return ev.sector === 'Enfermagem';
               if (activeSector === 'physio') return ev.sector === 'Fisioterapia';
@@ -1154,20 +1297,53 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
               if (activeSector === 'social') return ev.sector === 'Serviço Social';
               if (activeSector === 'nutrition') return ev.sector === 'Nutrição';
               return true;
-            }).length > 0 ? (
-              <div className="space-y-3">
-                {periodUnifiedEvolutions
-                  .filter(ev => {
-                    if (activeSector === 'all') return true;
-                    if (activeSector === 'nursing') return ev.sector === 'Enfermagem';
-                    if (activeSector === 'physio') return ev.sector === 'Fisioterapia';
-                    if (activeSector === 'psych') return ev.sector === 'Psicologia';
-                    if (activeSector === 'pedagogy') return ev.sector === 'Pedagogia';
-                    if (activeSector === 'social') return ev.sector === 'Serviço Social';
-                    if (activeSector === 'nutrition') return ev.sector === 'Nutrição';
-                    return true;
-                  })
-                  .map(ev => (
+            })}
+            allEvolutions={allUnifiedEvolutions}
+            professionals={props.professionals}
+            selectedProfessional={selectedProfFilter}
+            onSelectProfessional={setSelectedProfFilter}
+            sectorName={activeSector === 'all' ? 'Multidisciplinar' : activeSector}
+            title="Contagem dos Lançamentos das Profissionais (Acompanhamento Multidisciplinar)"
+          />
+
+          {/* Sector Specific Evolutions Table */}
+          <div className="space-y-4">
+            <h3 className="font-bold text-gray-800 dark:text-white text-sm">
+              Registros no Período ({startDate} a {endDate})
+            </h3>
+
+            {(() => {
+              const displayed = periodUnifiedEvolutions.filter(ev => {
+                const matchesSector = 
+                  activeSector === 'all' ? true :
+                  activeSector === 'nursing' ? ev.sector === 'Enfermagem' :
+                  activeSector === 'physio' ? ev.sector === 'Fisioterapia' :
+                  activeSector === 'psych' ? ev.sector === 'Psicologia' :
+                  activeSector === 'pedagogy' ? ev.sector === 'Pedagogia' :
+                  activeSector === 'social' ? ev.sector === 'Serviço Social' :
+                  activeSector === 'nutrition' ? ev.sector === 'Nutrição' : true;
+
+                const matchesProf = !selectedProfFilter || (() => {
+                  const { isDirect, isCoWorker } = matchesEvolutionToProfessional(ev, { name: selectedProfFilter });
+                  return isDirect || isCoWorker;
+                })();
+
+                return matchesSector && matchesProf;
+              });
+
+              if (displayed.length === 0) {
+                return (
+                  <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/30 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
+                    <Activity className="mx-auto text-gray-400 mb-2" size={32} />
+                    <p className="text-sm font-bold text-gray-500">Nenhum registro encontrado no período selecionado.</p>
+                    <p className="text-xs text-gray-400 mt-1">Altere o filtro de período ou profissional acima para visualizar registros anteriores.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {displayed.map(ev => (
                     <div
                       key={ev.id}
                       className="p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-4"
@@ -1196,14 +1372,9 @@ export const MonitoringSection: React.FC<MonitoringSectionProps> = (props) => {
                       </div>
                     </div>
                   ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/30 rounded-3xl border border-dashed border-gray-200 dark:border-gray-700">
-                <Activity className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-sm font-bold text-gray-500">Nenhum registro encontrado no período selecionado.</p>
-                <p className="text-xs text-gray-400 mt-1">Altere o filtro de período acima para visualizar registros anteriores.</p>
-              </div>
-            )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

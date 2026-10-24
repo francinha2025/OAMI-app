@@ -65,7 +65,12 @@ import {
   Boxes,
   Mail,
   Key,
-  HeartHandshake
+  HeartHandshake,
+  Cake,
+  Filter,
+  ArrowUpDown,
+  SlidersHorizontal,
+  MapPin
 } from 'lucide-react';
 import { 
   format, 
@@ -633,111 +638,165 @@ const MOCK_FINANCIAL: FinancialRecord[] = [
   { id: '3', date: '2024-03-10', description: 'Manutenção Predial', amount: 1200, type: 'DESPESA', category: 'MANUTENCAO' },
 ];
 
-const MOCK_PROFESSIONALS: Professional[] = [
+export const OFFICIAL_INSTITUTIONAL_ROSTER: Professional[] = [
   {
-    id: 'p1',
+    id: 'prof_jardeline',
+    uid: 'prof_jardeline',
+    name: 'Jardeline Amorim',
+    role: 'ASSISTENTE_SOCIAL',
+    registrationNumber: 'CRESS',
+    status: 'ATIVO',
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'social@oami.org.br',
+    phone: '',
+    address: ''
+  },
+  {
+    id: 'prof_tenaelen',
+    uid: 'prof_tenaelen',
+    name: 'Tenaelen Marinho',
+    role: 'PSICOLOGA',
+    registrationNumber: 'CRP 22-03099',
+    status: 'ATIVO',
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'psicologia@oami.org.br',
+    phone: '',
+    address: ''
+  },
+  {
+    id: 'prof_amanda',
+    uid: 'prof_amanda',
+    name: 'Amanda Velez',
+    role: 'PEDAGOGA',
+    registrationNumber: 'PEDAGOGIA',
+    status: 'ATIVO',
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'pedagogia@oami.org.br',
+    phone: '',
+    address: ''
+  },
+  {
+    id: 'prof_jordana',
+    uid: 'prof_jordana',
+    name: 'Jordana Viero',
+    role: 'ENFERMEIRA',
+    registrationNumber: 'COREN',
+    status: 'ATIVO',
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'enfermagem@oami.org.br',
+    phone: '',
+    address: ''
+  },
+  {
+    id: 'prof_lysllie',
+    uid: 'prof_lysllie',
+    name: 'Lysllie Vieira',
+    role: 'FISIOTERAPEUTA',
+    registrationNumber: 'CREFITO',
+    status: 'ATIVO',
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'fisioterapia@oami.org.br',
+    phone: '',
+    address: ''
+  },
+  {
+    id: 'prof_franciara',
+    uid: 'prof_franciara',
     name: 'Franciara Coelho',
     role: 'COORDENADORA',
     registrationNumber: 'REG-001',
-    cpf: '111.111.111-11',
-    phone: '(11) 99999-9991',
     email: 'franciaraeabreucoelho@gmail.com',
-    address: 'Rua Exemplo, 123',
+    status: 'ATIVO',
     admissionDate: '2022-01-10',
-    status: 'ATIVO',
-    createdAt: '2022-01-10'
+    createdAt: '2022-01-10',
+    phone: '',
+    address: ''
   },
   {
-    id: 'p2',
-    name: 'Dra. Ana Paula (Assistente Social)',
-    role: 'ASSISTENTE_SOCIAL',
-    registrationNumber: 'CRESS-456',
-    cpf: '222.222.222-22',
-    phone: '(11) 99999-9992',
-    email: 'social@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2023-03-15',
+    id: 'prof_rodrigo',
+    uid: 'prof_rodrigo',
+    name: 'Rodrigo',
+    role: 'PROJETISTA',
+    registrationNumber: 'PROJETOS',
     status: 'ATIVO',
-    createdAt: '2023-03-15'
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: '',
+    phone: '',
+    address: ''
   },
   {
-    id: 'p3',
-    name: 'Dra. Camila Santos (Psicóloga)',
-    role: 'PSICOLOGA',
-    registrationNumber: 'CRP-789',
-    cpf: '333.333.333-33',
-    phone: '(11) 99999-9993',
-    email: 'psico@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2024-01-15',
+    id: 'prof_lucas',
+    uid: 'prof_lucas',
+    name: 'Lucas Emanuel Barbosa',
+    role: 'FABRICANTE_FRALDAS',
+    registrationNumber: 'PRODUCAO',
     status: 'ATIVO',
-    createdAt: '2024-01-15'
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: '',
+    phone: '',
+    address: ''
   },
   {
-    id: 'p4',
-    name: 'Prof. Marina Silva (Pedagoga)',
-    role: 'PEDAGOGA',
-    registrationNumber: 'REG-004',
-    cpf: '444.444.444-44',
-    phone: '(11) 99999-9994',
-    email: 'pedagoga@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2023-05-20',
+    id: 'prof_maria_enilde',
+    uid: 'prof_maria_enilde',
+    name: 'Maria Enilde',
+    role: 'PRESIDENTE',
+    registrationNumber: 'DIRETORIA',
     status: 'ATIVO',
-    createdAt: '2023-05-20'
+    admissionDate: '2020-01-10',
+    createdAt: '2020-01-10',
+    email: 'presidencia@oami.org.br',
+    phone: '',
+    address: ''
   },
   {
-    id: 'p5',
-    name: 'Dr. Roberto Oliveira (Fisioterapeuta)',
-    role: 'FISIOTERAPEUTA',
-    registrationNumber: 'CREFITO-321',
-    cpf: '555.555.555-55',
-    phone: '(11) 99999-9995',
-    email: 'physio@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2022-11-01',
+    id: 'prof_fernanda',
+    uid: 'prof_fernanda',
+    name: 'Fernanda Kellen',
+    role: 'AUXILIAR_ADMINISTRATIVO',
+    registrationNumber: 'ADMINISTRATIVO',
     status: 'ATIVO',
-    createdAt: '2022-11-01'
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: 'administracao@oami.org.br',
+    phone: '',
+    address: ''
   },
   {
-    id: 'p6',
-    name: 'Enf. Juliana Rocha',
-    role: 'ENFERMEIRA',
-    registrationNumber: 'COREN-654',
-    cpf: '666.666.666-66',
-    phone: '(11) 99999-9996',
-    email: 'enfermeira@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2021-08-10',
+    id: 'prof_vania',
+    uid: 'prof_vania',
+    name: 'Vania Vieira Lima',
+    role: 'CUIDADORA',
+    registrationNumber: 'CUIDADOS',
     status: 'ATIVO',
-    createdAt: '2021-08-10'
-  },
-  {
-    id: 'p7',
-    name: 'Nutr. Beatriz Costa',
-    role: 'NUTRICIONISTA',
-    registrationNumber: 'CRN-9871',
-    cpf: '777.777.777-77',
-    phone: '(11) 99999-9997',
-    email: 'nutri@oami.org.br',
-    address: 'Rua Exemplo, 123',
-    admissionDate: '2023-10-15',
-    status: 'ATIVO',
-    createdAt: '2023-10-15'
+    admissionDate: '2023-01-10',
+    createdAt: '2023-01-10',
+    email: '',
+    phone: '',
+    address: ''
   }
 ];
+
+const MOCK_PROFESSIONALS: Professional[] = OFFICIAL_INSTITUTIONAL_ROSTER;
 
 const MOCK_PROFESSIONAL_EVALUATIONS: ProfessionalEvaluation[] = [
   {
     id: 'eval-1',
-    professionalId: 'p2',
-    professionalName: 'Dra. Ana Paula (Assistente Social)',
+    professionalId: 'prof_jardeline',
+    professionalName: 'Jardeline Amorim',
     professionalRole: 'ASSISTENTE_SOCIAL',
-    evaluatorId: 'p1',
+    evaluatorId: 'prof_franciara',
     evaluatorName: 'Franciara Coelho',
     date: '2026-05-15',
     attendance: 5,
-    teamwork: 4,
+    teamwork: 5,
     competence: 5,
     proactivity: 5,
     relationshipWithElderly: 5,
@@ -747,16 +806,16 @@ const MOCK_PROFESSIONAL_EVALUATIONS: ProfessionalEvaluation[] = [
   },
   {
     id: 'eval-2',
-    professionalId: 'p3',
-    professionalName: 'Dra. Camila Santos (Psicóloga)',
+    professionalId: 'prof_tenaelen',
+    professionalName: 'Tenaelen Marinho',
     professionalRole: 'PSICOLOGA',
-    evaluatorId: 'p1',
+    evaluatorId: 'prof_franciara',
     evaluatorName: 'Franciara Coelho',
     date: '2026-05-18',
-    attendance: 4,
+    attendance: 5,
     teamwork: 5,
-    competence: 4,
-    proactivity: 4,
+    competence: 5,
+    proactivity: 5,
     relationshipWithElderly: 5,
     comments: 'Muito dedicada e com ótima postura ética. Tem desenvolvido dinâmicas excelentes com os idosos.',
     recommendations: 'Reforçar o preenchimento diário das evoluções de acompanhamento clínico.',
@@ -886,7 +945,7 @@ const MOCK_SOCIAL_FAMILY_TIES: SocialFamilyTie[] = [
     ],
     observations: 'Filha demonstra desgaste familiar histórico, mas mantém contato telefônico e visitas mensais.',
     abandonmentRisk: true,
-    registeredBy: 'Camila Santos',
+    registeredBy: 'Jardeline Amorim',
     updatedAt: '2026-05-19T15:00:00.000Z'
   },
   {
@@ -896,7 +955,7 @@ const MOCK_SOCIAL_FAMILY_TIES: SocialFamilyTie[] = [
     members: [],
     observations: 'Ausência total de familiares de referência ou contatos conhecidos. Acolhimento institucional total.',
     abandonmentRisk: true,
-    registeredBy: 'Camila Santos',
+    registeredBy: 'Jardeline Amorim',
     updatedAt: '2026-05-20T10:00:00.000Z'
   }
 ];
@@ -994,7 +1053,7 @@ const MOCK_SOCIAL_STUDIES: SocialStudy[] = [
     institutionalizationReason: 'Encontrado pela equipe de assistência do CRAS em quadro visível de autonegligência alimentar e higiênica de alta severidade.',
     supportNetwork: 'Rompida com filhos e irmãos há mais de uma década.',
     technicalOpinion: 'Estudo social recomenda vivamente a permanência institucional assistida para reconstrução de rotina de convívio social qualificado.',
-    registeredBy: 'Camila Santos'
+    registeredBy: 'Jardeline Amorim'
   }
 ];
 
@@ -1015,7 +1074,7 @@ const MOCK_SOCIAL_EVOLUTIONS: SocialEvolution[] = [
     serviceType: 'Visita Familiar',
     observation: 'Acompanhamento de atendimento conjunto com a filha Ana. Conversa pautada em superação de mágoas históricas.',
     conduct: 'Agendar novas sessões de escuta conjunta para abrandar tensões e encorajar visitas frequentes.',
-    registeredBy: 'Camila Santos'
+    registeredBy: 'Jardeline Amorim'
   }
 ];
 
@@ -1038,7 +1097,7 @@ const MOCK_SOCIAL_REFERRALS: SocialReferral[] = [
     description: 'Solicitação de detalhamento de empréstimos ativos em sua folha previdenciária de modo a coibir abusos.',
     status: 'EM_ANDAMENTO',
     observations: 'Equipe aguarda retorno oficial do portal MEU INSS.',
-    registeredBy: 'Camila Santos'
+    registeredBy: 'Jardeline Amorim'
   }
 ];
 
@@ -1061,7 +1120,7 @@ const MOCK_SOCIAL_RISK_SITUATIONS: SocialRiskSituation[] = [
     description: 'Acolhimento imediato de idosa sem referências familiares ou rede de suporte primária identificável.',
     severity: 'ALTA',
     status: 'EM_ACOMPANHAMENTO',
-    registeredBy: 'Camila Santos'
+    registeredBy: 'Jardeline Amorim'
   }
 ];
 
@@ -1082,7 +1141,7 @@ const MOCK_SOCIAL_FAMILY_VISITS: SocialFamilyVisit[] = [
     visitorName: 'Ana Pereira',
     kinship: 'Filha',
     observations: 'Visitou o pai João Pereira. Conversaram no refeitório, relatando tranquilidade.',
-    registeredBy: 'Camila Santos'
+    registeredBy: 'Jardeline Amorim'
   }
 ];
 
@@ -2391,7 +2450,7 @@ const DashboardSection = ({
   const workshopStats = useMemo(() => {
     const categories: Record<string, number> = {};
     (workshops || []).forEach(w => {
-      const label = w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina';
+      const label = w.type === 'ACAO_MES' ? 'Ação do Mês' : (w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina');
       categories[label] = (categories[label] || 0) + 1;
     });
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
@@ -2601,7 +2660,7 @@ const DashboardSection = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Workshop Distrubution */}
         <div className="bg-white dark:bg-gray-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
-           <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6">Oficinas vs Capacitações</h3>
+           <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6">Oficinas, Capacitações & Ações</h3>
            <div style={{ width: '100%', height: 300 }} className="relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -2698,7 +2757,38 @@ const ElderlySection = ({
   socialPatients: SocialPatient[],
   nutritionPatients: NutritionPatient[]
 }) => {
+  const calculateAge = (birthDate?: string | null): number | null => {
+    if (!birthDate) return null;
+    try {
+      const cleanStr = String(birthDate).trim();
+      if (!cleanStr) return null;
+      const birth = new Date(cleanStr.includes('T') ? cleanStr : `${cleanStr}T00:00:00`);
+      if (isNaN(birth.getTime())) return null;
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      return age >= 0 ? age : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const getElderlyAgeCategory = (age: number | null): { key: string; label: string; badgeColor: string } => {
+    if (age === null) return { key: 'unknown', label: 'Idade Não Informada', badgeColor: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' };
+    if (age < 22) return { key: 'under22', label: 'Menor de 22 anos', badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' };
+    if (age <= 59) return { key: '22-59', label: '22 a 59 anos', badgeColor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' };
+    if (age <= 79) return { key: '60-79', label: '60 a 79 anos', badgeColor: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' };
+    return { key: '80+', label: '80 anos ou mais', badgeColor: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' };
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
+  const [ageFilter, setAgeFilter] = useState<'all' | '22-59' | '60-79' | '80+' | 'under22' | 'custom'>('all');
+  const [customMinAge, setCustomMinAge] = useState<string>('');
+  const [customMaxAge, setCustomMaxAge] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'name-asc' | 'age-desc' | 'age-asc' | 'entry-desc'>('name-asc');
   const [selectedElderly, setSelectedElderly] = useState<Elderly | null>(null);
 
   const nursingData = selectedElderly ? nursingPatients?.find(p => p.elderlyId === selectedElderly.id) : null;
@@ -2714,23 +2804,133 @@ const ElderlySection = ({
   const [exporting, setExporting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; type: 'EVOLUCAO' | 'PIA' | 'ELDERLY'; id: string } | null>(null);
 
+  const ageStats = useMemo(() => {
+    let range22_59 = 0;
+    let range60_79 = 0;
+    let range80plus = 0;
+    let under22 = 0;
+    let unknown = 0;
+    let sumAge = 0;
+    let validCount = 0;
+    let minAge: number | null = null;
+    let maxAge: number | null = null;
+
+    (elderly || []).forEach(e => {
+      const age = calculateAge(e.birthDate);
+      if (age === null) {
+        unknown++;
+      } else {
+        sumAge += age;
+        validCount++;
+        if (minAge === null || age < minAge) minAge = age;
+        if (maxAge === null || age > maxAge) maxAge = age;
+
+        if (age < 22) under22++;
+        else if (age <= 59) range22_59++;
+        else if (age <= 79) range60_79++;
+        else range80plus++;
+      }
+    });
+
+    const avgAge = validCount > 0 ? (sumAge / validCount).toFixed(1) : null;
+
+    return {
+      total: (elderly || []).length,
+      range22_59,
+      range60_79,
+      range80plus,
+      under22,
+      unknown,
+      avgAge,
+      minAge,
+      maxAge,
+      validCount
+    };
+  }, [elderly]);
+
+  const filtered = useMemo(() => {
+    return (elderly || []).filter(e => {
+      const term = searchTerm.trim().toLowerCase();
+      if (term) {
+        const matchName = e.name?.toLowerCase().includes(term);
+        const matchFullName = e.fullName?.toLowerCase().includes(term);
+        const matchCpf = e.cpf?.toLowerCase().includes(term);
+        const matchNaturalidade = (e.naturalidade || e.naturalness)?.toLowerCase().includes(term);
+        if (!matchName && !matchFullName && !matchCpf && !matchNaturalidade) return false;
+      }
+
+      const age = calculateAge(e.birthDate);
+
+      if (ageFilter === 'all') return true;
+      if (ageFilter === 'under22') return age !== null && age < 22;
+      if (ageFilter === '22-59') return age !== null && age >= 22 && age <= 59;
+      if (ageFilter === '60-79') return age !== null && age >= 60 && age <= 79;
+      if (ageFilter === '80+') return age !== null && age >= 80;
+      if (ageFilter === 'custom') {
+        if (age === null) return false;
+        const min = customMinAge ? parseInt(customMinAge, 10) : null;
+        const max = customMaxAge ? parseInt(customMaxAge, 10) : null;
+        if (min !== null && !isNaN(min) && age < min) return false;
+        if (max !== null && !isNaN(max) && age > max) return false;
+        return true;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'name-asc') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      if (sortBy === 'age-desc') {
+        const ageA = calculateAge(a.birthDate) ?? -1;
+        const ageB = calculateAge(b.birthDate) ?? -1;
+        return ageB - ageA;
+      }
+      if (sortBy === 'age-asc') {
+        const ageA = calculateAge(a.birthDate) ?? 999;
+        const ageB = calculateAge(b.birthDate) ?? 999;
+        return ageA - ageB;
+      }
+      if (sortBy === 'entry-desc') {
+        return (b.entryDate || '').localeCompare(a.entryDate || '');
+      }
+      return 0;
+    });
+  }, [elderly, searchTerm, ageFilter, customMinAge, customMaxAge, sortBy]);
+
+  const getFilterDescription = () => {
+    if (ageFilter === 'all') return 'Todas as faixas etárias';
+    if (ageFilter === '22-59') return 'Faixa etária: 22 a 59 anos';
+    if (ageFilter === '60-79') return 'Faixa etária: 60 a 79 anos';
+    if (ageFilter === '80+') return 'Faixa etária: 80 anos ou mais';
+    if (ageFilter === 'under22') return 'Faixa etária: Menor de 22 anos';
+    if (ageFilter === 'custom') return `Faixa etária personalizada: ${customMinAge || 0} a ${customMaxAge || '∞'} anos`;
+    return 'Filtro por idade';
+  };
+
   const generateElderlyListPDF = async () => {
     setExporting(true);
     try {
-      const columns = ['Nome', 'CPF', 'Data Nasc.', 'Status'];
-      const data = (elderly || []).map(e => [
-        e.name || 'N/A',
-        e.cpf || 'N/A',
-        safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
-        e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
-      ]);
+      const columns = ['Nome', 'CPF', 'Data Nasc.', 'Idade', 'Faixa Etária', 'Naturalidade', 'Status'];
+      const data = filtered.map(e => {
+        const age = calculateAge(e.birthDate);
+        const cat = getElderlyAgeCategory(age);
+        return [
+          e.fullName || e.name || 'N/A',
+          e.cpf || 'N/A',
+          safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
+          age !== null ? `${age} anos` : 'Não informada',
+          cat.label,
+          e.naturalidade || e.naturalness || 'Não informada',
+          e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
+        ];
+      });
 
       await generateModernPDF({
-        title: 'Lista de Acolhidos',
-        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+        title: 'Lista de Acolhidos - OAMI',
+        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")} • ${getFilterDescription()} • Total: ${filtered.length} acolhido(s)`,
         columns,
         data,
-        fileName: 'lista_acolhidos'
+        fileName: `lista_acolhidos_${ageFilter}`
       });
       showToast('Lista de acolhidos exportada com sucesso (PDF)!');
     } catch (err) {
@@ -2744,20 +2944,27 @@ const ElderlySection = ({
   const generateElderlyListWord = async () => {
     setExporting(true);
     try {
-      const columns = ['Nome', 'CPF', 'Data Nasc.', 'Status'];
-      const data = (elderly || []).map(e => [
-        e.name || 'N/A',
-        e.cpf || 'N/A',
-        safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
-        e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
-      ]);
+      const columns = ['Nome', 'CPF', 'Data Nasc.', 'Idade', 'Faixa Etária', 'Naturalidade', 'Status'];
+      const data = filtered.map(e => {
+        const age = calculateAge(e.birthDate);
+        const cat = getElderlyAgeCategory(age);
+        return [
+          e.fullName || e.name || 'N/A',
+          e.cpf || 'N/A',
+          safeFormat(e.birthDate, 'dd/MM/yyyy', 'N/A'),
+          age !== null ? `${age} anos` : 'Não informada',
+          cat.label,
+          e.naturalidade || e.naturalness || 'Não informada',
+          e.status === 'ATIVO' ? 'Ativo' : 'Inativo'
+        ];
+      });
 
       await generateModernWord({
-        title: 'Lista de Acolhidos',
-        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")}`,
+        title: 'Lista de Acolhidos - OAMI',
+        subtitle: `Relatório gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm")} • ${getFilterDescription()} • Total: ${filtered.length} acolhido(s)`,
         columns,
         data,
-        fileName: 'lista_acolhidos'
+        fileName: `lista_acolhidos_${ageFilter}`
       });
       showToast('Lista de acolhidos exportada com sucesso (Word)!');
     } catch (err) {
@@ -2775,6 +2982,7 @@ const ElderlySection = ({
     rg: '',
     susCard: '',
     birthCertificate: '',
+    naturalidade: '',
     lastProfession: '',
     birthDate: '',
     gender: 'F' as 'M' | 'F' | 'OUTRO',
@@ -2833,6 +3041,7 @@ const ElderlySection = ({
         rg: '',
         susCard: '',
         birthCertificate: '',
+        naturalidade: '',
         lastProfession: '',
         birthDate: '',
         gender: 'F',
@@ -2879,6 +3088,7 @@ const ElderlySection = ({
       rg: e.rg || '',
       susCard: e.susCard || '',
       birthCertificate: e.birthCertificate || '',
+      naturalidade: e.naturalidade || e.naturalness || '',
       lastProfession: e.lastProfession || '',
       birthDate: e.birthDate || '',
       gender: e.gender || 'F',
@@ -2918,8 +3128,6 @@ const ElderlySection = ({
       console.error("Erro ao comprimir foto do idoso:", err);
     }
   };
-
-  const filtered = elderly.filter(e => e.name?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="space-y-6">
@@ -3044,6 +3252,19 @@ const ElderlySection = ({
                       className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
                       value={formData.birthDate}
                       onChange={e => setFormData({...formData, birthDate: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                      <MapPin size={15} className="text-emerald-600 dark:text-emerald-400" />
+                      Naturalidade (Cidade/UF)
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Manaus/AM ou Salvador/BA"
+                      className="w-full p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-gray-800 dark:text-white"
+                      value={formData.naturalidade}
+                      onChange={e => setFormData({...formData, naturalidade: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
@@ -3222,76 +3443,401 @@ const ElderlySection = ({
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white" translate="no">Acompanhamento de Idosos</h2>
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-            <input 
-              type="text"
-              placeholder="Buscar idoso..."
-              className="pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-green-500 outline-none w-full md:w-64 text-gray-800 dark:text-white"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      {/* Header com Busca, Ações e Filtro de Faixa Etária */}
+      <div className="space-y-4 bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl">
+              <Users size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-white" translate="no">
+                  Acompanhamento de Idosos
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                  {filtered.length} {filtered.length === 1 ? 'acolhido' : 'acolhidos'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Gestão cadastral, prontuário e pesquisa por faixas etárias
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Search Input */}
+            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={17} />
+              <input 
+                type="text"
+                placeholder="Buscar por nome ou CPF..."
+                className="pl-9 pr-8 py-2 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-green-500 outline-none w-full text-sm text-gray-800 dark:text-white"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Sort Selector */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="appearance-none pl-8 pr-8 py-2 bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-green-500 outline-none cursor-pointer"
+                title="Ordenar lista"
+              >
+                <option value="name-asc">Nome (A-Z)</option>
+                <option value="age-desc">Mais Velhos (Decrescente)</option>
+                <option value="age-asc">Mais Jovens (Crescente)</option>
+                <option value="entry-desc">Entrada Mais Recente</option>
+              </select>
+              <ArrowUpDown size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Actions */}
             <button 
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all shadow-md"
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-all shadow-sm shrink-0"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               <span translate="no">Novo Acolhido</span>
             </button>
             <button 
               onClick={generateElderlyListPDF}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all disabled:opacity-50" 
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all disabled:opacity-50 shrink-0" 
               title="Exportar Lista em PDF"
             >
-              <FileDown size={18} />
+              <FileDown size={16} />
               PDF
             </button>
             <button 
               onClick={generateElderlyListWord}
               disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-100 dark:hover:bg-green-900/30 transition-all disabled:opacity-50" 
+              className="flex items-center gap-1.5 px-3 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-xl text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/30 transition-all disabled:opacity-50 shrink-0" 
               title="Exportar Lista em Word"
             >
-              <FileText size={18} />
+              <FileText size={16} />
               Word
             </button>
           </div>
         </div>
+
+        {/* Barra de Filtros por Faixa Etária (22 a 59 anos, 60 a 79 anos, 80 anos ou mais) */}
+        <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mr-1">
+              <Cake size={15} className="text-pink-500" />
+              Faixa Etária:
+            </span>
+
+            {/* Todas as Idades */}
+            <button
+              type="button"
+              onClick={() => setAgeFilter('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                ageFilter === 'all'
+                  ? "bg-gray-800 text-white dark:bg-white dark:text-gray-900 shadow-sm"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              )}
+            >
+              Todas as Idades
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px]",
+                ageFilter === 'all'
+                  ? "bg-white/20 text-white dark:bg-gray-900/20 dark:text-gray-900 font-extrabold"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              )}>
+                {ageStats.total}
+              </span>
+            </button>
+
+            {/* 22 anos a 59 anos */}
+            <button
+              type="button"
+              onClick={() => setAgeFilter('22-59')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                ageFilter === '22-59'
+                  ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/40"
+                  : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/30"
+              )}
+            >
+              22 a 59 anos
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px]",
+                ageFilter === '22-59' ? "bg-white/20 text-white font-extrabold" : "bg-blue-200/70 dark:bg-blue-800/60 text-blue-800 dark:text-blue-200"
+              )}>
+                {ageStats.range22_59}
+              </span>
+            </button>
+
+            {/* 60 a 79 anos */}
+            <button
+              type="button"
+              onClick={() => setAgeFilter('60-79')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                ageFilter === '60-79'
+                  ? "bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/40"
+                  : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
+              )}
+            >
+              60 a 79 anos
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px]",
+                ageFilter === '60-79' ? "bg-white/20 text-white font-extrabold" : "bg-emerald-200/70 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200"
+              )}>
+                {ageStats.range60_79}
+              </span>
+            </button>
+
+            {/* 80 anos ou mais */}
+            <button
+              type="button"
+              onClick={() => setAgeFilter('80+')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                ageFilter === '80+'
+                  ? "bg-purple-600 text-white shadow-sm ring-2 ring-purple-400/40"
+                  : "bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/30"
+              )}
+            >
+              80 anos ou mais
+              <span className={cn(
+                "px-1.5 py-0.2 rounded-full text-[10px]",
+                ageFilter === '80+' ? "bg-white/20 text-white font-extrabold" : "bg-purple-200/70 dark:bg-purple-800/60 text-purple-800 dark:text-purple-200"
+              )}>
+                {ageStats.range80plus}
+              </span>
+            </button>
+
+            {/* < 22 anos se houver */}
+            {ageStats.under22 > 0 && (
+              <button
+                type="button"
+                onClick={() => setAgeFilter('under22')}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                  ageFilter === 'under22'
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-300"
+                )}
+              >
+                &lt; 22 anos
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-200/70 dark:bg-amber-800/60 text-amber-800 dark:text-amber-200">
+                  {ageStats.under22}
+                </span>
+              </button>
+            )}
+
+            {/* Personalizada */}
+            <button
+              type="button"
+              onClick={() => setAgeFilter(ageFilter === 'custom' ? 'all' : 'custom')}
+              className={cn(
+                "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                ageFilter === 'custom'
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+              )}
+            >
+              <SlidersHorizontal size={13} />
+              Personalizada
+            </button>
+          </div>
+
+          {/* Indicador Demográfico */}
+          <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+            {ageStats.avgAge && (
+              <span className="inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-lg font-medium">
+                Média: <strong className="text-gray-800 dark:text-gray-200">{ageStats.avgAge} anos</strong>
+              </span>
+            )}
+            {ageStats.minAge !== null && ageStats.maxAge !== null && (
+              <span className="hidden sm:inline-flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-lg font-medium">
+                Variação: <strong className="text-gray-800 dark:text-gray-200">{ageStats.minAge} a {ageStats.maxAge} anos</strong>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Sub-painel para faixa personalizada */}
+        {ageFilter === 'custom' && (
+          <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl flex flex-wrap items-center gap-3 text-xs">
+            <span className="font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+              <SlidersHorizontal size={14} /> Definir intervalo personalizado de idade:
+            </span>
+            <div className="flex items-center gap-2">
+              <label className="text-gray-600 dark:text-gray-300">De:</label>
+              <input 
+                type="number"
+                min="0"
+                max="130"
+                placeholder="Ex: 65"
+                value={customMinAge}
+                onChange={(e) => setCustomMinAge(e.target.value)}
+                className="w-16 px-2 py-1 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 rounded-lg text-center font-bold text-gray-800 dark:text-white"
+              />
+              <span className="text-gray-600 dark:text-gray-300">anos</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-gray-600 dark:text-gray-300">Até:</label>
+              <input 
+                type="number"
+                min="0"
+                max="130"
+                placeholder="Ex: 85"
+                value={customMaxAge}
+                onChange={(e) => setCustomMaxAge(e.target.value)}
+                className="w-16 px-2 py-1 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 rounded-lg text-center font-bold text-gray-800 dark:text-white"
+              />
+              <span className="text-gray-600 dark:text-gray-300">anos</span>
+            </div>
+            {(customMinAge || customMaxAge) && (
+              <button
+                type="button"
+                onClick={() => { setCustomMinAge(''); setCustomMaxAge(''); }}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+              >
+                Limpar intervalo
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Indicador de Filtro Ativo com Botão de Reset */}
+        {(ageFilter !== 'all' || searchTerm) && (
+          <div className="flex items-center justify-between text-xs px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200/60 dark:border-gray-700/60">
+            <span className="text-gray-600 dark:text-gray-300 flex items-center gap-1.5 flex-wrap">
+              <Filter size={13} className="text-green-600 dark:text-green-400" />
+              Exibindo <strong>{filtered.length}</strong> de <strong>{elderly.length}</strong> acolhidos
+              {ageFilter !== 'all' && (
+                <span>• Faixa Etária: <strong className="text-green-700 dark:text-green-400">
+                  {ageFilter === '22-59' ? '22 a 59 anos' : ageFilter === '60-79' ? '60 a 79 anos' : ageFilter === '80+' ? '80 anos ou mais' : ageFilter === 'under22' ? 'Menor de 22 anos' : 'Personalizada'}
+                </strong></span>
+              )}
+              {searchTerm && (
+                <span>• Busca: "<strong>{searchTerm}</strong>"</span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAgeFilter('all');
+                setSearchTerm('');
+                setCustomMinAge('');
+                setCustomMaxAge('');
+              }}
+              className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 shrink-0 ml-2"
+            >
+              <X size={12} /> Limpar Filtros
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((elderly) => (
-          <motion.div 
-            key={elderly.id}
-            layoutId={elderly.id}
-            onClick={() => setSelectedElderly(elderly)}
-            className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-all cursor-pointer group"
+      {filtered.length === 0 ? (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-12 text-center shadow-sm">
+          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+            <Users size={32} />
+          </div>
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">
+            Nenhum acolhido encontrado
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6">
+            Não encontramos nenhum acolhido correspondente aos filtros de faixa etária ou termo de busca selecionados.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setAgeFilter('all');
+              setSearchTerm('');
+              setCustomMinAge('');
+              setCustomMaxAge('');
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold hover:bg-green-700 transition-all shadow-sm"
           >
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400 font-bold text-xl group-hover:bg-green-600 group-hover:text-white transition-all overflow-hidden shadow-sm">
-                {elderly.photoUrl ? (
-                  <img src={elderly.photoUrl} alt={elderly.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  elderly.name.charAt(0)
-                )}
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-800 dark:text-white">{elderly.name}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Entrada: {formatLocalDate(elderly.entryDate)}</p>
-                <span className="inline-block mt-2 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-[10px] font-bold rounded-full uppercase">
-                  {elderly.status}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            Ver Todas as Idades ({elderly.length})
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((elderly) => {
+            const age = calculateAge(elderly.birthDate);
+            const ageCat = getElderlyAgeCategory(age);
+            return (
+              <motion.div 
+                key={elderly.id}
+                layoutId={elderly.id}
+                onClick={() => setSelectedElderly(elderly)}
+                className="bg-white dark:bg-gray-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md hover:border-green-300 dark:hover:border-green-800 transition-all cursor-pointer group"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400 font-bold text-xl group-hover:bg-green-600 group-hover:text-white transition-all overflow-hidden shadow-sm shrink-0">
+                    {elderly.photoUrl ? (
+                      <img src={elderly.photoUrl} alt={elderly.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      elderly.name.charAt(0)
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-bold text-gray-800 dark:text-white truncate text-base">{elderly.name}</h4>
+                      <span className={cn(
+                        "px-2 py-0.5 text-[10px] font-bold rounded-full uppercase shrink-0",
+                        elderly.status === 'ATIVO' 
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" 
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                      )}>
+                        {elderly.status}
+                      </span>
+                    </div>
+
+                    {elderly.fullName && elderly.fullName !== elderly.name && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate mb-1">{elderly.fullName}</p>
+                    )}
+
+                    {/* Faixa Etária, Idade e Naturalidade */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold",
+                        ageCat.badgeColor
+                      )}>
+                        <Cake size={12} />
+                        {age !== null ? `${age} anos` : 'Idade N/I'}
+                      </span>
+                      <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-lg text-[10px] font-medium">
+                        {ageCat.label}
+                      </span>
+                      {(elderly.naturalidade || elderly.naturalness) && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 rounded-lg text-[10px] font-semibold border border-emerald-100 dark:border-emerald-800/40 truncate max-w-[140px]" title={`Natural de: ${elderly.naturalidade || elderly.naturalness}`}>
+                          <MapPin size={10} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          {elderly.naturalidade || elderly.naturalness}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-gray-800/60 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                      <span>Nasc: {safeFormat(elderly.birthDate, 'dd/MM/yyyy', 'N/I')}</span>
+                      <span>Entrada: {formatLocalDate(elderly.entryDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
 
       <AnimatePresence>
         {selectedElderly && (
@@ -3326,21 +3872,32 @@ const ElderlySection = ({
                           <Calendar size={14} />
                           Nascimento: {formatLocalDate(selectedElderly.birthDate)}
                         </p>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1">
-                          <Activity size={14} />
-                          Idade: {(() => {
-                            const birth = new Date(selectedElderly.birthDate);
-                            const today = new Date();
-                            let age = today.getFullYear() - birth.getFullYear();
-                            const m = today.getMonth() - birth.getMonth();
-                            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-                            return age;
-                          })()} anos
+                        <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1.5">
+                          <Cake size={14} className="text-pink-500" />
+                          <span>Idade:</span>
+                          {(() => {
+                            const age = calculateAge(selectedElderly.birthDate);
+                            const cat = getElderlyAgeCategory(age);
+                            return (
+                              <span className="font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                                {age !== null ? `${age} anos` : 'Não informada'}
+                                <span className={cn("px-2 py-0.5 rounded-md text-[11px] font-bold", cat.badgeColor)}>
+                                  {cat.label}
+                                </span>
+                              </span>
+                            );
+                          })()}
                         </p>
                         {selectedElderly.cpf && (
                           <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1">
                             <Shield size={14} />
                             CPF: {selectedElderly.cpf}
+                          </p>
+                        )}
+                        {(selectedElderly.naturalidade || selectedElderly.naturalness) && (
+                          <p className="text-gray-500 dark:text-gray-400 text-sm flex items-center gap-1">
+                            <MapPin size={14} className="text-emerald-500" />
+                            Natural de: <strong className="text-gray-700 dark:text-gray-300 font-semibold">{selectedElderly.naturalidade || selectedElderly.naturalness}</strong>
                           </p>
                         )}
                       </div>
@@ -3380,6 +3937,13 @@ const ElderlySection = ({
                         Informações Pessoais
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Naturalidade</p>
+                          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                            <MapPin size={14} className="text-emerald-600 dark:text-emerald-400" />
+                            {selectedElderly.naturalidade || selectedElderly.naturalness || 'Não informada'}
+                          </p>
+                        </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Última Profissão</p>
                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{selectedElderly.lastProfession || 'Não informada'}</p>
@@ -8243,6 +8807,153 @@ const WorkshopsSection = ({
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState<{ msg: string; onConfirm: () => void } | null>(null);
   const [profSearch, setProfSearch] = useState('');
+  const [profCategoryFilter, setProfCategoryFilter] = useState<'ALL' | 'SAUDE' | 'SOCIO_PEDAGOGICO' | 'GESTAO_GERAL'>('ALL');
+  const [customCoworkerInput, setCustomCoworkerInput] = useState('');
+  const [showCustomCoworkerField, setShowCustomCoworkerField] = useState(false);
+  const [liveProfessionals, setLiveProfessionals] = useState<Professional[]>([]);
+
+  // Carrega em tempo real profissionais e perfis da Casa OAMI para garantir que a lista nunca fique vazia
+  useEffect(() => {
+    let unsubProfs = () => {};
+    let unsubProfiles = () => {};
+    let unsubUsers = () => {};
+    try {
+      unsubProfs = onSnapshot(collection(db, 'professionals'), (snap) => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Professional));
+        if (list.length > 0) {
+          setLiveProfessionals(prev => {
+            const map = new Map<string, Professional>();
+            [...prev, ...list].forEach(p => {
+              if (p && p.name) {
+                const k = (p.id || p.name).toLowerCase();
+                map.set(k, p);
+              }
+            });
+            return Array.from(map.values());
+          });
+        }
+      }, (err) => console.warn("Aviso ao carregar profissionais em WorkshopsSection:", err));
+
+      unsubProfiles = onSnapshot(collection(db, 'profiles'), (snap) => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        if (list.length > 0) {
+          setLiveProfessionals(prev => {
+            const map = new Map<string, Professional>();
+            [...prev, ...list].forEach(p => {
+              if (p && p.name) {
+                const k = (p.id || p.name).toLowerCase();
+                map.set(k, p);
+              }
+            });
+            return Array.from(map.values());
+          });
+        }
+      }, (err) => console.warn("Aviso ao carregar profiles em WorkshopsSection:", err));
+
+      unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        if (list.length > 0) {
+          setLiveProfessionals(prev => {
+            const map = new Map<string, Professional>();
+            [...prev, ...list].forEach(p => {
+              if (p && p.name) {
+                const k = (p.id || p.name).toLowerCase();
+                map.set(k, p);
+              }
+            });
+            return Array.from(map.values());
+          });
+        }
+      }, (err) => console.warn("Aviso ao carregar users em WorkshopsSection:", err));
+    } catch (e) {
+      console.warn("Erro ao configurar listeners de profissionais:", e);
+    }
+    return () => {
+      unsubProfs();
+      unsubProfiles();
+      unsubUsers();
+    };
+  }, []);
+
+  // Consolidação de toda a equipe institucional OAMI (com deduplicação inteligente por nome)
+  const allAvailableProfessionals = useMemo(() => {
+    const map = new Map<string, Professional>();
+
+    const addProf = (p: any) => {
+      if (!p || !p.name) return;
+      const cleanName = String(p.name).trim();
+      if (!cleanName) return;
+      // Normalização de chave para evitar duplicações por acentuação ou espaços
+      let normKey = cleanName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+      
+      // Bloquear explicitamente profissionais excluídos solicitados pelo usuário
+      const blacklisted = [
+        'ana paula',
+        'camila santos',
+        'juliana rocha',
+        'roberto oliveira',
+        'beatriz costa',
+        'marina silva',
+        'jordana rodrigues'
+      ];
+      if (blacklisted.some(b => normKey.includes(b))) {
+        return;
+      }
+
+      // Garantir que "Lucas Emanuel Barbosa" apareça apenas uma vez (sem repetições)
+      let canonicalName = cleanName;
+      if (normKey.includes('lucas emanuel') || normKey.includes('lucas emanoel')) {
+        normKey = 'lucas emanuel barbosa';
+        canonicalName = 'Lucas Emanuel Barbosa';
+      }
+
+      // Garantir que Jordana seja apenas Jordana Viero
+      if (normKey.includes('jordana')) {
+        normKey = 'jordana viero';
+        canonicalName = 'Jordana Viero';
+      }
+
+      const role = p.role || p.cargo || 'COLABORADOR';
+      const existing = map.get(normKey);
+      if (!existing) {
+        map.set(normKey, {
+          id: p.id || p.uid || `prof_${normKey}`,
+          uid: p.uid || p.id || `prof_${normKey}`,
+          name: canonicalName,
+          role: role as Role,
+          email: p.email || '',
+          registrationNumber: p.registrationNumber || '',
+          phone: p.phone || '',
+          address: p.address || '',
+          status: p.status || 'ATIVO',
+          admissionDate: p.admissionDate || new Date().toISOString(),
+          createdAt: p.createdAt || new Date().toISOString(),
+          photoUrl: p.photoUrl
+        });
+      } else {
+        if (p.id && (!existing.id || existing.id.startsWith('prof_'))) existing.id = p.id;
+        if (p.email && !existing.email) existing.email = p.email;
+        if (p.registrationNumber && !existing.registrationNumber) existing.registrationNumber = p.registrationNumber;
+        if (p.photoUrl && !existing.photoUrl) existing.photoUrl = p.photoUrl;
+        if (p.role && ((existing.role as any) === 'GERAL' || (existing.role as any) === 'COLABORADOR')) existing.role = p.role;
+      }
+    };
+
+    // 1. Roster Oficial Completo da Casa OAMI (Garante presença imediata dos profissionais reais da instituição)
+    OFFICIAL_INSTITUTIONAL_ROSTER.forEach(addProf);
+
+    // 2. Da prop users (StaffMember da instituição)
+    (users || []).forEach(addProf);
+
+    // 3. Da prop professionals (combinedProfessionals)
+    (professionals || []).forEach(addProf);
+
+    // 4. Do Firestore ao vivo dentro da seção
+    liveProfessionals.forEach(addProf);
+
+    return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [liveProfessionals, professionals, users]);
+
   const [uploadingDocStatus, setUploadingDocStatus] = useState<string | null>(null);
   const [isDocDownloading, setIsDocDownloading] = useState<string | null>(null);
   
@@ -8268,11 +8979,14 @@ const WorkshopsSection = ({
     trainingInterests: [] as string[]
   });
 
+  const [workshopFilterType, setWorkshopFilterType] = useState<'ALL' | 'OFICINA' | 'CAPACITACAO' | 'ACAO_MES'>('ALL');
+  const [workshopSearchTerm, setWorkshopSearchTerm] = useState('');
+
   const [workshopFormData, setWorkshopFormData] = useState({
     title: '',
     date: '',
     description: '',
-    type: 'OFICINA' as 'OFICINA' | 'CAPACITACAO',
+    type: 'OFICINA' as 'OFICINA' | 'CAPACITACAO' | 'ACAO_MES',
     participants: [] as string[],
     what: '',
     why: '',
@@ -8285,6 +8999,31 @@ const WorkshopsSection = ({
     photos: [] as string[],
     documents: [] as AttachedDocument[]
   });
+
+  const filteredWorkshops = useMemo(() => {
+    return (workshops || []).filter(w => {
+      if (workshopFilterType !== 'ALL' && w.type !== workshopFilterType) return false;
+      if (!workshopSearchTerm.trim()) return true;
+      const term = workshopSearchTerm.toLowerCase();
+      return (
+        w.title.toLowerCase().includes(term) ||
+        (w.what || '').toLowerCase().includes(term) ||
+        (w.who || '').toLowerCase().includes(term) ||
+        (w.why || '').toLowerCase().includes(term) ||
+        (w.description || '').toLowerCase().includes(term)
+      );
+    });
+  }, [workshops, workshopFilterType, workshopSearchTerm]);
+
+  const workshopCounts = useMemo(() => {
+    const list = workshops || [];
+    return {
+      all: list.length,
+      oficinas: list.filter(w => w.type === 'OFICINA').length,
+      capacitacoes: list.filter(w => w.type === 'CAPACITACAO').length,
+      acoesMes: list.filter(w => w.type === 'ACAO_MES').length
+    };
+  }, [workshops]);
 
   const handleAddCommunityElderly = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -8486,7 +9225,7 @@ const WorkshopsSection = ({
         elderly,
         communityElderly,
         caregivers,
-        professionals,
+        professionals: allAvailableProfessionals,
         users,
         periodLabel: 'Histórico Completo de Atividades',
         fileName: `relatorio_oficinas_capacitacoes_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`
@@ -8503,67 +9242,208 @@ const WorkshopsSection = ({
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Oficinas e Capacitações</h2>
-          <p className="text-gray-500 text-sm">Gestão de atividades institucionais e comunitárias</p>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+            <span>Oficinas, Capacitações & Ações</span>
+          </h2>
+          <p className="text-gray-500 text-sm">
+            Gestão de oficinas terapêuticas, capacitações profissionais e ações realizadas no mês (Dia das Mães, Outubro Rosa, etc.)
+          </p>
         </div>
-        <div className="flex flex-wrap gap-3 justify-end">
+        <div className="flex flex-wrap gap-2.5 justify-end">
           <button 
             onClick={handleExportWorkshopsPDF}
             disabled={isExportingWorkshopsPDF || workshops.length === 0}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-            title="Baixar Relatório em PDF de Oficinas e Capacitações"
+            className="bg-emerald-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-emerald-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            title="Baixar Relatório em PDF de Oficinas, Capacitações e Ações"
           >
-            {isExportingWorkshopsPDF ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />}
+            {isExportingWorkshopsPDF ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
             Baixar Relatório (PDF)
           </button>
           <button 
             onClick={() => setIsElderlyModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="bg-blue-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             Cadastrar Idoso
           </button>
           <button 
             onClick={() => setIsCaregiverModalOpen(true)}
-            className="bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+            className="bg-purple-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-purple-700 transition-colors flex items-center gap-2"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             Cadastrar Cuidador
           </button>
+          {/* Nova Ação do Mês Button */}
           <button 
-            onClick={() => setIsWorkshopModalOpen(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            onClick={() => {
+              setEditingWorkshop(null);
+              setWorkshopFormData({
+                title: '',
+                date: new Date().toISOString().split('T')[0],
+                description: '',
+                type: 'ACAO_MES',
+                participants: [],
+                what: '',
+                why: '',
+                where: 'Sede OAMI',
+                when: '',
+                who: user?.name || '',
+                how: '',
+                howMuch: '',
+                coWorkers: [],
+                photos: [],
+                documents: []
+              });
+              setIsWorkshopModalOpen(true);
+            }}
+            className="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-md shadow-pink-200 dark:shadow-none transition-all flex items-center gap-2 cursor-pointer"
+            title="Registrar Ação Temática Realizada no Mês (ex: Dia das Mães, Outubro Rosa, etc.)"
           >
-            <Plus size={18} />
+            <HeartHandshake size={16} />
+            Registrar Ação do Mês
+          </button>
+          <button 
+            onClick={() => {
+              setEditingWorkshop(null);
+              setWorkshopFormData({
+                title: '',
+                date: new Date().toISOString().split('T')[0],
+                description: '',
+                type: 'OFICINA',
+                participants: [],
+                what: '',
+                why: '',
+                where: 'Sede OAMI',
+                when: '',
+                who: user?.name || '',
+                how: '',
+                howMuch: '',
+                coWorkers: [],
+                photos: [],
+                documents: []
+              });
+              setIsWorkshopModalOpen(true);
+            }}
+            className="bg-green-600 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-md hover:bg-green-700 transition-colors flex items-center gap-2 cursor-pointer"
+          >
+            <Plus size={16} />
             Registrar Oficina/Capacitação
           </button>
         </div>
       </div>
 
+      {/* Barra de Filtros e Busca */}
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setWorkshopFilterType('ALL')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              workshopFilterType === 'ALL'
+                ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+            )}
+          >
+            <span>Todas</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/20 font-black">
+              {workshopCounts.all}
+            </span>
+          </button>
+          <button
+            onClick={() => setWorkshopFilterType('OFICINA')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              workshopFilterType === 'OFICINA'
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+            )}
+          >
+            <span>Oficinas</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-200/50 dark:bg-blue-800/50 font-black">
+              {workshopCounts.oficinas}
+            </span>
+          </button>
+          <button
+            onClick={() => setWorkshopFilterType('CAPACITACAO')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              workshopFilterType === 'CAPACITACAO'
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40"
+            )}
+          >
+            <span>Capacitações</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-200/50 dark:bg-purple-800/50 font-black">
+              {workshopCounts.capacitacoes}
+            </span>
+          </button>
+          <button
+            onClick={() => setWorkshopFilterType('ACAO_MES')}
+            className={cn(
+              "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+              workshopFilterType === 'ACAO_MES'
+                ? "bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-sm"
+                : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40"
+            )}
+            title="Ações Realizadas no Mês (Dia das Mães, Outubro Rosa, etc.)"
+          >
+            <HeartHandshake size={14} />
+            <span>Ações do Mês</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-200/50 dark:bg-rose-800/50 font-black">
+              {workshopCounts.acoesMes}
+            </span>
+          </button>
+        </div>
+
+        <div className="relative min-w-[240px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={workshopSearchTerm}
+            onChange={(e) => setWorkshopSearchTerm(e.target.value)}
+            placeholder="Buscar por título, objetivo, responsável..."
+            className="w-full pl-9 pr-8 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-green-500"
+          />
+          {workshopSearchTerm && (
+            <button
+              onClick={() => setWorkshopSearchTerm('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {workshops.length > 0 ? workshops.map((w) => (
+        {filteredWorkshops.length > 0 ? filteredWorkshops.map((w) => (
           <div key={w.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 space-y-4">
             <div className="flex justify-between items-start">
               <div className="flex gap-2 items-center">
                 <div className={cn(
-                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase", 
-                  w.type === 'CAPACITACAO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1", 
+                  w.type === 'ACAO_MES' 
+                    ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800' 
+                    : w.type === 'CAPACITACAO' 
+                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800' 
+                    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
                 )}>
-                  {w.type}
+                  {w.type === 'ACAO_MES' && <HeartHandshake size={12} className="text-rose-600 dark:text-rose-400" />}
+                  {w.type === 'ACAO_MES' ? 'Ação do Mês' : w.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold">{formatLocalDate(w.date)}</span>
                 <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-800 ml-2 pl-2">
-                  <button onClick={() => { setSelectedWorkshop(w); setIsDetailsModalOpen(true); }} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors" title="Visualizar 👁️">
+                  <button onClick={() => { setSelectedWorkshop(w); setIsDetailsModalOpen(true); }} className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors cursor-pointer" title="Visualizar 👁️">
                     <Eye size={14} />
                   </button>
-                  <button onClick={() => handleEditWorkshop(w)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Editar ✏️">
+                  <button onClick={() => handleEditWorkshop(w)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors cursor-pointer" title="Editar ✏️">
                     <Edit2 size={14} />
                   </button>
-                  <button onClick={() => handleDeleteWorkshop(w.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Excluir 🗑️">
+                  <button onClick={() => handleDeleteWorkshop(w.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors cursor-pointer" title="Excluir 🗑️">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -8587,16 +9467,31 @@ const WorkshopsSection = ({
                   setSelectedWorkshop(w);
                   setIsDetailsModalOpen(true);
                 }}
-                className="text-green-600 dark:text-green-400 text-sm font-bold hover:underline"
+                className="text-green-600 dark:text-green-400 text-sm font-bold hover:underline cursor-pointer"
               >
                 Ver detalhes
               </button>
             </div>
           </div>
         )) : (
-          <div className="col-span-2 text-center py-12 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
-            <BookOpen className="mx-auto text-gray-300 mb-4" size={48} />
-            <p className="text-gray-500">Nenhuma atividade agendada</p>
+          <div className="col-span-1 md:col-span-2 text-center py-12 bg-white dark:bg-gray-900 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 space-y-3">
+            <BookOpen className="mx-auto text-gray-300 mb-2" size={48} />
+            <p className="text-gray-500 font-medium">
+              {workshopSearchTerm || workshopFilterType !== 'ALL'
+                ? 'Nenhuma atividade encontrada com os filtros selecionados.'
+                : 'Nenhuma oficina, capacitação ou ação temática cadastrada.'}
+            </p>
+            {(workshopSearchTerm || workshopFilterType !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setWorkshopSearchTerm('');
+                  setWorkshopFilterType('ALL');
+                }}
+                className="text-xs font-bold text-green-600 hover:underline cursor-pointer"
+              >
+                Limpar filtros e ver todas
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -8845,15 +9740,17 @@ const WorkshopsSection = ({
               className="bg-white dark:bg-gray-900 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-2xl my-4 md:my-10"
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {editingWorkshop ? 'Editar' : 'Registrar'} Oficina/Capacitação
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                  <span>
+                    {editingWorkshop ? 'Editar' : 'Registrar'} {workshopFormData.type === 'ACAO_MES' ? 'Ação Realizada no Mês' : workshopFormData.type === 'CAPACITACAO' ? 'Capacitação' : 'Oficina'}
+                  </span>
                 </h3>
                 <button 
                   onClick={() => {
                     setIsWorkshopModalOpen(false);
                     setEditingWorkshop(null);
                   }} 
-                  className="bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2.5 rounded-2xl transition-all shadow-sm"
+                  className="bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-2.5 rounded-2xl transition-all shadow-sm cursor-pointer"
                   aria-label="Fechar"
                 >
                   <X size={20} />
@@ -8863,27 +9760,75 @@ const WorkshopsSection = ({
               <form onSubmit={handleAddWorkshop} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Título do Evento</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Título da Atividade / Ação *</label>
                     <input 
                       type="text"
                       className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-medium"
                       value={workshopFormData.title}
+                      placeholder={workshopFormData.type === 'ACAO_MES' ? 'Ex: Dia das Mães, Outubro Rosa...' : 'Ex: Oficina de Pintura, Capacitação em Primeiros Socorros...'}
                       onChange={e => setWorkshopFormData({...workshopFormData, title: e.target.value})}
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase">Tipo</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase">Tipo de Registro</label>
                     <select 
-                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-medium"
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-green-500 font-medium cursor-pointer"
                       value={workshopFormData.type}
                       onChange={e => setWorkshopFormData({...workshopFormData, type: e.target.value as any})}
                     >
-                      <option value="OFICINA">Oficina</option>
-                      <option value="CAPACITACAO">Capacitação</option>
+                      <option value="OFICINA">Oficina Terapêutica / Ocupacional</option>
+                      <option value="CAPACITACAO">Capacitação Profissional / Equipe</option>
+                      <option value="ACAO_MES">Ação Realizada no Mês (ex: Dia das Mães, Outubro Rosa...)</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Banner de Temas Sugeridos para Ações do Mês */}
+                {workshopFormData.type === 'ACAO_MES' && (
+                  <div className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20 p-4 rounded-2xl border border-rose-200/60 dark:border-rose-900/40 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-rose-700 dark:text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-rose-500" /> Ações do Mês Sugeridas (Exemplos Temáticos)
+                      </span>
+                      <span className="text-[10px] text-rose-500 dark:text-rose-400 font-medium">
+                        Clique para preencher rápido
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: '🌸 Dia das Mães', title: 'Dia das Mães', what: 'Celebração comemorativa do Dia das Mães com homenagens, dinâmicas afetivas, música e confraternização.', why: 'Fortalecimento de vínculos familiares e afetivos e valorização da figura materna.' },
+                        { label: '🎗️ Outubro Rosa', title: 'Outubro Rosa', what: 'Campanha institucional de conscientização e prevenção à saúde da mulher, com palestras e dinâmicas.', why: 'Promoção da saúde preventiva e autocuidado das idosas, cuidadoras e colaboradoras.' },
+                        { label: '💙 Novembro Azul', title: 'Novembro Azul', what: 'Ação temática de conscientização sobre a saúde do homem e importância dos exames preventivos.', why: 'Orientação preventiva e cuidado integral à saúde dos idosos e equipe masculina.' },
+                        { label: '👵 Dia do Idoso', title: 'Dia Nacional do Idoso', what: 'Semana comemorativa do Dia do Idoso com apresentações culturais, bailinho adaptado e homenagens.', why: 'Comemoração e fortalecimento dos direitos, dignidade e protagonismo da pessoa idosa.' },
+                        { label: '💛 Setembro Amarelo', title: 'Setembro Amarelo', what: 'Roda de conversa, escuta ativa e dinâmicas de acolhimento sobre valorização da vida e bem-estar emocional.', why: 'Promoção da saúde mental, convivência acolhedora e prevenção ao isolamento.' },
+                        { label: '👨‍👧 Dia dos Pais', title: 'Dia dos Pais', what: 'Comemoração especial de Dia dos Pais com atividades culturais, lembrancinhas e café da tarde comemorativo.', why: 'Valorização dos idosos e fortalecimento dos laços familiares e comunitários.' },
+                        { label: '🎊 Festa Junina', title: 'Festa Junina Comunitária', what: 'Arraiá da OAMI com comidas típicas saudáveis, quadrilha adaptada, pescaria e músicas tradicionais.', why: 'Integração cultural comunitária, resgate de memórias afetivas e socialização ativa.' },
+                        { label: '🎄 Natal Solidário', title: 'Natal Solidário e Fim de Ano', what: 'Confraternização natalina com entrega de presentes, almoço festivo e apresentação musical natalina.', why: 'Celebração do espírito natalino, união de residentes, familiares, voluntários e equipe.' },
+                        { label: '🍫 Páscoa Solidária', title: 'Páscoa da Fraternidade', what: 'Atividades alusivas à Páscoa com partilha de afeto, reflexões, músicas e distribuição de lembranças.', why: 'Renovação da esperança e estímulo à convivência harmoniosa e espiritualidade.' },
+                        { label: '🎭 Carnaval da Terceira Idade', title: 'Carnaval da Terceira Idade', what: 'Baile de carnaval adaptado com marchinhas antigas, confete, serpentina e desfile de fantasias.', why: 'Estímulo à alegria, memória musical, coordenação motora e bem-estar psicossocial.' }
+                      ].map((theme) => (
+                        <button
+                          key={theme.title}
+                          type="button"
+                          onClick={() => {
+                            setWorkshopFormData({
+                              ...workshopFormData,
+                              title: `Ação do Mês: ${theme.title}`,
+                              what: workshopFormData.what || theme.what,
+                              why: workshopFormData.why || theme.why,
+                              where: workshopFormData.where || 'Sede OAMI',
+                              who: workshopFormData.who || user?.name || 'Equipe Multidisciplinar OAMI'
+                            });
+                          }}
+                          className="px-2.5 py-1 bg-white dark:bg-gray-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-800 dark:text-rose-200 border border-rose-200/60 dark:border-rose-800/40 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] cursor-pointer"
+                        >
+                          {theme.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-3xl space-y-4">
                   <label className="text-xs font-bold text-gray-400 uppercase">Participantes (Idosos, Idosos da Comunidade e Cuidadores)</label>
@@ -8972,90 +9917,254 @@ const WorkshopsSection = ({
                 </div>
 
                 {/* Seleção de Profissionais Co-Participantes (Equipe Multidisciplinar) */}
-                <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/30 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-emerald-850 dark:text-emerald-400 uppercase flex items-center gap-1.5">
-                      <Users size={14} /> Equipe Co-participante (Multidisciplinar)
-                    </label>
-                    <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full">
-                      {workshopFormData.coWorkers?.length || 0} selecionado(s)
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Selecione outros profissionais do OAMI (Assistente Social, Psicóloga, Pedagoga, Enfermeira, etc.) que realizaram esta ação em conjunto.
-                  </p>
-
-                  {/* Search box */}
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      placeholder="Buscar por nome do profissional ou cargo..."
-                      className="w-full text-sm p-3 pr-10 bg-white dark:bg-gray-850 border border-emerald-100 dark:border-emerald-950 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-gray-800 dark:text-white"
-                      value={profSearch}
-                      onChange={e => setProfSearch(e.target.value)}
-                    />
-                    {profSearch && (
-                      <button 
-                        type="button"
-                        onClick={() => setProfSearch('')}
-                        className="absolute right-3 top-3 text-xs text-gray-400 hover:text-emerald-600 font-semibold"
-                      >
-                        Limpar
-                      </button>
-                    )}
+                <div className="bg-emerald-50/60 dark:bg-emerald-950/20 p-6 rounded-3xl border border-emerald-100 dark:border-emerald-900/30 space-y-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="text-xs font-black text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-1.5 tracking-wider">
+                        <Users size={15} className="text-emerald-600 dark:text-emerald-400" /> Equipe Co-participante (Multidisciplinar)
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        Selecione outros profissionais do OAMI (Assistente Social, Psicóloga, Pedagoga, Enfermeira, etc.) que realizaram esta ação em conjunto.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                      {(workshopFormData.coWorkers || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setWorkshopFormData({ ...workshopFormData, coWorkers: [] })}
+                          className="text-[11px] font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline cursor-pointer"
+                        >
+                          Desmarcar todos
+                        </button>
+                      )}
+                      <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-bold px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        {workshopFormData.coWorkers?.length || 0} selecionado(s)
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Filtered list */}
-                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-2">
+                  {/* Search and Category Filter Toolbar */}
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        placeholder="Buscar por nome do profissional ou cargo (ex: Assistente Social, Psicóloga, Pedagoga)..."
+                        className="w-full text-xs p-3 pr-16 bg-white dark:bg-gray-800 border border-emerald-100 dark:border-emerald-900/40 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-gray-800 dark:text-white shadow-sm"
+                        value={profSearch}
+                        onChange={e => setProfSearch(e.target.value)}
+                      />
+                      {profSearch && (
+                        <button 
+                          type="button"
+                          onClick={() => setProfSearch('')}
+                          className="absolute right-3 top-2.5 text-xs text-gray-400 hover:text-emerald-600 font-bold px-1.5 py-0.5 rounded cursor-pointer"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Category Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      {[
+                        { id: 'ALL', label: 'Todos os Setores' },
+                        { id: 'SOCIO_PEDAGOGICO', label: 'Sócio-Pedagógico' },
+                        { id: 'SAUDE', label: 'Saúde' },
+                        { id: 'GESTAO_GERAL', label: 'Gestão & Equipe' }
+                      ].map(cat => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setProfCategoryFilter(cat.id as any)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer",
+                            profCategoryFilter === cat.id
+                              ? "bg-emerald-600 text-white shadow-sm"
+                              : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-emerald-100 dark:border-emerald-900/40 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                          )}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Filtered list of institutional professionals */}
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1.5 scrollbar-thin">
                     {(() => {
                       const queryClean = profSearch.toLowerCase().trim();
-                      const filteredProfs = professionals.filter(p => {
-                        // Exclude myself (who registered it) to keep interface intuitive
-                        if (p.id === user?.id || p.email === user?.email) return false;
+                      const filteredProfs = allAvailableProfessionals.filter(p => {
+                        // Exclude myself only if exact user ID matches and search is not actively used
+                        const isMyself = user?.id && (p.id === user.id || p.uid === user.id);
+                        if (isMyself && !queryClean) return false;
+
+                        // Category filter
+                        const roleUpper = String(p.role || '').toUpperCase();
+                        const isSaude = ['ENFERMEIRA', 'FISIOTERAPEUTA', 'NUTRICIONISTA'].includes(roleUpper);
+                        const isSocio = ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA'].includes(roleUpper);
+                        const isGestao = !isSaude && !isSocio;
+
+                        if (profCategoryFilter === 'SAUDE' && !isSaude) return false;
+                        if (profCategoryFilter === 'SOCIO_PEDAGOGICO' && !isSocio) return false;
+                        if (profCategoryFilter === 'GESTAO_GERAL' && !isGestao) return false;
+
                         if (!queryClean) return true;
                         
-                        const nameMatch = p.name.toLowerCase().includes(queryClean);
-                        const roleMatch = (ROLE_LABELS[p.role] || p.role).toLowerCase().includes(queryClean);
-                        return nameMatch || roleMatch;
+                        const nameMatch = (p.name || '').toLowerCase().includes(queryClean);
+                        const roleLabel = (ROLE_LABELS[p.role] || p.role || '').toLowerCase();
+                        const regMatch = (p.registrationNumber || '').toLowerCase().includes(queryClean);
+                        return nameMatch || roleLabel.includes(queryClean) || regMatch;
                       });
 
                       if (filteredProfs.length === 0) {
                         return (
-                          <p className="text-xs text-gray-400 dark:text-gray-500 py-4 text-center">
-                            Nenhum outro profissional participante cadastrado.
-                          </p>
+                          <div className="text-center py-6 px-4 bg-white dark:bg-gray-850 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+                            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                              Nenhum profissional encontrado com os filtros selecionados.
+                            </p>
+                            {profSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setProfSearch('')}
+                                className="text-xs text-emerald-600 font-bold hover:underline mt-2 inline-block"
+                              >
+                                Limpar busca para ver toda a equipe
+                              </button>
+                            )}
+                          </div>
                         );
                       }
 
-                      return filteredProfs.map(p => {
-                        const isChecked = (workshopFormData.coWorkers || []).some(cwId => cwId === p.id || cwId === p.uid || (p.email && cwId.toLowerCase() === p.email.toLowerCase()) || (p.name && cwId.toLowerCase() === p.name.toLowerCase()));
-                        return (
-                          <label key={p.id || p.uid || p.email} className="flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 rounded-xl cursor-pointer transition-colors group border border-gray-50 dark:border-gray-750">
-                            <input 
-                              type="checkbox"
-                              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                              checked={isChecked}
-                              onChange={() => {
-                                const idToUse = p.id || p.uid || p.email;
-                                const originalCoWorkers = workshopFormData.coWorkers || [];
-                                const newCoWorkers = isChecked
-                                  ? originalCoWorkers.filter(id => id !== p.id && id !== p.uid && id !== p.email && id !== p.name)
-                                  : [...originalCoWorkers, idToUse];
-                                setWorkshopFormData({...workshopFormData, coWorkers: newCoWorkers});
-                              }}
-                            />
-                            <div className="flex-1 flex flex-col">
-                              <span className="text-xs font-bold text-gray-700 dark:text-gray-200 group-hover:text-emerald-600 transition-colors">
-                                {p.name}
-                              </span>
-                              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                                {ROLE_LABELS[p.role] || p.role}
-                              </span>
-                            </div>
-                          </label>
-                        );
-                      });
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {filteredProfs.map(p => {
+                            const isChecked = (workshopFormData.coWorkers || []).some(cwId => 
+                              cwId === p.id || 
+                              cwId === p.uid || 
+                              (p.email && cwId.toLowerCase() === p.email.toLowerCase()) || 
+                              (p.name && cwId.toLowerCase() === p.name.toLowerCase())
+                            );
+
+                            const roleLabel = ROLE_LABELS[p.role] || p.role || 'Profissional';
+                            const roleUpper = String(p.role || '').toUpperCase();
+                            const isSaude = ['ENFERMEIRA', 'FISIOTERAPEUTA', 'NUTRICIONISTA'].includes(roleUpper);
+                            const isSocio = ['ASSISTENTE_SOCIAL', 'PSICOLOGA', 'PEDAGOGA'].includes(roleUpper);
+
+                            const roleBadgeColor = isSaude
+                              ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                              : isSocio
+                              ? 'bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                              : 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
+
+                            return (
+                              <label 
+                                key={p.id || p.uid || p.name} 
+                                className={cn(
+                                  "flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all border group",
+                                  isChecked
+                                    ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-600 shadow-sm ring-1 ring-emerald-500/30"
+                                    : "bg-white dark:bg-gray-850 hover:bg-emerald-50/40 dark:hover:bg-gray-800 border-gray-100 dark:border-gray-750"
+                                )}
+                              >
+                                <input 
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    const idToUse = p.id || p.name;
+                                    const originalCoWorkers = workshopFormData.coWorkers || [];
+                                    const newCoWorkers = isChecked
+                                      ? originalCoWorkers.filter(id => id !== p.id && id !== p.uid && (!p.email || id.toLowerCase() !== p.email.toLowerCase()) && (!p.name || id.toLowerCase() !== p.name.toLowerCase()))
+                                      : [...originalCoWorkers, idToUse];
+                                    setWorkshopFormData({...workshopFormData, coWorkers: newCoWorkers});
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0 flex flex-col">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-xs font-bold text-gray-800 dark:text-gray-100 truncate group-hover:text-emerald-600 transition-colors">
+                                      {p.name}
+                                    </span>
+                                    {p.registrationNumber && (
+                                      <span className="text-[9px] font-mono font-semibold text-gray-400 dark:text-gray-500 shrink-0">
+                                        {p.registrationNumber}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className={cn(
+                                    "text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border self-start mt-0.5",
+                                    roleBadgeColor
+                                  )}>
+                                    {roleLabel}
+                                  </span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      );
                     })()}
+                  </div>
+
+                  {/* Option to add custom / external collaborator */}
+                  <div className="pt-2 border-t border-emerald-100/60 dark:border-emerald-900/30">
+                    {!showCustomCoworkerField ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomCoworkerField(true)}
+                        className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus size={14} /> Adicionar outro colaborador ou convidado externo
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Nome e cargo do convidado ou voluntário externo..."
+                          value={customCoworkerInput}
+                          onChange={(e) => setCustomCoworkerInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (customCoworkerInput.trim()) {
+                                const newName = customCoworkerInput.trim();
+                                const current = workshopFormData.coWorkers || [];
+                                if (!current.includes(newName)) {
+                                  setWorkshopFormData({ ...workshopFormData, coWorkers: [...current, newName] });
+                                }
+                                setCustomCoworkerInput('');
+                              }
+                            }
+                          }}
+                          className="flex-1 text-xs p-2.5 bg-white dark:bg-gray-800 border border-emerald-200 dark:border-emerald-800 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-gray-800 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (customCoworkerInput.trim()) {
+                              const newName = customCoworkerInput.trim();
+                              const current = workshopFormData.coWorkers || [];
+                              if (!current.includes(newName)) {
+                                setWorkshopFormData({ ...workshopFormData, coWorkers: [...current, newName] });
+                              }
+                              setCustomCoworkerInput('');
+                            }
+                          }}
+                          className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Adicionar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCustomCoworkerField(false);
+                            setCustomCoworkerInput('');
+                          }}
+                          className="p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs font-bold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -9345,10 +10454,15 @@ const WorkshopsSection = ({
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <div className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-black uppercase mb-2 inline-block", 
-                    selectedWorkshop.type === 'CAPACITACAO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase mb-2 inline-flex items-center gap-1.5", 
+                    selectedWorkshop.type === 'ACAO_MES'
+                      ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                      : selectedWorkshop.type === 'CAPACITACAO'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
                   )}>
-                    {selectedWorkshop.type}
+                    {selectedWorkshop.type === 'ACAO_MES' && <HeartHandshake size={12} className="text-rose-600 dark:text-rose-400" />}
+                    {selectedWorkshop.type === 'ACAO_MES' ? 'Ação do Mês / Temática' : selectedWorkshop.type === 'CAPACITACAO' ? 'Capacitação Profissional' : 'Oficina'}
                   </div>
                   <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{selectedWorkshop.title}</h3>
                   <p className="text-sm text-gray-400 font-medium">{formatLocalDate(selectedWorkshop.date, "dd 'de' MMMM 'de' yyyy")}</p>
@@ -9403,7 +10517,7 @@ const WorkshopsSection = ({
                     <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase mb-2">Colaboradores da Ação ({selectedWorkshop.coWorkers.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {selectedWorkshop.coWorkers.map((id, idx) => {
-                        const resolved = resolveCollaborator(id, professionals, users);
+                        const resolved = resolveCollaborator(id, allAvailableProfessionals, users);
                         return (
                           <div key={id || idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-xl shadow-sm text-xs border border-emerald-100/30">
                             <span className="font-bold text-gray-700 dark:text-gray-200">{resolved.name}</span>
@@ -10796,7 +11910,7 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
                       <input
                         type="text"
                         required
-                        placeholder="Ex: Dra. Ana Paula"
+                        placeholder="Ex: Jardeline Amorim"
                         value={newUserForm.name}
                         onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
                         className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
@@ -10822,7 +11936,7 @@ const SettingsSection = ({ users, showToast, institutionalInfo }: { users: User[
                       <label className="block text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">E-mail Profissional (Opcional)</label>
                       <input
                         type="email"
-                        placeholder="Ex: ana.paula@oami.org.br"
+                        placeholder="Ex: social@oami.org.br"
                         value={newUserForm.email || ''}
                         onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
                         className="w-full text-xs p-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500 outline-none"
@@ -11566,6 +12680,16 @@ export default function App() {
   const combinedProfessionals = useMemo(() => {
     const map = new Map<string, Professional>();
 
+    // 0. Roster Institucional Oficial OAMI e Profissionais de Referência
+    [...OFFICIAL_INSTITUTIONAL_ROSTER, ...MOCK_PROFESSIONALS].forEach(p => {
+      if (!p || !p.name) return;
+      const key = (p.id || p.uid || p.email || p.name).trim().toLowerCase();
+      map.set(key, p);
+      if (p.name) map.set(p.name.trim().toLowerCase(), p);
+      if (p.id) map.set(p.id.trim().toLowerCase(), p);
+      if (p.email) map.set(p.email.trim().toLowerCase(), p);
+    });
+
     // 1. From professionals collection
     (professionals || []).forEach(p => {
       if (!p) return;
@@ -11665,12 +12789,39 @@ export default function App() {
 
     // Return deduplicated list
     const uniqueList: Professional[] = [];
-    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+
+    const blacklisted = [
+      'ana paula',
+      'camila santos',
+      'juliana rocha',
+      'roberto oliveira',
+      'beatriz costa',
+      'marina silva',
+      'jordana rodrigues'
+    ];
 
     map.forEach((prof) => {
-      const uniqueKey = (prof.id || prof.uid || prof.email || prof.name || '').trim().toLowerCase();
-      if (uniqueKey && !seenIds.has(uniqueKey)) {
-        seenIds.add(uniqueKey);
+      const cleanName = (prof.name || '').trim();
+      let normName = cleanName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+      
+      // Blacklist filter
+      if (blacklisted.some(b => normName.includes(b))) return;
+
+      // Deduplicate Lucas Emanuel Barbosa
+      if (normName.includes('lucas emanuel') || normName.includes('lucas emanoel')) {
+        normName = 'lucas emanuel barbosa';
+        prof.name = 'Lucas Emanuel Barbosa';
+      }
+
+      // Deduplicate Jordana Viero
+      if (normName.includes('jordana')) {
+        normName = 'jordana viero';
+        prof.name = 'Jordana Viero';
+      }
+
+      if (normName && !seenNames.has(normName)) {
+        seenNames.add(normName);
         uniqueList.push(prof);
       }
     });

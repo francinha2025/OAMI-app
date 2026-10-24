@@ -43,6 +43,7 @@ import {
   Elderly,
   NursingEvolution, PhysioEvolution, PsychEvolution, PedagogyEvolution, SocialEvolution, Workshop, AppNotification, Professional
 } from '../types';
+import { EvolutionProfessionalCounter, matchesEvolutionToProfessional } from './EvolutionProfessionalCounter';
 import { cn, safeReplace, getProfessionalName } from '../lib/utils';
 import { ProductivitySection } from './ProductivitySection';
 import { MultiPatientSelector } from './MultiPatientSelector';
@@ -118,6 +119,19 @@ export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'patients' | 'evolutions' | 'assessments' | 'mealPlans' | 'productivity' | 'reports'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [patientFilter, setPatientFilter] = useState('');
+  const [evolutionProfFilter, setEvolutionProfFilter] = useState<string | null>(null);
+
+  const allMultidisciplinaryEvolutions = useMemo(() => {
+    return [
+      ...(evolutions || []).map((e: any) => ({ ...e, sectorName: 'Nutrição' })),
+      ...(nursingEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Enfermagem' })),
+      ...(physioEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Fisioterapia' })),
+      ...(psychEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Psicologia' })),
+      ...(pedagogyEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Pedagogia' })),
+      ...(socialEvolutions || []).map((e: any) => ({ ...e, sectorName: 'Serviço Social' }))
+    ];
+  }, [evolutions, nursingEvolutions, physioEvolutions, psychEvolutions, pedagogyEvolutions, socialEvolutions]);
+
   const [reportsPatientFilter, setReportsPatientFilter] = useState('');
   
   // Integrated report states
@@ -233,10 +247,14 @@ export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
         const patient = patients.find(p => p.elderlyId === e.patientId || p.id === e.patientId);
         const nameMatch = patient?.name.toLowerCase().includes(searchTerm.toLowerCase());
         const patientMatch = !patientFilter || e.patientId === patientFilter || e.patientIds?.includes(patientFilter);
-        return nameMatch && patientMatch;
+        const profMatch = !evolutionProfFilter || (() => {
+          const { isDirect, isCoWorker } = matchesEvolutionToProfessional(e, { name: evolutionProfFilter });
+          return isDirect || isCoWorker;
+        })();
+        return nameMatch && patientMatch && profMatch;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [evolutions, patients, searchTerm, patientFilter]);
+  }, [evolutions, patients, searchTerm, patientFilter, evolutionProfFilter]);
 
   const filteredAnthropometries = useMemo(() => {
     return anthropometries
@@ -956,6 +974,16 @@ export const NutritionSection: React.FC<NutritionSectionProps> = (props) => {
             <Plus size={20} /> Nova Evolução
           </button>
         </div>
+
+        {/* Opção de Contagem dos Lançamentos de Todas as Profissionais */}
+        <EvolutionProfessionalCounter
+          evolutions={evolutions || []}
+          allEvolutions={allMultidisciplinaryEvolutions}
+          professionals={professionals}
+          selectedProfessional={evolutionProfFilter}
+          onSelectProfessional={setEvolutionProfFilter}
+          sectorName="Nutrição"
+        />
 
         {/* Barra de Seleção em Lote */}
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
